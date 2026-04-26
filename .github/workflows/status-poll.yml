@@ -1,0 +1,53 @@
+name: Poll Slate status
+
+on:
+  push:
+    branches: [main]
+    paths: ['.github/workflows/status-poll.yml']
+  schedule:
+    - cron: '*/5 * * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: status-poll
+  cancel-in-progress: false
+
+jobs:
+  poll:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out status branch
+        uses: actions/checkout@v4
+        with:
+          ref: status
+          fetch-depth: 1
+
+      - name: Curl /api/_diag
+        env:
+          BASE_URL: https://slate.strawhutmedia.com
+        run: |
+          mkdir -p polls
+          ts=$(date -u +%Y-%m-%dT%H-%M-%SZ)
+          if curl -fsS -m 30 "$BASE_URL/api/_diag" -o "poll-latest.json"; then
+            echo "ok"
+          else
+            code=$?
+            jq -n --arg ts "$ts" --arg code "$code" '{poll_failed: true, http_or_curl_error_code: $code, polled_at: $ts}' > poll-latest.json
+          fi
+          cp poll-latest.json "polls/${ts}.json"
+          ls -la polls | tail -5
+
+      - name: Commit if changed
+        run: |
+          git config user.name "slate-status-bot"
+          git config user.email "slate-status-bot@noreply.local"
+          git add poll-latest.json polls
+          if git diff --cached --quiet; then
+            echo "no changes"
+          else
+            git commit -m "poll: $(date -u +%FT%TZ)"
+            git push origin status
+          fi
