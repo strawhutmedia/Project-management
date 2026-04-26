@@ -7,6 +7,7 @@ import {
   setSessionCookie,
 } from '../auth'
 import { sendMagicLink } from '../email'
+import { logError, logInfo } from '../diag'
 
 export const authRouter = Router()
 
@@ -41,8 +42,13 @@ authRouter.post('/request', async (req, res) => {
   const link = `${appBaseUrl()}/auth/verify?token=${token}`
   try {
     await sendMagicLink(email, link)
+    logInfo('magic link sent', { email })
   } catch (err) {
-    console.error('[slate] failed to send magic link:', err)
+    logError('magic link send failed', {
+      email,
+      error: err instanceof Error ? err.message : String(err),
+      from: process.env.MAIL_FROM || 'Slate <slate@strawhutmedia.com>',
+    })
     res.status(500).json({ error: 'email_failed' })
     return
   }

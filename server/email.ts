@@ -36,7 +36,7 @@ export async function sendMagicLink(email: string, link: string) {
     console.log(`[slate] (no RESEND_API_KEY) magic link for ${email}: ${link}`)
     return
   }
-  await resend.emails.send({
+  const result = await resend.emails.send({
     from: FROM,
     to: email,
     subject: 'Sign in to Slate',
@@ -52,4 +52,8 @@ export async function sendMagicLink(email: string, link: string) {
       </div>
     `,
   })
+  // Resend returns { data, error } — surface the error so it lands in our error log
+  if (result.error) {
+    throw new Error(`resend: ${result.error.name || 'send_failed'}: ${result.error.message || JSON.stringify(result.error)}`)
+  }
 }
