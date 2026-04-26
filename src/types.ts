@@ -30,15 +30,93 @@ export const STAGE_LABEL: Record<Stage, string> = {
   done: 'Done',
 }
 
-export const STAGE_COLOR: Record<Stage, { bg: string; text: string; border: string; dot: string }> = {
-  writing: { bg: 'bg-stage-writing/10', text: 'text-stage-writing', border: 'border-stage-writing', dot: 'bg-stage-writing' },
-  tracking: { bg: 'bg-stage-tracking/10', text: 'text-stage-tracking', border: 'border-stage-tracking', dot: 'bg-stage-tracking' },
-  overdubs: { bg: 'bg-stage-overdubs/10', text: 'text-stage-overdubs', border: 'border-stage-overdubs', dot: 'bg-stage-overdubs' },
-  producing: { bg: 'bg-stage-producing/10', text: 'text-stage-producing', border: 'border-stage-producing', dot: 'bg-stage-producing' },
-  stems: { bg: 'bg-stage-stems/10', text: 'text-stage-stems', border: 'border-stage-stems', dot: 'bg-stage-stems' },
-  mixing: { bg: 'bg-stage-mixing/10', text: 'text-stage-mixing', border: 'border-stage-mixing', dot: 'bg-stage-mixing' },
-  mastering: { bg: 'bg-stage-mastering/10', text: 'text-stage-mastering', border: 'border-stage-mastering', dot: 'bg-stage-mastering' },
-  done: { bg: 'bg-stage-done/10', text: 'text-stage-done', border: 'border-stage-done', dot: 'bg-stage-done' },
+export const STAGE_ICON: Record<Stage, string> = {
+  writing: '✍️',
+  tracking: '🎤',
+  overdubs: '🎸',
+  producing: '🎚️',
+  stems: '📦',
+  mixing: '🎛️',
+  mastering: '✨',
+  done: '✅',
+}
+
+export const STAGE_COLOR: Record<
+  Stage,
+  { bg: string; bgStrong: string; text: string; border: string; dot: string; glow: string; hex: string }
+> = {
+  writing: {
+    bg: 'bg-stage-writing/10',
+    bgStrong: 'bg-stage-writing/20',
+    text: 'text-stage-writing',
+    border: 'border-stage-writing',
+    dot: 'bg-stage-writing',
+    glow: 'shadow-[0_0_24px_-4px_rgba(148,163,184,0.5)]',
+    hex: '#94a3b8',
+  },
+  tracking: {
+    bg: 'bg-stage-tracking/10',
+    bgStrong: 'bg-stage-tracking/20',
+    text: 'text-stage-tracking',
+    border: 'border-stage-tracking',
+    dot: 'bg-stage-tracking',
+    glow: 'shadow-[0_0_30px_-4px_rgba(251,191,36,0.55)]',
+    hex: '#fbbf24',
+  },
+  overdubs: {
+    bg: 'bg-stage-overdubs/10',
+    bgStrong: 'bg-stage-overdubs/20',
+    text: 'text-stage-overdubs',
+    border: 'border-stage-overdubs',
+    dot: 'bg-stage-overdubs',
+    glow: 'shadow-[0_0_30px_-4px_rgba(251,146,60,0.55)]',
+    hex: '#fb923c',
+  },
+  producing: {
+    bg: 'bg-stage-producing/10',
+    bgStrong: 'bg-stage-producing/20',
+    text: 'text-stage-producing',
+    border: 'border-stage-producing',
+    dot: 'bg-stage-producing',
+    glow: 'shadow-[0_0_30px_-4px_rgba(167,139,250,0.6)]',
+    hex: '#a78bfa',
+  },
+  stems: {
+    bg: 'bg-stage-stems/10',
+    bgStrong: 'bg-stage-stems/20',
+    text: 'text-stage-stems',
+    border: 'border-stage-stems',
+    dot: 'bg-stage-stems',
+    glow: 'shadow-[0_0_30px_-4px_rgba(96,165,250,0.6)]',
+    hex: '#60a5fa',
+  },
+  mixing: {
+    bg: 'bg-stage-mixing/10',
+    bgStrong: 'bg-stage-mixing/20',
+    text: 'text-stage-mixing',
+    border: 'border-stage-mixing',
+    dot: 'bg-stage-mixing',
+    glow: 'shadow-[0_0_30px_-4px_rgba(45,212,191,0.6)]',
+    hex: '#2dd4bf',
+  },
+  mastering: {
+    bg: 'bg-stage-mastering/10',
+    bgStrong: 'bg-stage-mastering/20',
+    text: 'text-stage-mastering',
+    border: 'border-stage-mastering',
+    dot: 'bg-stage-mastering',
+    glow: 'shadow-[0_0_30px_-4px_rgba(244,114,182,0.6)]',
+    hex: '#f472b6',
+  },
+  done: {
+    bg: 'bg-stage-done/10',
+    bgStrong: 'bg-stage-done/20',
+    text: 'text-stage-done',
+    border: 'border-stage-done',
+    dot: 'bg-stage-done',
+    glow: 'shadow-[0_0_30px_-4px_rgba(52,211,153,0.6)]',
+    hex: '#34d399',
+  },
 }
 
 export type User = {

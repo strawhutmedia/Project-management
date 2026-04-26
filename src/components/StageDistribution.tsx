@@ -1,4 +1,4 @@
-import { STAGES, STAGE_COLOR, STAGE_LABEL, type Song, type Stage } from '../types'
+import { STAGES, STAGE_COLOR, STAGE_ICON, STAGE_LABEL, type Song, type Stage } from '../types'
 
 export default function StageDistribution({ songs }: { songs: Song[] }) {
   const total = songs.length || 1
@@ -6,16 +6,22 @@ export default function StageDistribution({ songs }: { songs: Song[] }) {
     acc[s] = songs.filter((song) => song.stage === s).length
     return acc
   }, {} as Record<Stage, number>)
+  const donePct = Math.round((counts.done / total) * 100)
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-2">
-        <span className="text-[11px] uppercase tracking-wider text-muted">Album progress</span>
+      <div className="flex items-center justify-between mb-3">
+        <span className="text-[11px] uppercase tracking-[0.2em] text-muted font-bold">
+          Album progress
+        </span>
         <span className="text-[11px] text-muted">
-          {counts.done}/{songs.length} done
+          <span className="text-text font-bold">
+            {counts.done}/{songs.length}
+          </span>{' '}
+          done · {donePct}%
         </span>
       </div>
-      <div className="h-2.5 w-full rounded-full overflow-hidden flex bg-panel border border-line">
+      <div className="relative h-3 w-full rounded-full overflow-hidden flex bg-panel border border-line shadow-inner">
         {STAGES.map((s) => {
           const w = (counts[s] / total) * 100
           if (w === 0) return null
@@ -24,19 +30,30 @@ export default function StageDistribution({ songs }: { songs: Song[] }) {
               key={s}
               title={`${STAGE_LABEL[s]}: ${counts[s]}`}
               style={{ width: `${w}%` }}
-              className={`${STAGE_COLOR[s].dot} h-full`}
+              className={`${STAGE_COLOR[s].dot} h-full relative`}
             />
           )
         })}
+        <div className="shimmer absolute inset-0 pointer-events-none" />
       </div>
-      <div className="flex flex-wrap gap-x-4 gap-y-1.5 mt-3">
-        {STAGES.map((s) => (
-          <div key={s} className="flex items-center gap-1.5 text-[11px] text-muted">
-            <span className={`w-2 h-2 rounded-full ${STAGE_COLOR[s].dot}`} />
-            <span className="uppercase tracking-wider">{STAGE_LABEL[s]}</span>
-            <span className="text-text/80 font-semibold">{counts[s]}</span>
-          </div>
-        ))}
+      <div className="flex flex-wrap gap-x-3 gap-y-2 mt-4">
+        {STAGES.map((s) => {
+          const c = STAGE_COLOR[s]
+          const n = counts[s]
+          const active = n > 0
+          return (
+            <div
+              key={s}
+              className={`flex items-center gap-1.5 text-[11px] rounded-full px-2.5 py-1 border ${
+                active ? `${c.border}/40 ${c.bgStrong} ${c.text}` : 'border-line text-muted/60'
+              }`}
+            >
+              <span className="text-[0.95em] leading-none">{STAGE_ICON[s]}</span>
+              <span className="uppercase tracking-wider font-semibold">{STAGE_LABEL[s]}</span>
+              <span className={`font-bold ${active ? '' : 'opacity-60'}`}>{n}</span>
+            </div>
+          )
+        })}
       </div>
     </div>
   )

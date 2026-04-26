@@ -1,6 +1,6 @@
 import { Link, useParams } from 'react-router-dom'
 import { PROJECTS } from '../data'
-import { STAGE_COLOR, STAGES, STAGE_LABEL } from '../types'
+import { STAGE_COLOR, STAGES, STAGE_LABEL, STAGE_ICON } from '../types'
 import StagePill from '../components/StagePill'
 import StageDistribution from '../components/StageDistribution'
 
@@ -20,62 +20,83 @@ export default function ProjectPage() {
   }
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-10">
       <div>
-        <Link to="/" className="text-[11px] uppercase tracking-wider text-muted hover:text-text">
+        <Link to="/" className="text-[11px] uppercase tracking-[0.2em] text-muted hover:text-text font-bold">
           ← Projects
         </Link>
-        <div className="mt-2 flex items-end justify-between flex-wrap gap-4">
+        <div className="mt-3 flex items-end justify-between flex-wrap gap-4">
           <div>
-            <div className="text-[10px] uppercase tracking-[0.25em] text-muted mb-1">
+            <div className="text-[10px] uppercase tracking-[0.3em] text-muted mb-2 font-bold">
               {project.kind}
             </div>
-            <h1 className="font-display text-5xl">{project.name}</h1>
-            {project.subtitle && <p className="text-muted mt-1 text-sm">{project.subtitle}</p>}
+            <h1 className="font-display text-6xl text-rainbow leading-none">{project.name}</h1>
+            {project.subtitle && <p className="text-muted mt-2 text-sm">{project.subtitle}</p>}
           </div>
         </div>
       </div>
 
-      <div className="rounded-2xl border border-line bg-panel/60 p-5">
-        <StageDistribution songs={project.songs} />
+      <div className="relative rounded-3xl border border-line/70 overflow-hidden">
+        <div className="absolute inset-0 bg-gradient-to-br from-stage-mastering/20 via-stage-producing/15 to-stage-mixing/20 opacity-80" />
+        <div className="absolute inset-0 bg-ink/50" />
+        <div className="relative p-6">
+          <StageDistribution songs={project.songs} />
+        </div>
       </div>
 
-      <div className="space-y-6">
+      <div className="space-y-8">
         {STAGES.map((stage) => {
           const songs = project.songs.filter((s) => s.stage === stage)
           if (songs.length === 0) return null
           const c = STAGE_COLOR[stage]
           return (
             <section key={stage}>
-              <div className="flex items-center gap-2 mb-3">
-                <span className={`w-2 h-2 rounded-full ${c.dot}`} />
-                <h2 className={`text-xs uppercase tracking-[0.25em] ${c.text} font-semibold`}>
+              <div className="flex items-center gap-2.5 mb-4">
+                <span className={`text-lg leading-none`}>{STAGE_ICON[stage]}</span>
+                <h2 className={`text-sm uppercase tracking-[0.25em] ${c.text} font-bold`}>
                   {STAGE_LABEL[stage]}
                 </h2>
-                <span className="text-[11px] text-muted">{songs.length}</span>
+                <span className={`text-[11px] ${c.text} ${c.bgStrong} border ${c.border}/40 rounded-full px-2 py-0.5 font-bold`}>
+                  {songs.length}
+                </span>
+                <div
+                  className="flex-1 h-px"
+                  style={{ background: `linear-gradient(to right, ${c.hex}66, transparent)` }}
+                />
               </div>
-              <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
+              <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
                 {songs.map((song) => (
                   <Link
                     key={song.id}
                     to={`/projects/${project.id}/songs/${song.id}`}
-                    className={`group block rounded-xl bg-panel/70 hover:bg-panel transition border-l-4 ${c.border} border-y border-r border-line p-4`}
+                    className={`group relative block rounded-2xl border ${c.border}/30 ${c.bg} p-5 transition hover:-translate-y-1 hover:${c.bgStrong} hover:${c.glow}`}
                   >
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="min-w-0">
-                        <div className="font-display text-xl truncate group-hover:text-text">
+                    <div
+                      className={`absolute left-0 top-3 bottom-3 w-1 rounded-r-full ${c.dot}`}
+                    />
+                    <div className="pl-3 flex items-start justify-between gap-3">
+                      <div className="min-w-0 flex-1">
+                        <div className="font-display text-2xl truncate group-hover:text-text leading-tight">
                           {song.title}
                         </div>
                         {song.subtitle && (
-                          <div className="text-xs text-muted">{song.subtitle}</div>
+                          <div className={`text-[11px] uppercase tracking-wider mt-0.5 ${c.text} font-semibold`}>
+                            {song.subtitle}
+                          </div>
                         )}
                       </div>
                       <StagePill stage={song.stage} size="xs" />
                     </div>
-                    <div className="mt-3 text-[11px] text-muted flex items-center gap-3">
-                      <span>{song.tasks.filter((t) => !t.done).length} open tasks</span>
-                      <span>·</span>
-                      <span>{song.comments.length} comments</span>
+                    <div className="pl-3 mt-4 text-[11px] text-muted flex items-center gap-3">
+                      <span className="inline-flex items-center gap-1">
+                        <span className="opacity-70">📝</span>
+                        {song.tasks.filter((t) => !t.done).length} open
+                      </span>
+                      <span className="opacity-40">·</span>
+                      <span className="inline-flex items-center gap-1">
+                        <span className="opacity-70">💬</span>
+                        {song.comments.length}
+                      </span>
                     </div>
                   </Link>
                 ))}

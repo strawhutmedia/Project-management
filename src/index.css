@@ -15,12 +15,49 @@ body,
 body {
   @apply bg-ink text-text font-body antialiased;
   background-image:
-    radial-gradient(1200px 600px at 10% -10%, rgba(167, 139, 250, 0.08), transparent 60%),
-    radial-gradient(1000px 500px at 110% 0%, rgba(45, 212, 191, 0.06), transparent 60%),
-    radial-gradient(800px 400px at 50% 110%, rgba(244, 114, 182, 0.05), transparent 60%);
+    radial-gradient(900px 500px at 8% -10%, rgba(167, 139, 250, 0.22), transparent 60%),
+    radial-gradient(900px 500px at 110% 0%, rgba(45, 212, 191, 0.18), transparent 60%),
+    radial-gradient(900px 500px at 50% 110%, rgba(244, 114, 182, 0.18), transparent 60%),
+    radial-gradient(700px 400px at 90% 80%, rgba(251, 191, 36, 0.12), transparent 60%);
   background-attachment: fixed;
 }
 
 .font-display {
-  letter-spacing: 0.02em;
+  letter-spacing: 0.01em;
+}
+
+.text-rainbow {
+  background: linear-gradient(90deg, #fbbf24 0%, #fb923c 18%, #f472b6 36%, #a78bfa 54%, #60a5fa 72%, #2dd4bf 88%, #34d399 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.bar-rainbow {
+  background: linear-gradient(90deg, #94a3b8 0%, #fbbf24 14%, #fb923c 28%, #a78bfa 42%, #60a5fa 56%, #2dd4bf 70%, #f472b6 84%, #34d399 100%);
+}
+
+@keyframes shimmer {
+  0% { background-position: -400% 0; }
+  100% { background-position: 400% 0; }
+}
+
+.shimmer {
+  background-image: linear-gradient(110deg, transparent 35%, rgba(255, 255, 255, 0.18) 50%, transparent 65%);
+  background-size: 200% 100%;
+  animation: shimmer 3.5s linear infinite;
+}
+
+@keyframes floaty {
+  0%, 100% { transform: translateY(0px); }
+  50% { transform: translateY(-3px); }
+}
+
+.floaty {
+  animation: floaty 4s ease-in-out infinite;
+}
+
+.rainbow-strip {
+  height: 3px;
+  background: linear-gradient(90deg, #fbbf24, #fb923c, #f472b6, #a78bfa, #60a5fa, #2dd4bf, #34d399);
 }

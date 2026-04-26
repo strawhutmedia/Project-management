@@ -1,6 +1,6 @@
 import { Link, useParams } from 'react-router-dom'
 import { PROJECTS } from '../data'
-import { STAGES, STAGE_COLOR, STAGE_LABEL } from '../types'
+import { STAGES, STAGE_COLOR, STAGE_LABEL, STAGE_ICON } from '../types'
 import StagePill from '../components/StagePill'
 
 export default function SongPage() {
@@ -23,64 +23,75 @@ export default function SongPage() {
   const stageIndex = STAGES.indexOf(song.stage)
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-10">
       <div>
         <Link
           to={`/projects/${project.id}`}
-          className="text-[11px] uppercase tracking-wider text-muted hover:text-text"
+          className="text-[11px] uppercase tracking-[0.2em] text-muted hover:text-text font-bold"
         >
           ← {project.name}
         </Link>
-        <div className="mt-2 flex items-end justify-between flex-wrap gap-4">
+        <div className="mt-3 flex items-end justify-between flex-wrap gap-4">
           <div>
-            <div className="text-[10px] uppercase tracking-[0.25em] text-muted mb-1">song</div>
-            <h1 className="font-display text-5xl">{song.title}</h1>
-            {song.subtitle && <p className="text-muted mt-1 text-sm">{song.subtitle}</p>}
+            <div className={`text-[10px] uppercase tracking-[0.3em] mb-2 font-bold ${c.text}`}>
+              {STAGE_ICON[song.stage]} {STAGE_LABEL[song.stage]}
+            </div>
+            <h1 className={`font-display text-6xl leading-none`}>
+              <span className="text-rainbow">{song.title}</span>
+            </h1>
+            {song.subtitle && <p className={`mt-2 text-sm ${c.text} uppercase tracking-wider font-semibold`}>{song.subtitle}</p>}
           </div>
-          <StagePill stage={song.stage} />
+          <StagePill stage={song.stage} size="lg" glow />
         </div>
       </div>
 
-      <div className={`rounded-2xl border ${c.border}/30 ${c.bg} p-5`}>
-        <div className="text-[11px] uppercase tracking-wider text-muted mb-3">Pipeline</div>
-        <div className="flex items-center gap-1 overflow-x-auto pb-1">
-          {STAGES.map((s, i) => {
-            const sc = STAGE_COLOR[s]
-            const passed = i <= stageIndex
-            return (
-              <div key={s} className="flex items-center gap-1 shrink-0">
-                <div
-                  className={`flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[10px] uppercase tracking-wider font-semibold ${
-                    passed ? `${sc.bg} ${sc.text} border ${sc.border}/40` : 'text-muted/60 border border-line'
-                  }`}
-                >
-                  <span className={`w-1.5 h-1.5 rounded-full ${passed ? sc.dot : 'bg-line'}`} />
-                  {STAGE_LABEL[s]}
-                </div>
-                {i < STAGES.length - 1 && (
+      <div className={`relative rounded-3xl border ${c.border}/30 overflow-hidden`}>
+        <div className={`absolute inset-0 ${c.bgStrong} opacity-60`} />
+        <div className="absolute inset-0 bg-ink/40" />
+        <div className="relative p-6">
+          <div className="text-[11px] uppercase tracking-[0.2em] text-muted mb-4 font-bold">Pipeline</div>
+          <div className="flex items-center gap-1.5 overflow-x-auto pb-1">
+            {STAGES.map((s, i) => {
+              const sc = STAGE_COLOR[s]
+              const passed = i <= stageIndex
+              const current = i === stageIndex
+              return (
+                <div key={s} className="flex items-center gap-1.5 shrink-0">
                   <div
-                    className={`w-3 h-px ${passed && i < stageIndex ? sc.dot : 'bg-line'}`}
-                  />
-                )}
-              </div>
-            )
-          })}
+                    className={`flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[10px] uppercase tracking-wider font-bold ${
+                      passed
+                        ? `${sc.bgStrong} ${sc.text} border ${sc.border}/50 ${current ? sc.glow : ''}`
+                        : 'text-muted/60 border border-line'
+                    }`}
+                  >
+                    <span className="text-[0.95em] leading-none">{STAGE_ICON[s]}</span>
+                    {STAGE_LABEL[s]}
+                  </div>
+                  {i < STAGES.length - 1 && (
+                    <div
+                      className={`w-3 h-px ${passed && i < stageIndex ? sc.dot : 'bg-line'}`}
+                    />
+                  )}
+                </div>
+              )
+            })}
+          </div>
         </div>
       </div>
 
       <div className="grid lg:grid-cols-3 gap-5">
-        <section className="lg:col-span-2 rounded-2xl border border-line bg-panel/60 p-5">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-[11px] uppercase tracking-wider text-muted">What's left</h2>
+        <section className="lg:col-span-2 rounded-2xl border border-line bg-panel/60 p-6">
+          <div className="flex items-center justify-between mb-5">
+            <h2 className="text-[11px] uppercase tracking-[0.2em] text-muted font-bold">📝 What's left</h2>
             <button
               disabled
-              className="text-xs text-muted opacity-60 cursor-not-allowed border border-line rounded-full px-2.5 py-1"
+              className="text-xs text-muted opacity-60 cursor-not-allowed border border-line rounded-full px-3 py-1"
             >
               + Add task
             </button>
           </div>
           {song.tasks.length === 0 ? (
-            <div className="text-sm text-muted py-6 text-center border border-dashed border-line rounded-xl">
+            <div className="text-sm text-muted py-8 text-center border border-dashed border-line rounded-xl">
               No tasks yet. Once you tell me what's left for this song, they'll show up here.
             </div>
           ) : (
@@ -99,9 +110,9 @@ export default function SongPage() {
         </section>
 
         <aside className="space-y-5">
-          <section className="rounded-2xl border border-line bg-panel/60 p-5">
-            <h2 className="text-[11px] uppercase tracking-wider text-muted mb-3">People</h2>
-            <div className="space-y-2 text-sm">
+          <section className="rounded-2xl border border-line bg-panel/60 p-6">
+            <h2 className="text-[11px] uppercase tracking-[0.2em] text-muted mb-4 font-bold">👥 People</h2>
+            <div className="space-y-2.5 text-sm">
               <div className="flex items-center justify-between">
                 <span className="text-muted">Producer</span>
                 <span>{song.producer ?? '—'}</span>
@@ -113,8 +124,8 @@ export default function SongPage() {
             </div>
           </section>
 
-          <section className="rounded-2xl border border-line bg-panel/60 p-5">
-            <h2 className="text-[11px] uppercase tracking-wider text-muted mb-3">Links</h2>
+          <section className="rounded-2xl border border-line bg-panel/60 p-6">
+            <h2 className="text-[11px] uppercase tracking-[0.2em] text-muted mb-4 font-bold">🔗 Links</h2>
             {song.links.length === 0 ? (
               <p className="text-sm text-muted">
                 Drop Dropbox or WeTransfer links here once we wire it up.
@@ -139,9 +150,9 @@ export default function SongPage() {
         </aside>
       </div>
 
-      <section className="rounded-2xl border border-line bg-panel/60 p-5">
-        <h2 className="text-[11px] uppercase tracking-wider text-muted mb-3">Comments</h2>
-        <div className="text-sm text-muted py-6 text-center border border-dashed border-line rounded-xl">
+      <section className="rounded-2xl border border-line bg-panel/60 p-6">
+        <h2 className="text-[11px] uppercase tracking-[0.2em] text-muted mb-4 font-bold">💬 Comments</h2>
+        <div className="text-sm text-muted py-8 text-center border border-dashed border-line rounded-xl">
           Comments + @mentions show up here once login is live.
         </div>
       </section>

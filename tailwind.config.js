@@ -1,6 +1,25 @@
 /** @type {import('tailwindcss').Config} */
+const STAGES = ['writing', 'tracking', 'overdubs', 'producing', 'stems', 'mixing', 'mastering', 'done']
+const OPACITIES = ['10', '20', '30', '40', '50', '60', '70']
+
+const safelist = []
+for (const s of STAGES) {
+  safelist.push(`bg-stage-${s}`, `text-stage-${s}`, `border-stage-${s}`)
+  for (const o of OPACITIES) {
+    safelist.push(
+      `bg-stage-${s}/${o}`,
+      `border-stage-${s}/${o}`,
+      `text-stage-${s}/${o}`,
+      `from-stage-${s}/${o}`,
+      `via-stage-${s}/${o}`,
+      `to-stage-${s}/${o}`,
+    )
+  }
+}
+
 export default {
   content: ['./index.html', './src/**/*.{ts,tsx}'],
+  safelist,
   theme: {
     extend: {
       fontFamily: {
