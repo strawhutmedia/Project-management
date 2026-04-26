@@ -5,6 +5,8 @@ import ProjectPage from './pages/ProjectPage'
 import SongPage from './pages/SongPage'
 import Login from './pages/Login'
 import Verify from './pages/Verify'
+import Profile from './pages/Profile'
+import Settings from './pages/Settings'
 import { AuthProvider, useAuth } from './auth'
 
 function Protected({ children }: { children: React.ReactNode }) {
@@ -32,6 +34,8 @@ export default function App() {
           }
         >
           <Route index element={<Dashboard />} />
+          <Route path="profile" element={<Profile />} />
+          <Route path="settings" element={<Settings />} />
           <Route path="projects/:projectId" element={<ProjectPage />} />
           <Route path="projects/:projectId/songs/:songId" element={<SongPage />} />
         </Route>

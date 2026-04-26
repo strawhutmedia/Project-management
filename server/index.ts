@@ -5,6 +5,8 @@ import { runMigrations } from './db'
 import { authRouter } from './routes/auth'
 import { meRouter } from './routes/me'
 import { projectsRouter } from './routes/projects'
+import { songsRouter } from './routes/songs'
+import { integrationsRouter } from './routes/integrations'
 import {
   diagRouter,
   logError,
@@ -30,6 +32,8 @@ app.use('/api/_diag', diagRouter)
 app.use('/api/auth', authRouter)
 app.use('/api/me', meRouter)
 app.use('/api/projects', projectsRouter)
+app.use('/api/songs', songsRouter)
+app.use('/api/integrations', integrationsRouter)
 
 const clientDir = path.resolve(process.cwd(), 'dist')
 logInfo('serving client from', { clientDir })

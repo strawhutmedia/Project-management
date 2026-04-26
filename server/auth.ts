@@ -13,6 +13,7 @@ export type SessionUser = {
   id: string
   email: string
   name: string
+  display_name: string | null
   role: 'admin' | 'user'
   timezone: string
 }
@@ -32,7 +33,7 @@ export async function getSessionUser(req: Request): Promise<SessionUser | null> 
   const sid = req.cookies?.[SESSION_COOKIE]
   if (!sid) return null
   const { rows } = await pool.query(
-    `SELECT u.id, u.email, u.name, u.role, u.timezone
+    `SELECT u.id, u.email, u.name, u.display_name, u.role, u.timezone
      FROM sessions s JOIN users u ON u.id = s.user_id
      WHERE s.id = $1 AND s.expires_at > now()`,
     [sid],
