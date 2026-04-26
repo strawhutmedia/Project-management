@@ -2,9 +2,9 @@ name: Deploy Slate to GitHub Pages
 
 on:
   push:
-    branches:
-      - main
-      - claude/music-project-tracker-1Hp5G
+    branches: [main]
+  pull_request:
+    branches: [main]
   workflow_dispatch:
 
 permissions:
@@ -29,12 +29,15 @@ jobs:
       - run: npm run build
       - name: Add SPA fallback
         run: cp dist/index.html dist/404.html
-      - uses: actions/configure-pages@v5
-      - uses: actions/upload-pages-artifact@v3
+      - if: github.ref == 'refs/heads/main'
+        uses: actions/configure-pages@v5
+      - if: github.ref == 'refs/heads/main'
+        uses: actions/upload-pages-artifact@v3
         with:
           path: dist
 
   deploy:
+    if: github.ref == 'refs/heads/main'
     needs: build
     runs-on: ubuntu-latest
     environment:
