@@ -19,7 +19,8 @@ export async function runMigrations() {
       run_at TIMESTAMPTZ NOT NULL DEFAULT now()
     )
   `)
-  const migrationsDir = path.resolve(__dirname, '../../server/migrations')
+  const migrationsDir = path.resolve(process.cwd(), 'server/migrations')
+  console.log(`[slate] migrations dir: ${migrationsDir}`)
   const files = fs.readdirSync(migrationsDir).filter((f) => f.endsWith('.sql')).sort()
   for (const file of files) {
     const { rows } = await pool.query('SELECT 1 FROM migrations WHERE name = $1', [file])
