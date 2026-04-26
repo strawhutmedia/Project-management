@@ -1,23 +1,37 @@
 import { Link, useParams } from 'react-router-dom'
-import { PROJECTS } from '../data'
-import { STAGE_COLOR, STAGES, STAGE_LABEL, STAGE_ICON } from '../types'
+import { useEffect, useState } from 'react'
+import { api, type ApiProject } from '../api'
+import { STAGE_COLOR, STAGES, STAGE_LABEL, STAGE_ICON, type Song } from '../types'
 import StagePill from '../components/StagePill'
 import StageDistribution from '../components/StageDistribution'
 
 export default function ProjectPage() {
   const { projectId } = useParams()
-  const project = PROJECTS.find((p) => p.id === projectId)
+  const [project, setProject] = useState<ApiProject | null>(null)
+  const [error, setError] = useState<string | null>(null)
 
-  if (!project) {
+  useEffect(() => {
+    if (!projectId) return
+    api
+      .project(projectId)
+      .then(({ project }) => setProject(project))
+      .catch((err) => setError(err instanceof Error ? err.message : 'failed to load'))
+  }, [projectId])
+
+  if (error) {
     return (
       <div className="text-muted">
-        Project not found.{' '}
+        {error}.{' '}
         <Link to="/" className="underline">
           Back to dashboard
         </Link>
       </div>
     )
   }
+
+  if (!project) return <p className="text-muted text-sm">Loading…</p>
+
+  const songs = project.songs as unknown as Song[]
 
   return (
     <div className="space-y-10">
@@ -40,14 +54,14 @@ export default function ProjectPage() {
         <div className="absolute inset-0 bg-gradient-to-br from-stage-mastering/20 via-stage-producing/15 to-stage-mixing/20 opacity-80" />
         <div className="absolute inset-0 bg-ink/50" />
         <div className="relative p-6">
-          <StageDistribution songs={project.songs} />
+          <StageDistribution songs={songs} />
         </div>
       </div>
 
       <div className="space-y-8">
         {STAGES.map((stage) => {
-          const songs = project.songs.filter((s) => s.stage === stage)
-          if (songs.length === 0) return null
+          const stageSongs = songs.filter((s) => s.stage === stage)
+          if (stageSongs.length === 0) return null
           const c = STAGE_COLOR[stage]
           return (
             <section key={stage}>
@@ -57,7 +71,7 @@ export default function ProjectPage() {
                   {STAGE_LABEL[stage]}
                 </h2>
                 <span className={`text-[11px] ${c.text} ${c.bgStrong} border ${c.border}/40 rounded-full px-2 py-0.5 font-bold`}>
-                  {songs.length}
+                  {stageSongs.length}
                 </span>
                 <div
                   className="flex-1 h-px"
@@ -65,7 +79,7 @@ export default function ProjectPage() {
                 />
               </div>
               <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                {songs.map((song) => (
+                {stageSongs.map((song) => (
                   <Link
                     key={song.id}
                     to={`/projects/${project.id}/songs/${song.id}`}

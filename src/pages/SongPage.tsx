@@ -1,19 +1,32 @@
 import { Link, useParams } from 'react-router-dom'
-import { PROJECTS } from '../data'
+import { useEffect, useState } from 'react'
+import { api, type ApiProject, type ApiSong } from '../api'
 import { STAGES, STAGE_COLOR, STAGE_LABEL, STAGE_ICON } from '../types'
 import StagePill from '../components/StagePill'
 
 export default function SongPage() {
   const { projectId, songId } = useParams()
-  const project = PROJECTS.find((p) => p.id === projectId)
-  const song = project?.songs.find((s) => s.id === songId)
+  const [project, setProject] = useState<ApiProject | null>(null)
+  const [error, setError] = useState<string | null>(null)
 
-  if (!project || !song) {
+  useEffect(() => {
+    if (!projectId) return
+    api
+      .project(projectId)
+      .then(({ project }) => setProject(project))
+      .catch((err) => setError(err instanceof Error ? err.message : 'failed to load'))
+  }, [projectId])
+
+  if (error) return <div className="text-muted">{error}</div>
+  if (!project) return <p className="text-muted text-sm">Loading…</p>
+
+  const song = project.songs.find((s) => s.id === songId) as ApiSong | undefined
+  if (!song) {
     return (
       <div className="text-muted">
         Song not found.{' '}
-        <Link to="/" className="underline">
-          Back to dashboard
+        <Link to={`/projects/${project.id}`} className="underline">
+          Back
         </Link>
       </div>
     )
@@ -39,7 +52,11 @@ export default function SongPage() {
             <h1 className={`font-display text-6xl leading-none`}>
               <span className="text-rainbow">{song.title}</span>
             </h1>
-            {song.subtitle && <p className={`mt-2 text-sm ${c.text} uppercase tracking-wider font-semibold`}>{song.subtitle}</p>}
+            {song.subtitle && (
+              <p className={`mt-2 text-sm ${c.text} uppercase tracking-wider font-semibold`}>
+                {song.subtitle}
+              </p>
+            )}
           </div>
           <StagePill stage={song.stage} size="lg" glow />
         </div>
@@ -87,12 +104,12 @@ export default function SongPage() {
               disabled
               className="text-xs text-muted opacity-60 cursor-not-allowed border border-line rounded-full px-3 py-1"
             >
-              + Add task
+              + Add task (next push)
             </button>
           </div>
           {song.tasks.length === 0 ? (
             <div className="text-sm text-muted py-8 text-center border border-dashed border-line rounded-xl">
-              No tasks yet. Once you tell me what's left for this song, they'll show up here.
+              No tasks yet.
             </div>
           ) : (
             <ul className="space-y-2">
@@ -111,51 +128,11 @@ export default function SongPage() {
 
         <aside className="space-y-5">
           <section className="rounded-2xl border border-line bg-panel/60 p-6">
-            <h2 className="text-[11px] uppercase tracking-[0.2em] text-muted mb-4 font-bold">👥 People</h2>
-            <div className="space-y-2.5 text-sm">
-              <div className="flex items-center justify-between">
-                <span className="text-muted">Producer</span>
-                <span>{song.producer ?? '—'}</span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-muted">Mixer</span>
-                <span>{song.mixer ?? '—'}</span>
-              </div>
-            </div>
-          </section>
-
-          <section className="rounded-2xl border border-line bg-panel/60 p-6">
             <h2 className="text-[11px] uppercase tracking-[0.2em] text-muted mb-4 font-bold">🔗 Links</h2>
-            {song.links.length === 0 ? (
-              <p className="text-sm text-muted">
-                Drop Dropbox or WeTransfer links here once we wire it up.
-              </p>
-            ) : (
-              <ul className="space-y-2 text-sm">
-                {song.links.map((l) => (
-                  <li key={l.id}>
-                    <a
-                      href={l.url}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="text-stage-stems hover:underline"
-                    >
-                      {l.label}
-                    </a>
-                  </li>
-                ))}
-              </ul>
-            )}
+            <p className="text-sm text-muted">Comments, links, and Dropbox files coming next push.</p>
           </section>
         </aside>
       </div>
-
-      <section className="rounded-2xl border border-line bg-panel/60 p-6">
-        <h2 className="text-[11px] uppercase tracking-[0.2em] text-muted mb-4 font-bold">💬 Comments</h2>
-        <div className="text-sm text-muted py-8 text-center border border-dashed border-line rounded-xl">
-          Comments + @mentions show up here once login is live.
-        </div>
-      </section>
     </div>
   )
 }
