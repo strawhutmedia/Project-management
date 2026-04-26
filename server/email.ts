@@ -4,6 +4,32 @@ const apiKey = process.env.RESEND_API_KEY
 const resend = apiKey ? new Resend(apiKey) : null
 
 const FROM = process.env.MAIL_FROM || 'Slate <slate@strawhutmedia.com>'
+const ADMIN_EMAIL = process.env.ADMIN_EMAIL || 'ryan@strawhutmedia.com'
+
+const recentAdminAlerts = new Map<string, number>()
+
+export async function sendAdminAlert(subject: string, body: string, key?: string) {
+  if (!resend) {
+    console.log(`[slate] (no RESEND_API_KEY) would alert admin: ${subject}`)
+    return
+  }
+  if (key) {
+    const last = recentAdminAlerts.get(key)
+    const now = Date.now()
+    if (last && now - last < 60 * 60 * 1000) return
+    recentAdminAlerts.set(key, now)
+  }
+  try {
+    await resend.emails.send({
+      from: FROM,
+      to: ADMIN_EMAIL,
+      subject: `[Slate] ${subject}`,
+      text: body,
+    })
+  } catch (err) {
+    console.error('[slate] sendAdminAlert failed', err)
+  }
+}
 
 export async function sendMagicLink(email: string, link: string) {
   if (!resend) {

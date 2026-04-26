@@ -12,6 +12,7 @@ import {
   markBootComplete,
   markBootError,
   markBootStart,
+  reportStatus,
 } from './diag'
 
 const app = express()
@@ -66,6 +67,7 @@ async function start() {
   app.listen(PORT, '0.0.0.0', () => {
     markBootComplete()
     logInfo(`listening on :${PORT}`)
+    void reportStatus()
   })
 }
 
@@ -75,5 +77,6 @@ start().catch((err) => {
   // keep the process alive long enough that /api/_diag can be reached
   app.listen(PORT, '0.0.0.0', () => {
     console.error(`[slate] degraded mode listening on :${PORT}`)
+    void reportStatus()
   })
 })

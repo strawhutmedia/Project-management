@@ -2,6 +2,8 @@ import { Router } from 'express'
 import fs from 'fs'
 import path from 'path'
 import { pool } from './db'
+import { appendStatusJsonl, statusReportingEnabled, writeStatusFile } from './github'
+import { sendAdminAlert } from './email'
 
 type LogEntry = { level: 'info' | 'error'; ts: string; msg: string; data?: unknown }
 
@@ -10,6 +12,7 @@ const ring: LogEntry[] = []
 let bootStartedAt: string | null = null
 let bootCompletedAt: string | null = null
 let bootError: string | null = null
+let lastReportedHealthy: boolean | null = null
 
 export function logInfo(msg: string, data?: unknown) {
   const entry: LogEntry = { level: 'info', ts: new Date().toISOString(), msg, data }
@@ -23,6 +26,13 @@ export function logError(msg: string, data?: unknown) {
   ring.push(entry)
   while (ring.length > RING_SIZE) ring.shift()
   console.error(`[slate] ERROR ${msg}`, data ?? '')
+  // Fire-and-forget: log to GitHub + email admin (rate limited per key).
+  void appendStatusJsonl('errors.jsonl', entry)
+  void sendAdminAlert(
+    `Error: ${msg.slice(0, 80)}`,
+    `Error in Slate at ${entry.ts}\n\n${msg}\n\nData:\n${JSON.stringify(data, null, 2)}\n\nSee https://github.com/strawhutmedia/Project-management/blob/status/errors.jsonl for the full log.`,
+    `err:${msg}`,
+  )
 }
 
 export function markBootStart() {
@@ -35,15 +45,38 @@ export function markBootError(err: unknown) {
   bootError = err instanceof Error ? `${err.message}\n${err.stack ?? ''}` : String(err)
 }
 
-export const diagRouter = Router()
+export async function reportStatus(): Promise<void> {
+  if (!statusReportingEnabled()) {
+    logInfo('GITHUB_TOKEN not set; status reporting disabled')
+    return
+  }
+  const snapshot = await collectSnapshot()
+  const healthy = snapshot.boot.error === null && snapshot.db.state === 'ok'
+  await writeStatusFile('latest.json', JSON.stringify(snapshot, null, 2), `status: ${healthy ? 'healthy' : 'degraded'}`)
 
-diagRouter.get('/', async (_req, res) => {
+  if (lastReportedHealthy === false && healthy) {
+    await sendAdminAlert(
+      'Recovered',
+      `Slate is back to healthy at ${snapshot.now}.\n\nLast boot completed at ${snapshot.boot.completedAt}.\nDB: ${snapshot.db.state}, ${snapshot.db.userCount} users, ${snapshot.db.projectCount} projects.`,
+    )
+  } else if (lastReportedHealthy === true && !healthy) {
+    await sendAdminAlert(
+      'Degraded',
+      `Slate just went into a degraded state at ${snapshot.now}.\n\nBoot error: ${snapshot.boot.error}\nDB state: ${snapshot.db.state}\nDB error: ${snapshot.db.error}\n\nSee https://github.com/strawhutmedia/Project-management/blob/status/latest.json`,
+    )
+  }
+  lastReportedHealthy = healthy
+}
+
+async function collectSnapshot() {
   const env = {
     NODE_ENV: process.env.NODE_ENV ?? null,
     PORT: process.env.PORT ?? null,
     HAS_DATABASE_URL: Boolean(process.env.DATABASE_URL),
     HAS_RESEND_API_KEY: Boolean(process.env.RESEND_API_KEY),
+    HAS_GITHUB_TOKEN: Boolean(process.env.GITHUB_TOKEN),
     APP_BASE_URL: process.env.APP_BASE_URL ?? null,
+    ADMIN_EMAIL: process.env.ADMIN_EMAIL ?? 'ryan@strawhutmedia.com',
   }
   const cwd = process.cwd()
   const expectedPaths = {
@@ -83,8 +116,8 @@ diagRouter.get('/', async (_req, res) => {
     dbState = 'error'
     dbError = err instanceof Error ? err.message : String(err)
   }
-  res.json({
-    version: '0.2.1',
+  return {
+    version: '0.2.2',
     now: new Date().toISOString(),
     boot: {
       startedAt: bootStartedAt,
@@ -95,5 +128,12 @@ diagRouter.get('/', async (_req, res) => {
     paths: { ...expectedPaths, exists },
     db: { state: dbState, error: dbError, migrationsApplied, userCount, projectCount },
     recentLog: ring.slice(-50),
-  })
+  }
+}
+
+export const diagRouter = Router()
+
+diagRouter.get('/', async (_req, res) => {
+  const snapshot = await collectSnapshot()
+  res.json(snapshot)
 })
