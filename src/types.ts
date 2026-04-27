@@ -23,7 +23,7 @@ export const STAGE_LABEL: Record<Stage, string> = {
   writing: 'Writing',
   tracking: 'Tracking',
   overdubs: 'Overdubs',
-  producing: 'Producing',
+  producing: 'Comp',
   stems: 'Stems',
   mixing: 'Mixing',
   mastering: 'Mastering',

@@ -56,7 +56,13 @@ emails the admin (Ryan) a "Recovered" alert automatically.
 
 ## Pipeline (album default)
 
-Writing → Tracking → Overdubs → Producing → Stems → Mixing → Mastering → Done
+Writing → Tracking → Overdubs → Comp → Stems → Mixing → Mastering → Done
+
+The internal stage value is still `producing` (to avoid a DB migration); only the
+display label is "Comp". A future cleanup can rename the value if useful, but
+for now: **the comp engineer picks the best takes, stitches them together, and
+exports stems for the mixer**. They're making creative choices and communicating
+with the artist (e.g. Maggie) — not mixing.
 
 Per-project pipelines (e.g. for podcasts/films) are planned but not yet built.
 
