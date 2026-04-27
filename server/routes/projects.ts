@@ -1,6 +1,7 @@
 import { Router } from 'express'
 import { pool } from '../db'
 import { requireUser, type SessionUser } from '../auth'
+import { logInfo, logError } from '../diag'
 
 export const projectsRouter = Router()
 
@@ -58,38 +59,47 @@ projectsRouter.get('/:id/members', async (req, res) => {
   const user = (req as typeof req & { user: SessionUser }).user
   const projectId = req.params.id
 
-  // Verify access (full or partial via song_members)
-  if (user.role !== 'admin') {
-    const access = await pool.query(
-      `SELECT 1 FROM projects p
-       LEFT JOIN project_members pm ON pm.project_id = p.id AND pm.user_id = $1
-       LEFT JOIN songs s ON s.project_id = p.id
-       LEFT JOIN song_members sm ON sm.song_id = s.id AND sm.user_id = $1
-       WHERE p.id = $2 AND (p.created_by = $1 OR pm.user_id IS NOT NULL OR sm.user_id IS NOT NULL)
-       LIMIT 1`,
-      [user.id, projectId],
-    )
-    if (access.rows.length === 0) {
-      res.status(403).json({ error: 'forbidden' })
-      return
+  try {
+    // Verify access (full or partial via song_members)
+    if (user.role !== 'admin') {
+      const access = await pool.query(
+        `SELECT 1 FROM projects p
+         LEFT JOIN project_members pm ON pm.project_id = p.id AND pm.user_id = $1
+         LEFT JOIN songs s ON s.project_id = p.id
+         LEFT JOIN song_members sm ON sm.song_id = s.id AND sm.user_id = $1
+         WHERE p.id = $2 AND (p.created_by = $1 OR pm.user_id IS NOT NULL OR sm.user_id IS NOT NULL)
+         LIMIT 1`,
+        [user.id, projectId],
+      )
+      if (access.rows.length === 0) {
+        res.status(403).json({ error: 'forbidden' })
+        return
+      }
     }
-  }
 
-  const { rows } = await pool.query(
-    `SELECT DISTINCT u.id, u.email, u.name, u.display_name, u.role
-     FROM users u
-     WHERE u.role = 'admin'
-        OR u.id IN (SELECT user_id FROM project_members WHERE project_id = $1)
-        OR u.id IN (SELECT created_by FROM projects WHERE id = $1)
-        OR u.id IN (
-          SELECT sm.user_id FROM song_members sm
-          JOIN songs s ON s.id = sm.song_id
-          WHERE s.project_id = $1
-        )
-     ORDER BY COALESCE(u.display_name, u.name) ASC`,
-    [projectId],
-  )
-  res.json({ members: rows })
+    const { rows } = await pool.query(
+      `SELECT DISTINCT u.id, u.email, u.name, u.display_name, u.role
+       FROM users u
+       WHERE u.role = 'admin'
+          OR u.id IN (SELECT user_id FROM project_members WHERE project_id = $1)
+          OR u.id IN (SELECT created_by FROM projects WHERE id = $1)
+          OR u.id IN (
+            SELECT sm.user_id FROM song_members sm
+            JOIN songs s ON s.id = sm.song_id
+            WHERE s.project_id = $1
+          )
+       ORDER BY COALESCE(u.display_name, u.name) ASC`,
+      [projectId],
+    )
+    logInfo('members fetched', { projectId, count: rows.length, requesterRole: user.role })
+    res.json({ members: rows })
+  } catch (err) {
+    logError('members fetch error', {
+      projectId,
+      error: err instanceof Error ? err.message : String(err),
+    })
+    res.status(500).json({ error: err instanceof Error ? err.message : 'unknown' })
+  }
 })
 
 projectsRouter.patch('/:id', async (req, res) => {
