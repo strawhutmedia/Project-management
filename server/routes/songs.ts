@@ -40,14 +40,24 @@ songsRouter.get('/:id', async (req, res) => {
   }
   const songRes = await pool.query(
     `SELECT s.id, s.project_id, s.title, s.subtitle, s.stage, s.dropbox_folder,
-            s.producer_id, s.mixer_id,
+            s.writer_id, s.tracker_id, s.overdub_id, s.producer_id, s.stems_id, s.mixer_id, s.master_id,
+            wu.display_name AS writer_name, wu.name AS writer_full_name,
+            tu.display_name AS tracker_name, tu.name AS tracker_full_name,
+            ou.display_name AS overdub_name, ou.name AS overdub_full_name,
             pu.display_name AS producer_name, pu.name AS producer_full_name,
+            su.display_name AS stems_name, su.name AS stems_full_name,
             mu.display_name AS mixer_name, mu.name AS mixer_full_name,
+            mau.display_name AS master_name, mau.name AS master_full_name,
             p.name AS project_name, p.dropbox_folder AS project_root
      FROM songs s
      JOIN projects p ON p.id = s.project_id
+     LEFT JOIN users wu ON wu.id = s.writer_id
+     LEFT JOIN users tu ON tu.id = s.tracker_id
+     LEFT JOIN users ou ON ou.id = s.overdub_id
      LEFT JOIN users pu ON pu.id = s.producer_id
+     LEFT JOIN users su ON su.id = s.stems_id
      LEFT JOIN users mu ON mu.id = s.mixer_id
+     LEFT JOIN users mau ON mau.id = s.master_id
      WHERE s.id = $1`,
     [songId],
   )
@@ -84,6 +94,16 @@ songsRouter.get('/:id', async (req, res) => {
       subtitle: song.subtitle,
       stage: song.stage,
       dropboxFolder: song.dropbox_folder,
+      stageOwners: {
+        writing: song.writer_id ? { id: song.writer_id, name: song.writer_name || song.writer_full_name } : null,
+        tracking: song.tracker_id ? { id: song.tracker_id, name: song.tracker_name || song.tracker_full_name } : null,
+        overdubs: song.overdub_id ? { id: song.overdub_id, name: song.overdub_name || song.overdub_full_name } : null,
+        producing: song.producer_id ? { id: song.producer_id, name: song.producer_name || song.producer_full_name } : null,
+        stems: song.stems_id ? { id: song.stems_id, name: song.stems_name || song.stems_full_name } : null,
+        mixing: song.mixer_id ? { id: song.mixer_id, name: song.mixer_name || song.mixer_full_name } : null,
+        mastering: song.master_id ? { id: song.master_id, name: song.master_name || song.master_full_name } : null,
+      },
+      // legacy fields kept for backward compat
       producerId: song.producer_id,
       producerName: song.producer_name || song.producer_full_name || null,
       mixerId: song.mixer_id,
@@ -121,7 +141,7 @@ songsRouter.patch('/:id', async (req, res) => {
     res.status(403).json({ error: 'forbidden' })
     return
   }
-  const { stage, title, subtitle, dropboxFolder, producerId, mixerId } = req.body ?? {}
+  const { stage, title, subtitle, dropboxFolder, producerId, mixerId, writerId, trackerId, overdubId, stemsId, masterId } = req.body ?? {}
   const updates: string[] = []
   const values: unknown[] = []
   let i = 1
@@ -141,13 +161,20 @@ songsRouter.patch('/:id', async (req, res) => {
     updates.push(`dropbox_folder = $${i++}`)
     values.push(dropboxFolder.trim() || null)
   }
-  if (producerId === null || (typeof producerId === 'string' && producerId.length > 0)) {
-    updates.push(`producer_id = $${i++}`)
-    values.push(producerId || null)
-  }
-  if (mixerId === null || (typeof mixerId === 'string' && mixerId.length > 0)) {
-    updates.push(`mixer_id = $${i++}`)
-    values.push(mixerId || null)
+  const ownerFields: Array<[unknown, string]> = [
+    [writerId, 'writer_id'],
+    [trackerId, 'tracker_id'],
+    [overdubId, 'overdub_id'],
+    [producerId, 'producer_id'],
+    [stemsId, 'stems_id'],
+    [mixerId, 'mixer_id'],
+    [masterId, 'master_id'],
+  ]
+  for (const [val, col] of ownerFields) {
+    if (val === null || (typeof val === 'string' && val.length > 0)) {
+      updates.push(`${col} = $${i++}`)
+      values.push(val || null)
+    }
   }
   if (updates.length === 0) {
     res.status(400).json({ error: 'no_fields' })

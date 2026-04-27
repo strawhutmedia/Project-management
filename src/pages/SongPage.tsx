@@ -169,57 +169,72 @@ function PeoplePanel({
   members: ApiMember[]
   onChange: () => void | Promise<void>
 }) {
-  async function setProducer(id: string) {
-    await api.updateSong(song.id, { producerId: id || null })
+  const STAGE_ROLES: Array<{ stage: Stage; label: string; field: keyof PatchPayload }> = [
+    { stage: 'writing', label: '✍️ Writer', field: 'writerId' },
+    { stage: 'tracking', label: '🎤 Tracking', field: 'trackerId' },
+    { stage: 'overdubs', label: '🎸 Overdubs', field: 'overdubId' },
+    { stage: 'producing', label: '🎚️ Comp / Producer', field: 'producerId' },
+    { stage: 'stems', label: '📦 Stems', field: 'stemsId' },
+    { stage: 'mixing', label: '🎛️ Mixer', field: 'mixerId' },
+    { stage: 'mastering', label: '✨ Mastering', field: 'masterId' },
+  ]
+
+  async function setOwner(field: keyof PatchPayload, id: string) {
+    await api.updateSong(song.id, { [field]: id || null } as PatchPayload)
     await onChange()
   }
-  async function setMixer(id: string) {
-    await api.updateSong(song.id, { mixerId: id || null })
-    await onChange()
-  }
+
   return (
     <section className="rounded-2xl border border-line bg-panel/60 p-6">
       <h2 className="text-[11px] uppercase tracking-[0.2em] text-muted mb-4 font-bold">👥 People</h2>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-        <div>
-          <label className="block text-[11px] uppercase tracking-wider text-muted font-bold mb-1.5">
-            🎚️ Comp / Producer
-          </label>
-          <select
-            value={song.producerId ?? ''}
-            onChange={(e) => void setProducer(e.target.value)}
-            className="w-full rounded-xl bg-ink/40 border border-line text-text px-3 py-2.5 outline-none focus:border-stage-producing text-sm"
-          >
-            <option value="">— Unassigned —</option>
-            {members.map((m) => (
-              <option key={m.id} value={m.id}>
-                {m.display_name || m.name}
-                {m.role === 'admin' ? ' (admin)' : ''}
-              </option>
-            ))}
-          </select>
-        </div>
-        <div>
-          <label className="block text-[11px] uppercase tracking-wider text-muted font-bold mb-1.5">
-            🎛️ Mixer
-          </label>
-          <select
-            value={song.mixerId ?? ''}
-            onChange={(e) => void setMixer(e.target.value)}
-            className="w-full rounded-xl bg-ink/40 border border-line text-text px-3 py-2.5 outline-none focus:border-stage-mixing text-sm"
-          >
-            <option value="">— Unassigned —</option>
-            {members.map((m) => (
-              <option key={m.id} value={m.id}>
-                {m.display_name || m.name}
-                {m.role === 'admin' ? ' (admin)' : ''}
-              </option>
-            ))}
-          </select>
-        </div>
+        {STAGE_ROLES.map(({ stage, label, field }) => {
+          const owner = song.stageOwners?.[stage]
+          const c = STAGE_COLOR[stage]
+          const isCurrent = song.stage === stage
+          return (
+            <div key={stage}>
+              <label
+                className={`flex items-center gap-1.5 text-[11px] uppercase tracking-wider font-bold mb-1.5 ${
+                  isCurrent ? c.text : 'text-muted'
+                }`}
+              >
+                {label}
+                {isCurrent && (
+                  <span className={`text-[9px] ${c.bgStrong} ${c.text} border ${c.border}/40 rounded-full px-1.5 py-0.5`}>
+                    Now
+                  </span>
+                )}
+              </label>
+              <select
+                value={owner?.id ?? ''}
+                onChange={(e) => void setOwner(field, e.target.value)}
+                className={`w-full rounded-xl bg-ink/40 border border-line text-text px-3 py-2.5 outline-none focus:${c.border} text-sm`}
+              >
+                <option value="">— Unassigned —</option>
+                {members.map((m) => (
+                  <option key={m.id} value={m.id}>
+                    {m.display_name || m.name}
+                    {m.role === 'admin' ? ' (admin)' : ''}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )
+        })}
       </div>
     </section>
   )
+}
+
+type PatchPayload = {
+  writerId?: string | null
+  trackerId?: string | null
+  overdubId?: string | null
+  producerId?: string | null
+  stemsId?: string | null
+  mixerId?: string | null
+  masterId?: string | null
 }
 
 function TasksPanel({

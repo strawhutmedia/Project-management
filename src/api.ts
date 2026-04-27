@@ -32,6 +32,8 @@ export type ApiLink = {
   createdAt: string
 }
 
+export type ApiStageOwner = { id: string; name: string } | null
+
 export type ApiSongDetail = {
   id: string
   projectId: string
@@ -41,6 +43,7 @@ export type ApiSongDetail = {
   subtitle?: string | null
   stage: Stage
   dropboxFolder: string | null
+  stageOwners: Record<Stage, ApiStageOwner>
   producerId: string | null
   producerName: string | null
   mixerId: string | null
@@ -170,7 +173,19 @@ export const api = {
   projects: () => request<{ projects: ApiProject[] }>('/api/projects'),
   project: (id: string) => request<{ project: ApiProject }>(`/api/projects/${id}`),
   song: (id: string) => request<{ song: ApiSongDetail }>(`/api/songs/${id}`),
-  updateSong: (id: string, patch: { stage?: Stage; title?: string; subtitle?: string; dropboxFolder?: string; producerId?: string | null; mixerId?: string | null }) =>
+  updateSong: (id: string, patch: {
+    stage?: Stage
+    title?: string
+    subtitle?: string
+    dropboxFolder?: string
+    writerId?: string | null
+    trackerId?: string | null
+    overdubId?: string | null
+    producerId?: string | null
+    stemsId?: string | null
+    mixerId?: string | null
+    masterId?: string | null
+  }) =>
     request<{ ok: true }>(`/api/songs/${id}`, { method: 'PATCH', body: JSON.stringify(patch) }),
   projectMembers: (projectId: string) =>
     request<{ members: ApiMember[] }>(`/api/projects/${projectId}/members`),
