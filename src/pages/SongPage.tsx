@@ -24,8 +24,11 @@ export default function SongPage() {
       try {
         const { members } = await api.projectMembers(song.projectId)
         setMembers(members)
-      } catch {
-        // members fetch is non-critical
+        if (members.length === 0) {
+          console.warn('[slate] /api/projects/.../members returned 0 members')
+        }
+      } catch (err) {
+        console.error('[slate] members fetch failed:', err)
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'failed to load')

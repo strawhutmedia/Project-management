@@ -8,6 +8,8 @@ import { projectsRouter } from './routes/projects'
 import { songsRouter } from './routes/songs'
 import { integrationsRouter } from './routes/integrations'
 import { adminRouter } from './routes/admin'
+import { notificationsRouter } from './routes/notifications'
+import { startScheduler } from './scheduler'
 import {
   diagRouter,
   logError,
@@ -36,6 +38,7 @@ app.use('/api/projects', projectsRouter)
 app.use('/api/songs', songsRouter)
 app.use('/api/integrations', integrationsRouter)
 app.use('/api/admin', adminRouter)
+app.use('/api/notifications', notificationsRouter)
 
 const clientDir = path.resolve(process.cwd(), 'dist')
 logInfo('serving client from', { clientDir })
@@ -74,6 +77,7 @@ async function start() {
     markBootComplete()
     logInfo(`listening on :${PORT}`)
     void reportStatus()
+    startScheduler()
   })
 }
 

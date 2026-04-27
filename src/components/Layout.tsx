@@ -1,6 +1,7 @@
 import { Link, NavLink, Outlet } from 'react-router-dom'
 import { useState } from 'react'
 import { useAuth } from '../auth'
+import NotificationsBell from './NotificationsBell'
 
 export default function Layout() {
   const { user, logout } = useAuth()
@@ -25,6 +26,8 @@ export default function Layout() {
                 Admin
               </span>
             )}
+
+            <NotificationsBell />
 
             <div className="relative">
               <button

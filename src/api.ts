@@ -58,6 +58,18 @@ export type ApiMember = {
   role: 'admin' | 'user'
 }
 
+export type ApiNotification = {
+  id: string
+  kind: string
+  title: string
+  body: string
+  link: string | null
+  songId: string | null
+  taskId: string | null
+  readAt: string | null
+  createdAt: string
+}
+
 export type ApiTaskFull = {
   id: string
   title: string
@@ -231,4 +243,10 @@ export const api = {
     request<{ ok: true }>(`/api/admin/users/${userId}/songs/${songId}`, { method: 'POST' }),
   adminRevokeSong: (userId: string, songId: string) =>
     request<{ ok: true }>(`/api/admin/users/${userId}/songs/${songId}`, { method: 'DELETE' }),
+  // Notifications
+  notifications: () => request<{ notifications: ApiNotification[]; unreadCount: number }>('/api/notifications'),
+  notificationRead: (id: string) =>
+    request<{ ok: true }>(`/api/notifications/${id}/read`, { method: 'POST' }),
+  notificationsReadAll: () =>
+    request<{ ok: true }>('/api/notifications/read-all', { method: 'POST' }),
 }
