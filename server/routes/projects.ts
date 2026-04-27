@@ -78,7 +78,7 @@ projectsRouter.get('/:id/members', async (req, res) => {
     }
 
     const { rows } = await pool.query(
-      `SELECT DISTINCT u.id, u.email, u.name, u.display_name, u.role
+      `SELECT u.id, u.email, u.name, u.display_name, u.role
        FROM users u
        WHERE u.role = 'admin'
           OR u.id IN (SELECT user_id FROM project_members WHERE project_id = $1)
