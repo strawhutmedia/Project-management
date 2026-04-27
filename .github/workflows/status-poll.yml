@@ -3,7 +3,10 @@ name: Poll Slate status
 on:
   push:
     branches: [main]
-    paths: ['.github/workflows/status-poll.yml']
+    paths:
+      - '.github/workflows/status-poll.yml'
+      - 'server/**'
+      - 'src/**'
   schedule:
     - cron: '*/5 * * * *'
   workflow_dispatch:

@@ -52,7 +52,13 @@ export async function reportStatus(): Promise<void> {
   }
   const snapshot = await collectSnapshot()
   const healthy = snapshot.boot.error === null && snapshot.db.state === 'ok'
-  await writeStatusFile('latest.json', JSON.stringify(snapshot, null, 2), `status: ${healthy ? 'healthy' : 'degraded'}`)
+  const result = await writeStatusFile('latest.json', JSON.stringify(snapshot, null, 2), `status: ${healthy ? 'healthy' : 'degraded'}`)
+  if (!result.ok) {
+    console.error(`[slate] reportStatus: GitHub write failed:`, result.error)
+    ring.push({ level: 'error', ts: new Date().toISOString(), msg: 'github_write_failed (latest.json)', data: { error: result.error } })
+  } else {
+    ring.push({ level: 'info', ts: new Date().toISOString(), msg: 'status reported to github', data: { file: 'latest.json' } })
+  }
 
   if (lastReportedHealthy === false && healthy) {
     await sendAdminAlert(
