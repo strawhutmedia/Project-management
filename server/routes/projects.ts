@@ -49,11 +49,50 @@ projectsRouter.get('/', async (req, res) => {
   })
 })
 
+projectsRouter.patch('/:id', async (req, res) => {
+  const user = (req as typeof req & { user: SessionUser }).user
+  const projectId = req.params.id
+  // Only admin or project members can edit
+  const access = await pool.query(
+    `SELECT 1 FROM projects p
+     LEFT JOIN project_members m ON m.project_id = p.id AND m.user_id = $1
+     WHERE p.id = $2 AND ($3 = 'admin' OR p.created_by = $1 OR m.user_id IS NOT NULL)`,
+    [user.id, projectId, user.role],
+  )
+  if (access.rows.length === 0) {
+    res.status(403).json({ error: 'forbidden' })
+    return
+  }
+  const { name, subtitle, dropboxFolder } = req.body ?? {}
+  const updates: string[] = []
+  const values: unknown[] = []
+  let i = 1
+  if (typeof name === 'string' && name.trim().length > 0) {
+    updates.push(`name = $${i++}`)
+    values.push(name.trim().slice(0, 200))
+  }
+  if (typeof subtitle === 'string') {
+    updates.push(`subtitle = $${i++}`)
+    values.push(subtitle.trim().slice(0, 200) || null)
+  }
+  if (typeof dropboxFolder === 'string') {
+    updates.push(`dropbox_folder = $${i++}`)
+    values.push(dropboxFolder.trim() || null)
+  }
+  if (updates.length === 0) {
+    res.status(400).json({ error: 'no_fields' })
+    return
+  }
+  values.push(projectId)
+  await pool.query(`UPDATE projects SET ${updates.join(', ')} WHERE id = $${i}`, values)
+  res.json({ ok: true })
+})
+
 projectsRouter.get('/:id', async (req, res) => {
   const user = (req as typeof req & { user: SessionUser }).user
   const projectId = req.params.id
   const projRes = await pool.query(
-    `SELECT id, name, subtitle, kind FROM projects WHERE id = $1`,
+    `SELECT id, name, subtitle, kind, dropbox_folder FROM projects WHERE id = $1`,
     [projectId],
   )
   if (projRes.rows.length === 0) {
@@ -99,6 +138,7 @@ projectsRouter.get('/:id', async (req, res) => {
       name: project.name,
       subtitle: project.subtitle,
       kind: project.kind,
+      dropboxFolder: project.dropbox_folder,
       songs: songs.rows.map((s: { id: string; title: string; subtitle: string | null; stage: string }) => ({
         id: s.id,
         title: s.title,

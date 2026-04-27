@@ -1,9 +1,10 @@
-import { Router } from 'express'
+import express, { Router } from 'express'
 import crypto from 'crypto'
 import { requireAdmin, requireUser, type SessionUser } from '../auth'
 import {
   buildAuthorizeUrl,
   createFolder,
+  createSharedLink,
   deleteIntegration,
   exchangeCodeForToken,
   getCurrentAccount,
@@ -11,6 +12,7 @@ import {
   getIntegration,
   listFolder,
   saveIntegration,
+  uploadFile,
 } from '../dropbox'
 import { logError } from '../diag'
 
@@ -103,4 +105,49 @@ integrationsRouter.post('/dropbox/create-folder', requireUser, async (req, res) 
     return
   }
   res.json({ ok: true })
+})
+
+// Upload a file. Body is the raw file bytes; folder + filename in headers.
+const MAX_UPLOAD = 150 * 1024 * 1024 // 150 MB single-shot Dropbox limit
+integrationsRouter.post(
+  '/dropbox/upload',
+  requireUser,
+  express.raw({ type: 'application/octet-stream', limit: MAX_UPLOAD }),
+  async (req, res) => {
+    const folderPath = String(req.headers['x-folder-path'] || '')
+    const fileName = String(req.headers['x-file-name'] || '')
+    if (!folderPath || !fileName) {
+      res.status(400).json({ error: 'missing_headers' })
+      return
+    }
+    if (!Buffer.isBuffer(req.body) || req.body.length === 0) {
+      res.status(400).json({ error: 'empty_body' })
+      return
+    }
+    if (req.body.length > MAX_UPLOAD) {
+      res.status(413).json({ error: 'file_too_large_150mb_limit' })
+      return
+    }
+    const result = await uploadFile(folderPath, decodeURIComponent(fileName), req.body)
+    if (!result.ok) {
+      res.status(500).json({ error: result.error })
+      return
+    }
+    res.json({ ok: true, path: result.path })
+  },
+)
+
+// Get a shared link for a Dropbox path (used when adding a Dropbox file as a song "Link").
+integrationsRouter.post('/dropbox/share-link', requireUser, async (req, res) => {
+  const path = String(req.body?.path || '')
+  if (!path) {
+    res.status(400).json({ error: 'path_required' })
+    return
+  }
+  const result = await createSharedLink(path)
+  if (!result.ok) {
+    res.status(500).json({ error: result.error })
+    return
+  }
+  res.json({ url: result.url })
 })

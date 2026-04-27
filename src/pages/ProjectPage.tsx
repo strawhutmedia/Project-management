@@ -4,6 +4,7 @@ import { api, type ApiProject } from '../api'
 import { STAGE_COLOR, STAGES, STAGE_LABEL, STAGE_ICON, type Song } from '../types'
 import StagePill from '../components/StagePill'
 import StageDistribution from '../components/StageDistribution'
+import InlineEdit from '../components/InlineEdit'
 
 export default function ProjectPage() {
   const { projectId } = useParams()
@@ -33,6 +34,21 @@ export default function ProjectPage() {
 
   const songs = project.songs as unknown as Song[]
 
+  async function saveName(next: string) {
+    await api.updateProject(project!.id, { name: next })
+    setProject({ ...project!, name: next })
+  }
+
+  async function saveSubtitle(next: string) {
+    await api.updateProject(project!.id, { subtitle: next })
+    setProject({ ...project!, subtitle: next })
+  }
+
+  async function saveRootFolder(next: string) {
+    await api.updateProject(project!.id, { dropboxFolder: next })
+    setProject({ ...project!, dropboxFolder: next })
+  }
+
   return (
     <div className="space-y-10">
       <div>
@@ -40,12 +56,34 @@ export default function ProjectPage() {
           ← Projects
         </Link>
         <div className="mt-3 flex items-end justify-between flex-wrap gap-4">
-          <div>
+          <div className="flex-1 min-w-0">
             <div className="text-[10px] uppercase tracking-[0.3em] text-muted mb-2 font-bold">
               {project.kind}
             </div>
-            <h1 className="font-display text-6xl text-rainbow leading-none">{project.name}</h1>
-            {project.subtitle && <p className="text-muted mt-2 text-sm">{project.subtitle}</p>}
+            <h1 className="font-display text-5xl leading-none">
+              <InlineEdit
+                value={project.name}
+                onSave={saveName}
+                inputClassName="font-display text-5xl"
+                className="text-rainbow"
+              />
+            </h1>
+            <div className="text-muted mt-2 text-sm">
+              <InlineEdit
+                value={project.subtitle ?? ''}
+                onSave={saveSubtitle}
+                emptyLabel="+ Add subtitle"
+              />
+            </div>
+            <div className="text-[11px] text-muted mt-1 font-mono">
+              📦 Dropbox root:{' '}
+              <InlineEdit
+                value={project.dropboxFolder ?? ''}
+                onSave={saveRootFolder}
+                emptyLabel="+ Set root folder"
+                inputClassName="text-[11px] font-mono"
+              />
+            </div>
           </div>
         </div>
       </div>

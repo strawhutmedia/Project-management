@@ -191,6 +191,76 @@ export async function createFolder(folderPath: string): Promise<{ ok: boolean; e
   return { ok: false, error: `dropbox_${res.status}: ${text.slice(0, 200)}` }
 }
 
+export async function uploadFile(folderPath: string, fileName: string, body: Buffer): Promise<{ ok: boolean; path?: string; error?: string }> {
+  const token = await getValidAccessToken()
+  if (!token) return { ok: false, error: 'not_connected' }
+  const fullPath = `${folderPath.replace(/\/$/, '')}/${fileName}`
+  const res = await fetch('https://content.dropboxapi.com/2/files/upload', {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'application/octet-stream',
+      'Dropbox-API-Arg': JSON.stringify({
+        path: fullPath,
+        mode: 'add',
+        autorename: true,
+        mute: false,
+      }),
+    },
+    body: new Uint8Array(body),
+  })
+  if (!res.ok) {
+    const text = await res.text()
+    return { ok: false, error: `dropbox_${res.status}: ${text.slice(0, 200)}` }
+  }
+  const data = (await res.json()) as { path_display: string }
+  return { ok: true, path: data.path_display }
+}
+
+export async function getTemporaryLink(filePath: string): Promise<{ ok: boolean; url?: string; error?: string }> {
+  const token = await getValidAccessToken()
+  if (!token) return { ok: false, error: 'not_connected' }
+  const res = await fetch(`${DROPBOX_API}/files/get_temporary_link`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ path: filePath }),
+  })
+  if (!res.ok) {
+    const text = await res.text()
+    return { ok: false, error: `dropbox_${res.status}: ${text.slice(0, 200)}` }
+  }
+  const data = (await res.json()) as { link: string }
+  return { ok: true, url: data.link }
+}
+
+export async function createSharedLink(filePath: string): Promise<{ ok: boolean; url?: string; error?: string }> {
+  const token = await getValidAccessToken()
+  if (!token) return { ok: false, error: 'not_connected' }
+  const res = await fetch(`${DROPBOX_API}/sharing/create_shared_link_with_settings`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ path: filePath, settings: { audience: 'public', access: 'viewer' } }),
+  })
+  if (res.ok) {
+    const data = (await res.json()) as { url: string }
+    return { ok: true, url: data.url }
+  }
+  // 409 = already shared, fetch the existing shared link
+  if (res.status === 409) {
+    const listRes = await fetch(`${DROPBOX_API}/sharing/list_shared_links`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ path: filePath, direct_only: true }),
+    })
+    if (listRes.ok) {
+      const listData = (await listRes.json()) as { links: Array<{ url: string }> }
+      if (listData.links.length > 0) return { ok: true, url: listData.links[0].url }
+    }
+  }
+  const text = await res.text()
+  return { ok: false, error: `dropbox_${res.status}: ${text.slice(0, 200)}` }
+}
+
 export async function getCurrentAccount(): Promise<{ ok: boolean; name?: string; email?: string; error?: string }> {
   const token = await getValidAccessToken()
   if (!token) return { ok: false, error: 'not_connected' }

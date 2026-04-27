@@ -25,6 +25,13 @@ export type ApiComment = {
   authorName: string
 }
 
+export type ApiLink = {
+  id: string
+  label: string
+  url: string
+  createdAt: string
+}
+
 export type ApiSongDetail = {
   id: string
   projectId: string
@@ -36,6 +43,7 @@ export type ApiSongDetail = {
   dropboxFolder: string | null
   tasks: ApiTaskFull[]
   comments: ApiComment[]
+  links: ApiLink[]
 }
 
 export type ApiTaskFull = {
@@ -85,6 +93,7 @@ export type ApiProject = {
   name: string
   subtitle?: string | null
   kind: 'album' | 'podcast' | 'film'
+  dropboxFolder?: string | null
   songs: ApiSong[]
 }
 
@@ -137,4 +146,33 @@ export const api = {
     request<{ entries: ApiDropboxEntry[] }>(`/api/integrations/dropbox/list?path=${encodeURIComponent(path)}`),
   dropboxCreateFolder: (path: string) =>
     request<{ ok: true }>('/api/integrations/dropbox/create-folder', { method: 'POST', body: JSON.stringify({ path }) }),
+  dropboxShareLink: (path: string) =>
+    request<{ url: string }>('/api/integrations/dropbox/share-link', { method: 'POST', body: JSON.stringify({ path }) }),
+  dropboxUpload: async (folderPath: string, file: File): Promise<{ ok: true; path: string }> => {
+    const res = await fetch('/api/integrations/dropbox/upload', {
+      method: 'POST',
+      credentials: 'include',
+      headers: {
+        'Content-Type': 'application/octet-stream',
+        'X-Folder-Path': folderPath,
+        'X-File-Name': encodeURIComponent(file.name),
+      },
+      body: file,
+    })
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({ error: 'unknown' }))
+      throw new Error(body.error ?? `HTTP ${res.status}`)
+    }
+    return res.json() as Promise<{ ok: true; path: string }>
+  },
+  // Project edit
+  updateProject: (id: string, patch: { name?: string; subtitle?: string; dropboxFolder?: string }) =>
+    request<{ ok: true }>(`/api/projects/${id}`, { method: 'PATCH', body: JSON.stringify(patch) }),
+  // Links
+  addLink: (songId: string, body: { label: string; url: string }) =>
+    request<{ link: ApiLink }>(`/api/songs/${songId}/links`, { method: 'POST', body: JSON.stringify(body) }),
+  updateLink: (linkId: string, patch: { label?: string; url?: string }) =>
+    request<{ ok: true }>(`/api/songs/links/${linkId}`, { method: 'PATCH', body: JSON.stringify(patch) }),
+  deleteLink: (linkId: string) =>
+    request<{ ok: true }>(`/api/songs/links/${linkId}`, { method: 'DELETE' }),
 }

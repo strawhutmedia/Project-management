@@ -60,6 +60,10 @@ songsRouter.get('/:id', async (req, res) => {
      WHERE c.song_id = $1 ORDER BY c.created_at ASC`,
     [songId],
   )
+  const links = await pool.query(
+    `SELECT id, label, url, created_at FROM links WHERE song_id = $1 ORDER BY created_at DESC`,
+    [songId],
+  )
   res.json({
     song: {
       id: song.id,
@@ -85,6 +89,12 @@ songsRouter.get('/:id', async (req, res) => {
         createdAt: c.created_at,
         authorId: c.author_id,
         authorName: c.author_name,
+      })),
+      links: links.rows.map((l: { id: string; label: string; url: string; created_at: string }) => ({
+        id: l.id,
+        label: l.label,
+        url: l.url,
+        createdAt: l.created_at,
       })),
     },
   })
@@ -261,5 +271,94 @@ songsRouter.delete('/comments/:commentId', async (req, res) => {
     return
   }
   await pool.query(`DELETE FROM comments WHERE id = $1`, [commentId])
+  res.json({ ok: true })
+})
+
+// Links
+songsRouter.get('/:id/links', async (req, res) => {
+  const user = (req as typeof req & { user: SessionUser }).user
+  const songId = req.params.id
+  if (!(await userCanAccessSong(user.id, user.role, songId))) {
+    res.status(403).json({ error: 'forbidden' })
+    return
+  }
+  const { rows } = await pool.query(
+    `SELECT id, label, url, created_at FROM links WHERE song_id = $1 ORDER BY created_at DESC`,
+    [songId],
+  )
+  res.json({ links: rows })
+})
+
+songsRouter.post('/:id/links', async (req, res) => {
+  const user = (req as typeof req & { user: SessionUser }).user
+  const songId = req.params.id
+  if (!(await userCanAccessSong(user.id, user.role, songId))) {
+    res.status(403).json({ error: 'forbidden' })
+    return
+  }
+  const { label, url } = req.body ?? {}
+  if (typeof label !== 'string' || label.trim().length === 0) {
+    res.status(400).json({ error: 'label_required' })
+    return
+  }
+  if (typeof url !== 'string' || url.trim().length === 0) {
+    res.status(400).json({ error: 'url_required' })
+    return
+  }
+  const { rows } = await pool.query(
+    `INSERT INTO links (song_id, label, url, created_by)
+     VALUES ($1, $2, $3, $4)
+     RETURNING id, label, url, created_at`,
+    [songId, label.trim().slice(0, 120), url.trim().slice(0, 2000), user.id],
+  )
+  res.json({ link: rows[0] })
+})
+
+songsRouter.patch('/links/:linkId', async (req, res) => {
+  const user = (req as typeof req & { user: SessionUser }).user
+  const linkId = req.params.linkId
+  const { rows } = await pool.query(`SELECT song_id FROM links WHERE id = $1`, [linkId])
+  if (rows.length === 0) {
+    res.status(404).json({ error: 'not_found' })
+    return
+  }
+  if (!(await userCanAccessSong(user.id, user.role, rows[0].song_id))) {
+    res.status(403).json({ error: 'forbidden' })
+    return
+  }
+  const { label, url } = req.body ?? {}
+  const updates: string[] = []
+  const values: unknown[] = []
+  let i = 1
+  if (typeof label === 'string' && label.trim().length > 0) {
+    updates.push(`label = $${i++}`)
+    values.push(label.trim().slice(0, 120))
+  }
+  if (typeof url === 'string' && url.trim().length > 0) {
+    updates.push(`url = $${i++}`)
+    values.push(url.trim().slice(0, 2000))
+  }
+  if (updates.length === 0) {
+    res.status(400).json({ error: 'no_fields' })
+    return
+  }
+  values.push(linkId)
+  await pool.query(`UPDATE links SET ${updates.join(', ')} WHERE id = $${i}`, values)
+  res.json({ ok: true })
+})
+
+songsRouter.delete('/links/:linkId', async (req, res) => {
+  const user = (req as typeof req & { user: SessionUser }).user
+  const linkId = req.params.linkId
+  const { rows } = await pool.query(`SELECT song_id FROM links WHERE id = $1`, [linkId])
+  if (rows.length === 0) {
+    res.status(404).json({ error: 'not_found' })
+    return
+  }
+  if (!(await userCanAccessSong(user.id, user.role, rows[0].song_id))) {
+    res.status(403).json({ error: 'forbidden' })
+    return
+  }
+  await pool.query(`DELETE FROM links WHERE id = $1`, [linkId])
   res.json({ ok: true })
 })
