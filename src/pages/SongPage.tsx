@@ -1,16 +1,18 @@
 import { Link, useParams } from 'react-router-dom'
 import { useEffect, useRef, useState } from 'react'
-import { api, type ApiDropboxEntry, type ApiSongDetail } from '../api'
+import { api, type ApiDropboxEntry, type ApiMember, type ApiSongDetail } from '../api'
 import { STAGES, STAGE_COLOR, STAGE_LABEL, STAGE_ICON, type Stage } from '../types'
 import StagePill from '../components/StagePill'
 import InlineEdit from '../components/InlineEdit'
 import AddLinkModal from '../components/AddLinkModal'
+import MentionInput, { renderWithMentions } from '../components/MentionInput'
 import { useAuth } from '../auth'
 
 export default function SongPage() {
   const { projectId, songId } = useParams()
   const { user } = useAuth()
   const [song, setSong] = useState<ApiSongDetail | null>(null)
+  const [members, setMembers] = useState<ApiMember[]>([])
   const [error, setError] = useState<string | null>(null)
   const [savingStage, setSavingStage] = useState(false)
 
@@ -19,6 +21,12 @@ export default function SongPage() {
     try {
       const { song } = await api.song(songId)
       setSong(song)
+      try {
+        const { members } = await api.projectMembers(song.projectId)
+        setMembers(members)
+      } catch {
+        // members fetch is non-critical
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'failed to load')
     }
@@ -136,8 +144,9 @@ export default function SongPage() {
 
       <div className="grid lg:grid-cols-3 gap-5">
         <div className="lg:col-span-2 space-y-5">
-          <TasksPanel song={song} onChange={reload} />
-          <CommentsPanel song={song} onChange={reload} userId={user?.id ?? ''} userRole={user?.role ?? 'user'} />
+          <PeoplePanel song={song} members={members} onChange={reload} />
+          <TasksPanel song={song} members={members} onChange={reload} />
+          <CommentsPanel song={song} members={members} onChange={reload} userId={user?.id ?? ''} userRole={user?.role ?? 'user'} />
         </div>
         <aside className="space-y-5">
           <LinksPanel song={song} onChange={reload} />
@@ -148,12 +157,81 @@ export default function SongPage() {
   )
 }
 
-function TasksPanel({ song, onChange }: { song: ApiSongDetail; onChange: () => void | Promise<void> }) {
+function PeoplePanel({
+  song,
+  members,
+  onChange,
+}: {
+  song: ApiSongDetail
+  members: ApiMember[]
+  onChange: () => void | Promise<void>
+}) {
+  async function setProducer(id: string) {
+    await api.updateSong(song.id, { producerId: id || null })
+    await onChange()
+  }
+  async function setMixer(id: string) {
+    await api.updateSong(song.id, { mixerId: id || null })
+    await onChange()
+  }
+  return (
+    <section className="rounded-2xl border border-line bg-panel/60 p-6">
+      <h2 className="text-[11px] uppercase tracking-[0.2em] text-muted mb-4 font-bold">👥 People</h2>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <div>
+          <label className="block text-[11px] uppercase tracking-wider text-muted font-bold mb-1.5">
+            🎚️ Comp / Producer
+          </label>
+          <select
+            value={song.producerId ?? ''}
+            onChange={(e) => void setProducer(e.target.value)}
+            className="w-full rounded-xl bg-ink/40 border border-line text-text px-3 py-2.5 outline-none focus:border-stage-producing text-sm"
+          >
+            <option value="">— Unassigned —</option>
+            {members.map((m) => (
+              <option key={m.id} value={m.id}>
+                {m.display_name || m.name}
+                {m.role === 'admin' ? ' (admin)' : ''}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div>
+          <label className="block text-[11px] uppercase tracking-wider text-muted font-bold mb-1.5">
+            🎛️ Mixer
+          </label>
+          <select
+            value={song.mixerId ?? ''}
+            onChange={(e) => void setMixer(e.target.value)}
+            className="w-full rounded-xl bg-ink/40 border border-line text-text px-3 py-2.5 outline-none focus:border-stage-mixing text-sm"
+          >
+            <option value="">— Unassigned —</option>
+            {members.map((m) => (
+              <option key={m.id} value={m.id}>
+                {m.display_name || m.name}
+                {m.role === 'admin' ? ' (admin)' : ''}
+              </option>
+            ))}
+          </select>
+        </div>
+      </div>
+    </section>
+  )
+}
+
+function TasksPanel({
+  song,
+  members,
+  onChange,
+}: {
+  song: ApiSongDetail
+  members: ApiMember[]
+  onChange: () => void | Promise<void>
+}) {
   const [newTask, setNewTask] = useState('')
   const [adding, setAdding] = useState(false)
 
-  async function add(e: React.FormEvent) {
-    e.preventDefault()
+  async function submitNew() {
     if (!newTask.trim()) return
     setAdding(true)
     try {
@@ -165,8 +243,18 @@ function TasksPanel({ song, onChange }: { song: ApiSongDetail; onChange: () => v
     }
   }
 
+  async function add(e: React.FormEvent) {
+    e.preventDefault()
+    await submitNew()
+  }
+
   async function toggle(taskId: string, done: boolean) {
     await api.updateTask(taskId, { done })
+    await onChange()
+  }
+
+  async function setAssignee(taskId: string, assigneeId: string) {
+    await api.updateTask(taskId, { assigneeId: assigneeId || null })
     await onChange()
   }
 
@@ -186,17 +274,20 @@ function TasksPanel({ song, onChange }: { song: ApiSongDetail; onChange: () => v
       </div>
 
       <form onSubmit={add} className="flex gap-2 mb-4">
-        <input
-          type="text"
-          value={newTask}
-          onChange={(e) => setNewTask(e.target.value)}
-          placeholder="Add a task…"
-          className="flex-1 rounded-xl bg-ink/40 border border-line text-text px-3 py-2 outline-none focus:border-stage-mastering text-sm"
-        />
+        <div className="flex-1">
+          <MentionInput
+            value={newTask}
+            onChange={setNewTask}
+            members={members}
+            placeholder="Add a task… use @ to assign someone"
+            className="w-full rounded-xl bg-ink/40 border border-line text-text px-3 py-2 outline-none focus:border-stage-mastering text-sm"
+            onEnter={() => void submitNew()}
+          />
+        </div>
         <button
           type="submit"
           disabled={adding || !newTask.trim()}
-          className="rounded-xl bg-stage-producing/20 border border-stage-producing/40 text-stage-producing font-bold uppercase tracking-wider text-xs px-3 py-2 disabled:opacity-50"
+          className="rounded-xl bg-stage-producing/20 border border-stage-producing/40 text-stage-producing font-bold uppercase tracking-wider text-xs px-3 py-2 disabled:opacity-50 self-start"
         >
           {adding ? '…' : '+ Add'}
         </button>
@@ -217,12 +308,28 @@ function TasksPanel({ song, onChange }: { song: ApiSongDetail; onChange: () => v
                 type="checkbox"
                 checked={t.done}
                 onChange={(e) => void toggle(t.id, e.target.checked)}
-                className="accent-stage-done w-4 h-4 cursor-pointer"
+                className="accent-stage-done w-4 h-4 cursor-pointer shrink-0"
               />
-              <span className={`flex-1 ${t.done ? 'line-through text-muted' : ''}`}>{t.title}</span>
+              <span className={`flex-1 min-w-0 ${t.done ? 'line-through text-muted' : ''}`}>
+                {renderWithMentions(t.title, members)}
+              </span>
+              <select
+                value={t.assigneeId ?? ''}
+                onChange={(e) => void setAssignee(t.id, e.target.value)}
+                onClick={(e) => e.stopPropagation()}
+                className="text-[11px] bg-ink/60 border border-line text-text rounded-full px-2 py-0.5 outline-none focus:border-stage-mastering shrink-0 max-w-[120px]"
+                title={t.assigneeName ? `Assigned to ${t.assigneeName}` : 'Assign to'}
+              >
+                <option value="">— Unassigned —</option>
+                {members.map((m) => (
+                  <option key={m.id} value={m.id}>
+                    {m.display_name || m.name}
+                  </option>
+                ))}
+              </select>
               <button
                 onClick={() => void remove(t.id)}
-                className="opacity-0 group-hover:opacity-100 text-xs text-muted hover:text-urgent transition"
+                className="opacity-0 group-hover:opacity-100 text-xs text-muted hover:text-urgent transition shrink-0"
                 title="Delete task"
               >
                 ✕
@@ -237,11 +344,13 @@ function TasksPanel({ song, onChange }: { song: ApiSongDetail; onChange: () => v
 
 function CommentsPanel({
   song,
+  members,
   onChange,
   userId,
   userRole,
 }: {
   song: ApiSongDetail
+  members: ApiMember[]
   onChange: () => void | Promise<void>
   userId: string
   userRole: string
@@ -273,10 +382,12 @@ function CommentsPanel({
       <h2 className="text-[11px] uppercase tracking-[0.2em] text-muted mb-4 font-bold">💬 Comments</h2>
 
       <form onSubmit={post} className="space-y-2 mb-4">
-        <textarea
+        <MentionInput
           value={body}
-          onChange={(e) => setBody(e.target.value)}
-          placeholder="Add a comment…"
+          onChange={setBody}
+          members={members}
+          placeholder="Add a comment… use @ to mention someone"
+          multiline
           rows={3}
           className="w-full rounded-xl bg-ink/40 border border-line text-text px-3 py-2 outline-none focus:border-stage-mastering text-sm resize-none"
         />
@@ -315,7 +426,7 @@ function CommentsPanel({
                     </button>
                   )}
                 </div>
-                <p className="text-sm whitespace-pre-wrap">{c.body}</p>
+                <p className="text-sm whitespace-pre-wrap">{renderWithMentions(c.body, members)}</p>
               </li>
             )
           })}

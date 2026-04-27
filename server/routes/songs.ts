@@ -39,8 +39,15 @@ songsRouter.get('/:id', async (req, res) => {
   }
   const songRes = await pool.query(
     `SELECT s.id, s.project_id, s.title, s.subtitle, s.stage, s.dropbox_folder,
+            s.producer_id, s.mixer_id,
+            pu.display_name AS producer_name, pu.name AS producer_full_name,
+            mu.display_name AS mixer_name, mu.name AS mixer_full_name,
             p.name AS project_name, p.dropbox_folder AS project_root
-     FROM songs s JOIN projects p ON p.id = s.project_id WHERE s.id = $1`,
+     FROM songs s
+     JOIN projects p ON p.id = s.project_id
+     LEFT JOIN users pu ON pu.id = s.producer_id
+     LEFT JOIN users mu ON mu.id = s.mixer_id
+     WHERE s.id = $1`,
     [songId],
   )
   if (songRes.rows.length === 0) {
@@ -76,6 +83,10 @@ songsRouter.get('/:id', async (req, res) => {
       subtitle: song.subtitle,
       stage: song.stage,
       dropboxFolder: song.dropbox_folder,
+      producerId: song.producer_id,
+      producerName: song.producer_name || song.producer_full_name || null,
+      mixerId: song.mixer_id,
+      mixerName: song.mixer_name || song.mixer_full_name || null,
       tasks: tasks.rows.map((t: { id: string; title: string; stage: string; done: boolean; due_at: string | null; assignee_id: string | null; assignee_name: string | null }) => ({
         id: t.id,
         title: t.title,
@@ -109,7 +120,7 @@ songsRouter.patch('/:id', async (req, res) => {
     res.status(403).json({ error: 'forbidden' })
     return
   }
-  const { stage, title, subtitle, dropboxFolder } = req.body ?? {}
+  const { stage, title, subtitle, dropboxFolder, producerId, mixerId } = req.body ?? {}
   const updates: string[] = []
   const values: unknown[] = []
   let i = 1
@@ -128,6 +139,14 @@ songsRouter.patch('/:id', async (req, res) => {
   if (typeof dropboxFolder === 'string') {
     updates.push(`dropbox_folder = $${i++}`)
     values.push(dropboxFolder.trim() || null)
+  }
+  if (producerId === null || (typeof producerId === 'string' && producerId.length > 0)) {
+    updates.push(`producer_id = $${i++}`)
+    values.push(producerId || null)
+  }
+  if (mixerId === null || (typeof mixerId === 'string' && mixerId.length > 0)) {
+    updates.push(`mixer_id = $${i++}`)
+    values.push(mixerId || null)
   }
   if (updates.length === 0) {
     res.status(400).json({ error: 'no_fields' })

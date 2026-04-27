@@ -41,9 +41,21 @@ export type ApiSongDetail = {
   subtitle?: string | null
   stage: Stage
   dropboxFolder: string | null
+  producerId: string | null
+  producerName: string | null
+  mixerId: string | null
+  mixerName: string | null
   tasks: ApiTaskFull[]
   comments: ApiComment[]
   links: ApiLink[]
+}
+
+export type ApiMember = {
+  id: string
+  email: string
+  name: string
+  display_name: string | null
+  role: 'admin' | 'user'
 }
 
 export type ApiTaskFull = {
@@ -146,8 +158,10 @@ export const api = {
   projects: () => request<{ projects: ApiProject[] }>('/api/projects'),
   project: (id: string) => request<{ project: ApiProject }>(`/api/projects/${id}`),
   song: (id: string) => request<{ song: ApiSongDetail }>(`/api/songs/${id}`),
-  updateSong: (id: string, patch: { stage?: Stage; title?: string; subtitle?: string; dropboxFolder?: string }) =>
+  updateSong: (id: string, patch: { stage?: Stage; title?: string; subtitle?: string; dropboxFolder?: string; producerId?: string | null; mixerId?: string | null }) =>
     request<{ ok: true }>(`/api/songs/${id}`, { method: 'PATCH', body: JSON.stringify(patch) }),
+  projectMembers: (projectId: string) =>
+    request<{ members: ApiMember[] }>(`/api/projects/${projectId}/members`),
   addTask: (songId: string, body: { title: string; stage?: Stage; dueAt?: string; assigneeId?: string }) =>
     request<{ task: ApiTaskFull }>(`/api/songs/${songId}/tasks`, { method: 'POST', body: JSON.stringify(body) }),
   updateTask: (taskId: string, patch: { title?: string; done?: boolean; dueAt?: string | null; assigneeId?: string | null; stage?: Stage }) =>
