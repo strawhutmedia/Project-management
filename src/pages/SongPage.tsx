@@ -6,6 +6,7 @@ import StagePill from '../components/StagePill'
 import InlineEdit from '../components/InlineEdit'
 import AddLinkModal from '../components/AddLinkModal'
 import MentionInput, { renderWithMentions } from '../components/MentionInput'
+import DueDateChip from '../components/DueDateChip'
 import { useAuth } from '../auth'
 
 export default function SongPage() {
@@ -247,14 +248,20 @@ function TasksPanel({
   onChange: () => void | Promise<void>
 }) {
   const [newTask, setNewTask] = useState('')
+  const [newTaskDueAt, setNewTaskDueAt] = useState<string | null>(null)
   const [adding, setAdding] = useState(false)
 
   async function submitNew() {
     if (!newTask.trim()) return
     setAdding(true)
     try {
-      await api.addTask(song.id, { title: newTask.trim(), stage: song.stage })
+      await api.addTask(song.id, {
+        title: newTask.trim(),
+        stage: song.stage,
+        ...(newTaskDueAt ? { dueAt: newTaskDueAt } : {}),
+      })
       setNewTask('')
+      setNewTaskDueAt(null)
       await onChange()
     } finally {
       setAdding(false)
@@ -276,6 +283,11 @@ function TasksPanel({
     await onChange()
   }
 
+  async function setDueAt(taskId: string, dueAt: string | null) {
+    await api.updateTask(taskId, { dueAt })
+    await onChange()
+  }
+
   async function remove(taskId: string) {
     if (!confirm('Delete this task?')) return
     await api.deleteTask(taskId)
@@ -291,24 +303,31 @@ function TasksPanel({
         </span>
       </div>
 
-      <form onSubmit={add} className="flex gap-2 mb-4">
-        <div className="flex-1">
-          <MentionInput
-            value={newTask}
-            onChange={setNewTask}
-            members={members}
-            placeholder="Add a task… use @ to assign someone"
-            className="w-full rounded-xl bg-ink/40 border border-line text-text px-3 py-2 outline-none focus:border-stage-mastering text-sm"
-            onEnter={() => void submitNew()}
-          />
+      <form onSubmit={add} className="space-y-2 mb-4">
+        <div className="flex gap-2">
+          <div className="flex-1">
+            <MentionInput
+              value={newTask}
+              onChange={setNewTask}
+              members={members}
+              placeholder="Add a task… use @ to assign someone"
+              className="w-full rounded-xl bg-ink/40 border border-line text-text px-3 py-2 outline-none focus:border-stage-mastering text-sm"
+              onEnter={() => void submitNew()}
+            />
+          </div>
+          <button
+            type="submit"
+            disabled={adding || !newTask.trim()}
+            className="rounded-xl bg-stage-producing/20 border border-stage-producing/40 text-stage-producing font-bold uppercase tracking-wider text-xs px-3 py-2 disabled:opacity-50 self-start"
+          >
+            {adding ? '…' : '+ Add'}
+          </button>
         </div>
-        <button
-          type="submit"
-          disabled={adding || !newTask.trim()}
-          className="rounded-xl bg-stage-producing/20 border border-stage-producing/40 text-stage-producing font-bold uppercase tracking-wider text-xs px-3 py-2 disabled:opacity-50 self-start"
-        >
-          {adding ? '…' : '+ Add'}
-        </button>
+        {newTask.trim().length > 0 && (
+          <div className="pl-1">
+            <DueDateChip value={newTaskDueAt} onChange={setNewTaskDueAt} />
+          </div>
+        )}
       </form>
 
       {song.tasks.length === 0 ? (
@@ -320,38 +339,43 @@ function TasksPanel({
           {song.tasks.map((t) => (
             <li
               key={t.id}
-              className="flex items-center gap-3 rounded-lg border border-line p-3 bg-ink/40 group"
+              className="rounded-lg border border-line p-3 bg-ink/40 group space-y-2"
             >
-              <input
-                type="checkbox"
-                checked={t.done}
-                onChange={(e) => void toggle(t.id, e.target.checked)}
-                className="accent-stage-done w-4 h-4 cursor-pointer shrink-0"
-              />
-              <span className={`flex-1 min-w-0 ${t.done ? 'line-through text-muted' : ''}`}>
-                {renderWithMentions(t.title, members)}
-              </span>
-              <select
-                value={t.assigneeId ?? ''}
-                onChange={(e) => void setAssignee(t.id, e.target.value)}
-                onClick={(e) => e.stopPropagation()}
-                className="text-[11px] bg-ink/60 border border-line text-text rounded-full px-2 py-0.5 outline-none focus:border-stage-mastering shrink-0 max-w-[120px]"
-                title={t.assigneeName ? `Assigned to ${t.assigneeName}` : 'Assign to'}
-              >
-                <option value="">— Unassigned —</option>
-                {members.map((m) => (
-                  <option key={m.id} value={m.id}>
-                    {m.display_name || m.name}
-                  </option>
-                ))}
-              </select>
-              <button
-                onClick={() => void remove(t.id)}
-                className="opacity-0 group-hover:opacity-100 text-xs text-muted hover:text-urgent transition shrink-0"
-                title="Delete task"
-              >
-                ✕
-              </button>
+              <div className="flex items-center gap-3">
+                <input
+                  type="checkbox"
+                  checked={t.done}
+                  onChange={(e) => void toggle(t.id, e.target.checked)}
+                  className="accent-stage-done w-4 h-4 cursor-pointer shrink-0"
+                />
+                <span className={`flex-1 min-w-0 ${t.done ? 'line-through text-muted' : ''}`}>
+                  {renderWithMentions(t.title, members)}
+                </span>
+                <select
+                  value={t.assigneeId ?? ''}
+                  onChange={(e) => void setAssignee(t.id, e.target.value)}
+                  onClick={(e) => e.stopPropagation()}
+                  className="text-[11px] bg-ink/60 border border-line text-text rounded-full px-2 py-0.5 outline-none focus:border-stage-mastering shrink-0 max-w-[120px]"
+                  title={t.assigneeName ? `Assigned to ${t.assigneeName}` : 'Assign to'}
+                >
+                  <option value="">— Unassigned —</option>
+                  {members.map((m) => (
+                    <option key={m.id} value={m.id}>
+                      {m.display_name || m.name}
+                    </option>
+                  ))}
+                </select>
+                <button
+                  onClick={() => void remove(t.id)}
+                  className="opacity-0 group-hover:opacity-100 text-xs text-muted hover:text-urgent transition shrink-0"
+                  title="Delete task"
+                >
+                  ✕
+                </button>
+              </div>
+              <div className="pl-7">
+                <DueDateChip value={t.dueAt ?? null} onChange={(d) => setDueAt(t.id, d)} />
+              </div>
             </li>
           ))}
         </ul>
