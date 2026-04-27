@@ -1,6 +1,7 @@
 import { Router } from 'express'
 import { pool } from '../db'
 import { requireUser, type SessionUser } from '../auth'
+import { findMentionedUsers, notify } from '../notifications'
 
 export const songsRouter = Router()
 songsRouter.use(requireUser)
@@ -154,6 +155,45 @@ songsRouter.patch('/:id', async (req, res) => {
   }
   values.push(songId)
   await pool.query(`UPDATE songs SET ${updates.join(', ')} WHERE id = $${i}`, values)
+
+  // Notify newly-assigned producer / mixer (if changed).
+  try {
+    const songInfo = await pool.query(
+      `SELECT s.title, s.subtitle, s.project_id, p.name AS project_name
+       FROM songs s JOIN projects p ON p.id = s.project_id WHERE s.id = $1`,
+      [songId],
+    )
+    const s = songInfo.rows[0]
+    if (s) {
+      const link = `/projects/${s.project_id}/songs/${songId}`
+      const songLabel = s.subtitle ? `${s.title} (${s.subtitle})` : s.title
+      if (typeof producerId === 'string' && producerId.length > 0) {
+        await notify({
+          actorId: user.id,
+          userId: producerId,
+          kind: 'assigned_song_role',
+          title: `You're now comping ${songLabel}`,
+          body: `${user.display_name || user.name} assigned you as the comp engineer for ${songLabel} on ${s.project_name}.`,
+          link,
+          songId,
+        })
+      }
+      if (typeof mixerId === 'string' && mixerId.length > 0) {
+        await notify({
+          actorId: user.id,
+          userId: mixerId,
+          kind: 'assigned_song_role',
+          title: `You're now mixing ${songLabel}`,
+          body: `${user.display_name || user.name} assigned you to mix ${songLabel} on ${s.project_name}.`,
+          link,
+          songId,
+        })
+      }
+    }
+  } catch {
+    // non-critical
+  }
+
   res.json({ ok: true })
 })
 
@@ -177,7 +217,51 @@ songsRouter.post('/:id/tasks', async (req, res) => {
      RETURNING id, title, stage, done, due_at, assignee_id`,
     [songId, title.trim().slice(0, 200), stageVal, dueAt || null, assigneeId || null, user.id],
   )
-  res.json({ task: rows[0] })
+  const task = rows[0]
+
+  // Notify assignee (if any) and any @mentioned users in the title.
+  try {
+    const songInfo = await pool.query(
+      `SELECT s.title, s.subtitle, s.project_id, p.name AS project_name
+       FROM songs s JOIN projects p ON p.id = s.project_id WHERE s.id = $1`,
+      [songId],
+    )
+    const s = songInfo.rows[0]
+    if (s) {
+      const link = `/projects/${s.project_id}/songs/${songId}`
+      const songLabel = s.subtitle ? `${s.title} (${s.subtitle})` : s.title
+      if (assigneeId) {
+        await notify({
+          actorId: user.id,
+          userId: assigneeId,
+          kind: 'assigned_task',
+          title: `Task assigned: ${task.title}`,
+          body: `${user.display_name || user.name} assigned you a task on ${songLabel}: "${task.title}"`,
+          link,
+          songId,
+          taskId: task.id,
+        })
+      }
+      const mentioned = await findMentionedUsers(task.title, s.project_id)
+      for (const mu of mentioned) {
+        if (mu.id === assigneeId) continue
+        await notify({
+          actorId: user.id,
+          userId: mu.id,
+          kind: 'mention',
+          title: `You were mentioned in a task on ${songLabel}`,
+          body: `${user.display_name || user.name}: "${task.title}"`,
+          link,
+          songId,
+          taskId: task.id,
+        })
+      }
+    }
+  } catch {
+    // non-critical
+  }
+
+  res.json({ task })
 })
 
 songsRouter.patch('/tasks/:taskId', async (req, res) => {
@@ -226,6 +310,35 @@ songsRouter.patch('/tasks/:taskId', async (req, res) => {
   }
   values.push(taskId)
   await pool.query(`UPDATE tasks SET ${updates.join(', ')} WHERE id = $${i}`, values)
+
+  // Notify newly-assigned assignee
+  if (typeof assigneeId === 'string' && assigneeId.length > 0) {
+    try {
+      const t = await pool.query(
+        `SELECT t.title, t.song_id, s.title AS song_title, s.subtitle AS song_subtitle,
+                s.project_id
+         FROM tasks t JOIN songs s ON s.id = t.song_id WHERE t.id = $1`,
+        [taskId],
+      )
+      if (t.rows.length > 0) {
+        const r = t.rows[0]
+        const songLabel = r.song_subtitle ? `${r.song_title} (${r.song_subtitle})` : r.song_title
+        await notify({
+          actorId: user.id,
+          userId: assigneeId,
+          kind: 'assigned_task',
+          title: `Task assigned: ${r.title}`,
+          body: `${user.display_name || user.name} assigned you a task on ${songLabel}: "${r.title}"`,
+          link: `/projects/${r.project_id}/songs/${r.song_id}`,
+          songId: r.song_id,
+          taskId,
+        })
+      }
+    } catch {
+      // non-critical
+    }
+  }
+
   res.json({ ok: true })
 })
 
@@ -264,6 +377,34 @@ songsRouter.post('/:id/comments', async (req, res) => {
     [songId, user.id, body.trim().slice(0, 4000)],
   )
   const c = rows[0]
+
+  // Notify @mentioned users
+  try {
+    const songInfo = await pool.query(
+      `SELECT s.title, s.subtitle, s.project_id, p.name AS project_name
+       FROM songs s JOIN projects p ON p.id = s.project_id WHERE s.id = $1`,
+      [songId],
+    )
+    const s = songInfo.rows[0]
+    if (s) {
+      const songLabel = s.subtitle ? `${s.title} (${s.subtitle})` : s.title
+      const mentioned = await findMentionedUsers(c.body, s.project_id)
+      for (const mu of mentioned) {
+        await notify({
+          actorId: user.id,
+          userId: mu.id,
+          kind: 'mention',
+          title: `${user.display_name || user.name} mentioned you on ${songLabel}`,
+          body: `${user.display_name || user.name}: ${c.body.slice(0, 280)}`,
+          link: `/projects/${s.project_id}/songs/${songId}`,
+          songId,
+        })
+      }
+    }
+  } catch {
+    // non-critical
+  }
+
   res.json({
     comment: {
       id: c.id,

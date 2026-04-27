@@ -60,6 +60,38 @@ export async function sendInviteEmail(email: string, name: string, inviterName: 
   }
 }
 
+export async function sendNotificationEmail(args: {
+  to: string
+  subject: string
+  body: string
+  link: string
+}) {
+  if (!resend) {
+    console.log(`[slate] (no RESEND_API_KEY) notify ${args.to}: ${args.subject}`)
+    return
+  }
+  const result = await resend.emails.send({
+    from: FROM,
+    to: args.to,
+    subject: args.subject,
+    html: `
+      <div style="font-family:system-ui,sans-serif;max-width:480px;margin:0 auto;padding:32px 24px;color:#0b0d12">
+        <p style="font-size:11px;letter-spacing:0.3em;text-transform:uppercase;color:#7a8294;margin:0 0 8px">Straw Hut Media presents</p>
+        <h1 style="font-family:Impact,sans-serif;font-size:32px;letter-spacing:0.02em;margin:0 0 16px;background:linear-gradient(90deg,#fbbf24,#f472b6,#a78bfa,#2dd4bf);-webkit-background-clip:text;background-clip:text;color:transparent">SLATE</h1>
+        <h2 style="font-size:18px;margin:0 0 12px">${escapeHtml(args.subject)}</h2>
+        <p style="font-size:15px;line-height:1.5;white-space:pre-wrap">${escapeHtml(args.body)}</p>
+        <p style="margin:24px 0">
+          <a href="${args.link}" style="display:inline-block;background:#a78bfa;color:white;padding:10px 20px;border-radius:999px;text-decoration:none;font-weight:600;font-size:14px">Open in Slate</a>
+        </p>
+        <p style="font-size:12px;color:#7a8294;line-height:1.5">${args.link}</p>
+      </div>
+    `,
+  })
+  if (result.error) {
+    throw new Error(`resend: ${result.error.name || 'send_failed'}: ${result.error.message || JSON.stringify(result.error)}`)
+  }
+}
+
 function escapeHtml(s: string): string {
   return s
     .replace(/&/g, '&amp;')
