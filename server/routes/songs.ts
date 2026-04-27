@@ -21,8 +21,10 @@ async function userCanAccessSong(userId: string, role: string, songId: string): 
   const { rows } = await pool.query(
     `SELECT 1 FROM songs s
      JOIN projects p ON p.id = s.project_id
-     LEFT JOIN project_members m ON m.project_id = p.id AND m.user_id = $1
-     WHERE s.id = $2 AND (p.created_by = $1 OR m.user_id IS NOT NULL)`,
+     LEFT JOIN project_members pm ON pm.project_id = p.id AND pm.user_id = $1
+     LEFT JOIN song_members sm ON sm.song_id = s.id AND sm.user_id = $1
+     WHERE s.id = $2
+       AND (p.created_by = $1 OR pm.user_id IS NOT NULL OR sm.user_id IS NOT NULL)`,
     [userId, songId],
   )
   return rows.length > 0

@@ -9,10 +9,13 @@ projectsRouter.use(requireUser)
 projectsRouter.get('/', async (req, res) => {
   const user = (req as typeof req & { user: SessionUser }).user
   const projects = await pool.query(
-    `SELECT p.id, p.name, p.subtitle, p.kind, p.created_at
+    `SELECT DISTINCT p.id, p.name, p.subtitle, p.kind, p.created_at
      FROM projects p
+     LEFT JOIN songs s ON s.project_id = p.id
+     LEFT JOIN song_members sm ON sm.song_id = s.id AND sm.user_id = $1
      WHERE p.created_by = $1
         OR EXISTS (SELECT 1 FROM project_members m WHERE m.project_id = p.id AND m.user_id = $1)
+        OR sm.user_id IS NOT NULL
         OR $2 = 'admin'
      ORDER BY p.created_at DESC`,
     [user.id, user.role],
@@ -100,21 +103,50 @@ projectsRouter.get('/:id', async (req, res) => {
     return
   }
   const project = projRes.rows[0]
-  if (user.role !== 'admin') {
+  // Determine access level.
+  // 'full' = admin / creator / project member -> sees all songs
+  // 'partial' = song-level access only -> sees only granted songs
+  // 'none' = no access -> 403
+  let accessLevel: 'full' | 'partial' | 'none' = 'none'
+  if (user.role === 'admin') {
+    accessLevel = 'full'
+  } else {
     const access = await pool.query(
       `SELECT 1 FROM projects p
-       WHERE p.id = $1 AND (p.created_by = $2 OR EXISTS (SELECT 1 FROM project_members WHERE project_id = $1 AND user_id = $2))`,
+       WHERE p.id = $1
+         AND (p.created_by = $2
+              OR EXISTS (SELECT 1 FROM project_members WHERE project_id = $1 AND user_id = $2))`,
       [projectId, user.id],
     )
-    if (access.rows.length === 0) {
-      res.status(403).json({ error: 'forbidden' })
-      return
+    if (access.rows.length > 0) {
+      accessLevel = 'full'
+    } else {
+      const songAccess = await pool.query(
+        `SELECT 1 FROM song_members sm JOIN songs s ON s.id = sm.song_id
+         WHERE s.project_id = $1 AND sm.user_id = $2 LIMIT 1`,
+        [projectId, user.id],
+      )
+      if (songAccess.rows.length > 0) accessLevel = 'partial'
     }
   }
-  const songs = await pool.query(
-    `SELECT id, title, subtitle, stage, position FROM songs WHERE project_id = $1 ORDER BY position ASC`,
-    [projectId],
-  )
+  if (accessLevel === 'none') {
+    res.status(403).json({ error: 'forbidden' })
+    return
+  }
+
+  const songs =
+    accessLevel === 'full'
+      ? await pool.query(
+          `SELECT id, title, subtitle, stage, position FROM songs WHERE project_id = $1 ORDER BY position ASC`,
+          [projectId],
+        )
+      : await pool.query(
+          `SELECT s.id, s.title, s.subtitle, s.stage, s.position
+           FROM songs s JOIN song_members sm ON sm.song_id = s.id
+           WHERE s.project_id = $1 AND sm.user_id = $2
+           ORDER BY s.position ASC`,
+          [projectId, user.id],
+        )
   const songIds = songs.rows.map((s: { id: string }) => s.id)
   const tasksBySong: Record<string, unknown[]> = Object.fromEntries(songIds.map((id: string) => [id, []]))
   if (songIds.length > 0) {

@@ -70,6 +70,24 @@ export type ApiDropboxEntry = {
   modified?: string
 }
 
+export type ApiAdminUser = {
+  id: string
+  email: string
+  name: string
+  display_name: string | null
+  role: 'admin' | 'user'
+  timezone: string
+  created_at: string
+  projects: Array<{ id: string; name: string }>
+  songs: Array<{ id: string; title: string; subtitle: string | null; projectId: string; projectName: string }>
+}
+
+export type ApiAdminProject = {
+  id: string
+  name: string
+  songs: Array<{ id: string; title: string; subtitle: string | null }>
+}
+
 export type ApiTask = {
   id: string
   title: string
@@ -175,4 +193,28 @@ export const api = {
     request<{ ok: true }>(`/api/songs/links/${linkId}`, { method: 'PATCH', body: JSON.stringify(patch) }),
   deleteLink: (linkId: string) =>
     request<{ ok: true }>(`/api/songs/links/${linkId}`, { method: 'DELETE' }),
+  // Admin
+  adminUsers: () => request<{ users: ApiAdminUser[] }>('/api/admin/users'),
+  adminProjects: () => request<{ projects: ApiAdminProject[] }>('/api/admin/projects'),
+  adminInviteUser: (body: {
+    email: string
+    name: string
+    displayName?: string
+    role?: 'admin' | 'user'
+    timezone?: string
+    projectIds?: string[]
+    songIds?: string[]
+  }) => request<{ user: ApiAdminUser }>('/api/admin/users', { method: 'POST', body: JSON.stringify(body) }),
+  adminDeleteUser: (id: string) =>
+    request<{ ok: true }>(`/api/admin/users/${id}`, { method: 'DELETE' }),
+  adminUpdateUser: (id: string, patch: { displayName?: string; name?: string; role?: 'admin' | 'user'; timezone?: string }) =>
+    request<{ ok: true }>(`/api/admin/users/${id}`, { method: 'PATCH', body: JSON.stringify(patch) }),
+  adminGrantProject: (userId: string, projectId: string) =>
+    request<{ ok: true }>(`/api/admin/users/${userId}/projects/${projectId}`, { method: 'POST' }),
+  adminRevokeProject: (userId: string, projectId: string) =>
+    request<{ ok: true }>(`/api/admin/users/${userId}/projects/${projectId}`, { method: 'DELETE' }),
+  adminGrantSong: (userId: string, songId: string) =>
+    request<{ ok: true }>(`/api/admin/users/${userId}/songs/${songId}`, { method: 'POST' }),
+  adminRevokeSong: (userId: string, songId: string) =>
+    request<{ ok: true }>(`/api/admin/users/${userId}/songs/${songId}`, { method: 'DELETE' }),
 }

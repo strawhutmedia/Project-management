@@ -1,6 +1,11 @@
 import { useEffect, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { api, type ApiDropboxStatus } from '../api'
+import {
+  api,
+  type ApiAdminProject,
+  type ApiAdminUser,
+  type ApiDropboxStatus,
+} from '../api'
 import { useAuth } from '../auth'
 
 export default function Settings() {
@@ -31,12 +36,13 @@ export default function Settings() {
   const isAdmin = user.role === 'admin'
 
   return (
-    <div className="max-w-2xl space-y-8">
+    <div className="max-w-3xl space-y-8">
       <div>
         <h1 className="font-display text-5xl text-rainbow">Settings</h1>
         <p className="text-muted text-sm mt-1">Workspace integrations and admin controls.</p>
       </div>
 
+      {/* Dropbox */}
       <section className="rounded-2xl border border-line bg-panel/60 p-6">
         <div className="flex items-start justify-between gap-4 mb-4">
           <div>
@@ -51,13 +57,11 @@ export default function Settings() {
             </span>
           )}
         </div>
-
         {justConnected && (
           <div className="mb-4 rounded-xl border border-stage-done/40 bg-stage-done/10 text-stage-done p-3 text-sm">
             🎉 Dropbox connected!
           </div>
         )}
-
         {loading ? (
           <p className="text-sm text-muted">Loading…</p>
         ) : !status?.configured ? (
@@ -99,11 +103,363 @@ export default function Settings() {
         )}
       </section>
 
+      {/* Admin: Users */}
+      {isAdmin && <UsersSection currentUserId={user.id} />}
+
       {!isAdmin && (
         <p className="text-[11px] text-muted">
           Some settings are admin-only. Ask Ryan if you need access to something here.
         </p>
       )}
+    </div>
+  )
+}
+
+function UsersSection({ currentUserId }: { currentUserId: string }) {
+  const [users, setUsers] = useState<ApiAdminUser[] | null>(null)
+  const [projects, setProjects] = useState<ApiAdminProject[] | null>(null)
+  const [showInvite, setShowInvite] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  async function load() {
+    setError(null)
+    try {
+      const [{ users }, { projects }] = await Promise.all([api.adminUsers(), api.adminProjects()])
+      setUsers(users)
+      setProjects(projects)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'failed')
+    }
+  }
+
+  useEffect(() => {
+    void load()
+  }, [])
+
+  async function remove(u: ApiAdminUser) {
+    if (u.id === currentUserId) return
+    if (!confirm(`Remove ${u.email}? They'll lose access immediately.`)) return
+    await api.adminDeleteUser(u.id)
+    await load()
+  }
+
+  return (
+    <section className="rounded-2xl border border-line bg-panel/60 p-6">
+      <div className="flex items-start justify-between gap-4 mb-4">
+        <div>
+          <h2 className="font-display text-2xl">👥 Users</h2>
+          <p className="text-sm text-muted mt-1">
+            Invite people to Slate. You can grant access to a whole project or just specific songs.
+          </p>
+        </div>
+        <button
+          onClick={() => setShowInvite(true)}
+          className="rounded-xl bg-gradient-to-r from-stage-producing to-stage-mastering text-white font-bold uppercase tracking-wider text-xs px-3 py-2 whitespace-nowrap"
+        >
+          + Invite user
+        </button>
+      </div>
+
+      {error && <p className="text-urgent text-sm mb-3">{error}</p>}
+
+      {!users ? (
+        <p className="text-sm text-muted">Loading…</p>
+      ) : users.length === 0 ? (
+        <p className="text-sm text-muted">No users yet.</p>
+      ) : (
+        <ul className="space-y-2">
+          {users.map((u) => (
+            <li key={u.id} className="rounded-xl border border-line bg-ink/30 p-4 group">
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-baseline gap-2 flex-wrap">
+                    <span className="font-bold">{u.display_name || u.name}</span>
+                    {u.role === 'admin' && (
+                      <span className="text-[10px] uppercase tracking-wider text-stage-mastering bg-stage-mastering/10 border border-stage-mastering/40 rounded-full px-2 py-0.5 font-bold">
+                        Admin
+                      </span>
+                    )}
+                    {u.id === currentUserId && (
+                      <span className="text-[10px] uppercase tracking-wider text-muted">(you)</span>
+                    )}
+                  </div>
+                  <div className="text-[11px] text-muted">{u.email}</div>
+                  <div className="text-[11px] mt-1.5">
+                    {u.projects.length > 0 && (
+                      <span>
+                        <span className="text-muted">Projects: </span>
+                        {u.projects.map((p) => p.name).join(', ')}
+                      </span>
+                    )}
+                    {u.songs.length > 0 && (
+                      <span className="ml-2">
+                        <span className="text-muted">Channels:</span>
+                        {u.songs.map((s) => `${s.title}${s.subtitle ? ` (${s.subtitle})` : ''}`).join(', ')}
+                      </span>
+                    )}
+                    {u.projects.length === 0 && u.songs.length === 0 && u.role !== 'admin' && (
+                      <span className="text-muted italic">No project access</span>
+                    )}
+                    {u.role === 'admin' && u.projects.length === 0 && u.songs.length === 0 && (
+                      <span className="text-muted italic">Auto-access to all projects</span>
+                    )}
+                  </div>
+                </div>
+                {u.id !== currentUserId && (
+                  <button
+                    onClick={() => void remove(u)}
+                    className="opacity-0 group-hover:opacity-100 text-xs text-muted hover:text-urgent transition shrink-0"
+                  >
+                    Remove
+                  </button>
+                )}
+              </div>
+            </li>
+          ))}
+        </ul>
+      )}
+
+      {showInvite && projects && (
+        <InviteModal
+          projects={projects}
+          onClose={() => setShowInvite(false)}
+          onAdded={() => {
+            setShowInvite(false)
+            void load()
+          }}
+        />
+      )}
+    </section>
+  )
+}
+
+function InviteModal({
+  projects,
+  onClose,
+  onAdded,
+}: {
+  projects: ApiAdminProject[]
+  onClose: () => void
+  onAdded: () => void
+}) {
+  const [email, setEmail] = useState('')
+  const [name, setName] = useState('')
+  const [displayName, setDisplayName] = useState('')
+  const [role, setRole] = useState<'admin' | 'user'>('user')
+  const [timezone, setTimezone] = useState('America/Los_Angeles')
+  const [accessByProject, setAccessByProject] = useState<Record<string, { mode: 'none' | 'full' | 'songs'; songIds: Set<string> }>>(
+    () => {
+      const init: Record<string, { mode: 'none' | 'full' | 'songs'; songIds: Set<string> }> = {}
+      for (const p of projects) {
+        init[p.id] = { mode: 'none', songIds: new Set() }
+      }
+      return init
+    },
+  )
+  const [submitting, setSubmitting] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  function setMode(projectId: string, mode: 'none' | 'full' | 'songs') {
+    setAccessByProject((prev) => ({ ...prev, [projectId]: { ...prev[projectId], mode } }))
+  }
+
+  function toggleSong(projectId: string, songId: string) {
+    setAccessByProject((prev) => {
+      const songIds = new Set(prev[projectId].songIds)
+      if (songIds.has(songId)) songIds.delete(songId)
+      else songIds.add(songId)
+      return { ...prev, [projectId]: { ...prev[projectId], songIds } }
+    })
+  }
+
+  async function submit() {
+    setSubmitting(true)
+    setError(null)
+    try {
+      const projectIds: string[] = []
+      const songIds: string[] = []
+      for (const [pid, access] of Object.entries(accessByProject)) {
+        if (access.mode === 'full') projectIds.push(pid)
+        else if (access.mode === 'songs') songIds.push(...Array.from(access.songIds))
+      }
+      await api.adminInviteUser({
+        email: email.trim(),
+        name: name.trim(),
+        displayName: displayName.trim() || undefined,
+        role,
+        timezone,
+        projectIds,
+        songIds,
+      })
+      onAdded()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'failed')
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 grid place-items-center bg-ink/80 backdrop-blur-sm p-4">
+      <div className="w-full max-w-lg rounded-2xl border border-line bg-panel/95 backdrop-blur-md shadow-2xl max-h-[90vh] flex flex-col">
+        <div className="flex items-center justify-between p-5 border-b border-line">
+          <h2 className="font-display text-2xl">Invite user</h2>
+          <button onClick={onClose} className="text-muted hover:text-text text-xl leading-none">
+            ✕
+          </button>
+        </div>
+
+        <div className="p-5 space-y-4 overflow-y-auto">
+          <Field label="Email" hint="They'll sign in with this and receive an invite email.">
+            <input
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="michael@example.com"
+              className="w-full rounded-xl bg-ink/40 border border-line text-text px-3 py-2.5 outline-none focus:border-stage-mastering text-sm"
+            />
+          </Field>
+          <Field label="Full name">
+            <input
+              type="text"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="Michael Amico"
+              className="w-full rounded-xl bg-ink/40 border border-line text-text px-3 py-2.5 outline-none focus:border-stage-mastering text-sm"
+            />
+          </Field>
+          <Field label="Display name (for @mentions)" hint="Defaults to first name if blank.">
+            <input
+              type="text"
+              value={displayName}
+              onChange={(e) => setDisplayName(e.target.value)}
+              placeholder="michael"
+              className="w-full rounded-xl bg-ink/40 border border-line text-text px-3 py-2.5 outline-none focus:border-stage-mastering text-sm"
+            />
+          </Field>
+          <div className="grid grid-cols-2 gap-3">
+            <Field label="Role">
+              <select
+                value={role}
+                onChange={(e) => setRole(e.target.value as 'admin' | 'user')}
+                className="w-full rounded-xl bg-ink/40 border border-line text-text px-3 py-2.5 outline-none focus:border-stage-mastering text-sm"
+              >
+                <option value="user">User</option>
+                <option value="admin">Admin</option>
+              </select>
+            </Field>
+            <Field label="Timezone">
+              <select
+                value={timezone}
+                onChange={(e) => setTimezone(e.target.value)}
+                className="w-full rounded-xl bg-ink/40 border border-line text-text px-3 py-2.5 outline-none focus:border-stage-mastering text-sm"
+              >
+                {[
+                  'America/Los_Angeles',
+                  'America/Denver',
+                  'America/Chicago',
+                  'America/New_York',
+                  'Europe/London',
+                  'UTC',
+                ].map((tz) => (
+                  <option key={tz} value={tz}>
+                    {tz}
+                  </option>
+                ))}
+              </select>
+            </Field>
+          </div>
+
+          {role === 'user' && (
+            <div>
+              <label className="block text-[11px] uppercase tracking-[0.2em] text-muted font-bold mb-2">
+                Project access
+              </label>
+              <p className="text-[11px] text-muted mb-3">
+                Admins automatically see everything. For users, pick which projects (or specific channels — songs for albums, episodes for podcasts) they can see.
+              </p>
+              <div className="space-y-3">
+                {projects.map((p) => {
+                  const acc = accessByProject[p.id]
+                  return (
+                    <div key={p.id} className="rounded-xl border border-line bg-ink/30 p-3">
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-sm font-bold">{p.name}</span>
+                        <select
+                          value={acc.mode}
+                          onChange={(e) => setMode(p.id, e.target.value as 'none' | 'full' | 'songs')}
+                          className="rounded-lg bg-ink/40 border border-line text-text px-2 py-1 text-xs outline-none"
+                        >
+                          <option value="none">No access</option>
+                          <option value="full">Whole project</option>
+                          <option value="songs">Specific channels</option>
+                        </select>
+                      </div>
+                      {acc.mode === 'songs' && (
+                        <div className="grid grid-cols-1 gap-1 max-h-40 overflow-y-auto pl-2 border-l border-line">
+                          {p.songs.length === 0 ? (
+                            <p className="text-xs text-muted">No channels in this project.</p>
+                          ) : (
+                            p.songs.map((s) => (
+                              <label
+                                key={s.id}
+                                className="flex items-center gap-2 text-xs cursor-pointer py-0.5"
+                              >
+                                <input
+                                  type="checkbox"
+                                  checked={acc.songIds.has(s.id)}
+                                  onChange={() => toggleSong(p.id, s.id)}
+                                  className="accent-stage-mastering"
+                                />
+                                <span>
+                                  {s.title}
+                                  {s.subtitle && (
+                                    <span className="text-muted ml-1">({s.subtitle})</span>
+                                  )}
+                                </span>
+                              </label>
+                            ))
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          )}
+
+          {error && <p className="text-urgent text-sm">{error}</p>}
+        </div>
+
+        <div className="flex gap-2 p-5 border-t border-line">
+          <button
+            onClick={onClose}
+            className="flex-1 rounded-xl border border-line text-muted hover:text-text font-bold uppercase tracking-wider text-xs px-4 py-2.5"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={submit}
+            disabled={submitting || !email.trim() || !name.trim()}
+            className="flex-1 rounded-xl bg-gradient-to-r from-stage-producing to-stage-mastering text-white font-bold uppercase tracking-wider text-xs px-4 py-2.5 disabled:opacity-50"
+          >
+            {submitting ? 'Inviting…' : 'Send invite'}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function Field({ label, hint, children }: { label: string; hint?: string; children: React.ReactNode }) {
+  return (
+    <div>
+      <label className="block text-[11px] uppercase tracking-[0.2em] text-muted font-bold mb-1.5">
+        {label}
+      </label>
+      {children}
+      {hint && <p className="text-[11px] text-muted/70 mt-1">{hint}</p>}
     </div>
   )
 }

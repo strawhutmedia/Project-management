@@ -7,6 +7,7 @@ import { meRouter } from './routes/me'
 import { projectsRouter } from './routes/projects'
 import { songsRouter } from './routes/songs'
 import { integrationsRouter } from './routes/integrations'
+import { adminRouter } from './routes/admin'
 import {
   diagRouter,
   logError,
@@ -34,6 +35,7 @@ app.use('/api/me', meRouter)
 app.use('/api/projects', projectsRouter)
 app.use('/api/songs', songsRouter)
 app.use('/api/integrations', integrationsRouter)
+app.use('/api/admin', adminRouter)
 
 const clientDir = path.resolve(process.cwd(), 'dist')
 logInfo('serving client from', { clientDir })
