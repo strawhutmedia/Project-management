@@ -154,7 +154,7 @@ projectsRouter.patch('/:id', async (req, res) => {
     res.status(403).json({ error: 'forbidden' })
     return
   }
-  const { name, subtitle, dropboxFolder } = req.body ?? {}
+  const { name, subtitle, dropboxFolder, defaultOwners } = req.body ?? {}
   const updates: string[] = []
   const values: unknown[] = []
   let i = 1
@@ -170,6 +170,17 @@ projectsRouter.patch('/:id', async (req, res) => {
     updates.push(`dropbox_folder = $${i++}`)
     values.push(dropboxFolder.trim() || null)
   }
+  if (defaultOwners && typeof defaultOwners === 'object') {
+    // Whitelist stage keys + ensure values are strings or null
+    const allowed = ['writing', 'tracking', 'overdubs', 'producing', 'stems', 'mixing', 'mastering']
+    const cleaned: Record<string, string> = {}
+    for (const k of allowed) {
+      const v = (defaultOwners as Record<string, unknown>)[k]
+      if (typeof v === 'string' && v.length > 0) cleaned[k] = v
+    }
+    updates.push(`default_owners = $${i++}::jsonb`)
+    values.push(JSON.stringify(cleaned))
+  }
   if (updates.length === 0) {
     res.status(400).json({ error: 'no_fields' })
     return
@@ -183,7 +194,7 @@ projectsRouter.get('/:id', async (req, res) => {
   const user = (req as typeof req & { user: SessionUser }).user
   const projectId = req.params.id
   const projRes = await pool.query(
-    `SELECT id, name, subtitle, kind, dropbox_folder FROM projects WHERE id = $1`,
+    `SELECT id, name, subtitle, kind, dropbox_folder, default_owners FROM projects WHERE id = $1`,
     [projectId],
   )
   if (projRes.rows.length === 0) {
@@ -252,6 +263,22 @@ projectsRouter.get('/:id', async (req, res) => {
       })
     }
   }
+  // Resolve default owner names for the project page UI.
+  const defaultOwners = (project.default_owners || {}) as Record<string, string>
+  const defaultIds = Object.values(defaultOwners).filter(Boolean)
+  const defaultOwnersResolved: Record<string, { id: string; name: string } | null> = {}
+  if (defaultIds.length > 0) {
+    const dRes = await pool.query(
+      `SELECT id, name, display_name FROM users WHERE id = ANY($1)`,
+      [defaultIds],
+    )
+    const byId: Record<string, string> = {}
+    for (const r of dRes.rows) byId[r.id] = r.display_name || r.name
+    for (const [stage, uid] of Object.entries(defaultOwners)) {
+      if (uid && byId[uid]) defaultOwnersResolved[stage] = { id: uid, name: byId[uid] }
+    }
+  }
+
   res.json({
     project: {
       id: project.id,
@@ -259,6 +286,7 @@ projectsRouter.get('/:id', async (req, res) => {
       subtitle: project.subtitle,
       kind: project.kind,
       dropboxFolder: project.dropbox_folder,
+      defaultOwners: defaultOwnersResolved,
       songs: songs.rows.map((s: { id: string; title: string; subtitle: string | null; stage: string }) => ({
         id: s.id,
         title: s.title,

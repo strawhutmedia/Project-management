@@ -191,30 +191,100 @@ export async function createFolder(folderPath: string): Promise<{ ok: boolean; e
   return { ok: false, error: `dropbox_${res.status}: ${text.slice(0, 200)}` }
 }
 
+const SINGLE_SHOT_LIMIT = 140 * 1024 * 1024 // 140 MB — under Dropbox's 150 MB cap
+const CHUNK_SIZE = 8 * 1024 * 1024 // 8 MB chunks for upload sessions
+
 export async function uploadFile(folderPath: string, fileName: string, body: Buffer): Promise<{ ok: boolean; path?: string; error?: string }> {
   const token = await getValidAccessToken()
   if (!token) return { ok: false, error: 'not_connected' }
   const fullPath = `${folderPath.replace(/\/$/, '')}/${fileName}`
-  const res = await fetch('https://content.dropboxapi.com/2/files/upload', {
+
+  if (body.length <= SINGLE_SHOT_LIMIT) {
+    const res = await fetch('https://content.dropboxapi.com/2/files/upload', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/octet-stream',
+        'Dropbox-API-Arg': JSON.stringify({
+          path: fullPath,
+          mode: 'add',
+          autorename: true,
+          mute: false,
+        }),
+      },
+      body: new Uint8Array(body),
+    })
+    if (!res.ok) {
+      const text = await res.text()
+      return { ok: false, error: `dropbox_${res.status}: ${text.slice(0, 200)}` }
+    }
+    const data = (await res.json()) as { path_display: string }
+    return { ok: true, path: data.path_display }
+  }
+
+  // Chunked upload session for files larger than the single-shot limit.
+  // Step 1: start session with first chunk
+  const first = body.slice(0, CHUNK_SIZE)
+  const startRes = await fetch('https://content.dropboxapi.com/2/files/upload_session/start', {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'application/octet-stream',
+      'Dropbox-API-Arg': JSON.stringify({ close: false }),
+    },
+    body: new Uint8Array(first),
+  })
+  if (!startRes.ok) {
+    const text = await startRes.text()
+    return { ok: false, error: `dropbox_session_start_${startRes.status}: ${text.slice(0, 200)}` }
+  }
+  const startData = (await startRes.json()) as { session_id: string }
+  const sessionId = startData.session_id
+
+  // Step 2: append remaining chunks (all but the last)
+  let offset = first.length
+  const lastStart = Math.max(offset, body.length - CHUNK_SIZE)
+  while (offset < lastStart) {
+    const chunk = body.slice(offset, Math.min(offset + CHUNK_SIZE, lastStart))
+    const r = await fetch('https://content.dropboxapi.com/2/files/upload_session/append_v2', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/octet-stream',
+        'Dropbox-API-Arg': JSON.stringify({
+          cursor: { session_id: sessionId, offset },
+          close: false,
+        }),
+      },
+      body: new Uint8Array(chunk),
+    })
+    if (!r.ok) {
+      const text = await r.text()
+      return { ok: false, error: `dropbox_session_append_${r.status}: ${text.slice(0, 200)}` }
+    }
+    offset += chunk.length
+  }
+
+  // Step 3: finish with the final chunk + commit metadata
+  const finalChunk = body.slice(offset)
+  const finishRes = await fetch('https://content.dropboxapi.com/2/files/upload_session/finish', {
     method: 'POST',
     headers: {
       Authorization: `Bearer ${token}`,
       'Content-Type': 'application/octet-stream',
       'Dropbox-API-Arg': JSON.stringify({
-        path: fullPath,
-        mode: 'add',
-        autorename: true,
-        mute: false,
+        cursor: { session_id: sessionId, offset },
+        commit: { path: fullPath, mode: 'add', autorename: true, mute: false },
       }),
     },
-    body: new Uint8Array(body),
+    body: new Uint8Array(finalChunk),
   })
-  if (!res.ok) {
-    const text = await res.text()
-    return { ok: false, error: `dropbox_${res.status}: ${text.slice(0, 200)}` }
+  if (!finishRes.ok) {
+    const text = await finishRes.text()
+    return { ok: false, error: `dropbox_session_finish_${finishRes.status}: ${text.slice(0, 200)}` }
   }
-  const data = (await res.json()) as { path_display: string }
-  return { ok: true, path: data.path_display }
+  const finishData = (await finishRes.json()) as { path_display: string }
+  return { ok: true, path: finishData.path_display }
 }
 
 export async function getTemporaryLink(filePath: string): Promise<{ ok: boolean; url?: string; error?: string }> {

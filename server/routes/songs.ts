@@ -48,7 +48,8 @@ songsRouter.get('/:id', async (req, res) => {
             su.display_name AS stems_name, su.name AS stems_full_name,
             mu.display_name AS mixer_name, mu.name AS mixer_full_name,
             mau.display_name AS master_name, mau.name AS master_full_name,
-            p.name AS project_name, p.dropbox_folder AS project_root
+            p.name AS project_name, p.dropbox_folder AS project_root,
+            p.default_owners AS project_default_owners
      FROM songs s
      JOIN projects p ON p.id = s.project_id
      LEFT JOIN users wu ON wu.id = s.writer_id
@@ -84,6 +85,40 @@ songsRouter.get('/:id', async (req, res) => {
     `SELECT id, label, url, created_at FROM links WHERE song_id = $1 ORDER BY created_at DESC`,
     [songId],
   )
+
+  // Resolve effective stage owners: explicit song owner, or fall back to project default.
+  const defaults = (song.project_default_owners || {}) as Record<string, string>
+  const defaultIds = Object.values(defaults).filter(Boolean)
+  let defaultsByStage: Record<string, { id: string; name: string } | null> = {}
+  if (defaultIds.length > 0) {
+    const dRes = await pool.query(
+      `SELECT id, name, display_name FROM users WHERE id = ANY($1)`,
+      [defaultIds],
+    )
+    const byId: Record<string, { name: string }> = {}
+    for (const r of dRes.rows) {
+      byId[r.id] = { name: r.display_name || r.name }
+    }
+    for (const [stage, uid] of Object.entries(defaults)) {
+      if (uid && byId[uid]) defaultsByStage[stage] = { id: uid, name: byId[uid].name }
+    }
+  }
+  function effectiveOwner(stage: string, explicitId: string | null, explicitName: string | null) {
+    if (explicitId) return { owner: { id: explicitId, name: explicitName || '' }, fromDefault: false }
+    const d = defaultsByStage[stage]
+    if (d) return { owner: d, fromDefault: true }
+    return { owner: null, fromDefault: false }
+  }
+  const owners = {
+    writing: effectiveOwner('writing', song.writer_id, song.writer_name || song.writer_full_name),
+    tracking: effectiveOwner('tracking', song.tracker_id, song.tracker_name || song.tracker_full_name),
+    overdubs: effectiveOwner('overdubs', song.overdub_id, song.overdub_name || song.overdub_full_name),
+    producing: effectiveOwner('producing', song.producer_id, song.producer_name || song.producer_full_name),
+    stems: effectiveOwner('stems', song.stems_id, song.stems_name || song.stems_full_name),
+    mixing: effectiveOwner('mixing', song.mixer_id, song.mixer_name || song.mixer_full_name),
+    mastering: effectiveOwner('mastering', song.master_id, song.master_name || song.master_full_name),
+  }
+
   res.json({
     song: {
       id: song.id,
@@ -95,13 +130,22 @@ songsRouter.get('/:id', async (req, res) => {
       stage: song.stage,
       dropboxFolder: song.dropbox_folder,
       stageOwners: {
-        writing: song.writer_id ? { id: song.writer_id, name: song.writer_name || song.writer_full_name } : null,
-        tracking: song.tracker_id ? { id: song.tracker_id, name: song.tracker_name || song.tracker_full_name } : null,
-        overdubs: song.overdub_id ? { id: song.overdub_id, name: song.overdub_name || song.overdub_full_name } : null,
-        producing: song.producer_id ? { id: song.producer_id, name: song.producer_name || song.producer_full_name } : null,
-        stems: song.stems_id ? { id: song.stems_id, name: song.stems_name || song.stems_full_name } : null,
-        mixing: song.mixer_id ? { id: song.mixer_id, name: song.mixer_name || song.mixer_full_name } : null,
-        mastering: song.master_id ? { id: song.master_id, name: song.master_name || song.master_full_name } : null,
+        writing: owners.writing.owner,
+        tracking: owners.tracking.owner,
+        overdubs: owners.overdubs.owner,
+        producing: owners.producing.owner,
+        stems: owners.stems.owner,
+        mixing: owners.mixing.owner,
+        mastering: owners.mastering.owner,
+      },
+      stageOwnerFromDefault: {
+        writing: owners.writing.fromDefault,
+        tracking: owners.tracking.fromDefault,
+        overdubs: owners.overdubs.fromDefault,
+        producing: owners.producing.fromDefault,
+        stems: owners.stems.fromDefault,
+        mixing: owners.mixing.fromDefault,
+        mastering: owners.mastering.fromDefault,
       },
       // legacy fields kept for backward compat
       producerId: song.producer_id,

@@ -122,19 +122,28 @@ export default function SongPage() {
               const sc = STAGE_COLOR[s]
               const passed = i <= stageIndex
               const current = i === stageIndex
+              const openInThisStage = song.tasks.filter((t) => !t.done && t.stage === s).length
+              const hasOpenWork = openInThisStage > 0 && !current
               return (
                 <div key={s} className="flex items-center gap-1.5 shrink-0">
                   <button
                     onClick={() => void setStage(s)}
                     disabled={savingStage || current}
-                    className={`flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[10px] uppercase tracking-wider font-bold transition ${
+                    className={`relative flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[10px] uppercase tracking-wider font-bold transition ${
                       passed
                         ? `${sc.bgStrong} ${sc.text} border ${sc.border}/50 ${current ? sc.glow : 'hover:opacity-80'}`
-                        : 'text-muted/60 border border-line hover:text-text'
-                    }`}
+                        : hasOpenWork
+                          ? `${sc.bg} ${sc.text} border ${sc.border}/50 hover:opacity-80`
+                          : 'text-muted/60 border border-line hover:text-text'
+                    } ${hasOpenWork ? sc.glow : ''}`}
                   >
                     <span className="text-[0.95em] leading-none">{STAGE_ICON[s]}</span>
                     {STAGE_LABEL[s]}
+                    {openInThisStage > 0 && (
+                      <span className={`ml-0.5 inline-flex items-center justify-center min-w-[16px] h-[16px] rounded-full text-[9px] font-bold ${sc.bgStrong} ${sc.text} border ${sc.border}/50`}>
+                        {openInThisStage}
+                      </span>
+                    )}
                   </button>
                   {i < STAGES.length - 1 && (
                     <div className={`w-3 h-px ${passed && i < stageIndex ? sc.dot : 'bg-line'}`} />
@@ -191,6 +200,7 @@ function PeoplePanel({
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         {STAGE_ROLES.map(({ stage, label, field }) => {
           const owner = song.stageOwners?.[stage]
+          const fromDefault = song.stageOwnerFromDefault?.[stage] ?? false
           const c = STAGE_COLOR[stage]
           const isCurrent = song.stage === stage
           return (
@@ -206,13 +216,22 @@ function PeoplePanel({
                     Now
                   </span>
                 )}
+                {fromDefault && (
+                  <span className="text-[9px] text-muted bg-line/40 border border-line rounded-full px-1.5 py-0.5">
+                    project default
+                  </span>
+                )}
               </label>
               <select
-                value={owner?.id ?? ''}
+                value={fromDefault ? '' : (owner?.id ?? '')}
                 onChange={(e) => void setOwner(field, e.target.value)}
-                className={`w-full rounded-xl bg-ink/40 border border-line text-text px-3 py-2.5 outline-none focus:${c.border} text-sm`}
+                className={`w-full rounded-xl bg-ink/40 border border-line ${fromDefault ? 'text-muted italic' : 'text-text'} px-3 py-2.5 outline-none focus:${c.border} text-sm`}
               >
-                <option value="">— Unassigned —</option>
+                <option value="">
+                  {fromDefault && owner
+                    ? `(inherits ${owner.name}) — override…`
+                    : '— Unassigned —'}
+                </option>
                 {members.map((m) => (
                   <option key={m.id} value={m.id}>
                     {m.display_name || m.name}
@@ -351,6 +370,14 @@ function TasksPanel({
                 <span className={`flex-1 min-w-0 ${t.done ? 'line-through text-muted' : ''}`}>
                   {renderWithMentions(t.title, members)}
                 </span>
+                {t.stage !== song.stage && (
+                  <span
+                    className={`text-[9px] uppercase tracking-wider font-bold rounded-full px-1.5 py-0.5 border shrink-0 ${STAGE_COLOR[t.stage].bgStrong} ${STAGE_COLOR[t.stage].text} ${STAGE_COLOR[t.stage].border}/40`}
+                    title={`This task belongs to the ${STAGE_LABEL[t.stage]} stage`}
+                  >
+                    {STAGE_ICON[t.stage]} {STAGE_LABEL[t.stage]}
+                  </span>
+                )}
                 <select
                   value={t.assigneeId ?? ''}
                   onChange={(e) => void setAssignee(t.id, e.target.value)}

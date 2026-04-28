@@ -1,7 +1,7 @@
 import { Link, useParams } from 'react-router-dom'
 import { useEffect, useState } from 'react'
-import { api, type ApiProject } from '../api'
-import { STAGE_COLOR, STAGES, STAGE_LABEL, STAGE_ICON, type Song } from '../types'
+import { api, type ApiMember, type ApiProject } from '../api'
+import { STAGE_COLOR, STAGES, STAGE_LABEL, STAGE_ICON, type Song, type Stage } from '../types'
 import StagePill from '../components/StagePill'
 import StageDistribution from '../components/StageDistribution'
 import InlineEdit from '../components/InlineEdit'
@@ -9,14 +9,27 @@ import InlineEdit from '../components/InlineEdit'
 export default function ProjectPage() {
   const { projectId } = useParams()
   const [project, setProject] = useState<ApiProject | null>(null)
+  const [members, setMembers] = useState<ApiMember[]>([])
   const [error, setError] = useState<string | null>(null)
 
-  useEffect(() => {
+  async function reload() {
     if (!projectId) return
-    api
-      .project(projectId)
-      .then(({ project }) => setProject(project))
-      .catch((err) => setError(err instanceof Error ? err.message : 'failed to load'))
+    try {
+      const { project } = await api.project(projectId)
+      setProject(project)
+      try {
+        const { members } = await api.projectMembers(projectId)
+        setMembers(members)
+      } catch {
+        // members non-critical
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'failed to load')
+    }
+  }
+
+  useEffect(() => {
+    void reload()
   }, [projectId])
 
   if (error) {
@@ -96,6 +109,8 @@ export default function ProjectPage() {
         </div>
       </div>
 
+      <ProjectRolesSection project={project} members={members} onSaved={reload} />
+
       <div className="space-y-8">
         {STAGES.map((stage) => {
           const stageSongs = songs.filter((s) => s.stage === stage)
@@ -160,3 +175,83 @@ export default function ProjectPage() {
     </div>
   )
 }
+
+function ProjectRolesSection({
+  project,
+  members,
+  onSaved,
+}: {
+  project: ApiProject
+  members: ApiMember[]
+  onSaved: () => void | Promise<void>
+}) {
+  const STAGE_ROLES: Array<{ stage: Stage; label: string }> = [
+    { stage: "writing", label: "✍️ Writer" },
+    { stage: "tracking", label: "🎤 Tracking" },
+    { stage: "overdubs", label: "🎸 Overdubs" },
+    { stage: "producing", label: "🎚️ Comp / Producer" },
+    { stage: "stems", label: "📦 Stems" },
+    { stage: "mixing", label: "🎛️ Mixer" },
+    { stage: "mastering", label: "✨ Mastering" },
+  ]
+
+  async function setDefault(stage: Stage, userId: string) {
+    const next: Record<string, string> = {}
+    for (const [s, owner] of Object.entries(project.defaultOwners ?? {})) {
+      if (owner) next[s] = owner.id
+    }
+    if (userId) next[stage] = userId
+    else delete next[stage]
+    await api.updateProject(project.id, { defaultOwners: next })
+    await onSaved()
+  }
+
+  const hasAny = Object.values(project.defaultOwners ?? {}).some((v) => v != null)
+
+  return (
+    <section className="rounded-2xl border border-line bg-panel/60 p-6">
+      <div className="flex items-start justify-between gap-3 mb-4">
+        <div>
+          <h2 className="text-[11px] uppercase tracking-[0.2em] text-muted font-bold">
+            👥 Default Roles
+          </h2>
+          <p className="text-[11px] text-muted/80 mt-1">
+            Set once here. Songs without an explicit owner for a stage inherit these defaults
+            automatically — set Ryan = Tracking, Dillon = Overdubs, etc., and every song picks them up.
+          </p>
+        </div>
+        {hasAny && (
+          <span className="text-[10px] uppercase tracking-wider text-stage-stems bg-stage-stems/10 border border-stage-stems/40 rounded-full px-2 py-0.5 font-bold whitespace-nowrap">
+            Active
+          </span>
+        )}
+      </div>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        {STAGE_ROLES.map(({ stage, label }) => {
+          const owner = project.defaultOwners?.[stage]
+          return (
+            <div key={stage}>
+              <label className="block text-[11px] uppercase tracking-wider text-muted font-bold mb-1.5">
+                {label}
+              </label>
+              <select
+                value={owner?.id ?? ""}
+                onChange={(e) => void setDefault(stage, e.target.value)}
+                className="w-full rounded-xl bg-ink/40 border border-line text-text px-3 py-2.5 outline-none focus:border-stage-mastering text-sm"
+              >
+                <option value="">— No default —</option>
+                {members.map((m) => (
+                  <option key={m.id} value={m.id}>
+                    {m.display_name || m.name}
+                    {m.role === "admin" ? " (admin)" : ""}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )
+        })}
+      </div>
+    </section>
+  )
+}
+

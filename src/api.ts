@@ -44,6 +44,7 @@ export type ApiSongDetail = {
   stage: Stage
   dropboxFolder: string | null
   stageOwners: Record<Stage, ApiStageOwner>
+  stageOwnerFromDefault?: Partial<Record<Stage, boolean>>
   producerId: string | null
   producerName: string | null
   mixerId: string | null
@@ -139,6 +140,7 @@ export type ApiProject = {
   subtitle?: string | null
   kind: 'album' | 'podcast' | 'film'
   dropboxFolder?: string | null
+  defaultOwners?: Record<string, { id: string; name: string } | null>
   songs: ApiSong[]
 }
 
@@ -225,7 +227,7 @@ export const api = {
     return res.json() as Promise<{ ok: true; path: string }>
   },
   // Project edit
-  updateProject: (id: string, patch: { name?: string; subtitle?: string; dropboxFolder?: string }) =>
+  updateProject: (id: string, patch: { name?: string; subtitle?: string; dropboxFolder?: string; defaultOwners?: Record<string, string> }) =>
     request<{ ok: true }>(`/api/projects/${id}`, { method: 'PATCH', body: JSON.stringify(patch) }),
   createProject: (body: { name: string; subtitle?: string; kind?: 'album' | 'podcast' | 'film'; dropboxFolder?: string }) =>
     request<{ project: ApiProject }>('/api/projects', { method: 'POST', body: JSON.stringify(body) }),
