@@ -1,14 +1,17 @@
 import { Link, useParams } from 'react-router-dom'
 import { useEffect, useState } from 'react'
 import { api, type ApiMember, type ApiProject } from '../api'
-import { STAGE_COLOR, STAGES, stageLabel, stageIcon, type Song, type Stage } from '../types'
+import { STAGE_COLOR, STAGES, stageLabel, stageIcon, type Song, type Stage, type StageLabels } from '../types'
 import StagePill from '../components/StagePill'
 import StageDistribution from '../components/StageDistribution'
 import InlineEdit from '../components/InlineEdit'
 import DropboxFolderPicker from '../components/DropboxFolderPicker'
+import { useAuth } from '../auth'
 
 export default function ProjectPage() {
   const { projectId } = useParams()
+  const { user } = useAuth()
+  const isAdmin = user?.role === 'admin'
   const [project, setProject] = useState<ApiProject | null>(null)
   const [members, setMembers] = useState<ApiMember[]>([])
   const [error, setError] = useState<string | null>(null)
@@ -96,51 +99,63 @@ export default function ProjectPage() {
               {project.kind}
             </div>
             <h1 className="font-display text-5xl leading-none">
-              <InlineEdit
-                value={project.name}
-                onSave={saveName}
-                inputClassName="font-display text-5xl"
-                className="text-rainbow"
-              />
+              {isAdmin ? (
+                <InlineEdit
+                  value={project.name}
+                  onSave={saveName}
+                  inputClassName="font-display text-5xl"
+                  className="text-rainbow"
+                />
+              ) : (
+                <span className="text-rainbow">{project.name}</span>
+              )}
             </h1>
             <div className="text-muted mt-2 text-sm">
-              <InlineEdit
-                value={project.subtitle ?? ''}
-                onSave={saveSubtitle}
-                emptyLabel="+ Add subtitle"
-              />
-            </div>
-            <div className="text-[11px] text-muted mt-1 font-mono flex items-center flex-wrap gap-2">
-              📦 Dropbox root:{' '}
-              <span className="break-all">{project.dropboxFolder || <em className="text-muted/60 not-italic">— not set —</em>}</span>
-              <button
-                onClick={() => setShowRootPicker(true)}
-                className="text-[10px] uppercase tracking-wider text-stage-stems border border-stage-stems/40 rounded-full px-2 py-0.5 hover:bg-stage-stems/10"
-              >
-                📁 Pick
-              </button>
-              {project.dropboxFolder && (
-                <button
-                  onClick={() => void saveRootFolder('')}
-                  className="text-[10px] text-muted hover:text-urgent"
-                  title="Clear"
-                >
-                  ✕
-                </button>
+              {isAdmin ? (
+                <InlineEdit
+                  value={project.subtitle ?? ''}
+                  onSave={saveSubtitle}
+                  emptyLabel="+ Add subtitle"
+                />
+              ) : (
+                project.subtitle && <span>{project.subtitle}</span>
               )}
             </div>
-            <div className="text-[11px] text-muted mt-1 font-mono">
-              📁 {channelLabel}s subfolder:{' '}
-              <InlineEdit
-                value={project.channelsSubfolder ?? ''}
-                onSave={saveChannelsSubfolder}
-                emptyLabel="+ Set subfolder (e.g. episodes)"
-                inputClassName="text-[11px] font-mono"
-              />
-              <span className="ml-1 opacity-60">
-                (where new {channelLabel}s land inside the root)
-              </span>
-            </div>
+            {isAdmin && (
+              <div className="text-[11px] text-muted mt-1 font-mono flex items-center flex-wrap gap-2">
+                📦 Dropbox root:{' '}
+                <span className="break-all">{project.dropboxFolder || <em className="text-muted/60 not-italic">— not set —</em>}</span>
+                <button
+                  onClick={() => setShowRootPicker(true)}
+                  className="text-[10px] uppercase tracking-wider text-stage-stems border border-stage-stems/40 rounded-full px-2 py-0.5 hover:bg-stage-stems/10"
+                >
+                  📁 Pick
+                </button>
+                {project.dropboxFolder && (
+                  <button
+                    onClick={() => void saveRootFolder('')}
+                    className="text-[10px] text-muted hover:text-urgent"
+                    title="Clear"
+                  >
+                    ✕
+                  </button>
+                )}
+              </div>
+            )}
+            {isAdmin && (
+              <div className="text-[11px] text-muted mt-1 font-mono">
+                📁 {channelLabel}s subfolder:{' '}
+                <InlineEdit
+                  value={project.channelsSubfolder ?? ''}
+                  onSave={saveChannelsSubfolder}
+                  emptyLabel="+ Set subfolder (e.g. episodes)"
+                  inputClassName="text-[11px] font-mono"
+                />
+                <span className="ml-1 opacity-60">
+                  (where new {channelLabel}s land inside the root)
+                </span>
+              </div>
+            )}
           </div>
           <button
             onClick={() => void addChannel()}
@@ -159,7 +174,7 @@ export default function ProjectPage() {
         </div>
       </div>
 
-      <ProjectRolesSection project={project} members={members} onSaved={reload} />
+      {isAdmin && <ProjectRolesSection project={project} members={members} onSaved={reload} />}
 
       {showRootPicker && (
         <DropboxFolderPicker
@@ -246,15 +261,19 @@ function ProjectRolesSection({
   members: ApiMember[]
   onSaved: () => void | Promise<void>
 }) {
+  const labels: StageLabels | undefined = project.stageLabels
   const STAGE_ROLES: Array<{ stage: Stage; label: string }> = [
-    { stage: "writing", label: "✍️ Writer" },
-    { stage: "tracking", label: "🎤 Tracking" },
-    { stage: "overdubs", label: "🎸 Overdubs" },
-    { stage: "producing", label: "🎚️ Comp / Producer" },
-    { stage: "stems", label: "📦 Stems" },
-    { stage: "mixing", label: "🎛️ Mixer" },
-    { stage: "mastering", label: "✨ Mastering" },
-  ]
+    'writing',
+    'tracking',
+    'overdubs',
+    'producing',
+    'stems',
+    'mixing',
+    'mastering',
+  ].map((s) => ({
+    stage: s as Stage,
+    label: `${stageIcon(s as Stage, labels)} ${stageLabel(s as Stage, labels)}`,
+  }))
 
   async function setDefault(stage: Stage, userId: string) {
     const next: Record<string, string> = {}

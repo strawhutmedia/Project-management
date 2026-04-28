@@ -180,15 +180,21 @@ function PeoplePanel({
   members: ApiMember[]
   onChange: () => void | Promise<void>
 }) {
-  const STAGE_ROLES: Array<{ stage: Stage; label: string; field: keyof PatchPayload }> = [
-    { stage: 'writing', label: '✍️ Writer', field: 'writerId' },
-    { stage: 'tracking', label: '🎤 Tracking', field: 'trackerId' },
-    { stage: 'overdubs', label: '🎸 Overdubs', field: 'overdubId' },
-    { stage: 'producing', label: '🎚️ Comp / Producer', field: 'producerId' },
-    { stage: 'stems', label: '📦 Stems', field: 'stemsId' },
-    { stage: 'mixing', label: '🎛️ Mixer', field: 'mixerId' },
-    { stage: 'mastering', label: '✨ Mastering', field: 'masterId' },
-  ]
+  const songLabels: StageLabels | undefined = song.projectStageLabels
+  const STAGE_ROLES: Array<{ stage: Stage; label: string; field: keyof PatchPayload }> = (
+    [
+      { stage: 'writing', field: 'writerId' },
+      { stage: 'tracking', field: 'trackerId' },
+      { stage: 'overdubs', field: 'overdubId' },
+      { stage: 'producing', field: 'producerId' },
+      { stage: 'stems', field: 'stemsId' },
+      { stage: 'mixing', field: 'mixerId' },
+      { stage: 'mastering', field: 'masterId' },
+    ] as Array<{ stage: Stage; field: keyof PatchPayload }>
+  ).map((r) => ({
+    ...r,
+    label: `${stageIcon(r.stage, songLabels)} ${stageLabel(r.stage, songLabels)}`,
+  }))
 
   async function setOwner(field: keyof PatchPayload, id: string) {
     await api.updateSong(song.id, { [field]: id || null } as PatchPayload)

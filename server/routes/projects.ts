@@ -226,15 +226,12 @@ projectsRouter.get('/:id/members', async (req, res) => {
 projectsRouter.patch('/:id', async (req, res) => {
   const user = (req as typeof req & { user: SessionUser }).user
   const projectId = req.params.id
-  // Only admin or project members can edit
-  const access = await pool.query(
-    `SELECT 1 FROM projects p
-     LEFT JOIN project_members m ON m.project_id = p.id AND m.user_id = $1
-     WHERE p.id = $2 AND ($3 = 'admin' OR p.created_by = $1 OR m.user_id IS NOT NULL)`,
-    [user.id, projectId, user.role],
-  )
-  if (access.rows.length === 0) {
-    res.status(403).json({ error: 'forbidden' })
+  // Project-level config (name, subtitle, Dropbox root, channels subfolder,
+  // default roles, stage labels) is admin-only. Operational edits — adding
+  // channels, editing channel titles, tasks, comments — happen through
+  // their own routes and remain available to project members.
+  if (user.role !== 'admin') {
+    res.status(403).json({ error: 'admin_only' })
     return
   }
   const { name, subtitle, dropboxFolder, defaultOwners } = req.body ?? {}
