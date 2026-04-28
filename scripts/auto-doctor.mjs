@@ -10,6 +10,32 @@ import fs from 'fs'
 import path from 'path'
 import { execSync } from 'child_process'
 
+// Verbose diagnostic log we'll write to the status branch every run.
+const diagLog = []
+function diag(msg, data) {
+  const entry = { ts: new Date().toISOString(), msg, ...(data ? { data } : {}) }
+  diagLog.push(entry)
+  console.log(`[doctor] ${msg}${data ? ` :: ${JSON.stringify(data).slice(0, 200)}` : ''}`)
+}
+
+process.on('uncaughtException', (err) => {
+  diag('uncaughtException', { message: err.message, stack: err.stack?.slice(0, 1000) })
+  void persistDiag().finally(() => process.exit(0))
+})
+process.on('unhandledRejection', (err) => {
+  const e = err instanceof Error ? err : new Error(String(err))
+  diag('unhandledRejection', { message: e.message, stack: e.stack?.slice(0, 1000) })
+  void persistDiag().finally(() => process.exit(0))
+})
+
+async function persistDiag() {
+  try {
+    await updateStatusFile('auto-doctor-runs.jsonl', diagLog.map((e) => JSON.stringify(e)).join('\n') + '\n', /* append */ true)
+  } catch (err) {
+    console.error('persistDiag failed:', err.message)
+  }
+}
+
 const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY
 if (!ANTHROPIC_API_KEY) {
   console.error('ANTHROPIC_API_KEY not set — exiting')
@@ -249,11 +275,18 @@ function errorKey(e) {
 }
 
 async function main() {
+  diag('boot', {
+    node: process.version,
+    has_anthropic_key: Boolean(process.env.ANTHROPIC_API_KEY),
+    has_github_token: Boolean(process.env.GITHUB_TOKEN),
+    cwd: process.cwd(),
+  })
+
   let errors = []
   try {
     const raw = await ghReadFile('errors.jsonl')
     if (raw === null) {
-      console.log('No errors.jsonl on status branch yet — nothing to do')
+      diag('no_errors_file')
       return
     }
     errors = raw.split('\n').filter(Boolean).map((line) => {
@@ -324,17 +357,17 @@ async function main() {
   await updateStatusFile('auto-doctor-seen.json', JSON.stringify(seen, null, 2))
 }
 
-async function updateStatusFile(filePath, content) {
+async function updateStatusFile(filePath, content, append = false) {
   const owner = 'strawhutmedia'
   const repo = 'Project-management'
   const branch = 'status'
   const token = process.env.GH_AUTODOCTOR_TOKEN || process.env.GITHUB_TOKEN
   if (!token) {
-    console.error('No GH_AUTODOCTOR_TOKEN/GITHUB_TOKEN — cannot persist seen state')
+    console.error('No GH_AUTODOCTOR_TOKEN/GITHUB_TOKEN — cannot persist file')
     return
   }
-  // Get existing sha (if any)
   let sha = undefined
+  let existing = ''
   try {
     const headRes = await fetch(
       `https://api.github.com/repos/${owner}/${repo}/contents/${filePath}?ref=${branch}`,
@@ -343,8 +376,15 @@ async function updateStatusFile(filePath, content) {
     if (headRes.ok) {
       const data = await headRes.json()
       sha = data.sha
+      if (append && data.encoding === 'base64') {
+        existing = Buffer.from(data.content, 'base64').toString('utf8')
+        // Tail to last 500 lines so the file doesn't grow unbounded.
+        existing = existing.split('\n').slice(-500).join('\n')
+        if (existing && !existing.endsWith('\n')) existing += '\n'
+      }
     }
   } catch {}
+  const finalContent = append ? existing + content : content
   const res = await fetch(
     `https://api.github.com/repos/${owner}/${repo}/contents/${filePath}`,
     {
@@ -356,7 +396,7 @@ async function updateStatusFile(filePath, content) {
       },
       body: JSON.stringify({
         message: `auto-doctor: update ${filePath}`,
-        content: Buffer.from(content).toString('base64'),
+        content: Buffer.from(finalContent).toString('base64'),
         branch,
         sha,
       }),
@@ -364,11 +404,17 @@ async function updateStatusFile(filePath, content) {
   )
   if (!res.ok) {
     const text = await res.text()
-    console.error(`Failed to persist seen state: ${res.status} ${text.slice(0, 200)}`)
+    console.error(`Failed to persist ${filePath}: ${res.status} ${text.slice(0, 200)}`)
   }
 }
 
-main().catch((err) => {
-  console.error('Auto-Doctor fatal:', err)
-  process.exit(1)
-})
+main()
+  .then(() => {
+    diag('done')
+    return persistDiag()
+  })
+  .catch(async (err) => {
+    diag('fatal', { message: err?.message, stack: err?.stack?.slice(0, 1000) })
+    await persistDiag()
+  })
+  .finally(() => process.exit(0))
