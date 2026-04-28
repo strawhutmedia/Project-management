@@ -41,6 +41,16 @@ export const STAGE_ICON: Record<Stage, string> = {
   done: '✅',
 }
 
+// Per-project stage label/icon overrides take precedence when present.
+export type StageLabels = Partial<Record<Stage, { label?: string; icon?: string }>>
+
+export function stageLabel(stage: Stage, overrides?: StageLabels): string {
+  return overrides?.[stage]?.label || STAGE_LABEL[stage]
+}
+export function stageIcon(stage: Stage, overrides?: StageLabels): string {
+  return overrides?.[stage]?.icon || STAGE_ICON[stage]
+}
+
 export const STAGE_COLOR: Record<
   Stage,
   { bg: string; bgStrong: string; text: string; border: string; dot: string; glow: string; hex: string }

@@ -1,7 +1,7 @@
 import { Link, useParams } from 'react-router-dom'
 import { useEffect, useRef, useState } from 'react'
 import { api, type ApiDropboxEntry, type ApiMember, type ApiSongDetail } from '../api'
-import { STAGES, STAGE_COLOR, STAGE_LABEL, STAGE_ICON, type Stage } from '../types'
+import { STAGES, STAGE_COLOR, STAGE_LABEL, STAGE_ICON, stageLabel, stageIcon, type Stage, type StageLabels } from '../types'
 import StagePill from '../components/StagePill'
 import InlineEdit from '../components/InlineEdit'
 import AddLinkModal from '../components/AddLinkModal'
@@ -45,6 +45,7 @@ export default function SongPage() {
 
   const c = STAGE_COLOR[song.stage]
   const stageIndex = STAGES.indexOf(song.stage)
+  const labels: StageLabels = song.projectStageLabels ?? {}
 
   async function setStage(stage: Stage) {
     if (!song || stage === song.stage) return
@@ -84,7 +85,7 @@ export default function SongPage() {
         <div className="mt-3 flex items-end justify-between flex-wrap gap-4">
           <div className="flex-1 min-w-0">
             <div className={`text-[10px] uppercase tracking-[0.3em] mb-2 font-bold ${c.text}`}>
-              {STAGE_ICON[song.stage]} {STAGE_LABEL[song.stage]}
+              {stageIcon(song.stage, labels)} {stageLabel(song.stage, labels)}
             </div>
             <h1 className="font-display text-5xl leading-none">
               <InlineEdit
@@ -137,8 +138,8 @@ export default function SongPage() {
                           : 'text-muted/60 border border-line hover:text-text'
                     } ${hasOpenWork ? sc.glow : ''}`}
                   >
-                    <span className="text-[0.95em] leading-none">{STAGE_ICON[s]}</span>
-                    {STAGE_LABEL[s]}
+                    <span className="text-[0.95em] leading-none">{stageIcon(s, labels)}</span>
+                    {stageLabel(s, labels)}
                     {openInThisStage > 0 && (
                       <span className={`ml-0.5 inline-flex items-center justify-center min-w-[16px] h-[16px] rounded-full text-[9px] font-bold ${sc.bgStrong} ${sc.text} border ${sc.border}/50`}>
                         {openInThisStage}

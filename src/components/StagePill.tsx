@@ -1,13 +1,15 @@
-import { STAGE_COLOR, STAGE_ICON, STAGE_LABEL, type Stage } from '../types'
+import { STAGE_COLOR, stageIcon, stageLabel, type Stage, type StageLabels } from '../types'
 
 export default function StagePill({
   stage,
   size = 'sm',
   glow = false,
+  labels,
 }: {
   stage: Stage
   size?: 'sm' | 'xs' | 'lg'
   glow?: boolean
+  labels?: StageLabels
 }) {
   const c = STAGE_COLOR[stage]
   const sizeCls =
@@ -22,8 +24,8 @@ export default function StagePill({
         glow ? c.glow : ''
       }`}
     >
-      <span className="text-[0.85em] leading-none">{STAGE_ICON[stage]}</span>
-      {STAGE_LABEL[stage]}
+      <span className="text-[0.85em] leading-none">{stageIcon(stage, labels)}</span>
+      {stageLabel(stage, labels)}
     </span>
   )
 }

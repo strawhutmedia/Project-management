@@ -39,6 +39,7 @@ export type ApiSongDetail = {
   projectId: string
   projectName: string
   projectRoot: string | null
+  projectStageLabels?: Partial<Record<Stage, { label?: string; icon?: string }>>
   title: string
   subtitle?: string | null
   stage: Stage
@@ -141,6 +142,7 @@ export type ApiProject = {
   kind: 'album' | 'podcast' | 'film'
   dropboxFolder?: string | null
   defaultOwners?: Record<string, { id: string; name: string } | null>
+  stageLabels?: Partial<Record<Stage, { label?: string; icon?: string }>>
   songs: ApiSong[]
 }
 

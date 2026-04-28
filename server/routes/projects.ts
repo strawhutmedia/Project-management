@@ -53,6 +53,21 @@ projectsRouter.get('/', async (req, res) => {
   })
 })
 
+// Default stage labels per project kind. The internal stage keys stay
+// the same (writing/tracking/overdubs/producing/stems/mixing/mastering/done)
+// so the data layer is identical across project types — only the displayed
+// label and icon change per project.
+const PODCAST_LABELS = {
+  writing: { label: 'Scheduled', icon: '📅' },
+  tracking: { label: 'Prepped', icon: '🎤' },
+  overdubs: { label: 'Recorded', icon: '🎬' },
+  producing: { label: 'Editing', icon: '✂️' },
+  stems: { label: 'Client Review', icon: '👀' },
+  mixing: { label: 'Revisions', icon: '🔧' },
+  mastering: { label: 'Finalized', icon: '✨' },
+  done: { label: 'Released', icon: '🚀' },
+}
+
 projectsRouter.post('/', async (req, res) => {
   const user = (req as typeof req & { user: SessionUser }).user
   const name = String(req.body?.name || '').trim()
@@ -66,11 +81,13 @@ projectsRouter.post('/', async (req, res) => {
     return
   }
 
+  const stageLabels = kind === 'podcast' ? PODCAST_LABELS : {}
+
   const { rows } = await pool.query(
-    `INSERT INTO projects (name, subtitle, kind, created_by, dropbox_folder)
-     VALUES ($1, $2, $3, $4, $5)
-     RETURNING id, name, subtitle, kind, dropbox_folder`,
-    [name.slice(0, 200), subtitle, kind, user.id, dropboxFolder],
+    `INSERT INTO projects (name, subtitle, kind, created_by, dropbox_folder, stage_labels)
+     VALUES ($1, $2, $3, $4, $5, $6::jsonb)
+     RETURNING id, name, subtitle, kind, dropbox_folder, stage_labels`,
+    [name.slice(0, 200), subtitle, kind, user.id, dropboxFolder, JSON.stringify(stageLabels)],
   )
   const project = rows[0]
   await pool.query(
@@ -194,7 +211,7 @@ projectsRouter.get('/:id', async (req, res) => {
   const user = (req as typeof req & { user: SessionUser }).user
   const projectId = req.params.id
   const projRes = await pool.query(
-    `SELECT id, name, subtitle, kind, dropbox_folder, default_owners FROM projects WHERE id = $1`,
+    `SELECT id, name, subtitle, kind, dropbox_folder, default_owners, stage_labels FROM projects WHERE id = $1`,
     [projectId],
   )
   if (projRes.rows.length === 0) {
@@ -287,6 +304,7 @@ projectsRouter.get('/:id', async (req, res) => {
       kind: project.kind,
       dropboxFolder: project.dropbox_folder,
       defaultOwners: defaultOwnersResolved,
+      stageLabels: project.stage_labels || {},
       songs: songs.rows.map((s: { id: string; title: string; subtitle: string | null; stage: string }) => ({
         id: s.id,
         title: s.title,
