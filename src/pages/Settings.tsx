@@ -374,8 +374,8 @@ function InviteModal({
   }
 
   return (
-    <div className="fixed inset-0 z-50 grid place-items-center bg-ink/80 backdrop-blur-sm p-4">
-      <div className="w-full max-w-lg rounded-2xl border border-line bg-panel/95 backdrop-blur-md shadow-2xl max-h-[90vh] flex flex-col">
+    <div className="fixed inset-0 z-50 grid place-items-center bg-ink/80 backdrop-blur-sm p-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
+      <div className="w-full max-w-lg rounded-2xl border border-line bg-panel/95 backdrop-blur-md shadow-2xl max-h-[88dvh] flex flex-col">
         <div className="flex items-center justify-between p-5 border-b border-line">
           <h2 className="font-display text-2xl">Invite user</h2>
           <button onClick={onClose} className="text-muted hover:text-text text-xl leading-none">

@@ -1,6 +1,18 @@
-import { STAGES, STAGE_COLOR, STAGE_ICON, STAGE_LABEL, type Song, type Stage } from '../types'
+import { STAGES, STAGE_COLOR, stageIcon, stageLabel, type Song, type Stage, type StageLabels } from '../types'
 
-export default function StageDistribution({ songs }: { songs: Song[] }) {
+type Props = {
+  songs: Song[]
+  labels?: StageLabels
+  kind?: 'album' | 'podcast' | 'film'
+}
+
+const PROGRESS_LABEL: Record<NonNullable<Props['kind']>, string> = {
+  album: 'Album progress',
+  podcast: 'Show progress',
+  film: 'Film progress',
+}
+
+export default function StageDistribution({ songs, labels, kind = 'album' }: Props) {
   const total = songs.length || 1
   const counts = STAGES.reduce<Record<Stage, number>>((acc, s) => {
     acc[s] = songs.filter((song) => song.stage === s).length
@@ -12,7 +24,7 @@ export default function StageDistribution({ songs }: { songs: Song[] }) {
     <div>
       <div className="flex items-center justify-between mb-3">
         <span className="text-[11px] uppercase tracking-[0.2em] text-muted font-bold">
-          Album progress
+          {PROGRESS_LABEL[kind]}
         </span>
         <span className="text-[11px] text-muted">
           <span className="text-text font-bold">
@@ -28,7 +40,7 @@ export default function StageDistribution({ songs }: { songs: Song[] }) {
           return (
             <div
               key={s}
-              title={`${STAGE_LABEL[s]}: ${counts[s]}`}
+              title={`${stageLabel(s, labels)}: ${counts[s]}`}
               style={{ width: `${w}%` }}
               className={`${STAGE_COLOR[s].dot} h-full relative`}
             />
@@ -48,8 +60,8 @@ export default function StageDistribution({ songs }: { songs: Song[] }) {
                 active ? `${c.border}/40 ${c.bgStrong} ${c.text}` : 'border-line text-muted/60'
               }`}
             >
-              <span className="text-[0.95em] leading-none">{STAGE_ICON[s]}</span>
-              <span className="uppercase tracking-wider font-semibold">{STAGE_LABEL[s]}</span>
+              <span className="text-[0.95em] leading-none">{stageIcon(s, labels)}</span>
+              <span className="uppercase tracking-wider font-semibold">{stageLabel(s, labels)}</span>
               <span className={`font-bold ${active ? '' : 'opacity-60'}`}>{n}</span>
             </div>
           )

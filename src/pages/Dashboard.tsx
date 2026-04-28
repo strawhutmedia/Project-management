@@ -74,7 +74,7 @@ export default function Dashboard() {
                     Open →
                   </span>
                 </div>
-                <StageDistribution songs={p.songs as unknown as Song[]} />
+                <StageDistribution songs={p.songs as unknown as Song[]} labels={p.stageLabels} kind={p.kind} />
               </div>
             </Link>
           ))}
@@ -137,15 +137,15 @@ function CreateProjectModal({
   ]
 
   return (
-    <div className="fixed inset-0 z-50 grid place-items-center bg-ink/80 backdrop-blur-sm p-4">
-      <div className="w-full max-w-lg rounded-2xl border border-line bg-panel/95 backdrop-blur-md shadow-2xl">
+    <div className="fixed inset-0 z-50 grid place-items-center bg-ink/80 backdrop-blur-sm p-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
+      <div className="w-full max-w-lg rounded-2xl border border-line bg-panel/95 backdrop-blur-md shadow-2xl max-h-[88dvh] flex flex-col overflow-hidden">
         <div className="flex items-center justify-between p-5 border-b border-line">
           <h2 className="font-display text-2xl">New project</h2>
           <button onClick={onClose} className="text-muted hover:text-text text-xl leading-none">
             ✕
           </button>
         </div>
-        <div className="p-5 space-y-4">
+        <div className="p-5 space-y-4 overflow-y-auto flex-1">
           <div>
             <label className="block text-[11px] uppercase tracking-[0.2em] text-muted font-bold mb-1.5">
               Name

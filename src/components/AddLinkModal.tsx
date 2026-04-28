@@ -75,7 +75,7 @@ export default function AddLinkModal({ songId, songFolder, onClose, onAdded }: P
   }
 
   return (
-    <div className="fixed inset-0 z-50 grid place-items-center bg-ink/80 backdrop-blur-sm p-4">
+    <div className="fixed inset-0 z-50 grid place-items-center bg-ink/80 backdrop-blur-sm p-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
       <div className="w-full max-w-lg rounded-2xl border border-line bg-panel/95 backdrop-blur-md shadow-2xl">
         <div className="flex items-center justify-between p-5 border-b border-line">
           <h2 className="font-display text-2xl">Add link</h2>
@@ -93,7 +93,7 @@ export default function AddLinkModal({ songId, songFolder, onClose, onAdded }: P
           </TabBtn>
         </div>
 
-        <div className="p-5 space-y-4 max-h-[55vh] overflow-y-auto">
+        <div className="p-5 space-y-4 max-h-[55dvh] overflow-y-auto">
           {tab === 'dropbox' ? (
             <DropboxPicker
               currentPath={currentPath}

@@ -1,7 +1,7 @@
 import { Link, useParams } from 'react-router-dom'
 import { useEffect, useState } from 'react'
 import { api, type ApiMember, type ApiProject } from '../api'
-import { STAGE_COLOR, STAGES, STAGE_LABEL, STAGE_ICON, type Song, type Stage } from '../types'
+import { STAGE_COLOR, STAGES, stageLabel, stageIcon, type Song, type Stage } from '../types'
 import StagePill from '../components/StagePill'
 import StageDistribution from '../components/StageDistribution'
 import InlineEdit from '../components/InlineEdit'
@@ -155,7 +155,7 @@ export default function ProjectPage() {
         <div className="absolute inset-0 bg-gradient-to-br from-stage-mastering/20 via-stage-producing/15 to-stage-mixing/20 opacity-80" />
         <div className="absolute inset-0 bg-ink/50" />
         <div className="relative p-6">
-          <StageDistribution songs={songs} />
+          <StageDistribution songs={songs} labels={project.stageLabels} kind={project.kind} />
         </div>
       </div>
 
@@ -180,9 +180,9 @@ export default function ProjectPage() {
           return (
             <section key={stage}>
               <div className="flex items-center gap-2.5 mb-4">
-                <span className={`text-lg leading-none`}>{STAGE_ICON[stage]}</span>
+                <span className={`text-lg leading-none`}>{stageIcon(stage, project.stageLabels)}</span>
                 <h2 className={`text-sm uppercase tracking-[0.25em] ${c.text} font-bold`}>
-                  {STAGE_LABEL[stage]}
+                  {stageLabel(stage, project.stageLabels)}
                 </h2>
                 <span className={`text-[11px] ${c.text} ${c.bgStrong} border ${c.border}/40 rounded-full px-2 py-0.5 font-bold`}>
                   {stageSongs.length}
@@ -213,7 +213,7 @@ export default function ProjectPage() {
                           </div>
                         )}
                       </div>
-                      <StagePill stage={song.stage} size="xs" />
+                      <StagePill stage={song.stage} size="xs" labels={project.stageLabels} />
                     </div>
                     <div className="pl-3 mt-4 text-[11px] text-muted flex items-center gap-3">
                       <span className="inline-flex items-center gap-1">
