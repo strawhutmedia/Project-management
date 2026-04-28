@@ -62,6 +62,26 @@ export default function ProjectPage() {
     setProject({ ...project!, dropboxFolder: next })
   }
 
+  async function saveChannelsSubfolder(next: string) {
+    await api.updateProject(project!.id, { channelsSubfolder: next || null })
+    setProject({ ...project!, channelsSubfolder: next || null })
+  }
+
+  const channelLabel =
+    project.kind === 'podcast' ? 'episode' : project.kind === 'film' ? 'scene' : 'song'
+
+  async function addChannel() {
+    if (!project) return
+    const title = prompt(`New ${channelLabel} title:`)
+    if (!title || !title.trim()) return
+    try {
+      await api.addSong(project.id, { title: title.trim() })
+      await reload()
+    } catch (err) {
+      alert(`Failed to add ${channelLabel}: ${err instanceof Error ? err.message : 'unknown'}`)
+    }
+  }
+
   return (
     <div className="space-y-10">
       <div>
@@ -97,7 +117,25 @@ export default function ProjectPage() {
                 inputClassName="text-[11px] font-mono"
               />
             </div>
+            <div className="text-[11px] text-muted mt-1 font-mono">
+              📁 {channelLabel}s subfolder:{' '}
+              <InlineEdit
+                value={project.channelsSubfolder ?? ''}
+                onSave={saveChannelsSubfolder}
+                emptyLabel="+ Set subfolder (e.g. episodes)"
+                inputClassName="text-[11px] font-mono"
+              />
+              <span className="ml-1 opacity-60">
+                (where new {channelLabel}s land inside the root)
+              </span>
+            </div>
           </div>
+          <button
+            onClick={() => void addChannel()}
+            className="rounded-xl bg-gradient-to-r from-stage-producing to-stage-mastering text-white font-bold uppercase tracking-wider text-xs px-3 py-2 whitespace-nowrap"
+          >
+            + New {channelLabel}
+          </button>
         </div>
       </div>
 

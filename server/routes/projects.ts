@@ -82,12 +82,13 @@ projectsRouter.post('/', async (req, res) => {
   }
 
   const stageLabels = kind === 'podcast' ? PODCAST_LABELS : {}
+  const channelsSubfolder = kind === 'podcast' ? 'episodes' : null
 
   const { rows } = await pool.query(
-    `INSERT INTO projects (name, subtitle, kind, created_by, dropbox_folder, stage_labels)
-     VALUES ($1, $2, $3, $4, $5, $6::jsonb)
-     RETURNING id, name, subtitle, kind, dropbox_folder, stage_labels`,
-    [name.slice(0, 200), subtitle, kind, user.id, dropboxFolder, JSON.stringify(stageLabels)],
+    `INSERT INTO projects (name, subtitle, kind, created_by, dropbox_folder, stage_labels, channels_subfolder)
+     VALUES ($1, $2, $3, $4, $5, $6::jsonb, $7)
+     RETURNING id, name, subtitle, kind, dropbox_folder, stage_labels, channels_subfolder`,
+    [name.slice(0, 200), subtitle, kind, user.id, dropboxFolder, JSON.stringify(stageLabels), channelsSubfolder],
   )
   const project = rows[0]
   await pool.query(
@@ -106,6 +107,70 @@ projectsRouter.post('/', async (req, res) => {
       songs: [],
     },
   })
+})
+
+// Create a new channel/song/episode under a project. Auto-derives the
+// Dropbox folder using {project_root}/{channels_subfolder}/{title}/
+// (or {project_root}/{title}/ if no channels_subfolder is set).
+projectsRouter.post('/:id/songs', async (req, res) => {
+  const user = (req as typeof req & { user: SessionUser }).user
+  const projectId = req.params.id
+  const title = String(req.body?.title || '').trim()
+  const subtitle = String(req.body?.subtitle || '').trim() || null
+
+  if (!title) {
+    res.status(400).json({ error: 'title_required' })
+    return
+  }
+
+  // Verify access
+  if (user.role !== 'admin') {
+    const access = await pool.query(
+      `SELECT 1 FROM projects p
+       LEFT JOIN project_members pm ON pm.project_id = p.id AND pm.user_id = $1
+       WHERE p.id = $2 AND (p.created_by = $1 OR pm.user_id IS NOT NULL) LIMIT 1`,
+      [user.id, projectId],
+    )
+    if (access.rows.length === 0) {
+      res.status(403).json({ error: 'forbidden' })
+      return
+    }
+  }
+
+  const projRes = await pool.query(
+    `SELECT dropbox_folder, channels_subfolder FROM projects WHERE id = $1`,
+    [projectId],
+  )
+  if (projRes.rows.length === 0) {
+    res.status(404).json({ error: 'project_not_found' })
+    return
+  }
+  const root = projRes.rows[0].dropbox_folder as string | null
+  const subfolder = projRes.rows[0].channels_subfolder as string | null
+
+  let dropboxFolder: string | null = null
+  if (root) {
+    const cleanRoot = root.replace(/\/+$/, '')
+    const folderTitle = subtitle ? `${title} (${subtitle})` : title
+    dropboxFolder = subfolder
+      ? `${cleanRoot}/${subfolder}/${folderTitle}`
+      : `${cleanRoot}/${folderTitle}`
+  }
+
+  const positionRes = await pool.query(
+    `SELECT COALESCE(MAX(position), 0) + 1 AS next FROM songs WHERE project_id = $1`,
+    [projectId],
+  )
+  const position = positionRes.rows[0].next as number
+
+  const { rows } = await pool.query(
+    `INSERT INTO songs (project_id, title, subtitle, stage, position, dropbox_folder)
+     VALUES ($1, $2, $3, 'writing', $4, $5)
+     RETURNING id, title, subtitle, stage, position, dropbox_folder`,
+    [projectId, title.slice(0, 200), subtitle, position, dropboxFolder],
+  )
+  logInfo('song created', { id: rows[0].id, projectId, title })
+  res.json({ song: rows[0] })
 })
 
 // Project members for autocomplete (@mentions, assignee pickers).
@@ -187,6 +252,11 @@ projectsRouter.patch('/:id', async (req, res) => {
     updates.push(`dropbox_folder = $${i++}`)
     values.push(dropboxFolder.trim() || null)
   }
+  if (typeof req.body?.channelsSubfolder === 'string' || req.body?.channelsSubfolder === null) {
+    const v = typeof req.body.channelsSubfolder === 'string' ? req.body.channelsSubfolder.trim() : ''
+    updates.push(`channels_subfolder = $${i++}`)
+    values.push(v || null)
+  }
   if (defaultOwners && typeof defaultOwners === 'object') {
     // Whitelist stage keys + ensure values are strings or null
     const allowed = ['writing', 'tracking', 'overdubs', 'producing', 'stems', 'mixing', 'mastering']
@@ -211,7 +281,7 @@ projectsRouter.get('/:id', async (req, res) => {
   const user = (req as typeof req & { user: SessionUser }).user
   const projectId = req.params.id
   const projRes = await pool.query(
-    `SELECT id, name, subtitle, kind, dropbox_folder, default_owners, stage_labels FROM projects WHERE id = $1`,
+    `SELECT id, name, subtitle, kind, dropbox_folder, default_owners, stage_labels, channels_subfolder FROM projects WHERE id = $1`,
     [projectId],
   )
   if (projRes.rows.length === 0) {
@@ -305,6 +375,7 @@ projectsRouter.get('/:id', async (req, res) => {
       dropboxFolder: project.dropbox_folder,
       defaultOwners: defaultOwnersResolved,
       stageLabels: project.stage_labels || {},
+      channelsSubfolder: project.channels_subfolder,
       songs: songs.rows.map((s: { id: string; title: string; subtitle: string | null; stage: string }) => ({
         id: s.id,
         title: s.title,

@@ -682,12 +682,38 @@ function DropboxPanel({
     }
   }
 
+  // Allow navigating up to the PROJECT root (not just the channel's own folder)
+  // so users can pull from sibling assets (logos, sponsor reads, templates).
+  const projectRoot = (song.projectRoot || '').replace(/\/+$/, '')
   function navigateUp() {
+    if (!currentPath) return
+    if (projectRoot && currentPath === projectRoot) return // already at project root
     const parent = currentPath.replace(/\/[^/]+\/?$/, '')
+    if (parent && projectRoot && !parent.startsWith(projectRoot)) {
+      setCurrentPath(projectRoot)
+      return
+    }
     setCurrentPath(parent || song.dropboxFolder || '')
   }
 
-  const atRoot = currentPath === (song.dropboxFolder ?? '')
+  const atRoot = !!projectRoot && currentPath === projectRoot
+
+  // Build breadcrumbs from project root → currentPath
+  function buildCrumbs(): Array<{ label: string; path: string }> {
+    if (!currentPath || !projectRoot) return []
+    if (!currentPath.startsWith(projectRoot)) return [{ label: currentPath, path: currentPath }]
+    const rest = currentPath.slice(projectRoot.length).split('/').filter(Boolean)
+    const crumbs: Array<{ label: string; path: string }> = [
+      { label: projectRoot.split('/').filter(Boolean).pop() || '/', path: projectRoot },
+    ]
+    let acc = projectRoot
+    for (const part of rest) {
+      acc = `${acc}/${part}`
+      crumbs.push({ label: part, path: acc })
+    }
+    return crumbs
+  }
+  const crumbs = buildCrumbs()
 
   return (
     <section className="rounded-2xl border border-line bg-panel/60 p-6">
@@ -700,7 +726,8 @@ function DropboxPanel({
         )}
       </div>
 
-      <div className="text-[11px] text-muted mb-3 break-all font-mono">
+      <div className="text-[11px] text-muted mb-2 break-all font-mono">
+        <span className="opacity-60">My folder:</span>{' '}
         <InlineEdit
           value={song.dropboxFolder ?? ''}
           onSave={onSaveFolder}
@@ -708,9 +735,29 @@ function DropboxPanel({
           inputClassName="text-[11px] font-mono"
         />
       </div>
-      {!atRoot && (
-        <div className="text-[11px] text-muted mb-3 break-all font-mono opacity-70">
-          📂 {currentPath}
+      {crumbs.length > 0 && (
+        <div className="text-[11px] mb-3 flex items-center flex-wrap gap-x-1 gap-y-0.5">
+          {crumbs.map((c, idx) => (
+            <span key={c.path} className="inline-flex items-center gap-1">
+              <button
+                onClick={() => setCurrentPath(c.path)}
+                className={`hover:underline ${
+                  c.path === currentPath ? 'text-text font-bold' : 'text-stage-stems'
+                }`}
+              >
+                {c.label}
+              </button>
+              {idx < crumbs.length - 1 && <span className="text-muted/50">/</span>}
+            </span>
+          ))}
+          {song.dropboxFolder && currentPath !== song.dropboxFolder && (
+            <button
+              onClick={() => setCurrentPath(song.dropboxFolder ?? '')}
+              className="ml-2 text-[10px] uppercase tracking-wider text-stage-stems border border-stage-stems/40 rounded-full px-2 py-0.5 hover:bg-stage-stems/10"
+            >
+              ↩ My folder
+            </button>
+          )}
         </div>
       )}
 
