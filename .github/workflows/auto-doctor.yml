@@ -1,0 +1,38 @@
+name: Slate Auto-Doctor
+
+on:
+  schedule:
+    - cron: '*/15 * * * *' # every 15 min — keep API costs low
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: auto-doctor
+  cancel-in-progress: false
+
+jobs:
+  doctor:
+    runs-on: ubuntu-latest
+    if: ${{ vars.AUTO_DOCTOR_DISABLED != 'true' }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Configure git
+        run: |
+          git config user.name "slate-auto-doctor"
+          git config user.email "auto-doctor@noreply.local"
+
+      - name: Run Auto-Doctor
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: node scripts/auto-doctor.mjs
