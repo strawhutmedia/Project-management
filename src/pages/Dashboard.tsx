@@ -2,6 +2,7 @@ import { Link, useNavigate } from 'react-router-dom'
 import { useEffect, useState } from 'react'
 import { api, type ApiProject } from '../api'
 import StageDistribution from '../components/StageDistribution'
+import DropboxFolderPicker from '../components/DropboxFolderPicker'
 import type { Song } from '../types'
 
 const KIND_GRADIENT: Record<string, string> = {
@@ -106,6 +107,7 @@ function CreateProjectModal({
   const [dropboxFolder, setDropboxFolder] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [showPicker, setShowPicker] = useState(false)
 
   async function submit() {
     if (!name.trim()) return
@@ -130,7 +132,7 @@ function CreateProjectModal({
 
   const kinds: Array<{ value: 'album' | 'podcast' | 'film'; label: string; emoji: string }> = [
     { value: 'album', label: 'Album', emoji: '🎵' },
-    { value: 'podcast', label: 'Podcast season', emoji: '🎙️' },
+    { value: 'podcast', label: 'Podcast', emoji: '🎙️' },
     { value: 'film', label: 'Film', emoji: '🎬' },
   ]
 
@@ -153,7 +155,7 @@ function CreateProjectModal({
               autoFocus
               value={name}
               onChange={(e) => setName(e.target.value)}
-              placeholder="Work Club Season 5"
+              placeholder="Code x Connor"
               className="w-full rounded-xl bg-ink/40 border border-line text-text px-3 py-2.5 outline-none focus:border-stage-mastering text-sm"
             />
           </div>
@@ -165,7 +167,7 @@ function CreateProjectModal({
               type="text"
               value={subtitle}
               onChange={(e) => setSubtitle(e.target.value)}
-              placeholder="12 episodes · launching Sept"
+              placeholder="podcast for codestrap"
               className="w-full rounded-xl bg-ink/40 border border-line text-text px-3 py-2.5 outline-none focus:border-stage-mastering text-sm"
             />
           </div>
@@ -194,22 +196,47 @@ function CreateProjectModal({
             <label className="block text-[11px] uppercase tracking-[0.2em] text-muted font-bold mb-1.5">
               Dropbox root folder (optional)
             </label>
-            <input
-              type="text"
-              value={dropboxFolder}
-              onChange={(e) => setDropboxFolder(e.target.value)}
-              placeholder="/2_CLIENTS/Work Club"
-              className="w-full rounded-xl bg-ink/40 border border-line text-text px-3 py-2.5 outline-none focus:border-stage-mastering text-sm font-mono"
-            />
+            <div className="flex gap-2">
+              <button
+                onClick={() => setShowPicker(true)}
+                type="button"
+                className="flex-1 text-left rounded-xl bg-ink/40 border border-line hover:border-stage-stems text-text px-3 py-2.5 text-sm font-mono break-all"
+              >
+                {dropboxFolder || (
+                  <span className="text-muted/70">📁 Tap to browse Dropbox…</span>
+                )}
+              </button>
+              {dropboxFolder && (
+                <button
+                  type="button"
+                  onClick={() => setDropboxFolder('')}
+                  className="text-muted hover:text-urgent text-sm px-2"
+                  title="Clear"
+                >
+                  ✕
+                </button>
+              )}
+            </div>
             <p className="text-[11px] text-muted/70 mt-1">
               Each channel/episode/song you add will get its own subfolder under this path.
             </p>
           </div>
+          {showPicker && (
+            <DropboxFolderPicker
+              initialPath={dropboxFolder}
+              onCancel={() => setShowPicker(false)}
+              onSelect={(p) => {
+                setDropboxFolder(p)
+                setShowPicker(false)
+              }}
+            />
+          )}
           {error && <p className="text-urgent text-sm">{error}</p>}
           {kind === 'podcast' && (
-            <p className="text-[11px] text-muted bg-stage-tracking/10 border border-stage-tracking/30 rounded-lg p-2.5">
-              ⚠️ Heads up: podcast pipelines currently use the music stage labels (Writing → Tracking
-              → Comp → ...). Tell Ryan your actual Work Club workflow stages and he'll customize them.
+            <p className="text-[11px] text-muted bg-stage-stems/10 border border-stage-stems/30 rounded-lg p-2.5">
+              ℹ️ Podcasts use the codestrap workflow by default: 📅 Scheduled → 🎤 Prepped → 🎬
+              Recorded → ✂️ Editing → 👀 Client Review → 🔧 Revisions → ✨ Finalized → 🚀 Released.
+              Per-show label customization coming in a future push.
             </p>
           )}
           {kind === 'film' && (

@@ -5,12 +5,14 @@ import { STAGE_COLOR, STAGES, STAGE_LABEL, STAGE_ICON, type Song, type Stage } f
 import StagePill from '../components/StagePill'
 import StageDistribution from '../components/StageDistribution'
 import InlineEdit from '../components/InlineEdit'
+import DropboxFolderPicker from '../components/DropboxFolderPicker'
 
 export default function ProjectPage() {
   const { projectId } = useParams()
   const [project, setProject] = useState<ApiProject | null>(null)
   const [members, setMembers] = useState<ApiMember[]>([])
   const [error, setError] = useState<string | null>(null)
+  const [showRootPicker, setShowRootPicker] = useState(false)
 
   async function reload() {
     if (!projectId) return
@@ -108,14 +110,24 @@ export default function ProjectPage() {
                 emptyLabel="+ Add subtitle"
               />
             </div>
-            <div className="text-[11px] text-muted mt-1 font-mono">
+            <div className="text-[11px] text-muted mt-1 font-mono flex items-center flex-wrap gap-2">
               📦 Dropbox root:{' '}
-              <InlineEdit
-                value={project.dropboxFolder ?? ''}
-                onSave={saveRootFolder}
-                emptyLabel="+ Set root folder"
-                inputClassName="text-[11px] font-mono"
-              />
+              <span className="break-all">{project.dropboxFolder || <em className="text-muted/60 not-italic">— not set —</em>}</span>
+              <button
+                onClick={() => setShowRootPicker(true)}
+                className="text-[10px] uppercase tracking-wider text-stage-stems border border-stage-stems/40 rounded-full px-2 py-0.5 hover:bg-stage-stems/10"
+              >
+                📁 Pick
+              </button>
+              {project.dropboxFolder && (
+                <button
+                  onClick={() => void saveRootFolder('')}
+                  className="text-[10px] text-muted hover:text-urgent"
+                  title="Clear"
+                >
+                  ✕
+                </button>
+              )}
             </div>
             <div className="text-[11px] text-muted mt-1 font-mono">
               📁 {channelLabel}s subfolder:{' '}
@@ -148,6 +160,17 @@ export default function ProjectPage() {
       </div>
 
       <ProjectRolesSection project={project} members={members} onSaved={reload} />
+
+      {showRootPicker && (
+        <DropboxFolderPicker
+          initialPath={project.dropboxFolder ?? ''}
+          onCancel={() => setShowRootPicker(false)}
+          onSelect={(p) => {
+            void saveRootFolder(p)
+            setShowRootPicker(false)
+          }}
+        />
+      )}
 
       <div className="space-y-8">
         {STAGES.map((stage) => {
