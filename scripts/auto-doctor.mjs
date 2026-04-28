@@ -224,35 +224,52 @@ Diagnose and fix it. Use the tools to investigate the codebase first.`,
   return { ...outcome, iterations }
 }
 
+// ---------- Read files from the status branch via GitHub API ----------
+const REPO_OWNER = 'strawhutmedia'
+const REPO_NAME = 'Project-management'
+const STATUS_BRANCH = 'status'
+
+async function ghReadFile(filePath) {
+  const token = process.env.GITHUB_TOKEN
+  if (!token) throw new Error('GITHUB_TOKEN not set')
+  const res = await fetch(
+    `https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/contents/${encodeURIComponent(filePath)}?ref=${STATUS_BRANCH}`,
+    { headers: { Authorization: `Bearer ${token}`, 'User-Agent': 'slate-auto-doctor', Accept: 'application/vnd.github.v3+json' } },
+  )
+  if (res.status === 404) return null
+  if (!res.ok) throw new Error(`GitHub ${res.status} reading ${filePath}: ${(await res.text()).slice(0, 300)}`)
+  const data = await res.json()
+  if (data.encoding !== 'base64') throw new Error(`unexpected encoding: ${data.encoding}`)
+  return Buffer.from(data.content, 'base64').toString('utf8')
+}
+
 // ---------- Main ----------
 function errorKey(e) {
   return `${e.msg}::${JSON.stringify(e.data || {}).slice(0, 80)}`
 }
 
 async function main() {
-  // Pull errors.jsonl from the status branch
   let errors = []
   try {
-    execSync('git fetch origin status:status --no-tags', { stdio: 'inherit' })
-    const raw = execSync('git show status:errors.jsonl', { encoding: 'utf8' })
+    const raw = await ghReadFile('errors.jsonl')
+    if (raw === null) {
+      console.log('No errors.jsonl on status branch yet — nothing to do')
+      return
+    }
     errors = raw.split('\n').filter(Boolean).map((line) => {
-      try {
-        return JSON.parse(line)
-      } catch {
-        return null
-      }
+      try { return JSON.parse(line) } catch { return null }
     }).filter(Boolean)
   } catch (e) {
-    console.log('No errors.jsonl yet on status branch — nothing to do')
+    console.error('Failed to read errors.jsonl:', e.message)
     return
   }
 
-  // Pull existing seen state
   let seen = {}
   try {
-    seen = JSON.parse(execSync('git show status:auto-doctor-seen.json', { encoding: 'utf8' }))
-  } catch {
-    seen = {}
+    const raw = await ghReadFile('auto-doctor-seen.json')
+    if (raw) seen = JSON.parse(raw)
+  } catch (e) {
+    console.warn('Could not read seen state (starting fresh):', e.message)
   }
 
   const cutoff = Date.now() - ERROR_LOOKBACK_HOURS * 60 * 60 * 1000
@@ -266,7 +283,7 @@ async function main() {
   if (newErrors.length === 0) return
 
   let committed = 0
-  for (const error of newErrors.slice(0, 5)) { // max 5 per run, defensive
+  for (const error of newErrors.slice(0, 5)) {
     const key = errorKey(error)
     console.log(`\n--- Working on: ${error.msg} ---`)
     let result
@@ -289,7 +306,7 @@ async function main() {
       const status = execSync('git status --porcelain', { encoding: 'utf8' })
       if (status.trim()) {
         execSync('git add -A')
-        const commitMsg = `Auto-Doctor fix: ${error.msg.slice(0, 80)}\n\n${result.summary}\n\nTriggered by error logged at ${error.ts}.\n\nhttps://github.com/strawhutmedia/Project-management/actions`
+        const commitMsg = `Auto-Doctor fix: ${error.msg.slice(0, 80)}\n\n${result.summary}\n\nTriggered by error logged at ${error.ts}.`
         execSync(`git -c user.name="slate-auto-doctor" -c user.email="auto-doctor@noreply.local" commit -m ${JSON.stringify(commitMsg)}`)
         committed++
         console.log(`Committed fix for ${error.msg}`)
@@ -299,14 +316,11 @@ async function main() {
     }
   }
 
-  // Push fixes to main
   if (committed > 0) {
     execSync('git push origin HEAD:main', { stdio: 'inherit' })
     console.log(`Pushed ${committed} fix(es) to main`)
   }
 
-  // Write back seen state to status branch via API (so Slate's Railway redeploy
-  // doesn't get triggered by status branch pushes)
   await updateStatusFile('auto-doctor-seen.json', JSON.stringify(seen, null, 2))
 }
 
