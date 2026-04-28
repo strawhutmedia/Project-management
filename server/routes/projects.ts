@@ -53,6 +53,44 @@ projectsRouter.get('/', async (req, res) => {
   })
 })
 
+projectsRouter.post('/', async (req, res) => {
+  const user = (req as typeof req & { user: SessionUser }).user
+  const name = String(req.body?.name || '').trim()
+  const subtitle = String(req.body?.subtitle || '').trim() || null
+  const kindRaw = req.body?.kind
+  const kind = kindRaw === 'podcast' || kindRaw === 'film' ? kindRaw : 'album'
+  const dropboxFolder = String(req.body?.dropboxFolder || '').trim() || null
+
+  if (!name) {
+    res.status(400).json({ error: 'name_required' })
+    return
+  }
+
+  const { rows } = await pool.query(
+    `INSERT INTO projects (name, subtitle, kind, created_by, dropbox_folder)
+     VALUES ($1, $2, $3, $4, $5)
+     RETURNING id, name, subtitle, kind, dropbox_folder`,
+    [name.slice(0, 200), subtitle, kind, user.id, dropboxFolder],
+  )
+  const project = rows[0]
+  await pool.query(
+    `INSERT INTO project_members (project_id, user_id) VALUES ($1, $2)
+     ON CONFLICT DO NOTHING`,
+    [project.id, user.id],
+  )
+  logInfo('project created', { id: project.id, name: project.name, kind, by: user.id })
+  res.json({
+    project: {
+      id: project.id,
+      name: project.name,
+      subtitle: project.subtitle,
+      kind: project.kind,
+      dropboxFolder: project.dropbox_folder,
+      songs: [],
+    },
+  })
+})
+
 // Project members for autocomplete (@mentions, assignee pickers).
 // Returns: project members + admins + the project creator. All distinct.
 projectsRouter.get('/:id/members', async (req, res) => {

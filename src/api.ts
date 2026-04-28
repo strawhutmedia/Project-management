@@ -227,6 +227,8 @@ export const api = {
   // Project edit
   updateProject: (id: string, patch: { name?: string; subtitle?: string; dropboxFolder?: string }) =>
     request<{ ok: true }>(`/api/projects/${id}`, { method: 'PATCH', body: JSON.stringify(patch) }),
+  createProject: (body: { name: string; subtitle?: string; kind?: 'album' | 'podcast' | 'film'; dropboxFolder?: string }) =>
+    request<{ project: ApiProject }>('/api/projects', { method: 'POST', body: JSON.stringify(body) }),
   // Links
   addLink: (songId: string, body: { label: string; url: string }) =>
     request<{ link: ApiLink }>(`/api/songs/${songId}/links`, { method: 'POST', body: JSON.stringify(body) }),
