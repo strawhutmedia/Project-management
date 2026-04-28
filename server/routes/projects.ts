@@ -10,7 +10,7 @@ projectsRouter.use(requireUser)
 projectsRouter.get('/', async (req, res) => {
   const user = (req as typeof req & { user: SessionUser }).user
   const projects = await pool.query(
-    `SELECT DISTINCT p.id, p.name, p.subtitle, p.kind, p.created_at
+    `SELECT DISTINCT p.id, p.name, p.subtitle, p.kind, p.created_at, p.stage_labels
      FROM projects p
      LEFT JOIN songs s ON s.project_id = p.id
      LEFT JOIN song_members sm ON sm.song_id = s.id AND sm.user_id = $1
@@ -43,11 +43,12 @@ projectsRouter.get('/', async (req, res) => {
     }
   }
   res.json({
-    projects: projects.rows.map((p: { id: string; name: string; subtitle: string | null; kind: string }) => ({
+    projects: projects.rows.map((p: { id: string; name: string; subtitle: string | null; kind: string; stage_labels: Record<string, unknown> | null }) => ({
       id: p.id,
       name: p.name,
       subtitle: p.subtitle,
       kind: p.kind,
+      stageLabels: p.stage_labels || {},
       songs: songsByProject[p.id],
     })),
   })
