@@ -84,23 +84,29 @@ export type StoredIntegration = {
   expires_at: string
   account_id?: string
   account_name?: string
+  // Dropbox path root for team folder access (vs personal namespace).
+  // Set to the team's root_namespace_id when the user is on a team account.
+  root_namespace_id?: string
 }
 
-export async function saveIntegration(token: DropboxTokenData, accountName?: string): Promise<void> {
+export async function saveIntegration(token: DropboxTokenData, accountName?: string, rootNamespaceId?: string): Promise<void> {
   const expiresAt = new Date(Date.now() + (token.expires_in - 60) * 1000).toISOString()
+  // Preserve existing fields if updating
+  const existing = await getIntegration()
   const data: StoredIntegration = {
     access_token: token.access_token,
     refresh_token: token.refresh_token,
     expires_at: expiresAt,
     account_id: token.account_id,
-    account_name: accountName,
+    account_name: accountName ?? existing?.account_name,
+    root_namespace_id: rootNamespaceId ?? existing?.root_namespace_id,
   }
   await pool.query(
     `INSERT INTO integrations (kind, data, updated_at) VALUES ('dropbox', $1::jsonb, now())
      ON CONFLICT (kind) DO UPDATE SET data = EXCLUDED.data, updated_at = now()`,
     [JSON.stringify(data)],
   )
-  logInfo('dropbox: integration saved', { account_id: token.account_id })
+  logInfo('dropbox: integration saved', { account_id: token.account_id, hasRootNamespace: Boolean(data.root_namespace_id) })
 }
 
 export async function getIntegration(): Promise<StoredIntegration | null> {
@@ -121,12 +127,64 @@ async function getValidAccessToken(): Promise<string | null> {
   if (!integration.refresh_token) return null
   try {
     const refreshed = await refreshAccessToken(integration.refresh_token)
-    await saveIntegration(refreshed, integration.account_name)
+    await saveIntegration(refreshed, integration.account_name, integration.root_namespace_id)
     return refreshed.access_token
   } catch (err) {
     logError('dropbox: refresh failed', { error: err instanceof Error ? err.message : String(err) })
     return null
   }
+}
+
+// Build request headers including the team-folder Path-Root header when
+// the integration has a stored team root namespace. Without this header,
+// Dropbox API calls operate in the user's personal namespace and will not
+// see team-shared folders.
+async function buildHeaders(extra: Record<string, string> = {}): Promise<Record<string, string> | null> {
+  const token = await getValidAccessToken()
+  if (!token) return null
+  const integration = await getIntegration()
+  const headers: Record<string, string> = {
+    Authorization: `Bearer ${token}`,
+    ...extra,
+  }
+  if (integration?.root_namespace_id) {
+    headers['Dropbox-API-Path-Root'] = JSON.stringify({
+      '.tag': 'root',
+      root: integration.root_namespace_id,
+    })
+  }
+  return headers
+}
+
+// Fetches root_info from get_current_account and stores root_namespace_id
+// so subsequent calls can use the team's path root. Idempotent — safe to
+// call repeatedly; only writes if missing or stale.
+export async function ensureRootNamespace(): Promise<void> {
+  const integration = await getIntegration()
+  if (!integration) return
+  if (integration.root_namespace_id) return
+  const token = await getValidAccessToken()
+  if (!token) return
+  const res = await fetch(`${DROPBOX_API}/users/get_current_account`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}` },
+  })
+  if (!res.ok) return
+  const data = (await res.json()) as {
+    name?: { display_name: string }
+    email?: string
+    root_info?: { root_namespace_id?: string }
+  }
+  const namespaceId = data.root_info?.root_namespace_id
+  if (!namespaceId) return
+  await pool.query(
+    `UPDATE integrations
+     SET data = data || jsonb_build_object('root_namespace_id', $1::text),
+         updated_at = now()
+     WHERE kind = 'dropbox'`,
+    [namespaceId],
+  )
+  logInfo('dropbox: root_namespace_id captured', { namespaceId })
 }
 
 export type DropboxEntry = {
@@ -138,13 +196,14 @@ export type DropboxEntry = {
 }
 
 export async function listFolder(folderPath: string): Promise<{ ok: true; entries: DropboxEntry[] } | { ok: false; error: string }> {
-  const token = await getValidAccessToken()
-  if (!token) return { ok: false, error: 'not_connected' }
+  await ensureRootNamespace()
+  const headers = await buildHeaders({ 'Content-Type': 'application/json' })
+  if (!headers) return { ok: false, error: 'not_connected' }
   // Dropbox API quirk: root folder is empty string, not "/"
   const apiPath = folderPath === '/' ? '' : folderPath.replace(/\/$/, '')
   const res = await fetch(`${DROPBOX_API}/files/list_folder`, {
     method: 'POST',
-    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+    headers,
     body: JSON.stringify({ path: apiPath, recursive: false, include_deleted: false }),
   })
   if (!res.ok) {
@@ -177,11 +236,12 @@ export async function listFolder(folderPath: string): Promise<{ ok: true; entrie
 }
 
 export async function createFolder(folderPath: string): Promise<{ ok: boolean; error?: string }> {
-  const token = await getValidAccessToken()
-  if (!token) return { ok: false, error: 'not_connected' }
+  await ensureRootNamespace()
+  const headers = await buildHeaders({ 'Content-Type': 'application/json' })
+  if (!headers) return { ok: false, error: 'not_connected' }
   const res = await fetch(`${DROPBOX_API}/files/create_folder_v2`, {
     method: 'POST',
-    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+    headers,
     body: JSON.stringify({ path: folderPath, autorename: false }),
   })
   if (res.ok) return { ok: true }
@@ -195,16 +255,16 @@ const SINGLE_SHOT_LIMIT = 140 * 1024 * 1024 // 140 MB — under Dropbox's 150 MB
 const CHUNK_SIZE = 8 * 1024 * 1024 // 8 MB chunks for upload sessions
 
 export async function uploadFile(folderPath: string, fileName: string, body: Buffer): Promise<{ ok: boolean; path?: string; error?: string }> {
-  const token = await getValidAccessToken()
-  if (!token) return { ok: false, error: 'not_connected' }
+  await ensureRootNamespace()
+  const headers = await buildHeaders({ 'Content-Type': 'application/octet-stream' })
+  if (!headers) return { ok: false, error: 'not_connected' }
   const fullPath = `${folderPath.replace(/\/$/, '')}/${fileName}`
 
   if (body.length <= SINGLE_SHOT_LIMIT) {
     const res = await fetch('https://content.dropboxapi.com/2/files/upload', {
       method: 'POST',
       headers: {
-        Authorization: `Bearer ${token}`,
-        'Content-Type': 'application/octet-stream',
+        ...headers,
         'Dropbox-API-Arg': JSON.stringify({
           path: fullPath,
           mode: 'add',
@@ -227,11 +287,7 @@ export async function uploadFile(folderPath: string, fileName: string, body: Buf
   const first = body.slice(0, CHUNK_SIZE)
   const startRes = await fetch('https://content.dropboxapi.com/2/files/upload_session/start', {
     method: 'POST',
-    headers: {
-      Authorization: `Bearer ${token}`,
-      'Content-Type': 'application/octet-stream',
-      'Dropbox-API-Arg': JSON.stringify({ close: false }),
-    },
+    headers: { ...headers, 'Dropbox-API-Arg': JSON.stringify({ close: false }) },
     body: new Uint8Array(first),
   })
   if (!startRes.ok) {
@@ -249,8 +305,7 @@ export async function uploadFile(folderPath: string, fileName: string, body: Buf
     const r = await fetch('https://content.dropboxapi.com/2/files/upload_session/append_v2', {
       method: 'POST',
       headers: {
-        Authorization: `Bearer ${token}`,
-        'Content-Type': 'application/octet-stream',
+        ...headers,
         'Dropbox-API-Arg': JSON.stringify({
           cursor: { session_id: sessionId, offset },
           close: false,
@@ -270,8 +325,7 @@ export async function uploadFile(folderPath: string, fileName: string, body: Buf
   const finishRes = await fetch('https://content.dropboxapi.com/2/files/upload_session/finish', {
     method: 'POST',
     headers: {
-      Authorization: `Bearer ${token}`,
-      'Content-Type': 'application/octet-stream',
+      ...headers,
       'Dropbox-API-Arg': JSON.stringify({
         cursor: { session_id: sessionId, offset },
         commit: { path: fullPath, mode: 'add', autorename: true, mute: false },
@@ -288,11 +342,12 @@ export async function uploadFile(folderPath: string, fileName: string, body: Buf
 }
 
 export async function getTemporaryLink(filePath: string): Promise<{ ok: boolean; url?: string; error?: string }> {
-  const token = await getValidAccessToken()
-  if (!token) return { ok: false, error: 'not_connected' }
+  await ensureRootNamespace()
+  const headers = await buildHeaders({ 'Content-Type': 'application/json' })
+  if (!headers) return { ok: false, error: 'not_connected' }
   const res = await fetch(`${DROPBOX_API}/files/get_temporary_link`, {
     method: 'POST',
-    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+    headers,
     body: JSON.stringify({ path: filePath }),
   })
   if (!res.ok) {
@@ -304,11 +359,12 @@ export async function getTemporaryLink(filePath: string): Promise<{ ok: boolean;
 }
 
 export async function createSharedLink(filePath: string): Promise<{ ok: boolean; url?: string; error?: string }> {
-  const token = await getValidAccessToken()
-  if (!token) return { ok: false, error: 'not_connected' }
+  await ensureRootNamespace()
+  const headers = await buildHeaders({ 'Content-Type': 'application/json' })
+  if (!headers) return { ok: false, error: 'not_connected' }
   const res = await fetch(`${DROPBOX_API}/sharing/create_shared_link_with_settings`, {
     method: 'POST',
-    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+    headers,
     body: JSON.stringify({ path: filePath, settings: { audience: 'public', access: 'viewer' } }),
   })
   if (res.ok) {
@@ -319,7 +375,7 @@ export async function createSharedLink(filePath: string): Promise<{ ok: boolean;
   if (res.status === 409) {
     const listRes = await fetch(`${DROPBOX_API}/sharing/list_shared_links`, {
       method: 'POST',
-      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      headers,
       body: JSON.stringify({ path: filePath, direct_only: true }),
     })
     if (listRes.ok) {
