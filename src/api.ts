@@ -99,7 +99,7 @@ export type ApiDropboxEntry = {
 
 export type ApiAdminUser = {
   id: string
-  email: string
+  email: string | null
   name: string
   display_name: string | null
   role: 'admin' | 'user'
@@ -248,7 +248,7 @@ export const api = {
   }) => request<{ user: ApiAdminUser }>('/api/admin/users', { method: 'POST', body: JSON.stringify(body) }),
   adminDeleteUser: (id: string) =>
     request<{ ok: true }>(`/api/admin/users/${id}`, { method: 'DELETE' }),
-  adminUpdateUser: (id: string, patch: { displayName?: string; name?: string; role?: 'admin' | 'user'; timezone?: string }) =>
+  adminUpdateUser: (id: string, patch: { displayName?: string; name?: string; role?: 'admin' | 'user'; timezone?: string; email?: string }) =>
     request<{ ok: true }>(`/api/admin/users/${id}`, { method: 'PATCH', body: JSON.stringify(patch) }),
   adminGrantProject: (userId: string, projectId: string) =>
     request<{ ok: true }>(`/api/admin/users/${userId}/projects/${projectId}`, { method: 'POST' }),

@@ -67,10 +67,13 @@ adminRouter.get('/projects', async (_req, res) => {
   })
 })
 
-// Create user (and grant project access)
+// Create user (and grant project access).
+// Email is OPTIONAL — leave blank to create a placeholder user (no invite
+// email sent). Admin can add the email later via PATCH /users/:id, which
+// triggers the invite email at that point.
 adminRouter.post('/users', async (req, res) => {
   const inviter = (req as typeof req & { user: SessionUser }).user
-  const email = String(req.body?.email || '').trim().toLowerCase()
+  const rawEmail = String(req.body?.email || '').trim().toLowerCase()
   const name = String(req.body?.name || '').trim()
   const displayName = String(req.body?.displayName || '').trim() || name
   const role = req.body?.role === 'admin' ? 'admin' : 'user'
@@ -78,7 +81,8 @@ adminRouter.post('/users', async (req, res) => {
   const projectIds: string[] = Array.isArray(req.body?.projectIds) ? req.body.projectIds : []
   const songIds: string[] = Array.isArray(req.body?.songIds) ? req.body.songIds : []
 
-  if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+  // Email is optional. If provided, validate.
+  if (rawEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(rawEmail)) {
     res.status(400).json({ error: 'invalid_email' })
     return
   }
@@ -87,10 +91,12 @@ adminRouter.post('/users', async (req, res) => {
     return
   }
 
-  const existing = await pool.query(`SELECT id FROM users WHERE email = $1`, [email])
-  if (existing.rows.length > 0) {
-    res.status(409).json({ error: 'user_exists' })
-    return
+  if (rawEmail) {
+    const existing = await pool.query(`SELECT id FROM users WHERE email = $1`, [rawEmail])
+    if (existing.rows.length > 0) {
+      res.status(409).json({ error: 'user_exists' })
+      return
+    }
   }
 
   const client = await pool.connect()
@@ -100,7 +106,7 @@ adminRouter.post('/users', async (req, res) => {
       `INSERT INTO users (email, name, display_name, role, timezone)
        VALUES ($1, $2, $3, $4, $5)
        RETURNING id, email, name, display_name, role, timezone`,
-      [email, name.slice(0, 80), displayName.slice(0, 40), role, timezone.slice(0, 60)],
+      [rawEmail || null, name.slice(0, 80), displayName.slice(0, 40), role, timezone.slice(0, 60)],
     )
     const newUser = userRes.rows[0]
     for (const projectId of projectIds) {
@@ -119,12 +125,14 @@ adminRouter.post('/users', async (req, res) => {
     }
     await client.query('COMMIT')
 
-    // Fire-and-forget invite email
-    void sendInviteEmail(email, name, inviter.display_name || inviter.name).catch((err) => {
-      logError('invite email failed', { email, error: err instanceof Error ? err.message : String(err) })
-    })
+    // Only send invite email if we have an email. Placeholders stay silent.
+    if (rawEmail) {
+      void sendInviteEmail(rawEmail, name, inviter.display_name || inviter.name).catch((err) => {
+        logError('invite email failed', { email: rawEmail, error: err instanceof Error ? err.message : String(err) })
+      })
+    }
 
-    logInfo('user invited', { email, role, projectCount: projectIds.length })
+    logInfo('user invited', { email: rawEmail || '(placeholder)', role, projectCount: projectIds.length })
     res.json({ user: newUser })
   } catch (err) {
     await client.query('ROLLBACK')
@@ -135,11 +143,46 @@ adminRouter.post('/users', async (req, res) => {
 })
 
 adminRouter.patch('/users/:id', async (req, res) => {
+  const inviter = (req as typeof req & { user: SessionUser }).user
   const userId = req.params.id
-  const { displayName, name, role, timezone } = req.body ?? {}
+  const { displayName, name, role, timezone, email } = req.body ?? {}
   const updates: string[] = []
   const values: unknown[] = []
   let i = 1
+
+  // If email is being set, validate uniqueness and prepare to send invite if user previously had no email.
+  let willSendInvite = false
+  let inviteToEmail: string | null = null
+  let inviteToName: string | null = null
+  if (typeof email === 'string') {
+    const trimmed = email.trim().toLowerCase()
+    if (trimmed.length === 0) {
+      res.status(400).json({ error: 'email_cannot_be_empty' })
+      return
+    }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed)) {
+      res.status(400).json({ error: 'invalid_email' })
+      return
+    }
+    const conflict = await pool.query(`SELECT id FROM users WHERE email = $1 AND id <> $2`, [trimmed, userId])
+    if (conflict.rows.length > 0) {
+      res.status(409).json({ error: 'email_taken' })
+      return
+    }
+    const cur = await pool.query(`SELECT email, name FROM users WHERE id = $1`, [userId])
+    if (cur.rows.length === 0) {
+      res.status(404).json({ error: 'not_found' })
+      return
+    }
+    if (!cur.rows[0].email) {
+      willSendInvite = true
+      inviteToEmail = trimmed
+      inviteToName = cur.rows[0].name
+    }
+    updates.push(`email = $${i++}`)
+    values.push(trimmed)
+  }
+
   if (typeof name === 'string' && name.trim().length > 0) {
     updates.push(`name = $${i++}`)
     values.push(name.trim().slice(0, 80))
@@ -162,6 +205,14 @@ adminRouter.patch('/users/:id', async (req, res) => {
   }
   values.push(userId)
   await pool.query(`UPDATE users SET ${updates.join(', ')} WHERE id = $${i}`, values)
+
+  if (willSendInvite && inviteToEmail) {
+    void sendInviteEmail(inviteToEmail, inviteToName || 'there', inviter.display_name || inviter.name).catch((err) => {
+      logError('invite email failed', { email: inviteToEmail, error: err instanceof Error ? err.message : String(err) })
+    })
+    logInfo('placeholder activated + invite email sent', { email: inviteToEmail })
+  }
+
   res.json({ ok: true })
 })
 

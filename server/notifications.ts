@@ -30,8 +30,10 @@ export async function notify(args: NotifyArgs & { actorId?: string }): Promise<v
     try {
       const { rows } = await pool.query(`SELECT email FROM users WHERE id = $1`, [args.userId])
       if (rows.length === 0) return
+      const email = rows[0].email
+      if (!email) return // placeholder user — in-app notification only, no email
       await sendNotificationEmail({
-        to: rows[0].email,
+        to: email,
         subject: args.title,
         body: args.body,
         link: `${APP_BASE}${args.link}`,

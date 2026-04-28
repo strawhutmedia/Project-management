@@ -183,7 +183,18 @@ function UsersSection({ currentUserId }: { currentUserId: string }) {
                       <span className="text-[10px] uppercase tracking-wider text-muted">(you)</span>
                     )}
                   </div>
-                  <div className="text-[11px] text-muted">{u.email}</div>
+                  <div className="text-[11px] text-muted flex items-center gap-2 flex-wrap">
+                    {u.email ? (
+                      <span>{u.email}</span>
+                    ) : (
+                      <>
+                        <span className="text-stage-tracking font-bold text-[10px] uppercase tracking-wider bg-stage-tracking/10 border border-stage-tracking/40 rounded px-1.5 py-0.5">
+                          No email yet
+                        </span>
+                        <AddEmailButton userId={u.id} onSaved={load} />
+                      </>
+                    )}
+                  </div>
                   <div className="text-[11px] mt-1.5">
                     {u.projects.length > 0 && (
                       <span>
@@ -230,6 +241,69 @@ function UsersSection({ currentUserId }: { currentUserId: string }) {
         />
       )}
     </section>
+  )
+}
+
+function AddEmailButton({ userId, onSaved }: { userId: string; onSaved: () => void | Promise<void> }) {
+  const [editing, setEditing] = useState(false)
+  const [email, setEmail] = useState('')
+  const [saving, setSaving] = useState(false)
+  const [err, setErr] = useState<string | null>(null)
+
+  async function save() {
+    if (!email.trim()) return
+    setSaving(true)
+    setErr(null)
+    try {
+      await api.adminUpdateUser(userId, { email: email.trim() })
+      setEditing(false)
+      setEmail('')
+      await onSaved()
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : 'failed')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  if (!editing) {
+    return (
+      <button
+        onClick={() => setEditing(true)}
+        className="text-[10px] uppercase tracking-wider font-bold text-stage-stems border border-stage-stems/40 rounded px-1.5 py-0.5 hover:bg-stage-stems/10"
+      >
+        + Add email + invite
+      </button>
+    )
+  }
+
+  return (
+    <span className="inline-flex items-center gap-1">
+      <input
+        type="email"
+        value={email}
+        onChange={(e) => setEmail(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') void save()
+          if (e.key === 'Escape') {
+            setEditing(false)
+            setEmail('')
+            setErr(null)
+          }
+        }}
+        placeholder="dillon@example.com"
+        autoFocus
+        className="bg-ink/40 border border-line text-text rounded px-1.5 py-0.5 text-[11px] outline-none focus:border-stage-mastering"
+      />
+      <button
+        onClick={() => void save()}
+        disabled={saving || !email.trim()}
+        className="text-[10px] uppercase font-bold text-stage-stems disabled:opacity-50"
+      >
+        {saving ? '…' : 'Send invite'}
+      </button>
+      {err && <span className="text-urgent text-[10px]">{err}</span>}
+    </span>
   )
 }
 
@@ -310,12 +384,15 @@ function InviteModal({
         </div>
 
         <div className="p-5 space-y-4 overflow-y-auto">
-          <Field label="Email" hint="They'll sign in with this and receive an invite email.">
+          <Field
+            label="Email (optional)"
+            hint="Leave blank to add them as a placeholder now and email later. With an email, they get an invite right away."
+          >
             <input
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              placeholder="michael@example.com"
+              placeholder="dillon@example.com (or leave blank)"
               className="w-full rounded-xl bg-ink/40 border border-line text-text px-3 py-2.5 outline-none focus:border-stage-mastering text-sm"
             />
           </Field>
@@ -441,10 +518,10 @@ function InviteModal({
           </button>
           <button
             onClick={submit}
-            disabled={submitting || !email.trim() || !name.trim()}
+            disabled={submitting || !name.trim()}
             className="flex-1 rounded-xl bg-gradient-to-r from-stage-producing to-stage-mastering text-white font-bold uppercase tracking-wider text-xs px-4 py-2.5 disabled:opacity-50"
           >
-            {submitting ? 'Inviting…' : 'Send invite'}
+            {submitting ? 'Adding…' : email.trim() ? 'Send invite' : 'Add as placeholder'}
           </button>
         </div>
       </div>
