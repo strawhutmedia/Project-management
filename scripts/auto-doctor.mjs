@@ -38,8 +38,13 @@ async function persistDiag() {
 
 const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY
 if (!ANTHROPIC_API_KEY) {
-  console.error('ANTHROPIC_API_KEY not set — exiting')
-  process.exit(1)
+  diag('ANTHROPIC_API_KEY not set — skipping run', {
+    secret_names_seen: Object.keys(process.env).filter((k) =>
+      ['ANTHROPIC', 'GITHUB', 'GH_'].some((p) => k.startsWith(p)),
+    ),
+  })
+  await persistDiag()
+  process.exit(0)
 }
 
 const MODEL = 'claude-sonnet-4-5-20250929'
