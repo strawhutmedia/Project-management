@@ -9,23 +9,29 @@ script importer over it.
 
 ## TL;DR — Can we make this for $700k?
 
-**Yes — Lean fits comfortably with $38k of margin.** Two big wins are now
-locked in:
+**Yes — at the 18-day target with lean post, we land at ~$692k with $8k
+margin.** The two big wins locked in:
 1. **Music sync** locked at ~$10k upfront (master = free, sync via Sony, step-up paid by distributor at sale)
-2. **Creative team unpaid in cash:** writer (Stephen Markley), co-directors (Stephen + Ryan), producers (Ryan, Steve, Alex), and editor (Alex) all take backend points instead of upfront fees. The only ATL cash spend is the line producer.
-
-Three scenarios:
+2. **Creative team unpaid in cash:** writer (Stephen Markley), co-directors (Stephen + Ryan), producers (Ryan, Steve, Alex), and editor (Alex) all take backend points instead of upfront fees. Only ATL cash spend is the line producer.
 
 | Scenario | Production | Post | Marketing | Admin | Direct | + Bond/Cont. (13%) | **TOTAL** | vs. $700k cap |
 |---|---:|---:|---:|---:|---:|---:|---:|---|
-| **Lean** (16 shoot days) | $432k | $70k | $50k | $30k | $582k | $76k | **$658k** | 🟢 fits ($42k margin) |
-| **Mid** (18 shoot days) | $468k | $91k | $50k | $30k | $639k | $83k | **$722k** | 🟡 over by $22k (trim-able) |
-| **Stretch** (20 shoot days, premium crew) | $515k | $119k | $50k | $35k | $719k | $93k | **$812k** | 🔴 over by $112k |
+| 🎯 **Target: 18 shoot days, lean post** | $462k | $70k | $50k | $30k | $612k | $80k | **$692k** | 🟢 fits ($8k margin) |
+| **18 days, mid post** (more asst edit / VFX / color) | $462k | $91k | $50k | $30k | $633k | $82k | **$715k** | 🟡 over by $15k |
+| **20 days, premium crew** | $515k | $119k | $50k | $35k | $719k | $93k | **$812k** | 🔴 over by $112k |
 
-**Recommendation:** **Aim for Lean.** Mid is now within trimming distance —
-small cuts to crew or location days could slide it under cap. Stretch still
-requires meaningful trims to fit. The unpaid creative team is the difference
-between a tight-margin fit and a comfortable fit.
+**At 18 days, the math:** 101 script pages ÷ 18 = **5.6 pages/day** average.
+That's standard indie pace for a feature with this many short scenes (you have
+~30 scenes that are 1/8 page — montage cuts that shoot fast). Achievable but
+not loose. **The $8k margin is real but tight** — one bad weather day, one
+location callback, or one extra prep day can eat it. Recommend pursuing one
+of the trim opportunities below to widen the margin to $25-30k.
+
+**Where to grab another $20k of margin if you want it:**
+- Mall sequence as a dying retail strip vs. real mall: -$8k
+- Real driving scenes on 1 day instead of 2 with process trailer: -$5k
+- Defer 25% of line producer fee against backend: -$10k
+- One less catering day (move to wrap pickup day) or self-cater wrap: -$3k
 
 ---
 
@@ -56,14 +62,15 @@ between a tight-margin fit and a comfortable fit.
 
 ---
 
-## Production crew (16-day shoot, $248k after unpaid creative team)
+## Production crew (**18-day shoot**, $278k after unpaid creative team)
+
+> Schedule assumption: 4 weeks prep + **18 shoot days** + 1 wrap week.
+> 101 pages ÷ 18 days = 5.6 pages/day. Heavy short-scene density (≥30 scenes
+> at 1/8 page) means we can knock out 8-12 short scenes on the lighter days.
 
 > Lean indie crew. Heavy doubling-up: DP operates own camera, gaffer keys his
 > own crew of 1, props/set-dec are one person, hair/makeup is one person, no
 > dedicated boom op.
->
-> Schedule assumption: 4 weeks prep + 16 shoot days + 1 wrap week = ~25 working
-> days for senior crew, ~20 for the on-set day-rate folks.
 
 ### Above-the-line
 The creative team is **all unpaid** in cash terms — they take backend points
