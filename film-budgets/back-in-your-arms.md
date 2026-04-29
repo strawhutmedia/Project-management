@@ -9,18 +9,22 @@ script importer over it.
 
 ## TL;DR — Can we make this for $700k?
 
-**Yes, but only at the lower end of music licensing and with a scrappy
-20-person crew.** Three scenarios:
+**Yes — Lean fits comfortably now that the music license is locked at ~$10k.**
+Master use is free (Maggie owns her recording), mechanical doesn't apply to
+in-film use, and we're targeting a festival-with-step-up sync deal from Sony
+Music Publishing. Three scenarios:
 
 | Scenario | Production | Post | Marketing | Admin | Direct | + Bond/Cont. (13%) | **TOTAL** | vs. $700k cap |
 |---|---:|---:|---:|---:|---:|---:|---:|---|
-| **Lean** (festival music, 16 shoot days, deferred writer) | $462k | $73k | $50k | $30k | $615k | $80k | **$695k** | 🟢 fits ($5k margin) |
-| **Mid** (broader music, 18 shoot days, paid writer) | $498k | $103k | $50k | $30k | $681k | $89k | **$770k** | 🔴 over by $70k |
-| **Stretch** (full music clearance, 20 shoot days) | $545k | $148k | $50k | $35k | $778k | $101k | **$879k** | 🔴 over by $179k |
+| **Lean** (16 shoot days, deferred writer) | $462k | $73k | $50k | $30k | $615k | $80k | **$695k** | 🟢 fits ($5k margin) |
+| **Mid** (18 shoot days, paid writer) | $498k | $88k | $50k | $30k | $666k | $87k | **$753k** | 🔴 over by $53k |
+| **Stretch** (20 shoot days, premium crew) | $545k | $103k | $50k | $35k | $733k | $95k | **$828k** | 🔴 over by $128k |
 
-**Recommendation:** Aim for the **Lean** scenario. The single biggest
-discretionary lever is music licensing. Festival-only rights at $10k vs. full
-clearance at $75k is a $65k swing — bigger than any other line in the budget.
+**Recommendation:** **Aim for Lean.** The previous music wildcard ($10k vs. $75k)
+that used to swing the whole budget is now eliminated — the sync deal is locked
+at ~$10k upfront with the step-up paid by a future distributor, not by you. The
+remaining levers if you need to come down: shoot days, writer's pay structure,
+and crew size.
 
 ---
 
@@ -219,7 +223,7 @@ Never shown on camera. Pure dialogue. **No money.** Just need Jason to deliver.
 
 ---
 
-## Post-production ($73–148k depending on music)
+## Post-production ($73–103k)
 
 | Item | Lean | Mid | Stretch |
 |---|---:|---:|---:|
@@ -228,20 +232,35 @@ Never shown on camera. Pure dialogue. **No money.** Just need Jason to deliver.
 | Sound design + Foley + ADR + mix | $20k | $20k | $25k |
 | Mix stage rental | $2k | $3k | $4k |
 | Composer / score | $10k | $15k | $20k |
-| **Music licensing** (incl. Maggie's Springsteen cover license) | $10k | $25k | $75k |
+| **Sync license** (Springsteen via Sony Music Publishing) | $10k | $10k | $15k |
+| Music supervisor (optional, recommended) | $0 | $5k | $8k |
 | Color (Cam) | $10k | $15k | $20k |
 | VFX (XenoSouls touch-ups, blood comp, minor cleanup) | $5k | $8k | $10k |
 | Deliverables / masters / closed captions | $4k | $4k | $4k |
 | Festival prep / DCP / digital files | $2k | $2k | $2k |
 | QC pass | $2k | $2k | $2k |
 | Editor station / drives / software | $3k | $3k | $3k |
-| **TOTAL POST** | **$73k** | **$103k** | **$148k** |
+| **TOTAL POST** | **$73k** | **$94k** | **$122k** |
 
-> ⚠️ **About the Springsteen cover:** even though Maggie's the performer, the
-> *underlying composition* is Springsteen's — the Bruce Springsteen Estate (or
-> his publisher) controls sync rights. Festival-only sync = ~$5-10k. Wide
-> theatrical/streaming sync = $30-100k+ depending on negotiation. **Get this
-> quote first** — it could move the whole budget.
+> ✅ **Music licensing is now locked to one ask.** Maggie owns her recording
+> (master use = $0). She's covering Springsteen's "Back in Your Arms," which is
+> a deep cut from his 1998 *Tracks* box set — not a Top 40 hit, so it's in the
+> "catalog tier" of pricing rather than the "iconic single" tier.
+>
+> **What we're licensing:** sync only, from Sony Music Publishing (who acquired
+> Springsteen's catalog in 2021).
+>
+> **Deal structure:** festival-only sync upfront with a step-up to all-media
+> when a distributor signs the film. Distributor pays the step-up out of their
+> acquisition budget, not us.
+>
+> **Cost we budget:** $10k upfront. Floor $5k (with strong music supervisor
+> pitch), ceiling $15k (Sony hardball). Step-up at sale = $30-50k, paid by
+> distributor.
+>
+> **What we DON'T need:** mechanical license (only matters if Maggie releases
+> the cover commercially as a single — separate decision from the film), and
+> we don't need a master use license since Maggie owns the recording.
 
 ---
 
