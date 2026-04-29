@@ -27,7 +27,7 @@ budgetsRouter.get('/projects/:projectId', async (req, res) => {
   }
   const budgetRes = await pool.query(
     `SELECT id, currency, shoot_days, bond_pct, contingency_pct,
-            production_target, post_target, marketing_target, total_target
+            production_target, post_target, marketing_target, admin_target, total_target
        FROM budgets WHERE project_id = $1`,
     [projectId],
   )
@@ -76,6 +76,7 @@ budgetsRouter.get('/projects/:projectId', async (req, res) => {
       productionTarget: numOrNull(budget.production_target),
       postTarget: numOrNull(budget.post_target),
       marketingTarget: numOrNull(budget.marketing_target),
+      adminTarget: numOrNull(budget.admin_target),
       totalTarget: numOrNull(budget.total_target),
       accounts: accounts.rows.map((a: { id: string; code: string; name: string; category: string; position: number }) => ({
         ...a,
@@ -107,6 +108,7 @@ budgetsRouter.post('/projects/:projectId', async (req, res) => {
   const productionTarget = numOrNull(req.body?.productionTarget)
   const postTarget = numOrNull(req.body?.postTarget)
   const marketingTarget = numOrNull(req.body?.marketingTarget)
+  const adminTarget = numOrNull(req.body?.adminTarget)
   const totalTarget = numOrNull(req.body?.totalTarget)
 
   const client = await pool.connect()
@@ -114,9 +116,9 @@ budgetsRouter.post('/projects/:projectId', async (req, res) => {
     await client.query('BEGIN')
     const b = await client.query(
       `INSERT INTO budgets (project_id, currency, shoot_days, created_by,
-         production_target, post_target, marketing_target, total_target)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id`,
-      [projectId, currency, shootDays, user.id, productionTarget, postTarget, marketingTarget, totalTarget],
+         production_target, post_target, marketing_target, admin_target, total_target)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING id`,
+      [projectId, currency, shootDays, user.id, productionTarget, postTarget, marketingTarget, adminTarget, totalTarget],
     )
     const budgetId = b.rows[0].id
     if (useTemplate) {
@@ -162,7 +164,7 @@ budgetsRouter.patch('/:budgetId', async (req, res) => {
     [user.id, budgetId, user.role],
   )
   if (access.rows.length === 0) { res.status(403).json({ error: 'forbidden' }); return }
-  const { currency, shootDays, bondPct, contingencyPct, productionTarget, postTarget, marketingTarget, totalTarget } = req.body ?? {}
+  const { currency, shootDays, bondPct, contingencyPct, productionTarget, postTarget, marketingTarget, adminTarget, totalTarget } = req.body ?? {}
   const updates: string[] = []
   const values: unknown[] = []
   let i = 1
@@ -184,6 +186,7 @@ budgetsRouter.patch('/:budgetId', async (req, res) => {
   targetField('productionTarget', productionTarget, 'production_target')
   targetField('postTarget', postTarget, 'post_target')
   targetField('marketingTarget', marketingTarget, 'marketing_target')
+  targetField('adminTarget', adminTarget, 'admin_target')
   targetField('totalTarget', totalTarget, 'total_target')
   if (updates.length === 0) { res.status(400).json({ error: 'no_fields' }); return }
   values.push(budgetId)

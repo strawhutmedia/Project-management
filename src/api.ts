@@ -152,6 +152,7 @@ export type ApiBudget = {
   productionTarget: number | null
   postTarget: number | null
   marketingTarget: number | null
+  adminTarget: number | null
   totalTarget: number | null
   accounts: ApiBudgetAccount[]
 }
@@ -316,6 +317,7 @@ export const api = {
     productionTarget?: number | null
     postTarget?: number | null
     marketingTarget?: number | null
+    adminTarget?: number | null
     totalTarget?: number | null
   }) =>
     request<{ budget: { id: string }; created: boolean }>(`/api/budgets/projects/${projectId}`, {
@@ -330,6 +332,7 @@ export const api = {
     productionTarget?: number | null
     postTarget?: number | null
     marketingTarget?: number | null
+    adminTarget?: number | null
     totalTarget?: number | null
   }) =>
     request<{ ok: true }>(`/api/budgets/${budgetId}`, { method: 'PATCH', body: JSON.stringify(patch) }),

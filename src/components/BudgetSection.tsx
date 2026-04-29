@@ -40,20 +40,24 @@ function accountTotal(acc: ApiBudgetAccount): number {
   return acc.lineItems.reduce((sum, li) => sum + li.total, 0)
 }
 
-// User-facing goal buckets:
-//   production  := above_line + production
-//   post        := post
-//   marketing   := other (publicity, legal, insurance, general)
-const GOAL_TO_CATEGORIES: Record<'production' | 'post' | 'marketing', BudgetCategory[]> = {
-  production: ['above_line', 'production'],
-  post: ['post'],
-  marketing: ['other'],
+type GoalBucket = 'production' | 'post' | 'marketing' | 'admin'
+
+// User-facing goal buckets. Production/Post are whole categories; "Other" is
+// further split by account code so Marketing (publicity) is separated from
+// Admin (legal/accounting + general expense + insurance).
+function accountInBucket(acc: ApiBudgetAccount, bucket: GoalBucket): boolean {
+  if (bucket === 'production') return acc.category === 'above_line' || acc.category === 'production'
+  if (bucket === 'post') return acc.category === 'post'
+  if (bucket === 'marketing') return acc.code.startsWith('55-')
+  if (bucket === 'admin') return (
+    acc.code.startsWith('56-') || acc.code.startsWith('57-') || acc.code.startsWith('58-')
+  )
+  return false
 }
 
-function bucketSpend(budget: ApiBudget, bucket: 'production' | 'post' | 'marketing'): number {
-  const cats = GOAL_TO_CATEGORIES[bucket]
+function bucketSpend(budget: ApiBudget, bucket: GoalBucket): number {
   return budget.accounts
-    .filter((a) => cats.includes(a.category))
+    .filter((a) => accountInBucket(a, bucket))
     .reduce((s, a) => s + accountTotal(a), 0)
 }
 
@@ -134,7 +138,8 @@ export default function BudgetSection({ projectId, isAdmin }: { projectId: strin
       {(budget.totalTarget != null ||
         budget.productionTarget != null ||
         budget.postTarget != null ||
-        budget.marketingTarget != null) && (
+        budget.marketingTarget != null ||
+        budget.adminTarget != null) && (
         <div className="space-y-3">
           {budget.totalTarget != null && (
             <GoalBar
@@ -145,7 +150,7 @@ export default function BudgetSection({ projectId, isAdmin }: { projectId: strin
               big
             />
           )}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
             {budget.productionTarget != null && (
               <GoalBar
                 label="🎬 Production"
@@ -164,9 +169,17 @@ export default function BudgetSection({ projectId, isAdmin }: { projectId: strin
             )}
             {budget.marketingTarget != null && (
               <GoalBar
-                label="📣 Marketing"
+                label="📣 Marketing / PR"
                 spent={bucketSpend(budget, 'marketing')}
                 target={budget.marketingTarget}
+                currency={budget.currency}
+              />
+            )}
+            {budget.adminTarget != null && (
+              <GoalBar
+                label="🛡️ Admin (Legal·Acct·Ins)"
+                spent={bucketSpend(budget, 'admin')}
+                target={budget.adminTarget}
                 currency={budget.currency}
               />
             )}
@@ -295,6 +308,7 @@ function BudgetCreate({ projectId, isAdmin, onCreated }: { projectId: string; is
   const [productionTarget, setProductionTarget] = useState<string>('')
   const [postTarget, setPostTarget] = useState<string>('')
   const [marketingTarget, setMarketingTarget] = useState<string>('')
+  const [adminTarget, setAdminTarget] = useState<string>('')
   const [totalTarget, setTotalTarget] = useState<string>('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -347,6 +361,7 @@ function BudgetCreate({ projectId, isAdmin, onCreated }: { projectId: string; is
         productionTarget: num(productionTarget),
         postTarget: num(postTarget),
         marketingTarget: num(marketingTarget),
+        adminTarget: num(adminTarget),
         totalTarget: num(totalTarget),
       })
       await onCreated()
@@ -398,11 +413,11 @@ function BudgetCreate({ projectId, isAdmin, onCreated }: { projectId: string; is
           <p className="text-[11px] text-muted/70 mt-1">
             What's the most you can spend? Set a Total cap, then split it across
             Production (above-the-line + crew + equip), Post (edit/sound/color/VFX),
-            and Marketing (PR/publicity). Progress bars show planned spend vs. each
-            cap and turn red when over.
+            Marketing/PR (publicity), and Admin (legal · accounting · insurance).
+            Progress bars show planned spend vs. each cap and turn red when over.
           </p>
         </div>
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
           <label className="block">
             <span className="block text-[11px] uppercase tracking-wider text-muted font-bold mb-1.5">🎯 Total cap</span>
             <input
@@ -443,6 +458,16 @@ function BudgetCreate({ projectId, isAdmin, onCreated }: { projectId: string; is
               className="w-full rounded-xl bg-ink/40 border border-line text-text px-3 py-2.5 outline-none focus:border-stage-mastering text-sm font-mono"
             />
           </label>
+          <label className="block">
+            <span className="block text-[11px] uppercase tracking-wider text-muted font-bold mb-1.5">🛡️ Admin</span>
+            <input
+              inputMode="decimal"
+              placeholder="e.g. 25000"
+              value={adminTarget}
+              onChange={(e) => setAdminTarget(e.target.value)}
+              className="w-full rounded-xl bg-ink/40 border border-line text-text px-3 py-2.5 outline-none focus:border-stage-mastering text-sm font-mono"
+            />
+          </label>
         </div>
       </div>
 
@@ -475,6 +500,7 @@ function BudgetSettings({ budget, onSaved }: { budget: ApiBudget; onSaved: () =>
   const [productionTarget, setProductionTarget] = useState<string>(budget.productionTarget != null ? String(budget.productionTarget) : '')
   const [postTarget, setPostTarget] = useState<string>(budget.postTarget != null ? String(budget.postTarget) : '')
   const [marketingTarget, setMarketingTarget] = useState<string>(budget.marketingTarget != null ? String(budget.marketingTarget) : '')
+  const [adminTarget, setAdminTarget] = useState<string>(budget.adminTarget != null ? String(budget.adminTarget) : '')
   const [totalTarget, setTotalTarget] = useState<string>(budget.totalTarget != null ? String(budget.totalTarget) : '')
   const [busy, setBusy] = useState(false)
 
@@ -495,6 +521,7 @@ function BudgetSettings({ budget, onSaved }: { budget: ApiBudget; onSaved: () =>
         productionTarget: num(productionTarget),
         postTarget: num(postTarget),
         marketingTarget: num(marketingTarget),
+        adminTarget: num(adminTarget),
         totalTarget: num(totalTarget),
       })
       await onSaved()
@@ -597,6 +624,16 @@ function BudgetSettings({ budget, onSaved }: { budget: ApiBudget; onSaved: () =>
           placeholder="50000"
           value={marketingTarget}
           onChange={(e) => setMarketingTarget(e.target.value)}
+          className="w-full rounded-md bg-ink/60 border border-line text-text px-2 py-1.5 outline-none font-mono"
+        />
+      </label>
+      <label className="block">
+        <span className="block text-[10px] uppercase tracking-wider text-muted font-bold mb-1">Admin cap (Legal·Acct·Ins)</span>
+        <input
+          inputMode="decimal"
+          placeholder="25000"
+          value={adminTarget}
+          onChange={(e) => setAdminTarget(e.target.value)}
           className="w-full rounded-md bg-ink/60 border border-line text-text px-2 py-1.5 outline-none font-mono"
         />
       </label>
