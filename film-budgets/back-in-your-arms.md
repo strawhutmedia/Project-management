@@ -9,22 +9,23 @@ script importer over it.
 
 ## TL;DR — Can we make this for $700k?
 
-**Yes — Lean fits comfortably now that the music license is locked at ~$10k.**
-Master use is free (Maggie owns her recording), mechanical doesn't apply to
-in-film use, and we're targeting a festival-with-step-up sync deal from Sony
-Music Publishing. Three scenarios:
+**Yes — Lean fits comfortably with $38k of margin.** Two big wins are now
+locked in:
+1. **Music sync** locked at ~$10k upfront (master = free, sync via Sony, step-up paid by distributor at sale)
+2. **Creative team unpaid in cash:** writer (Stephen Markley), co-directors (Stephen + Ryan), producers (Ryan, Steve, Alex), and editor (Alex) all take backend points instead of upfront fees. The only ATL cash spend is the line producer.
+
+Three scenarios:
 
 | Scenario | Production | Post | Marketing | Admin | Direct | + Bond/Cont. (13%) | **TOTAL** | vs. $700k cap |
 |---|---:|---:|---:|---:|---:|---:|---:|---|
-| **Lean** (16 shoot days, deferred writer) | $462k | $73k | $50k | $30k | $615k | $80k | **$695k** | 🟢 fits ($5k margin) |
-| **Mid** (18 shoot days, paid writer) | $498k | $88k | $50k | $30k | $666k | $87k | **$753k** | 🔴 over by $53k |
-| **Stretch** (20 shoot days, premium crew) | $545k | $103k | $50k | $35k | $733k | $95k | **$828k** | 🔴 over by $128k |
+| **Lean** (16 shoot days) | $432k | $70k | $50k | $30k | $582k | $76k | **$658k** | 🟢 fits ($42k margin) |
+| **Mid** (18 shoot days) | $468k | $91k | $50k | $30k | $639k | $83k | **$722k** | 🟡 over by $22k (trim-able) |
+| **Stretch** (20 shoot days, premium crew) | $515k | $119k | $50k | $35k | $719k | $93k | **$812k** | 🔴 over by $112k |
 
-**Recommendation:** **Aim for Lean.** The previous music wildcard ($10k vs. $75k)
-that used to swing the whole budget is now eliminated — the sync deal is locked
-at ~$10k upfront with the step-up paid by a future distributor, not by you. The
-remaining levers if you need to come down: shoot days, writer's pay structure,
-and crew size.
+**Recommendation:** **Aim for Lean.** Mid is now within trimming distance —
+small cuts to crew or location days could slide it under cap. Stretch still
+requires meaningful trims to fit. The unpaid creative team is the difference
+between a tight-margin fit and a comfortable fit.
 
 ---
 
@@ -55,7 +56,7 @@ and crew size.
 
 ---
 
-## Production crew (16-day shoot, $278k)
+## Production crew (16-day shoot, $248k after unpaid creative team)
 
 > Lean indie crew. Heavy doubling-up: DP operates own camera, gaffer keys his
 > own crew of 1, props/set-dec are one person, hair/makeup is one person, no
@@ -65,12 +66,19 @@ and crew size.
 > days for senior crew, ~20 for the on-set day-rate folks.
 
 ### Above-the-line
-| Role | Rate × days | Total |
-|---|---:|---:|
-| Director | flat | $30k |
-| Producer / UPM (combined) | flat | $30k |
-| Writer (Stephen Markley) — *deferred or partial* | flat | $10k upfront / $30k deferred |
-| **Subtotal** | | **$70k** |
+The creative team is **all unpaid** in cash terms — they take backend points
+out of the 50% producer side of the cap table instead of an upfront fee.
+
+| Role | Person | Cash | Notes |
+|---|---|---:|---|
+| Writer | Stephen Markley | $0 | Backend points |
+| Co-Director | Stephen Markley | $0 | Backend points |
+| Co-Director | Ryan | $0 | Backend points |
+| Producer | Ryan | $0 | Backend points |
+| Producer | Steve | $0 | Backend points |
+| Producer | Alex | $0 | Backend points (also editing — see Post) |
+| **Line Producer** (on set, paid) | TBD | **$40k** | 4 wks prep + 4 wks shoot + 1 wk wrap @ ~$5k/wk. The only ATL cash spend. |
+| **Subtotal** | | **$40k** | (was $70k — saves $30k) |
 
 ### Camera
 | Role | Rate × days | Total |
@@ -227,7 +235,7 @@ Never shown on camera. Pure dialogue. **No money.** Just need Jason to deliver.
 
 | Item | Lean | Mid | Stretch |
 |---|---:|---:|---:|
-| Editor (Alex) | $3k | $3k | $3k |
+| Editor (Alex) — *unpaid, takes points* | $0 | $0 | $0 |
 | Asst editor / picture conform | $2k | $4k | $6k |
 | Sound design + Foley + ADR + mix | $20k | $20k | $25k |
 | Mix stage rental | $2k | $3k | $4k |
@@ -240,7 +248,7 @@ Never shown on camera. Pure dialogue. **No money.** Just need Jason to deliver.
 | Festival prep / DCP / digital files | $2k | $2k | $2k |
 | QC pass | $2k | $2k | $2k |
 | Editor station / drives / software | $3k | $3k | $3k |
-| **TOTAL POST** | **$73k** | **$94k** | **$122k** |
+| **TOTAL POST** | **$70k** | **$91k** | **$119k** |
 
 > ✅ **Music licensing is now locked to one ask.** Maggie owns her recording
 > (master use = $0). She's covering Springsteen's "Back in Your Arms," which is
