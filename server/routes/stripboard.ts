@@ -2,6 +2,7 @@ import { Router } from 'express'
 import { pool } from '../db'
 import { requireUser, type SessionUser } from '../auth'
 import { parseFdx } from '../fdx_parser'
+import { applyBackInYourArmsSchedule } from '../seeds/back_in_your_arms'
 
 export const stripboardRouter = Router()
 stripboardRouter.use(requireUser)
@@ -202,4 +203,25 @@ stripboardRouter.patch('/scenes/:sceneId', async (req, res) => {
   values.push(sceneId)
   await pool.query(`UPDATE scenes SET ${updates.join(', ')} WHERE id = $${i}`, values)
   res.json({ ok: true })
+})
+
+// Apply Ryan's pre-seeded "Back in Your Arms" StudioBinder schedule. Maps
+// every scene number to its scheduled shoot day. Run this after uploading
+// the .fdx for the BIYA project.
+stripboardRouter.post('/projects/:projectId/apply-biya-schedule', async (req, res) => {
+  const user = (req as typeof req & { user: SessionUser }).user
+  const projectId = req.params.projectId
+  if (!(await userCanAccessProject(user.id, user.role, projectId))) {
+    res.status(403).json({ error: 'forbidden' }); return
+  }
+  const proj = await pool.query<{ name: string }>(
+    `SELECT name FROM projects WHERE id = $1`,
+    [projectId],
+  )
+  if (proj.rows.length === 0 || proj.rows[0].name !== 'Back in Your Arms') {
+    res.status(400).json({ error: 'wrong_project', message: 'This action is only for the Back in Your Arms project.' })
+    return
+  }
+  const result = await applyBackInYourArmsSchedule(projectId)
+  res.json({ ok: true, ...result })
 })

@@ -30,7 +30,7 @@ function fmtEighths(eighths: number): string {
   return `${whole} ${frac}/8`
 }
 
-export default function Stripboard({ projectId, isAdmin }: { projectId: string; isAdmin: boolean }) {
+export default function Stripboard({ projectId, isAdmin, projectName }: { projectId: string; isAdmin: boolean; projectName?: string }) {
   const [board, setBoard] = useState<ApiStripboard | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [importing, setImporting] = useState(false)
@@ -67,6 +67,22 @@ export default function Stripboard({ projectId, isAdmin }: { projectId: string; 
     } finally {
       setImporting(false)
       if (fileInputRef.current) fileInputRef.current.value = ''
+    }
+  }
+
+  async function applyBiyaSchedule() {
+    setBusy(true)
+    setError(null)
+    try {
+      const result = await api.applyBiyaSchedule(projectId)
+      await load()
+      if (result.missing.length > 0) {
+        setError(`Applied ${result.assigned} scenes. ${result.missing.length} scene numbers from the schedule weren't found in the .fdx: ${result.missing.slice(0, 5).join(', ')}${result.missing.length > 5 ? '…' : ''}`)
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'failed')
+    } finally {
+      setBusy(false)
     }
   }
 
@@ -175,6 +191,15 @@ export default function Stripboard({ projectId, isAdmin }: { projectId: string; 
             >
               {importing ? 'Parsing…' : '↻ Re-import .fdx'}
             </button>
+            {projectName === 'Back in Your Arms' && (grouped?.unscheduled.length ?? 0) > 0 && (
+              <button
+                onClick={() => void applyBiyaSchedule()}
+                disabled={busy}
+                className="text-[10px] uppercase tracking-wider text-white bg-gradient-to-r from-stage-producing to-stage-mastering rounded-full px-3 py-1.5 hover:opacity-90 disabled:opacity-50 font-bold"
+              >
+                ✨ Apply BIYA schedule
+              </button>
+            )}
             <button
               onClick={() => void addDay(false)}
               disabled={busy}

@@ -409,6 +409,11 @@ export const api = {
       method: 'PATCH',
       body: JSON.stringify(patch),
     }),
+  applyBiyaSchedule: (projectId: string) =>
+    request<{ ok: true; assigned: number; missing: string[] }>(
+      `/api/stripboard/projects/${projectId}/apply-biya-schedule`,
+      { method: 'POST' },
+    ),
   // Notifications
   notifications: () => request<{ notifications: ApiNotification[]; unreadCount: number }>('/api/notifications'),
   notificationRead: (id: string) =>

@@ -11,6 +11,7 @@ import { adminRouter } from './routes/admin'
 import { notificationsRouter } from './routes/notifications'
 import { budgetsRouter } from './routes/budgets'
 import { stripboardRouter } from './routes/stripboard'
+import { seedBackInYourArms } from './seeds/back_in_your_arms'
 import { startScheduler } from './scheduler'
 import {
   diagRouter,
@@ -72,6 +73,7 @@ async function start() {
   try {
     await runMigrations()
     logInfo('migrations complete')
+    await seedBackInYourArms()
   } catch (err) {
     logError('migrations failed', { error: err instanceof Error ? err.message : String(err) })
     markBootError(err)

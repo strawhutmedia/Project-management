@@ -178,7 +178,9 @@ export default function ProjectPage() {
 
       {isAdmin && <ProjectRolesSection project={project} members={members} onSaved={reload} />}
 
-      {project.kind === 'film' && <Stripboard projectId={project.id} isAdmin={isAdmin} />}
+      {project.kind === 'film' && (
+        <Stripboard projectId={project.id} isAdmin={isAdmin} projectName={project.name} />
+      )}
 
       <BudgetSection projectId={project.id} isAdmin={isAdmin} />
 
