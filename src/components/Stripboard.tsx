@@ -51,6 +51,11 @@ export default function Stripboard({ projectId, isAdmin }: { projectId: string; 
   async function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
     if (!file) return
+    if (!file.name.toLowerCase().endsWith('.fdx')) {
+      setError('Only .fdx files are accepted (Final Draft format).')
+      if (fileInputRef.current) fileInputRef.current.value = ''
+      return
+    }
     setImporting(true)
     setError(null)
     try {
@@ -123,7 +128,7 @@ export default function Stripboard({ projectId, isAdmin }: { projectId: string; 
             <input
               ref={fileInputRef}
               type="file"
-              accept=".fdx,application/xml,text/xml"
+              accept=".fdx"
               onChange={(e) => void handleFile(e)}
               className="hidden"
             />
@@ -159,7 +164,7 @@ export default function Stripboard({ projectId, isAdmin }: { projectId: string; 
             <input
               ref={fileInputRef}
               type="file"
-              accept=".fdx,application/xml,text/xml"
+              accept=".fdx"
               onChange={(e) => void handleFile(e)}
               className="hidden"
             />

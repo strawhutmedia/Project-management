@@ -83,11 +83,23 @@ stripboardRouter.post('/projects/:projectId/import-fdx', async (req, res) => {
   if (!xml || xml.length < 100) {
     res.status(400).json({ error: 'xml_required' }); return
   }
+  // Require the content to look like a Final Draft document. FD files always
+  // start with the XML declaration and have a top-level <FinalDraft DocumentType="Script"...>
+  // tag. Anything else is rejected with a clear error.
+  const head = xml.slice(0, 2000)
+  if (!head.includes('<?xml') || !head.includes('FinalDraft')) {
+    res.status(400).json({ error: 'not_fdx', message: 'File does not look like a Final Draft (.fdx) document.' })
+    return
+  }
   let parsed: ReturnType<typeof parseFdx>
   try {
     parsed = parseFdx(xml)
   } catch (err) {
     res.status(400).json({ error: 'parse_failed', message: err instanceof Error ? err.message : String(err) }); return
+  }
+  if (parsed.length === 0) {
+    res.status(400).json({ error: 'no_scenes', message: 'No numbered scene headings found. Make sure the script has scene numbers turned on in Final Draft.' })
+    return
   }
   const client = await pool.connect()
   try {
