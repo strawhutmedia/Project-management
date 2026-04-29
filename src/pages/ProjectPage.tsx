@@ -6,6 +6,7 @@ import StagePill from '../components/StagePill'
 import StageDistribution from '../components/StageDistribution'
 import InlineEdit from '../components/InlineEdit'
 import DropboxFolderPicker from '../components/DropboxFolderPicker'
+import BudgetSection from '../components/BudgetSection'
 import { useAuth } from '../auth'
 
 export default function ProjectPage() {
@@ -175,6 +176,8 @@ export default function ProjectPage() {
       </div>
 
       {isAdmin && <ProjectRolesSection project={project} members={members} onSaved={reload} />}
+
+      <BudgetSection projectId={project.id} isAdmin={isAdmin} />
 
       {showRootPicker && (
         <DropboxFolderPicker

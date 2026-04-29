@@ -117,6 +117,41 @@ export type ApiAdminProject = {
   songs: Array<{ id: string; title: string; subtitle: string | null }>
 }
 
+export type BudgetCategory = 'above_line' | 'production' | 'post' | 'other'
+
+export type ApiBudgetLineItem = {
+  id: string
+  code: string | null
+  description: string
+  amt: number
+  units: string | null
+  x: number
+  rate: number
+  vendor: string | null
+  datedAt: string | null
+  notes: string | null
+  position: number
+  total: number
+}
+
+export type ApiBudgetAccount = {
+  id: string
+  code: string
+  name: string
+  category: BudgetCategory
+  position: number
+  lineItems: ApiBudgetLineItem[]
+}
+
+export type ApiBudget = {
+  id: string
+  currency: string
+  shootDays: number
+  bondPct: number
+  contingencyPct: number
+  accounts: ApiBudgetAccount[]
+}
+
 export type ApiTask = {
   id: string
   title: string
@@ -267,6 +302,40 @@ export const api = {
     request<{ ok: true }>(`/api/admin/users/${userId}/songs/${songId}`, { method: 'POST' }),
   adminRevokeSong: (userId: string, songId: string) =>
     request<{ ok: true }>(`/api/admin/users/${userId}/songs/${songId}`, { method: 'DELETE' }),
+  // Budgets
+  budget: (projectId: string) =>
+    request<{ budget: ApiBudget }>(`/api/budgets/projects/${projectId}`),
+  createBudget: (projectId: string, body: { shootDays?: number; currency?: string; template?: 'studiobinder' | 'blank' }) =>
+    request<{ budget: { id: string }; created: boolean }>(`/api/budgets/projects/${projectId}`, {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+  updateBudget: (budgetId: string, patch: { currency?: string; shootDays?: number; bondPct?: number; contingencyPct?: number }) =>
+    request<{ ok: true }>(`/api/budgets/${budgetId}`, { method: 'PATCH', body: JSON.stringify(patch) }),
+  addBudgetItem: (accountId: string, body: {
+    code?: string
+    description: string
+    amt?: number
+    units?: string
+    x?: number
+    rate?: number
+    vendor?: string
+    datedAt?: string
+    notes?: string
+  }) => request<{ id: string }>(`/api/budgets/accounts/${accountId}/items`, { method: 'POST', body: JSON.stringify(body) }),
+  updateBudgetItem: (itemId: string, patch: Partial<{
+    code: string
+    description: string
+    amt: number
+    units: string
+    x: number
+    rate: number
+    vendor: string
+    datedAt: string | null
+    notes: string
+  }>) => request<{ ok: true }>(`/api/budgets/items/${itemId}`, { method: 'PATCH', body: JSON.stringify(patch) }),
+  deleteBudgetItem: (itemId: string) =>
+    request<{ ok: true }>(`/api/budgets/items/${itemId}`, { method: 'DELETE' }),
   // Notifications
   notifications: () => request<{ notifications: ApiNotification[]; unreadCount: number }>('/api/notifications'),
   notificationRead: (id: string) =>

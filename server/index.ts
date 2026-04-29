@@ -9,6 +9,7 @@ import { songsRouter } from './routes/songs'
 import { integrationsRouter } from './routes/integrations'
 import { adminRouter } from './routes/admin'
 import { notificationsRouter } from './routes/notifications'
+import { budgetsRouter } from './routes/budgets'
 import { startScheduler } from './scheduler'
 import {
   diagRouter,
@@ -39,6 +40,7 @@ app.use('/api/songs', songsRouter)
 app.use('/api/integrations', integrationsRouter)
 app.use('/api/admin', adminRouter)
 app.use('/api/notifications', notificationsRouter)
+app.use('/api/budgets', budgetsRouter)
 
 const clientDir = path.resolve(process.cwd(), 'dist')
 logInfo('serving client from', { clientDir })
