@@ -1,0 +1,85 @@
+{
+  "version": "0.2.2",
+  "now": "2026-04-29T00:22:46.952Z",
+  "boot": {
+    "startedAt": "2026-04-29T00:22:46.763Z",
+    "completedAt": "2026-04-29T00:22:46.945Z",
+    "error": null
+  },
+  "env": {
+    "NODE_ENV": "production",
+    "PORT": "8080",
+    "HAS_DATABASE_URL": true,
+    "HAS_RESEND_API_KEY": true,
+    "HAS_GITHUB_TOKEN": true,
+    "APP_BASE_URL": null,
+    "ADMIN_EMAIL": "ryan@strawhutmedia.com"
+  },
+  "paths": {
+    "cwd": "/app",
+    "clientDir": "/app/dist",
+    "clientIndex": "/app/dist/index.html",
+    "migrationsDir": "/app/server/migrations",
+    "exists": {
+      "clientDir": true,
+      "clientIndex": true,
+      "migrationsDir": true
+    }
+  },
+  "db": {
+    "state": "ok",
+    "error": null,
+    "migrationsApplied": [
+      "001_init.sql",
+      "002_seed.sql",
+      "003_dropbox_root.sql",
+      "004_display_name.sql",
+      "005_song_members.sql",
+      "006_notifications.sql",
+      "007_stage_owners.sql",
+      "008_optional_email.sql",
+      "009_project_default_owners.sql",
+      "010_stage_labels.sql",
+      "011_channels_subfolder.sql",
+      "012_seed_code_x_connor.sql"
+    ],
+    "userCount": 5,
+    "projectCount": 2
+  },
+  "recentLog": [
+    {
+      "level": "info",
+      "ts": "2026-04-29T00:22:46.761Z",
+      "msg": "serving client from",
+      "data": {
+        "clientDir": "/app/dist"
+      }
+    },
+    {
+      "level": "info",
+      "ts": "2026-04-29T00:22:46.763Z",
+      "msg": "boot starting",
+      "data": {
+        "cwd": "/app",
+        "nodeEnv": "production",
+        "hasDb": true,
+        "hasResend": true
+      }
+    },
+    {
+      "level": "info",
+      "ts": "2026-04-29T00:22:46.943Z",
+      "msg": "migrations complete"
+    },
+    {
+      "level": "info",
+      "ts": "2026-04-29T00:22:46.945Z",
+      "msg": "listening on :8080"
+    },
+    {
+      "level": "info",
+      "ts": "2026-04-29T00:22:46.945Z",
+      "msg": "scheduler started (every 5 min)"
+    }
+  ]
+}
