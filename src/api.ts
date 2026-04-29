@@ -157,6 +157,37 @@ export type ApiBudget = {
   accounts: ApiBudgetAccount[]
 }
 
+export type ApiShootDay = {
+  id: string
+  number: number
+  isBreak: boolean
+  shootDate: string | null
+  notes: string | null
+}
+
+export type ApiScene = {
+  id: string
+  number: string
+  scriptPosition: number
+  slug: string
+  intExt: string | null
+  location: string | null
+  locationTag: string | null
+  timeOfDay: string | null
+  page: number | null
+  pageEighths: number
+  characters: string[]
+  notes: string | null
+  shootDayId: string | null
+  dayPosition: number
+  locationStatus: 'unset' | 'free' | 'paid'
+}
+
+export type ApiStripboard = {
+  days: ApiShootDay[]
+  scenes: ApiScene[]
+}
+
 export type ApiTask = {
   id: string
   title: string
@@ -360,6 +391,24 @@ export const api = {
   }>) => request<{ ok: true }>(`/api/budgets/items/${itemId}`, { method: 'PATCH', body: JSON.stringify(patch) }),
   deleteBudgetItem: (itemId: string) =>
     request<{ ok: true }>(`/api/budgets/items/${itemId}`, { method: 'DELETE' }),
+  // Stripboard
+  stripboard: (projectId: string) =>
+    request<ApiStripboard>(`/api/stripboard/projects/${projectId}`),
+  importFdx: (projectId: string, xml: string) =>
+    request<{ ok: true; count: number }>(`/api/stripboard/projects/${projectId}/import-fdx`, {
+      method: 'POST',
+      body: JSON.stringify({ xml }),
+    }),
+  createShootDay: (projectId: string, body: { number: number; isBreak?: boolean; shootDate?: string }) =>
+    request<{ id: string }>(`/api/stripboard/projects/${projectId}/days`, {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+  updateScene: (sceneId: string, patch: { shootDayId?: string | null; dayPosition?: number; locationStatus?: 'unset' | 'free' | 'paid'; notes?: string }) =>
+    request<{ ok: true }>(`/api/stripboard/scenes/${sceneId}`, {
+      method: 'PATCH',
+      body: JSON.stringify(patch),
+    }),
   // Notifications
   notifications: () => request<{ notifications: ApiNotification[]; unreadCount: number }>('/api/notifications'),
   notificationRead: (id: string) =>

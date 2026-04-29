@@ -7,6 +7,7 @@ import StageDistribution from '../components/StageDistribution'
 import InlineEdit from '../components/InlineEdit'
 import DropboxFolderPicker from '../components/DropboxFolderPicker'
 import BudgetSection from '../components/BudgetSection'
+import Stripboard from '../components/Stripboard'
 import { useAuth } from '../auth'
 
 export default function ProjectPage() {
@@ -176,6 +177,8 @@ export default function ProjectPage() {
       </div>
 
       {isAdmin && <ProjectRolesSection project={project} members={members} onSaved={reload} />}
+
+      {project.kind === 'film' && <Stripboard projectId={project.id} isAdmin={isAdmin} />}
 
       <BudgetSection projectId={project.id} isAdmin={isAdmin} />
 
