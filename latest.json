@@ -1,9 +1,9 @@
 {
   "version": "0.2.2",
-  "now": "2026-04-29T20:30:20.039Z",
+  "now": "2026-04-29T20:31:15.976Z",
   "boot": {
-    "startedAt": "2026-04-29T20:30:19.848Z",
-    "completedAt": "2026-04-29T20:30:20.013Z",
+    "startedAt": "2026-04-29T20:31:15.910Z",
+    "completedAt": "2026-04-29T20:31:15.968Z",
     "error": null
   },
   "env": {
@@ -53,7 +53,7 @@
   "recentLog": [
     {
       "level": "info",
-      "ts": "2026-04-29T20:30:19.845Z",
+      "ts": "2026-04-29T20:31:15.907Z",
       "msg": "serving client from",
       "data": {
         "clientDir": "/app/dist"
@@ -61,7 +61,7 @@
     },
     {
       "level": "info",
-      "ts": "2026-04-29T20:30:19.848Z",
+      "ts": "2026-04-29T20:31:15.910Z",
       "msg": "boot starting",
       "data": {
         "cwd": "/app",
@@ -72,17 +72,17 @@
     },
     {
       "level": "info",
-      "ts": "2026-04-29T20:30:20.010Z",
+      "ts": "2026-04-29T20:31:15.965Z",
       "msg": "migrations complete"
     },
     {
       "level": "info",
-      "ts": "2026-04-29T20:30:20.013Z",
+      "ts": "2026-04-29T20:31:15.968Z",
       "msg": "listening on :8080"
     },
     {
       "level": "info",
-      "ts": "2026-04-29T20:30:20.013Z",
+      "ts": "2026-04-29T20:31:15.968Z",
       "msg": "scheduler started (every 5 min)"
     }
   ]
