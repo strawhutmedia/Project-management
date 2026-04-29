@@ -40,6 +40,23 @@ function accountTotal(acc: ApiBudgetAccount): number {
   return acc.lineItems.reduce((sum, li) => sum + li.total, 0)
 }
 
+// User-facing goal buckets:
+//   production  := above_line + production
+//   post        := post
+//   marketing   := other (publicity, legal, insurance, general)
+const GOAL_TO_CATEGORIES: Record<'production' | 'post' | 'marketing', BudgetCategory[]> = {
+  production: ['above_line', 'production'],
+  post: ['post'],
+  marketing: ['other'],
+}
+
+function bucketSpend(budget: ApiBudget, bucket: 'production' | 'post' | 'marketing'): number {
+  const cats = GOAL_TO_CATEGORIES[bucket]
+  return budget.accounts
+    .filter((a) => cats.includes(a.category))
+    .reduce((s, a) => s + accountTotal(a), 0)
+}
+
 export default function BudgetSection({ projectId, isAdmin }: { projectId: string; isAdmin: boolean }) {
   const [budget, setBudget] = useState<ApiBudget | null>(null)
   const [loading, setLoading] = useState(true)
@@ -114,6 +131,49 @@ export default function BudgetSection({ projectId, isAdmin }: { projectId: strin
         )}
       </div>
 
+      {(budget.totalTarget != null ||
+        budget.productionTarget != null ||
+        budget.postTarget != null ||
+        budget.marketingTarget != null) && (
+        <div className="space-y-3">
+          {budget.totalTarget != null && (
+            <GoalBar
+              label="🎯 Total Goal"
+              spent={grand}
+              target={budget.totalTarget}
+              currency={budget.currency}
+              big
+            />
+          )}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            {budget.productionTarget != null && (
+              <GoalBar
+                label="🎬 Production"
+                spent={bucketSpend(budget, 'production')}
+                target={budget.productionTarget}
+                currency={budget.currency}
+              />
+            )}
+            {budget.postTarget != null && (
+              <GoalBar
+                label="✂️ Post"
+                spent={bucketSpend(budget, 'post')}
+                target={budget.postTarget}
+                currency={budget.currency}
+              />
+            )}
+            {budget.marketingTarget != null && (
+              <GoalBar
+                label="📣 Marketing"
+                spent={bucketSpend(budget, 'marketing')}
+                target={budget.marketingTarget}
+                currency={budget.currency}
+              />
+            )}
+          </div>
+        </div>
+      )}
+
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         {totalsByCategory.map(({ cat, subtotal }) => {
           const a = CATEGORY_ACCENT[cat]
@@ -158,6 +218,66 @@ export default function BudgetSection({ projectId, isAdmin }: { projectId: strin
   )
 }
 
+function GoalBar({
+  label,
+  spent,
+  target,
+  currency,
+  big,
+}: {
+  label: string
+  spent: number
+  target: number
+  currency: string
+  big?: boolean
+}) {
+  const pct = target > 0 ? (spent / target) * 100 : 0
+  const clamped = Math.min(pct, 100)
+  const over = pct > 100
+  const tone =
+    pct > 100 ? 'urgent' : pct >= 90 ? 'warn' : pct >= 75 ? 'ok' : 'good'
+  const barClass: Record<typeof tone, string> = {
+    good: 'bg-stage-mixing',
+    ok: 'bg-stage-mastering',
+    warn: 'bg-stage-overdubs',
+    urgent: 'bg-urgent',
+  }
+  const textClass: Record<typeof tone, string> = {
+    good: 'text-stage-mixing',
+    ok: 'text-stage-mastering',
+    warn: 'text-stage-overdubs',
+    urgent: 'text-urgent',
+  }
+  const remaining = target - spent
+  return (
+    <div className={`rounded-xl border border-line/60 ${big ? 'bg-ink/60 p-4' : 'bg-ink/40 p-3'}`}>
+      <div className="flex items-baseline justify-between gap-2 flex-wrap">
+        <div className={`text-[10px] uppercase tracking-wider font-bold ${big ? 'text-text' : 'text-muted'}`}>
+          {label}
+        </div>
+        <div className={`text-[10px] uppercase tracking-wider font-bold ${textClass[tone]}`}>
+          {over ? `Over by ${fmtMoney(spent - target, currency)}` : `${fmtMoney(remaining, currency)} left`}
+        </div>
+      </div>
+      <div className="mt-1 flex items-baseline gap-2 flex-wrap">
+        <div className={`font-display ${big ? 'text-3xl' : 'text-xl'}`}>{fmtMoney(spent, currency)}</div>
+        <div className="text-muted text-xs">
+          / {fmtMoney(target, currency)} <span className={`ml-1 ${textClass[tone]}`}>({Math.round(pct)}%)</span>
+        </div>
+      </div>
+      <div className={`mt-2 relative h-1.5 rounded-full bg-line/40 overflow-hidden`}>
+        <div
+          className={`absolute left-0 top-0 bottom-0 ${barClass[tone]} transition-[width]`}
+          style={{ width: `${clamped}%` }}
+        />
+        {over && (
+          <div className="absolute right-0 top-0 bottom-0 bg-urgent/40 animate-pulse" style={{ width: '6%' }} />
+        )}
+      </div>
+    </div>
+  )
+}
+
 function Stat({ label, value, accent }: { label: string; value: string; accent?: boolean }) {
   return (
     <div>
@@ -172,6 +292,10 @@ function BudgetCreate({ projectId, isAdmin, onCreated }: { projectId: string; is
   const [shootDays, setShootDays] = useState(0)
   const [currency, setCurrency] = useState('USD')
   const [template, setTemplate] = useState<'studiobinder' | 'blank'>('studiobinder')
+  const [productionTarget, setProductionTarget] = useState<string>('')
+  const [postTarget, setPostTarget] = useState<string>('')
+  const [marketingTarget, setMarketingTarget] = useState<string>('')
+  const [totalTarget, setTotalTarget] = useState<string>('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -209,8 +333,22 @@ function BudgetCreate({ projectId, isAdmin, onCreated }: { projectId: string; is
   async function create() {
     setBusy(true)
     setError(null)
+    const num = (s: string) => {
+      const t = s.trim()
+      if (!t) return null
+      const n = parseFloat(t.replace(/[$,]/g, ''))
+      return Number.isFinite(n) ? n : null
+    }
     try {
-      await api.createBudget(projectId, { shootDays, currency, template })
+      await api.createBudget(projectId, {
+        shootDays,
+        currency,
+        template,
+        productionTarget: num(productionTarget),
+        postTarget: num(postTarget),
+        marketingTarget: num(marketingTarget),
+        totalTarget: num(totalTarget),
+      })
       await onCreated()
     } catch (err) {
       setError(err instanceof Error ? err.message : 'failed')
@@ -253,6 +391,61 @@ function BudgetCreate({ projectId, isAdmin, onCreated }: { projectId: string; is
           </select>
         </label>
       </div>
+
+      <div className="rounded-xl border border-line/60 bg-ink/40 p-4 space-y-3">
+        <div>
+          <h3 className="text-[11px] uppercase tracking-[0.15em] text-muted font-bold">🎯 Goals (optional, can edit later)</h3>
+          <p className="text-[11px] text-muted/70 mt-1">
+            What's the most you can spend? Set a Total cap, then split it across
+            Production (above-the-line + crew + equip), Post (edit/sound/color/VFX),
+            and Marketing (PR/publicity). Progress bars show planned spend vs. each
+            cap and turn red when over.
+          </p>
+        </div>
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          <label className="block">
+            <span className="block text-[11px] uppercase tracking-wider text-muted font-bold mb-1.5">🎯 Total cap</span>
+            <input
+              inputMode="decimal"
+              placeholder="e.g. 700000"
+              value={totalTarget}
+              onChange={(e) => setTotalTarget(e.target.value)}
+              className="w-full rounded-xl bg-ink/40 border border-line text-text px-3 py-2.5 outline-none focus:border-stage-mastering text-sm font-mono"
+            />
+          </label>
+          <label className="block">
+            <span className="block text-[11px] uppercase tracking-wider text-muted font-bold mb-1.5">🎬 Production</span>
+            <input
+              inputMode="decimal"
+              placeholder="e.g. 500000"
+              value={productionTarget}
+              onChange={(e) => setProductionTarget(e.target.value)}
+              className="w-full rounded-xl bg-ink/40 border border-line text-text px-3 py-2.5 outline-none focus:border-stage-mastering text-sm font-mono"
+            />
+          </label>
+          <label className="block">
+            <span className="block text-[11px] uppercase tracking-wider text-muted font-bold mb-1.5">✂️ Post</span>
+            <input
+              inputMode="decimal"
+              placeholder="e.g. 150000"
+              value={postTarget}
+              onChange={(e) => setPostTarget(e.target.value)}
+              className="w-full rounded-xl bg-ink/40 border border-line text-text px-3 py-2.5 outline-none focus:border-stage-mastering text-sm font-mono"
+            />
+          </label>
+          <label className="block">
+            <span className="block text-[11px] uppercase tracking-wider text-muted font-bold mb-1.5">📣 Marketing</span>
+            <input
+              inputMode="decimal"
+              placeholder="e.g. 50000"
+              value={marketingTarget}
+              onChange={(e) => setMarketingTarget(e.target.value)}
+              className="w-full rounded-xl bg-ink/40 border border-line text-text px-3 py-2.5 outline-none focus:border-stage-mastering text-sm font-mono"
+            />
+          </label>
+        </div>
+      </div>
+
       {error && <p className="text-urgent text-sm">{error}</p>}
       <div className="flex gap-2">
         <button
@@ -279,12 +472,31 @@ function BudgetSettings({ budget, onSaved }: { budget: ApiBudget; onSaved: () =>
   const [currency, setCurrency] = useState(budget.currency)
   const [bondPct, setBondPct] = useState(budget.bondPct)
   const [contingencyPct, setContingencyPct] = useState(budget.contingencyPct)
+  const [productionTarget, setProductionTarget] = useState<string>(budget.productionTarget != null ? String(budget.productionTarget) : '')
+  const [postTarget, setPostTarget] = useState<string>(budget.postTarget != null ? String(budget.postTarget) : '')
+  const [marketingTarget, setMarketingTarget] = useState<string>(budget.marketingTarget != null ? String(budget.marketingTarget) : '')
+  const [totalTarget, setTotalTarget] = useState<string>(budget.totalTarget != null ? String(budget.totalTarget) : '')
   const [busy, setBusy] = useState(false)
 
   async function save() {
     setBusy(true)
+    const num = (s: string): number | null => {
+      const t = s.trim()
+      if (!t) return null
+      const n = parseFloat(t.replace(/[$,]/g, ''))
+      return Number.isFinite(n) ? n : null
+    }
     try {
-      await api.updateBudget(budget.id, { shootDays, currency, bondPct, contingencyPct })
+      await api.updateBudget(budget.id, {
+        shootDays,
+        currency,
+        bondPct,
+        contingencyPct,
+        productionTarget: num(productionTarget),
+        postTarget: num(postTarget),
+        marketingTarget: num(marketingTarget),
+        totalTarget: num(totalTarget),
+      })
       await onSaved()
       setOpen(false)
     } finally {
@@ -343,6 +555,49 @@ function BudgetSettings({ budget, onSaved }: { budget: ApiBudget; onSaved: () =>
           value={contingencyPct}
           onChange={(e) => setContingencyPct(parseFloat(e.target.value) || 0)}
           className="w-full rounded-md bg-ink/60 border border-line text-text px-2 py-1.5 outline-none"
+        />
+      </label>
+      <div className="col-span-2 sm:col-span-4 mt-1 mb-1 text-[10px] uppercase tracking-[0.15em] text-muted font-bold">
+        🎯 Goals (leave blank to disable a bar)
+      </div>
+      <label className="block">
+        <span className="block text-[10px] uppercase tracking-wider text-muted font-bold mb-1">Total cap</span>
+        <input
+          inputMode="decimal"
+          placeholder="700000"
+          value={totalTarget}
+          onChange={(e) => setTotalTarget(e.target.value)}
+          className="w-full rounded-md bg-ink/60 border border-line text-text px-2 py-1.5 outline-none font-mono"
+        />
+      </label>
+      <label className="block">
+        <span className="block text-[10px] uppercase tracking-wider text-muted font-bold mb-1">Production cap</span>
+        <input
+          inputMode="decimal"
+          placeholder="500000"
+          value={productionTarget}
+          onChange={(e) => setProductionTarget(e.target.value)}
+          className="w-full rounded-md bg-ink/60 border border-line text-text px-2 py-1.5 outline-none font-mono"
+        />
+      </label>
+      <label className="block">
+        <span className="block text-[10px] uppercase tracking-wider text-muted font-bold mb-1">Post cap</span>
+        <input
+          inputMode="decimal"
+          placeholder="150000"
+          value={postTarget}
+          onChange={(e) => setPostTarget(e.target.value)}
+          className="w-full rounded-md bg-ink/60 border border-line text-text px-2 py-1.5 outline-none font-mono"
+        />
+      </label>
+      <label className="block">
+        <span className="block text-[10px] uppercase tracking-wider text-muted font-bold mb-1">Marketing cap</span>
+        <input
+          inputMode="decimal"
+          placeholder="50000"
+          value={marketingTarget}
+          onChange={(e) => setMarketingTarget(e.target.value)}
+          className="w-full rounded-md bg-ink/60 border border-line text-text px-2 py-1.5 outline-none font-mono"
         />
       </label>
       <div className="col-span-2 sm:col-span-4 flex gap-2">

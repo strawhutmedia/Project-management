@@ -26,7 +26,9 @@ budgetsRouter.get('/projects/:projectId', async (req, res) => {
     res.status(403).json({ error: 'forbidden' }); return
   }
   const budgetRes = await pool.query(
-    `SELECT id, currency, shoot_days, bond_pct, contingency_pct FROM budgets WHERE project_id = $1`,
+    `SELECT id, currency, shoot_days, bond_pct, contingency_pct,
+            production_target, post_target, marketing_target, total_target
+       FROM budgets WHERE project_id = $1`,
     [projectId],
   )
   if (budgetRes.rows.length === 0) {
@@ -63,6 +65,7 @@ budgetsRouter.get('/projects/:projectId', async (req, res) => {
       total,
     })
   }
+  const numOrNull = (v: unknown) => (v == null ? null : Number(v))
   res.json({
     budget: {
       id: budget.id,
@@ -70,6 +73,10 @@ budgetsRouter.get('/projects/:projectId', async (req, res) => {
       shootDays: budget.shoot_days,
       bondPct: Number(budget.bond_pct),
       contingencyPct: Number(budget.contingency_pct),
+      productionTarget: numOrNull(budget.production_target),
+      postTarget: numOrNull(budget.post_target),
+      marketingTarget: numOrNull(budget.marketing_target),
+      totalTarget: numOrNull(budget.total_target),
       accounts: accounts.rows.map((a: { id: string; code: string; name: string; category: string; position: number }) => ({
         ...a,
         lineItems: itemsByAccount[a.id] || [],
@@ -92,14 +99,24 @@ budgetsRouter.post('/projects/:projectId', async (req, res) => {
   const shootDays = Number(req.body?.shootDays) || 0
   const currency = String(req.body?.currency || 'USD')
   const useTemplate = req.body?.template !== 'blank'
+  const numOrNull = (v: unknown) => {
+    if (v === null || v === undefined || v === '') return null
+    const n = Number(v)
+    return Number.isFinite(n) ? n : null
+  }
+  const productionTarget = numOrNull(req.body?.productionTarget)
+  const postTarget = numOrNull(req.body?.postTarget)
+  const marketingTarget = numOrNull(req.body?.marketingTarget)
+  const totalTarget = numOrNull(req.body?.totalTarget)
 
   const client = await pool.connect()
   try {
     await client.query('BEGIN')
     const b = await client.query(
-      `INSERT INTO budgets (project_id, currency, shoot_days, created_by)
-       VALUES ($1, $2, $3, $4) RETURNING id`,
-      [projectId, currency, shootDays, user.id],
+      `INSERT INTO budgets (project_id, currency, shoot_days, created_by,
+         production_target, post_target, marketing_target, total_target)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id`,
+      [projectId, currency, shootDays, user.id, productionTarget, postTarget, marketingTarget, totalTarget],
     )
     const budgetId = b.rows[0].id
     if (useTemplate) {
@@ -145,7 +162,7 @@ budgetsRouter.patch('/:budgetId', async (req, res) => {
     [user.id, budgetId, user.role],
   )
   if (access.rows.length === 0) { res.status(403).json({ error: 'forbidden' }); return }
-  const { currency, shootDays, bondPct, contingencyPct } = req.body ?? {}
+  const { currency, shootDays, bondPct, contingencyPct, productionTarget, postTarget, marketingTarget, totalTarget } = req.body ?? {}
   const updates: string[] = []
   const values: unknown[] = []
   let i = 1
@@ -153,6 +170,21 @@ budgetsRouter.patch('/:budgetId', async (req, res) => {
   if (typeof shootDays === 'number') { updates.push(`shoot_days = $${i++}`); values.push(shootDays) }
   if (typeof bondPct === 'number') { updates.push(`bond_pct = $${i++}`); values.push(bondPct) }
   if (typeof contingencyPct === 'number') { updates.push(`contingency_pct = $${i++}`); values.push(contingencyPct) }
+  const targetField = (key: string, val: unknown, col: string) => {
+    if (!(key in (req.body ?? {}))) return
+    if (val === null || val === '') {
+      updates.push(`${col} = NULL`)
+      return
+    }
+    if (typeof val === 'number' && Number.isFinite(val)) {
+      updates.push(`${col} = $${i++}`)
+      values.push(val)
+    }
+  }
+  targetField('productionTarget', productionTarget, 'production_target')
+  targetField('postTarget', postTarget, 'post_target')
+  targetField('marketingTarget', marketingTarget, 'marketing_target')
+  targetField('totalTarget', totalTarget, 'total_target')
   if (updates.length === 0) { res.status(400).json({ error: 'no_fields' }); return }
   values.push(budgetId)
   await pool.query(`UPDATE budgets SET ${updates.join(', ')} WHERE id = $${i}`, values)

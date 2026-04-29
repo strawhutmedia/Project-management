@@ -149,6 +149,10 @@ export type ApiBudget = {
   shootDays: number
   bondPct: number
   contingencyPct: number
+  productionTarget: number | null
+  postTarget: number | null
+  marketingTarget: number | null
+  totalTarget: number | null
   accounts: ApiBudgetAccount[]
 }
 
@@ -305,12 +309,29 @@ export const api = {
   // Budgets
   budget: (projectId: string) =>
     request<{ budget: ApiBudget }>(`/api/budgets/projects/${projectId}`),
-  createBudget: (projectId: string, body: { shootDays?: number; currency?: string; template?: 'studiobinder' | 'blank' }) =>
+  createBudget: (projectId: string, body: {
+    shootDays?: number
+    currency?: string
+    template?: 'studiobinder' | 'blank'
+    productionTarget?: number | null
+    postTarget?: number | null
+    marketingTarget?: number | null
+    totalTarget?: number | null
+  }) =>
     request<{ budget: { id: string }; created: boolean }>(`/api/budgets/projects/${projectId}`, {
       method: 'POST',
       body: JSON.stringify(body),
     }),
-  updateBudget: (budgetId: string, patch: { currency?: string; shootDays?: number; bondPct?: number; contingencyPct?: number }) =>
+  updateBudget: (budgetId: string, patch: {
+    currency?: string
+    shootDays?: number
+    bondPct?: number
+    contingencyPct?: number
+    productionTarget?: number | null
+    postTarget?: number | null
+    marketingTarget?: number | null
+    totalTarget?: number | null
+  }) =>
     request<{ ok: true }>(`/api/budgets/${budgetId}`, { method: 'PATCH', body: JSON.stringify(patch) }),
   addBudgetItem: (accountId: string, body: {
     code?: string
