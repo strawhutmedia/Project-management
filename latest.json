@@ -1,9 +1,9 @@
 {
   "version": "0.2.2",
-  "now": "2026-04-29T01:26:51.578Z",
+  "now": "2026-04-29T15:06:32.486Z",
   "boot": {
-    "startedAt": "2026-04-29T01:26:51.346Z",
-    "completedAt": "2026-04-29T01:26:51.569Z",
+    "startedAt": "2026-04-29T15:06:32.076Z",
+    "completedAt": "2026-04-29T15:06:32.459Z",
     "error": null
   },
   "env": {
@@ -43,7 +43,8 @@
       "011_channels_subfolder.sql",
       "012_seed_code_x_connor.sql",
       "013_budgets.sql",
-      "014_budget_targets.sql"
+      "014_budget_targets.sql",
+      "015_admin_target.sql"
     ],
     "userCount": 6,
     "projectCount": 2
@@ -51,7 +52,7 @@
   "recentLog": [
     {
       "level": "info",
-      "ts": "2026-04-29T01:26:51.341Z",
+      "ts": "2026-04-29T15:06:32.073Z",
       "msg": "serving client from",
       "data": {
         "clientDir": "/app/dist"
@@ -59,7 +60,7 @@
     },
     {
       "level": "info",
-      "ts": "2026-04-29T01:26:51.346Z",
+      "ts": "2026-04-29T15:06:32.076Z",
       "msg": "boot starting",
       "data": {
         "cwd": "/app",
@@ -70,17 +71,17 @@
     },
     {
       "level": "info",
-      "ts": "2026-04-29T01:26:51.565Z",
+      "ts": "2026-04-29T15:06:32.456Z",
       "msg": "migrations complete"
     },
     {
       "level": "info",
-      "ts": "2026-04-29T01:26:51.569Z",
+      "ts": "2026-04-29T15:06:32.459Z",
       "msg": "listening on :8080"
     },
     {
       "level": "info",
-      "ts": "2026-04-29T01:26:51.569Z",
+      "ts": "2026-04-29T15:06:32.460Z",
       "msg": "scheduler started (every 5 min)"
     }
   ]
