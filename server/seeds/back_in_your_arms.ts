@@ -85,9 +85,37 @@ export async function seedBackInYourArms(): Promise<void> {
     )
     if (existing.rows.length > 0) {
       // Project exists. Make sure budget targets are up to date in case
-      // we tweaked them in code, and make sure all 21 shoot days exist.
+      // we tweaked them in code, make sure all 21 shoot days exist, and
+      // populate budget amounts if they haven't been populated yet.
       const projId = existing.rows[0].id
       await ensureShootDays(projId)
+      // Re-set budget targets in case they were updated in code
+      await pool.query(
+        `UPDATE budgets SET production_target = 500000, post_target = 150000,
+                            marketing_target = 50000, total_target = 700000,
+                            shoot_days = 18, bond_pct = 3, contingency_pct = 10
+         WHERE project_id = $1`,
+        [projId],
+      )
+      // Populate line items if total spend is still $0 (i.e. nothing entered yet)
+      const budgetRow = await pool.query<{ id: string }>(
+        `SELECT id FROM budgets WHERE project_id = $1`,
+        [projId],
+      )
+      if (budgetRow.rows.length > 0) {
+        const budgetId = budgetRow.rows[0].id
+        const totalSpend = await pool.query<{ total: string }>(
+          `SELECT COALESCE(SUM(li.amt * li.x * li.rate), 0)::text AS total
+             FROM budget_line_items li
+             JOIN budget_accounts a ON a.id = li.account_id
+             WHERE a.budget_id = $1`,
+          [budgetId],
+        )
+        if (Number(totalSpend.rows[0].total) === 0) {
+          await populateBiyaBudgetAmounts(pool, budgetId)
+          logInfo('BIYA seed: populated budget amounts on existing project', { projectId: projId })
+        }
+      }
       logInfo('BIYA seed: project already exists, ensured shoot days', { projectId: projId })
       return
     }
@@ -154,6 +182,9 @@ export async function seedBackInYourArms(): Promise<void> {
         )
       }
 
+      // Populate budget line items with the amounts from the budget plan
+      await populateBiyaBudgetAmounts(client, budgetId)
+
       await client.query('COMMIT')
       logInfo('BIYA seed: created project + budget + 21 shoot days', {
         projectId: projId,
@@ -168,6 +199,182 @@ export async function seedBackInYourArms(): Promise<void> {
   } catch (err) {
     logError('BIYA seed failed', { error: err instanceof Error ? err.message : String(err) })
   }
+}
+
+// Set a specific line item's amount. Identified by account code +
+// description match (case-insensitive contains). Sets amt=1, x=1, rate=$total
+// so the row reads cleanly as a flat fee.
+async function setLine(
+  client: { query: (sql: string, params?: unknown[]) => Promise<{ rows: unknown[] }> },
+  budgetId: string,
+  accountCode: string,
+  descMatch: string,
+  rate: number,
+): Promise<void> {
+  await client.query(
+    `UPDATE budget_line_items li
+       SET amt = 1, x = 1, rate = $4
+     FROM budget_accounts a
+     WHERE li.account_id = a.id
+       AND a.budget_id = $1
+       AND a.code = $2
+       AND lower(li.description) LIKE lower($3)`,
+    [budgetId, accountCode, `%${descMatch}%`, rate],
+  )
+}
+
+// Add a new line item to an account. Used when the StudioBinder template
+// doesn't have a matching default line.
+async function addLine(
+  client: { query: (sql: string, params?: unknown[]) => Promise<{ rows: unknown[] }> },
+  budgetId: string,
+  accountCode: string,
+  description: string,
+  rate: number,
+  code?: string,
+): Promise<void> {
+  const acc = await client.query(
+    `SELECT id FROM budget_accounts WHERE budget_id = $1 AND code = $2`,
+    [budgetId, accountCode],
+  )
+  if (acc.rows.length === 0) return
+  const accId = (acc.rows[0] as { id: string }).id
+  const posRes = await client.query(
+    `SELECT COALESCE(MAX(position), 0) + 10 AS next FROM budget_line_items WHERE account_id = $1`,
+    [accId],
+  )
+  const next = (posRes.rows[0] as { next: number }).next
+  await client.query(
+    `INSERT INTO budget_line_items (account_id, code, description, amt, x, rate, position)
+     VALUES ($1, $2, $3, 1, 1, $4, $5)`,
+    [accId, code ?? null, description, rate, next],
+  )
+}
+
+async function populateBiyaBudgetAmounts(
+  client: { query: (sql: string, params?: unknown[]) => Promise<{ rows: unknown[] }> },
+  budgetId: string,
+): Promise<void> {
+  // CAST (14-00) — Ryan's actual cast budget
+  await setLine(client, budgetId, '14-00', 'lead cast', 50000)         // Sawyer + Kendrick combined
+  await setLine(client, budgetId, '14-00', 'supporting cast', 39000)   // Anna $10k + Aaron $7k + Margo $7k + Justine $4k + Tom $2k + Nadia $2k + Lilly $3k + Alex $2k + Bernard $2k
+  await setLine(client, budgetId, '14-00', 'day players', 14000)
+  await setLine(client, budgetId, '14-00', 'stunt coordinators', 5000)
+  await setLine(client, budgetId, '14-00', 'stunts & adjustments', 3000)
+  await setLine(client, budgetId, '14-00', 'casting director', 4000)
+
+  // EXTRAS (21-00)
+  await setLine(client, budgetId, '21-00', 'background extras', 8000)
+
+  // PRODUCTION STAFF (20-00) — line producer is the only paid ATL role
+  await setLine(client, budgetId, '20-00', 'unit production manager', 40000)  // Line Producer
+  await setLine(client, budgetId, '20-00', 'production coordinator', 18000)
+  await setLine(client, budgetId, '20-00', '1st asst director', 20000)
+  await setLine(client, budgetId, '20-00', '2nd asst director', 11000)
+  await setLine(client, budgetId, '20-00', 'script supervisor', 8000)
+  await setLine(client, budgetId, '20-00', 'production asst (set)', 12000)  // 3 PAs combined
+
+  // SET DESIGN (22-00)
+  await setLine(client, budgetId, '22-00', 'production designer', 22000)
+
+  // SET OPERATIONS / GRIP (25-00)
+  await setLine(client, budgetId, '25-00', 'key grip', 13000)
+  await setLine(client, budgetId, '25-00', 'best boy grip', 9000)
+  await setLine(client, budgetId, '25-00', 'grip package rental', 9000)
+
+  // SET DRESSING (26-00)
+  await setLine(client, budgetId, '26-00', 'set decorator', 11000)  // combined w/ props
+
+  // WARDROBE (28-00)
+  await setLine(client, budgetId, '28-00', 'costume designer', 15000)
+
+  // ELECTRIC (29-00)
+  await setLine(client, budgetId, '29-00', 'gaffer', 13000)
+  await setLine(client, budgetId, '29-00', 'best boy electric', 9000)
+  await setLine(client, budgetId, '29-00', 'lighting package rental', 11000)
+  await setLine(client, budgetId, '29-00', 'generator', 5000)
+
+  // CAMERA (30-00)
+  await setLine(client, budgetId, '30-00', 'director of photography', 33000)
+  await setLine(client, budgetId, '30-00', '1st asst camera', 11000)
+  await setLine(client, budgetId, '30-00', 'dit', 9000)
+  await setLine(client, budgetId, '30-00', 'camera package rental', 14000)
+  await setLine(client, budgetId, '30-00', 'expendables', 4000)
+
+  // PRODUCTION SOUND (31-00)
+  await setLine(client, budgetId, '31-00', 'sound mixer', 11000)
+  await setLine(client, budgetId, '31-00', 'sound package rental', 4000)
+
+  // MAKE-UP & HAIR (32-00)
+  await setLine(client, budgetId, '32-00', 'key make-up', 11000)  // combined MU + Hair
+
+  // TRANSPORTATION (33-00)
+  await setLine(client, budgetId, '33-00', 'vehicle rentals', 8000)
+  await setLine(client, budgetId, '33-00', 'fuel', 2000)
+
+  // LOCATIONS (34-00)
+  await setLine(client, budgetId, '34-00', 'location manager', 14000)
+  await setLine(client, budgetId, '34-00', 'permits', 3000)
+  await setLine(client, budgetId, '34-00', 'parking', 1000)
+  // Specific location fees as added lines so they're itemized
+  await addLine(client, budgetId, '34-00', "Jason Kendrick's house (cleaning)", 3000, '34-09')
+  await addLine(client, budgetId, '34-00', 'ADU / Sawyer Solvang house (cleaning)', 2000, '34-10')
+  await addLine(client, budgetId, '34-00', 'Mall (4 scenes — Day 14)', 12000, '34-11')
+  await addLine(client, budgetId, '34-00', 'Hospital (5 scenes — Day 20)', 5000, '34-12')
+  await addLine(client, budgetId, '34-00', 'Coffee shop (4 scenes — Day 12)', 3000, '34-13')
+  await addLine(client, budgetId, '34-00', 'Bar Solvang + Bar Minneapolis', 4000, '34-14')
+  await addLine(client, budgetId, '34-00', 'Liquor store', 1000, '34-15')
+  await addLine(client, budgetId, '34-00', 'Boutique clothing store', 1000, '34-16')
+  await addLine(client, budgetId, '34-00', 'Goodwill exterior', 500, '34-17')
+  await addLine(client, budgetId, '34-00', 'Hotel conference (Dayanet) + YMCA', 2500, '34-18')
+  await addLine(client, budgetId, '34-00', "Justine & Tom's house + Sawyer's Minneapolis apt", 4000, '34-19')
+
+  // PICTURE VEHICLES (35-00)
+  await setLine(client, budgetId, '35-00', 'picture vehicles', 8000)  // Defender + Sawyer car + others
+
+  // SPECIAL EFFECTS (36-00) — knife rig
+  await setLine(client, budgetId, '36-00', 'sfx materials', 3000)
+  await setLine(client, budgetId, '36-00', 'sfx tech', 2000)
+
+  // BTL TRAVEL & CATERING — catering bucketed under General Expense for now
+  await addLine(client, budgetId, '57-00', 'Catering / craft service (18 days)', 24000, '57-07')
+
+  // POST PRODUCTION
+  await setLine(client, budgetId, '45-00', 'asst editor', 2000)
+  await setLine(client, budgetId, '45-00', 'edit suite rental', 2000)
+  await setLine(client, budgetId, '45-00', 'edit hardware', 1000)
+
+  await setLine(client, budgetId, '46-00', 'composer', 20000)
+  await setLine(client, budgetId, '46-00', 'music licensing', 10000)  // Sync only — Maggie owns the master
+
+  await setLine(client, budgetId, '47-00', 'vfx shots', 5000)  // XenoSouls touch-ups + blood comp
+
+  await setLine(client, budgetId, '48-00', 'sound designer', 20000)  // Foley + Sound Design combined
+  await setLine(client, budgetId, '48-00', 'mix stage rental', 2000)
+
+  await setLine(client, budgetId, '49-00', 'color correction', 20000)  // Cam
+  await setLine(client, budgetId, '49-00', 'deliverables', 4000)
+
+  // PUBLICITY (Marketing — $50k)
+  await setLine(client, budgetId, '55-00', 'unit publicist', 30000)
+  await setLine(client, budgetId, '55-00', 'stills photographer', 5000)
+  await setLine(client, budgetId, '55-00', 'press materials', 4000)
+  await setLine(client, budgetId, '55-00', 'premiere', 3000)
+  await addLine(client, budgetId, '55-00', 'Festival submissions', 3000, '55-06')
+
+  // LEGAL & ACCOUNTING (Admin)
+  await setLine(client, budgetId, '56-00', 'legal fees', 5000)
+  await setLine(client, budgetId, '56-00', 'production accountant', 5000)
+  await setLine(client, budgetId, '56-00', 'payroll service', 1000)
+
+  // GENERAL EXPENSE (Admin)
+  await setLine(client, budgetId, '57-00', 'office rent', 1000)
+  await setLine(client, budgetId, '57-00', 'office supplies', 1000)
+  await setLine(client, budgetId, '57-00', 'petty cash', 1000)
+
+  // INSURANCE (Admin)
+  await setLine(client, budgetId, '58-00', 'production package', 12000)
+  await setLine(client, budgetId, '58-00', 'e&o insurance', 4000)
 }
 
 async function ensureShootDays(projectId: string): Promise<void> {

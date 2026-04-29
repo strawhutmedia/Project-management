@@ -1,24 +1,31 @@
 import { useEffect, useMemo, useState, useRef } from 'react'
 import { api, type ApiScene, type ApiShootDay, type ApiStripboard } from '../api'
 
-const STRIP_COLOR: Record<string, string> = {
-  EXT_DAY: 'bg-yellow-100 text-yellow-900 border-yellow-300',
-  INT_DAY: 'bg-white text-text border-line',
-  EXT_NIGHT: 'bg-emerald-700 text-white border-emerald-800',
-  INT_NIGHT: 'bg-blue-700 text-white border-blue-800',
-  SUNSET: 'bg-orange-200 text-orange-900 border-orange-400',
-  DEFAULT: 'bg-panel text-text border-line',
+// Strip styles tuned for the dark Slate UI. Each strip is a dark card with
+// a colored left stripe + colored "INT/EXT · TIME" label, so text is always
+// readable. The stripe is the at-a-glance type indicator (industry-standard
+// colors: yellow=EXT day, off-white=INT day, blue=INT night, emerald=EXT
+// night, amber=sunset/magic hour).
+type StripKind = 'EXT_DAY' | 'INT_DAY' | 'EXT_NIGHT' | 'INT_NIGHT' | 'SUNSET' | 'DEFAULT'
+
+const STRIP_STYLE: Record<StripKind, { stripe: string; label: string }> = {
+  EXT_DAY:   { stripe: 'bg-amber-300',  label: 'text-amber-300' },
+  INT_DAY:   { stripe: 'bg-stone-200',  label: 'text-stone-200' },
+  EXT_NIGHT: { stripe: 'bg-emerald-400', label: 'text-emerald-400' },
+  INT_NIGHT: { stripe: 'bg-sky-400',    label: 'text-sky-400' },
+  SUNSET:    { stripe: 'bg-orange-400', label: 'text-orange-400' },
+  DEFAULT:   { stripe: 'bg-line',       label: 'text-muted' },
 }
 
-function stripColor(s: ApiScene): string {
+function stripKind(s: ApiScene): StripKind {
   const ie = s.intExt
   const tod = (s.timeOfDay || '').toUpperCase()
-  if (tod.startsWith('SUNSET') || tod.startsWith('SUNRISE') || tod.startsWith('MAGIC')) return STRIP_COLOR.SUNSET
-  if (tod.includes('NIGHT')) return ie === 'EXT' ? STRIP_COLOR.EXT_NIGHT : STRIP_COLOR.INT_NIGHT
+  if (tod.startsWith('SUNSET') || tod.startsWith('SUNRISE') || tod.startsWith('MAGIC')) return 'SUNSET'
+  if (tod.includes('NIGHT')) return ie === 'EXT' ? 'EXT_NIGHT' : 'INT_NIGHT'
   if (tod.includes('DAY') || tod.includes('MORNING') || tod.includes('AFTERNOON')) {
-    return ie === 'EXT' ? STRIP_COLOR.EXT_DAY : STRIP_COLOR.INT_DAY
+    return ie === 'EXT' ? 'EXT_DAY' : 'INT_DAY'
   }
-  return STRIP_COLOR.DEFAULT
+  return 'DEFAULT'
 }
 
 function fmtEighths(eighths: number): string {
@@ -220,32 +227,30 @@ export default function Stripboard({ projectId, isAdmin, projectName }: { projec
 
       {error && <p className="text-urgent text-sm">{error}</p>}
 
-      <div className="overflow-x-auto -mx-3 px-3 pb-2">
-        <div className="flex gap-3 min-w-max">
-          <DayColumn
-            day={null}
-            label="UNSCHEDULED"
-            scenes={grouped?.unscheduled ?? []}
+      <div className="space-y-2">
+        <DayRow
+          day={null}
+          label="UNSCHEDULED"
+          scenes={grouped?.unscheduled ?? []}
+          isAdmin={isAdmin}
+          onSceneMoved={load}
+        />
+        {board.days.map((day) => (
+          <DayRow
+            key={day.id}
+            day={day}
+            label={day.isBreak ? `BREAK · DAY ${day.number}` : `DAY ${day.number}`}
+            scenes={grouped?.byDay.get(day.id) ?? []}
             isAdmin={isAdmin}
             onSceneMoved={load}
           />
-          {board.days.map((day) => (
-            <DayColumn
-              key={day.id}
-              day={day}
-              label={day.isBreak ? `BREAK · DAY ${day.number}` : `DAY ${day.number}`}
-              scenes={grouped?.byDay.get(day.id) ?? []}
-              isAdmin={isAdmin}
-              onSceneMoved={load}
-            />
-          ))}
-        </div>
+        ))}
       </div>
     </section>
   )
 }
 
-function DayColumn({
+function DayRow({
   day,
   label,
   scenes,
@@ -259,8 +264,10 @@ function DayColumn({
   onSceneMoved: () => void | Promise<void>
 }) {
   const [over, setOver] = useState(false)
+  const [collapsed, setCollapsed] = useState(false)
   const totalEighths = scenes.reduce((s, sc) => s + sc.pageEighths, 0)
-  const overTarget = totalEighths > 56 // 7 pages = warn
+  const overTarget = totalEighths > 56 // 7 pages = warn (red)
+  const heavyTarget = totalEighths > 48 // 6 pages = caution (yellow)
 
   async function handleDrop(e: React.DragEvent) {
     e.preventDefault()
@@ -278,38 +285,66 @@ function DayColumn({
     }
   }
 
+  const isUnscheduled = day === null
+  const isBreak = day?.isBreak ?? false
+
   return (
     <div
       onDragOver={(e) => { if (isAdmin) { e.preventDefault(); setOver(true) } }}
       onDragLeave={() => setOver(false)}
       onDrop={(e) => isAdmin && void handleDrop(e)}
-      className={`w-72 flex-shrink-0 rounded-xl border ${over ? 'border-stage-mastering bg-stage-mastering/10' : 'border-line bg-ink/30'} transition`}
+      className={`rounded-xl border transition ${
+        over ? 'border-stage-mastering bg-stage-mastering/10' :
+        isBreak ? 'border-line/40 bg-ink/20' :
+        isUnscheduled ? 'border-stage-stems/40 bg-stage-stems/5' :
+        'border-line bg-ink/30'
+      }`}
     >
-      <div className={`px-3 py-2 border-b border-line/40 ${day?.isBreak ? 'bg-line/20' : ''}`}>
-        <div className="flex items-baseline justify-between gap-2">
-          <div className={`text-[10px] uppercase tracking-wider font-bold ${day?.isBreak ? 'text-muted' : 'text-stage-mastering'}`}>{label}</div>
-          <div className={`text-[10px] font-mono ${overTarget ? 'text-urgent' : 'text-muted'}`}>
-            {scenes.length}sc · {fmtEighths(totalEighths)}p
-          </div>
+      {/* Header row */}
+      <button
+        onClick={() => setCollapsed(!collapsed)}
+        className="w-full flex items-center justify-between gap-3 px-4 py-2.5 text-left hover:bg-ink/30 rounded-t-xl"
+      >
+        <div className="flex items-center gap-3 min-w-0">
+          <span className="text-muted text-xs">{collapsed ? '▸' : '▾'}</span>
+          <span className={`text-[11px] uppercase tracking-[0.15em] font-bold ${
+            isBreak ? 'text-muted' :
+            isUnscheduled ? 'text-stage-stems' :
+            overTarget ? 'text-urgent' :
+            heavyTarget ? 'text-stage-overdubs' :
+            'text-stage-mastering'
+          }`}>{label}</span>
+          {day?.shootDate && <span className="text-[10px] text-muted">· {day.shootDate}</span>}
         </div>
-        {day?.shootDate && <div className="text-[10px] text-muted mt-0.5">{day.shootDate}</div>}
-      </div>
-      <div className="p-2 space-y-1.5 min-h-[40px]">
-        {scenes.length === 0 && (
-          <div className="text-[10px] text-muted/60 italic text-center py-3">
-            {day === null ? 'All scheduled ✓' : 'Drop scenes here'}
-          </div>
-        )}
-        {scenes.map((s) => (
-          <SceneStrip key={s.id} scene={s} isAdmin={isAdmin} />
-        ))}
-      </div>
+        <div className={`text-[11px] font-mono ${overTarget ? 'text-urgent font-bold' : heavyTarget ? 'text-stage-overdubs' : 'text-muted'}`}>
+          {scenes.length} sc · {fmtEighths(totalEighths)} pages
+          {overTarget && ' ⚠ over'}
+        </div>
+      </button>
+
+      {/* Body — wrapped grid of strips */}
+      {!collapsed && (
+        <div
+          className="px-3 pb-3 pt-1 flex flex-wrap gap-1.5"
+          onDragOver={(e) => { if (isAdmin) e.preventDefault() }}
+        >
+          {scenes.length === 0 && (
+            <div className="text-[11px] text-muted/60 italic py-2">
+              {isUnscheduled ? 'All scenes scheduled ✓' : isBreak ? 'Day off' : 'Drop scenes here'}
+            </div>
+          )}
+          {scenes.map((s) => (
+            <SceneStrip key={s.id} scene={s} isAdmin={isAdmin} />
+          ))}
+        </div>
+      )}
     </div>
   )
 }
 
 function SceneStrip({ scene, isAdmin }: { scene: ApiScene; isAdmin: boolean }) {
-  const color = stripColor(scene)
+  const kind = stripKind(scene)
+  const style = STRIP_STYLE[kind]
   return (
     <div
       draggable={isAdmin}
@@ -317,22 +352,25 @@ function SceneStrip({ scene, isAdmin }: { scene: ApiScene; isAdmin: boolean }) {
         e.dataTransfer.setData('text/scene-id', scene.id)
         e.dataTransfer.effectAllowed = 'move'
       }}
-      className={`rounded border ${color} px-2 py-1.5 text-[11px] ${isAdmin ? 'cursor-grab active:cursor-grabbing' : ''} hover:shadow-sm transition`}
+      className={`relative flex-shrink-0 w-56 rounded-md border border-line bg-panel pl-3 pr-2 py-1.5 text-[11px] ${isAdmin ? 'cursor-grab active:cursor-grabbing' : ''} hover:border-stage-mastering/60 hover:shadow-md transition overflow-hidden`}
       title={scene.slug}
     >
+      {/* Colored stripe at left edge — at-a-glance type indicator */}
+      <div className={`absolute left-0 top-0 bottom-0 w-1.5 ${style.stripe}`} />
+
       <div className="flex items-baseline justify-between gap-2 mb-0.5">
-        <span className="font-mono font-bold text-[10px]">#{scene.number}</span>
-        <span className="text-[9px] font-mono opacity-80">{fmtEighths(scene.pageEighths)}p</span>
+        <span className="font-mono font-bold text-[10px] text-muted">#{scene.number}</span>
+        <span className="text-[10px] font-mono text-muted">{fmtEighths(scene.pageEighths)}p</span>
       </div>
-      <div className="font-bold uppercase tracking-tight leading-tight truncate" title={scene.location ?? ''}>
+      <div className="font-bold uppercase tracking-tight leading-tight truncate text-text" title={scene.location ?? ''}>
         {scene.location || scene.slug}
       </div>
       <div className="flex items-baseline justify-between gap-1 mt-0.5">
-        <span className="text-[9px] uppercase tracking-wider opacity-80">
+        <span className={`text-[9px] uppercase tracking-wider font-bold ${style.label}`}>
           {scene.intExt ?? ''} {scene.timeOfDay ?? ''}
         </span>
         {scene.characters.length > 0 && (
-          <span className="text-[9px] font-mono opacity-70 truncate" title={scene.characters.join(', ')}>
+          <span className="text-[9px] font-mono text-muted truncate" title={scene.characters.join(', ')}>
             {scene.characters.slice(0, 3).join('·')}{scene.characters.length > 3 ? `+${scene.characters.length - 3}` : ''}
           </span>
         )}

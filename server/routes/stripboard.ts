@@ -144,7 +144,18 @@ stripboardRouter.post('/projects/:projectId/import-fdx', async (req, res) => {
       )
     }
     await client.query('COMMIT')
-    res.json({ ok: true, count: parsed.length })
+
+    // If this is the BIYA project, auto-apply Ryan's StudioBinder
+    // schedule. No button click required.
+    let autoApplied: { assigned: number; missing: string[] } | null = null
+    const proj = await pool.query<{ name: string }>(
+      `SELECT name FROM projects WHERE id = $1`,
+      [projectId],
+    )
+    if (proj.rows[0]?.name === 'Back in Your Arms') {
+      autoApplied = await applyBackInYourArmsSchedule(projectId)
+    }
+    res.json({ ok: true, count: parsed.length, autoApplied })
   } catch (err) {
     await client.query('ROLLBACK')
     res.status(500).json({ error: err instanceof Error ? err.message : String(err) })
