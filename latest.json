@@ -1,9 +1,9 @@
 {
   "version": "0.2.2",
-  "now": "2026-04-29T20:39:52.969Z",
+  "now": "2026-04-29T22:31:48.046Z",
   "boot": {
-    "startedAt": "2026-04-29T20:39:52.745Z",
-    "completedAt": "2026-04-29T20:39:52.935Z",
+    "startedAt": "2026-04-29T22:31:46.246Z",
+    "completedAt": "2026-04-29T22:31:48.020Z",
     "error": null
   },
   "env": {
@@ -48,12 +48,12 @@
       "016_stripboard.sql"
     ],
     "userCount": 6,
-    "projectCount": 2
+    "projectCount": 3
   },
   "recentLog": [
     {
       "level": "info",
-      "ts": "2026-04-29T20:39:52.741Z",
+      "ts": "2026-04-29T22:31:46.243Z",
       "msg": "serving client from",
       "data": {
         "clientDir": "/app/dist"
@@ -61,7 +61,7 @@
     },
     {
       "level": "info",
-      "ts": "2026-04-29T20:39:52.745Z",
+      "ts": "2026-04-29T22:31:46.246Z",
       "msg": "boot starting",
       "data": {
         "cwd": "/app",
@@ -72,17 +72,26 @@
     },
     {
       "level": "info",
-      "ts": "2026-04-29T20:39:52.931Z",
+      "ts": "2026-04-29T22:31:46.402Z",
       "msg": "migrations complete"
     },
     {
       "level": "info",
-      "ts": "2026-04-29T20:39:52.935Z",
+      "ts": "2026-04-29T22:31:48.017Z",
+      "msg": "BIYA seed: created project + budget + 21 shoot days",
+      "data": {
+        "projectId": "12f53ed1-c6c7-4c11-8d7b-06d91744c9af",
+        "budgetId": "f1ab321d-4914-46cc-850e-6f2a8bad2ecf"
+      }
+    },
+    {
+      "level": "info",
+      "ts": "2026-04-29T22:31:48.020Z",
       "msg": "listening on :8080"
     },
     {
       "level": "info",
-      "ts": "2026-04-29T20:39:52.936Z",
+      "ts": "2026-04-29T22:31:48.021Z",
       "msg": "scheduler started (every 5 min)"
     }
   ]
