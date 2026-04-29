@@ -35,8 +35,6 @@ export default function Stripboard({ projectId, isAdmin }: { projectId: string; 
   const [error, setError] = useState<string | null>(null)
   const [importing, setImporting] = useState(false)
   const [busy, setBusy] = useState(false)
-  const [pasteOpen, setPasteOpen] = useState(false)
-  const [pastedXml, setPastedXml] = useState('')
   const fileInputRef = useRef<HTMLInputElement | null>(null)
 
   async function load() {
@@ -64,25 +62,6 @@ export default function Stripboard({ projectId, isAdmin }: { projectId: string; 
     } finally {
       setImporting(false)
       if (fileInputRef.current) fileInputRef.current.value = ''
-    }
-  }
-
-  async function importPasted() {
-    if (pastedXml.trim().length < 100) {
-      setError('Paste the full .fdx XML (starts with &lt;?xml...)')
-      return
-    }
-    setImporting(true)
-    setError(null)
-    try {
-      await api.importFdx(projectId, pastedXml)
-      setPastedXml('')
-      setPasteOpen(false)
-      await load()
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'import failed')
-    } finally {
-      setImporting(false)
     }
   }
 
@@ -140,7 +119,7 @@ export default function Stripboard({ projectId, isAdmin }: { projectId: string; 
           </p>
         </div>
         {isAdmin && (
-          <div className="space-y-3">
+          <div>
             <input
               ref={fileInputRef}
               type="file"
@@ -148,41 +127,13 @@ export default function Stripboard({ projectId, isAdmin }: { projectId: string; 
               onChange={(e) => void handleFile(e)}
               className="hidden"
             />
-            <div className="flex gap-2 flex-wrap">
-              <button
-                onClick={() => fileInputRef.current?.click()}
-                disabled={importing}
-                className="rounded-xl bg-gradient-to-r from-stage-producing to-stage-mastering text-white font-bold uppercase tracking-wider text-xs px-4 py-2.5 disabled:opacity-50"
-              >
-                {importing ? 'Parsing…' : '📥 Upload .fdx File'}
-              </button>
-              <button
-                onClick={() => setPasteOpen(!pasteOpen)}
-                className="rounded-xl border border-line text-text font-bold uppercase tracking-wider text-xs px-4 py-2.5 hover:bg-ink/40"
-              >
-                📋 Paste XML
-              </button>
-            </div>
-            {pasteOpen && (
-              <div className="space-y-2">
-                <textarea
-                  value={pastedXml}
-                  onChange={(e) => setPastedXml(e.target.value)}
-                  placeholder="Paste the full .fdx XML here (it starts with <?xml version=...)"
-                  className="w-full rounded-xl bg-ink/40 border border-line text-text px-3 py-2.5 outline-none focus:border-stage-mastering text-xs font-mono min-h-[200px]"
-                />
-                <div className="flex items-center gap-3">
-                  <button
-                    onClick={() => void importPasted()}
-                    disabled={importing}
-                    className="rounded-xl bg-gradient-to-r from-stage-producing to-stage-mastering text-white font-bold uppercase tracking-wider text-xs px-3 py-2 disabled:opacity-50"
-                  >
-                    {importing ? 'Parsing…' : 'Import pasted XML'}
-                  </button>
-                  <span className="text-[11px] text-muted">{pastedXml.length.toLocaleString()} characters</span>
-                </div>
-              </div>
-            )}
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              disabled={importing}
+              className="rounded-xl bg-gradient-to-r from-stage-producing to-stage-mastering text-white font-bold uppercase tracking-wider text-xs px-4 py-2.5 disabled:opacity-50"
+            >
+              {importing ? 'Parsing…' : '📥 Upload Final Draft (.fdx)'}
+            </button>
           </div>
         )}
         {error && <p className="text-urgent text-sm">{error}</p>}
@@ -218,12 +169,6 @@ export default function Stripboard({ projectId, isAdmin }: { projectId: string; 
               className="text-[10px] uppercase tracking-wider text-stage-stems border border-stage-stems/40 rounded-full px-3 py-1.5 hover:bg-stage-stems/10 disabled:opacity-50"
             >
               {importing ? 'Parsing…' : '↻ Re-import .fdx'}
-            </button>
-            <button
-              onClick={() => setPasteOpen(!pasteOpen)}
-              className="text-[10px] uppercase tracking-wider text-stage-stems border border-stage-stems/40 rounded-full px-3 py-1.5 hover:bg-stage-stems/10"
-            >
-              📋 Paste
             </button>
             <button
               onClick={() => void addDay(false)}
