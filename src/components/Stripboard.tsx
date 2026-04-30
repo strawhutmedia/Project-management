@@ -8,13 +8,21 @@ import { api, type ApiScene, type ApiShootDay, type ApiStripboard } from '../api
 // night, amber=sunset/magic hour).
 type StripKind = 'EXT_DAY' | 'INT_DAY' | 'EXT_NIGHT' | 'INT_NIGHT' | 'SUNSET' | 'DEFAULT'
 
-const STRIP_STYLE: Record<StripKind, { stripe: string; label: string }> = {
-  EXT_DAY:   { stripe: 'bg-amber-300',  label: 'text-amber-300' },
-  INT_DAY:   { stripe: 'bg-stone-200',  label: 'text-stone-200' },
-  EXT_NIGHT: { stripe: 'bg-emerald-400', label: 'text-emerald-400' },
-  INT_NIGHT: { stripe: 'bg-sky-400',    label: 'text-sky-400' },
-  SUNSET:    { stripe: 'bg-orange-400', label: 'text-orange-400' },
-  DEFAULT:   { stripe: 'bg-line',       label: 'text-muted' },
+// Each scene card gets a fun, saturated gradient by INT/EXT + time of day,
+// so the schedule reads like a colorful mood board at a glance.
+//   EXT DAY    — sunny gold / orange
+//   INT DAY    — warm peach / pink (cozy lit interior)
+//   EXT NIGHT  — deep emerald / teal (moonlit outdoors)
+//   INT NIGHT  — indigo / sky (lamp-lit interior at night)
+//   SUNSET     — orange → pink → fuchsia (magic hour)
+//   DEFAULT    — slate (no time-of-day metadata)
+const STRIP_STYLE: Record<StripKind, { stripe: string; label: string; card: string }> = {
+  EXT_DAY:   { stripe: 'bg-amber-200',  label: 'text-amber-100',   card: 'bg-gradient-to-br from-amber-500 via-orange-500 to-yellow-500' },
+  INT_DAY:   { stripe: 'bg-rose-200',   label: 'text-rose-100',    card: 'bg-gradient-to-br from-rose-400 via-pink-500 to-orange-400' },
+  EXT_NIGHT: { stripe: 'bg-emerald-300', label: 'text-emerald-100', card: 'bg-gradient-to-br from-emerald-600 via-teal-700 to-cyan-800' },
+  INT_NIGHT: { stripe: 'bg-sky-300',    label: 'text-sky-100',     card: 'bg-gradient-to-br from-sky-600 via-blue-700 to-indigo-800' },
+  SUNSET:    { stripe: 'bg-orange-200', label: 'text-orange-100',  card: 'bg-gradient-to-br from-orange-500 via-pink-500 to-fuchsia-600' },
+  DEFAULT:   { stripe: 'bg-line',       label: 'text-white/70',    card: 'bg-gradient-to-br from-slate-600 to-slate-800' },
 }
 
 function stripKind(s: ApiScene): StripKind {
@@ -355,33 +363,33 @@ function SceneCard({ scene, isAdmin }: { scene: ApiScene; isAdmin: boolean }) {
         e.dataTransfer.setData('text/scene-id', scene.id)
         e.dataTransfer.effectAllowed = 'move'
       }}
-      className={`relative aspect-square rounded-2xl border border-line bg-panel overflow-hidden ${
+      className={`relative aspect-square rounded-2xl ring-1 ring-white/10 overflow-hidden ${style.card} ${
         isAdmin ? 'cursor-grab active:cursor-grabbing' : ''
-      } hover:border-stage-mastering/60 hover:shadow-lg transition flex flex-col`}
+      } hover:ring-white/40 hover:shadow-xl hover:scale-[1.02] transition flex flex-col text-white shadow-md`}
       title={scene.slug}
     >
-      {/* Colored stripe along the top — at-a-glance type indicator */}
-      <div className={`h-1.5 w-full ${style.stripe}`} />
+      {/* Inner gloss for a little dimension */}
+      <div className={`h-1 w-full ${style.stripe} opacity-90`} />
 
       <div className="flex-1 flex flex-col px-3 py-2.5 min-h-0">
         <div className="flex items-baseline justify-between gap-2">
-          <span className="font-mono font-bold text-base text-text">#{scene.number}</span>
-          <span className="text-[10px] font-mono text-muted">{fmtEighths(scene.pageEighths)}p</span>
+          <span className="font-mono font-bold text-base text-white drop-shadow">#{scene.number}</span>
+          <span className="text-[10px] font-mono text-white/70">{fmtEighths(scene.pageEighths)}p</span>
         </div>
 
         <div
-          className="mt-1 font-bold uppercase tracking-tight leading-tight text-text text-[11px] line-clamp-3 break-words"
+          className="mt-1 font-bold uppercase tracking-tight leading-tight text-white text-[11px] line-clamp-3 break-words drop-shadow-sm"
           title={scene.location ?? ''}
         >
           {scene.location || scene.slug}
         </div>
 
         <div className="mt-auto pt-1 space-y-0.5">
-          <div className={`text-[9px] uppercase tracking-wider font-bold ${style.label} truncate`}>
+          <div className="text-[9px] uppercase tracking-wider font-bold text-white/90 truncate">
             {scene.intExt ?? ''} {scene.timeOfDay ?? ''}
           </div>
           {scene.characters.length > 0 && (
-            <div className="text-[9px] font-mono text-muted truncate" title={scene.characters.join(', ')}>
+            <div className="text-[9px] font-mono text-white/70 truncate" title={scene.characters.join(', ')}>
               {scene.characters.slice(0, 3).join('·')}{scene.characters.length > 3 ? `+${scene.characters.length - 3}` : ''}
             </div>
           )}
