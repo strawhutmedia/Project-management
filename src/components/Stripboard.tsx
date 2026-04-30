@@ -27,14 +27,24 @@ const STRIP_STYLE: Record<StripKind, { stripe: string; label: string; card: stri
   DEFAULT:   { stripe: 'bg-line',        label: 'text-white/70',    card: 'bg-gradient-to-br from-slate-600 to-slate-800' },
 }
 
-function stripKind(s: ApiScene): StripKind {
-  const ie = s.intExt
-  const tod = (s.timeOfDay || '').toUpperCase()
-  if (tod.startsWith('SUNSET') || tod.startsWith('SUNRISE') || tod.startsWith('MAGIC')) return 'SUNSET'
-  if (tod.includes('NIGHT')) return ie === 'EXT' ? 'EXT_NIGHT' : 'INT_NIGHT'
-  if (tod.includes('DAY') || tod.includes('MORNING') || tod.includes('AFTERNOON')) {
-    return ie === 'EXT' ? 'EXT_DAY' : 'INT_DAY'
-  }
+function timeOfDayCategory(tod: string | null | undefined): 'DAY' | 'NIGHT' | 'SUNSET' | null {
+  const t = (tod || '').toUpperCase()
+  if (!t) return null
+  if (t.startsWith('SUNSET') || t.startsWith('SUNRISE') || t.startsWith('MAGIC') || t.startsWith('DUSK') || t.startsWith('DAWN')) return 'SUNSET'
+  if (t.includes('NIGHT') || t.includes('EVENING')) return 'NIGHT'
+  if (t.includes('DAY') || t.includes('MORNING') || t.includes('AFTERNOON') || t.includes('NOON')) return 'DAY'
+  // CONTINUOUS / SAME / LATER / MOMENTS LATER / INTERCUT / CONT'D — caller should fall back
+  return null
+}
+
+function stripKind(s: ApiScene, resolvedTod?: string): StripKind {
+  // INT/EXT scenes (heading reads "INT/EXT.") are visible outdoors → treat as EXT
+  const ie = s.intExt === 'INT/EXT' ? 'EXT' : s.intExt
+  const tod = resolvedTod ?? s.timeOfDay ?? ''
+  const cat = timeOfDayCategory(tod)
+  if (cat === 'SUNSET') return 'SUNSET'
+  if (cat === 'NIGHT') return ie === 'EXT' ? 'EXT_NIGHT' : 'INT_NIGHT'
+  if (cat === 'DAY') return ie === 'EXT' ? 'EXT_DAY' : 'INT_DAY'
   return 'DEFAULT'
 }
 
@@ -134,6 +144,28 @@ export default function Stripboard({ projectId, isAdmin, projectName }: { projec
     }
     unscheduled.sort((a, b) => a.scriptPosition - b.scriptPosition)
     return { byDay, unscheduled }
+  }, [board])
+
+  // Walk all scenes in script order and forward-fill the time of day so that
+  // CONTINUOUS / SAME / LATER / INTERCUT / empty inherits from the most recent
+  // scene that did declare DAY/NIGHT/SUNSET. Without this, every CONTINUOUS
+  // scene falls into DEFAULT (slate) even though screenwriting convention is
+  // that "CONTINUOUS" means "right after the previous scene → same time".
+  const resolvedTod = useMemo(() => {
+    const map = new Map<string, string>()
+    if (!board) return map
+    const sorted = [...board.scenes].sort((a, b) => a.scriptPosition - b.scriptPosition)
+    let lastReal = ''
+    for (const s of sorted) {
+      const own = s.timeOfDay ?? ''
+      if (timeOfDayCategory(own) !== null) {
+        lastReal = own
+        map.set(s.id, own)
+      } else {
+        map.set(s.id, lastReal)
+      }
+    }
+    return map
   }, [board])
 
   if (!board) {
@@ -244,6 +276,7 @@ export default function Stripboard({ projectId, isAdmin, projectName }: { projec
           scenes={grouped?.unscheduled ?? []}
           isAdmin={isAdmin}
           onSceneMoved={load}
+          resolvedTod={resolvedTod}
         />
         {board.days.map((day) => (
           <DayRow
@@ -253,6 +286,7 @@ export default function Stripboard({ projectId, isAdmin, projectName }: { projec
             scenes={grouped?.byDay.get(day.id) ?? []}
             isAdmin={isAdmin}
             onSceneMoved={load}
+            resolvedTod={resolvedTod}
           />
         ))}
       </div>
@@ -266,12 +300,14 @@ function DayRow({
   scenes,
   isAdmin,
   onSceneMoved,
+  resolvedTod,
 }: {
   day: ApiShootDay | null
   label: string
   scenes: ApiScene[]
   isAdmin: boolean
   onSceneMoved: () => void | Promise<void>
+  resolvedTod: Map<string, string>
 }) {
   const [over, setOver] = useState(false)
   const [collapsed, setCollapsed] = useState(false)
@@ -345,7 +381,12 @@ function DayRow({
           ) : (
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2">
               {scenes.map((s) => (
-                <SceneCard key={s.id} scene={s} isAdmin={isAdmin} />
+                <SceneCard
+                  key={s.id}
+                  scene={s}
+                  isAdmin={isAdmin}
+                  resolvedTod={resolvedTod.get(s.id) ?? ''}
+                />
               ))}
             </div>
           )}
@@ -355,8 +396,16 @@ function DayRow({
   )
 }
 
-function SceneCard({ scene, isAdmin }: { scene: ApiScene; isAdmin: boolean }) {
-  const kind = stripKind(scene)
+function SceneCard({
+  scene,
+  isAdmin,
+  resolvedTod,
+}: {
+  scene: ApiScene
+  isAdmin: boolean
+  resolvedTod: string
+}) {
+  const kind = stripKind(scene, resolvedTod)
   const style = STRIP_STYLE[kind]
   return (
     <div
