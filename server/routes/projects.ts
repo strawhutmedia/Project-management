@@ -256,8 +256,13 @@ projectsRouter.patch('/:id', async (req, res) => {
     values.push(v || null)
   }
   if (defaultOwners && typeof defaultOwners === 'object') {
-    // Whitelist stage keys + ensure values are strings or null
-    const allowed = ['writing', 'tracking', 'overdubs', 'producing', 'stems', 'mixing', 'mastering']
+    // Whitelist: music workflow stage keys + film role keys
+    const allowed = [
+      // Music
+      'writing', 'tracking', 'overdubs', 'producing', 'stems', 'mixing', 'mastering',
+      // Film
+      'writer', 'producer', 'director', 'asst_director', 'editor',
+    ]
     const cleaned: Record<string, string> = {}
     for (const k of allowed) {
       const v = (defaultOwners as Record<string, unknown>)[k]
@@ -265,6 +270,13 @@ projectsRouter.patch('/:id', async (req, res) => {
     }
     updates.push(`default_owners = $${i++}::jsonb`)
     values.push(JSON.stringify(cleaned))
+  }
+  if (typeof req.body?.filmPhase === 'string') {
+    const phase = req.body.filmPhase
+    if (['pre', 'production', 'post', 'wrapped'].includes(phase)) {
+      updates.push(`film_phase = $${i++}`)
+      values.push(phase)
+    }
   }
   if (updates.length === 0) {
     res.status(400).json({ error: 'no_fields' })
@@ -279,7 +291,7 @@ projectsRouter.get('/:id', async (req, res) => {
   const user = (req as typeof req & { user: SessionUser }).user
   const projectId = req.params.id
   const projRes = await pool.query(
-    `SELECT id, name, subtitle, kind, dropbox_folder, default_owners, stage_labels, channels_subfolder FROM projects WHERE id = $1`,
+    `SELECT id, name, subtitle, kind, dropbox_folder, default_owners, stage_labels, channels_subfolder, film_phase FROM projects WHERE id = $1`,
     [projectId],
   )
   if (projRes.rows.length === 0) {
@@ -374,6 +386,7 @@ projectsRouter.get('/:id', async (req, res) => {
       defaultOwners: defaultOwnersResolved,
       stageLabels: project.stage_labels || {},
       channelsSubfolder: project.channels_subfolder,
+      filmPhase: project.film_phase || 'pre',
       songs: songs.rows.map((s: { id: string; title: string; subtitle: string | null; stage: string }) => ({
         id: s.id,
         title: s.title,

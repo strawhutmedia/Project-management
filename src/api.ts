@@ -215,6 +215,7 @@ export type ApiProject = {
   channelsSubfolder?: string | null
   defaultOwners?: Record<string, { id: string; name: string } | null>
   stageLabels?: Partial<Record<Stage, { label?: string; icon?: string }>>
+  filmPhase?: 'pre' | 'production' | 'post' | 'wrapped'
   songs: ApiSong[]
 }
 
@@ -301,7 +302,7 @@ export const api = {
     return res.json() as Promise<{ ok: true; path: string }>
   },
   // Project edit
-  updateProject: (id: string, patch: { name?: string; subtitle?: string; dropboxFolder?: string; channelsSubfolder?: string | null; defaultOwners?: Record<string, string> }) =>
+  updateProject: (id: string, patch: { name?: string; subtitle?: string; dropboxFolder?: string; channelsSubfolder?: string | null; defaultOwners?: Record<string, string>; filmPhase?: 'pre' | 'production' | 'post' | 'wrapped' }) =>
     request<{ ok: true }>(`/api/projects/${id}`, { method: 'PATCH', body: JSON.stringify(patch) }),
   addSong: (projectId: string, body: { title: string; subtitle?: string }) =>
     request<{ song: { id: string; title: string } }>(`/api/projects/${projectId}/songs`, { method: 'POST', body: JSON.stringify(body) }),

@@ -12,6 +12,7 @@
 // The .fdx itself is uploaded by the admin via the Stripboard UI; we don't
 // embed the script content in the codebase.
 
+import type { PoolClient } from 'pg'
 import { pool } from '../db'
 import { STUDIOBINDER_ACCOUNTS } from '../budget_template'
 import { logInfo, logError } from '../diag'
@@ -252,7 +253,7 @@ export async function seedBackInYourArms(): Promise<void> {
 // description match (case-insensitive contains). Sets amt=1, x=1, rate=$total
 // so the row reads cleanly as a flat fee.
 async function setLine(
-  client: { query: (sql: string, params?: unknown[]) => Promise<{ rows: unknown[] }> },
+  client: PoolClient | typeof pool,
   budgetId: string,
   accountCode: string,
   descMatch: string,
@@ -273,7 +274,7 @@ async function setLine(
 // Add a new line item to an account. Used when the StudioBinder template
 // doesn't have a matching default line.
 async function addLine(
-  client: { query: (sql: string, params?: unknown[]) => Promise<{ rows: unknown[] }> },
+  client: PoolClient | typeof pool,
   budgetId: string,
   accountCode: string,
   description: string,
@@ -299,7 +300,7 @@ async function addLine(
 }
 
 async function populateBiyaBudgetAmounts(
-  client: { query: (sql: string, params?: unknown[]) => Promise<{ rows: unknown[] }> },
+  client: PoolClient | typeof pool,
   budgetId: string,
 ): Promise<void> {
   // CAST (14-00) — Ryan's actual cast budget

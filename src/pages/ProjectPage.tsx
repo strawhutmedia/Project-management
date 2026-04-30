@@ -8,6 +8,7 @@ import InlineEdit from '../components/InlineEdit'
 import DropboxFolderPicker from '../components/DropboxFolderPicker'
 import BudgetSection from '../components/BudgetSection'
 import Stripboard from '../components/Stripboard'
+import FilmPhaseBar, { type FilmPhase } from '../components/FilmPhaseBar'
 import { useAuth } from '../auth'
 
 export default function ProjectPage() {
@@ -176,6 +177,15 @@ export default function ProjectPage() {
             <StageDistribution songs={songs} labels={project.stageLabels} kind={project.kind} />
           </div>
         </div>
+      )}
+
+      {project.kind === 'film' && (
+        <FilmPhaseBar
+          projectId={project.id}
+          currentPhase={(project.filmPhase ?? 'pre') as FilmPhase}
+          isAdmin={isAdmin}
+          onChanged={reload}
+        />
       )}
 
       {isAdmin && project.kind !== 'film' && <ProjectRolesSection project={project} members={members} onSaved={reload} />}
