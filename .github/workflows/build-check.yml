@@ -1,0 +1,111 @@
+name: Build check (mirror Railway)
+
+# Runs on every push to main using the same commands Railway runs:
+#   npm ci && npm run build
+# Captures stdout/stderr and posts results to the `status` branch.
+# When Railway fails but local works, this is how we get the actual
+# error log without asking the user to paste it.
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: build-check
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out commit being deployed
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Setup Node 20 (Railway default)
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Run Railway-equivalent build
+        id: build
+        run: |
+          set +e
+          mkdir -p /tmp/build
+          npm ci 2>&1 | tee /tmp/build/install.log
+          install_code=${PIPESTATUS[0]}
+          if [ "$install_code" -ne 0 ]; then
+            echo "phase=install" >> "$GITHUB_OUTPUT"
+            echo "exit=$install_code" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          npm run build 2>&1 | tee /tmp/build/build.log
+          build_code=${PIPESTATUS[0]}
+          echo "phase=build" >> "$GITHUB_OUTPUT"
+          echo "exit=$build_code" >> "$GITHUB_OUTPUT"
+          exit 0
+
+      - name: Check out status branch
+        uses: actions/checkout@v4
+        with:
+          ref: status
+          path: status-branch
+
+      - name: Write build-status.json + last-failure log
+        env:
+          PHASE: ${{ steps.build.outputs.phase }}
+          EXIT: ${{ steps.build.outputs.exit }}
+          SHA: ${{ github.sha }}
+          REF: ${{ github.ref }}
+          ACTOR: ${{ github.actor }}
+        run: |
+          cd status-branch
+          ts=$(date -u +%FT%TZ)
+          short_sha=$(echo "$SHA" | cut -c1-7)
+          mkdir -p build-failures
+
+          # Last 200 lines of the relevant log
+          if [ "$PHASE" = "install" ]; then
+            tail -n 200 /tmp/build/install.log > /tmp/build/excerpt.log
+          else
+            tail -n 200 /tmp/build/build.log > /tmp/build/excerpt.log
+          fi
+
+          # Convert to JSON with jq so newlines are encoded correctly
+          jq -Rs --arg ts "$ts" \
+                 --arg sha "$SHA" \
+                 --arg short_sha "$short_sha" \
+                 --arg phase "$PHASE" \
+                 --arg exit "$EXIT" \
+                 --arg actor "$ACTOR" \
+                 --arg ref "$REF" \
+            '{ts: $ts, sha: $sha, short_sha: $short_sha, phase: $phase, exit: ($exit|tonumber), actor: $actor, ref: $ref, ok: ($exit == "0"), log_excerpt: .}' \
+            /tmp/build/excerpt.log > build-status.json
+
+          # If failed, also keep a per-SHA copy so history is preserved
+          if [ "$EXIT" != "0" ]; then
+            cp build-status.json "build-failures/${ts}-${short_sha}.json"
+          fi
+
+          # Trim build-failures to last 50 entries
+          ls build-failures/ 2>/dev/null | sort | head -n -50 | while read f; do
+            rm -f "build-failures/$f"
+          done
+
+      - name: Commit + push status branch
+        run: |
+          cd status-branch
+          git config user.name "slate-build-check"
+          git config user.email "slate-build-check@noreply.local"
+          git add build-status.json build-failures/ 2>/dev/null || true
+          if git diff --cached --quiet; then
+            echo "no changes"
+          else
+            git commit -m "build-check: $(jq -r '.ok' build-status.json) $(jq -r '.short_sha' build-status.json) ($(jq -r '.phase' build-status.json))"
+            git push origin status
+          fi
