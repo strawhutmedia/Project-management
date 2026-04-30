@@ -1,9 +1,9 @@
 {
   "version": "0.2.2",
-  "now": "2026-04-30T01:52:02.473Z",
+  "now": "2026-04-30T04:34:20.811Z",
   "boot": {
-    "startedAt": "2026-04-30T01:52:02.065Z",
-    "completedAt": "2026-04-30T01:52:02.446Z",
+    "startedAt": "2026-04-30T04:34:19.402Z",
+    "completedAt": "2026-04-30T04:34:20.807Z",
     "error": null
   },
   "env": {
@@ -54,7 +54,7 @@
   "recentLog": [
     {
       "level": "info",
-      "ts": "2026-04-30T01:52:02.063Z",
+      "ts": "2026-04-30T04:34:19.400Z",
       "msg": "serving client from",
       "data": {
         "clientDir": "/app/dist"
@@ -62,7 +62,7 @@
     },
     {
       "level": "info",
-      "ts": "2026-04-30T01:52:02.065Z",
+      "ts": "2026-04-30T04:34:19.402Z",
       "msg": "boot starting",
       "data": {
         "cwd": "/app",
@@ -73,12 +73,29 @@
     },
     {
       "level": "info",
-      "ts": "2026-04-30T01:52:02.240Z",
+      "ts": "2026-04-30T04:34:19.450Z",
       "msg": "migrations complete"
     },
     {
       "level": "info",
-      "ts": "2026-04-30T01:52:02.445Z",
+      "ts": "2026-04-30T04:34:20.797Z",
+      "msg": "BIYA seed: auto-applied schedule to unscheduled scenes",
+      "data": {
+        "projectId": "12f53ed1-c6c7-4c11-8d7b-06d91744c9af",
+        "assigned": 157,
+        "missing": [
+          "124A",
+          "124B",
+          "32A",
+          "150A",
+          "149A",
+          "153A"
+        ]
+      }
+    },
+    {
+      "level": "info",
+      "ts": "2026-04-30T04:34:20.804Z",
       "msg": "BIYA seed: project already exists, ensured shoot days",
       "data": {
         "projectId": "12f53ed1-c6c7-4c11-8d7b-06d91744c9af"
@@ -86,12 +103,12 @@
     },
     {
       "level": "info",
-      "ts": "2026-04-30T01:52:02.446Z",
+      "ts": "2026-04-30T04:34:20.807Z",
       "msg": "listening on :8080"
     },
     {
       "level": "info",
-      "ts": "2026-04-30T01:52:02.447Z",
+      "ts": "2026-04-30T04:34:20.807Z",
       "msg": "scheduler started (every 5 min)"
     }
   ]
