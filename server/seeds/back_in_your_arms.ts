@@ -67,6 +67,23 @@ export const BIYA_SCHEDULE: Record<string, number> = {
 
 const BREAK_DAYS = [5, 10, 15]
 
+async function ensurePlaceholderUser(name: string, displayName: string): Promise<string | null> {
+  // Look up by exact name match first (placeholder users may not have email)
+  const existing = await pool.query<{ id: string }>(
+    `SELECT id FROM users WHERE name = $1 LIMIT 1`,
+    [name],
+  )
+  if (existing.rows.length > 0) return existing.rows[0].id
+  // Create as placeholder (no email, role=user, default timezone)
+  const created = await pool.query<{ id: string }>(
+    `INSERT INTO users (name, display_name, role, timezone)
+     VALUES ($1, $2, 'user', 'America/Los_Angeles')
+     RETURNING id`,
+    [name, displayName],
+  )
+  return created.rows[0]?.id ?? null
+}
+
 export async function seedBackInYourArms(): Promise<void> {
   try {
     const ryan = await pool.query<{ id: string }>(
@@ -79,6 +96,11 @@ export async function seedBackInYourArms(): Promise<void> {
     }
     const ryanId = ryan.rows[0].id
 
+    // Placeholder users for Stephen Markley and Alex (creative team
+    // unpaid in cash, but listed here so roles can be assigned)
+    const stephenId = await ensurePlaceholderUser('Stephen Markley', 'Stephen')
+    const alexId = await ensurePlaceholderUser('Alex', 'Alex')
+
     const existing = await pool.query<{ id: string }>(
       `SELECT id FROM projects WHERE name = $1`,
       ['Back in Your Arms'],
@@ -89,6 +111,7 @@ export async function seedBackInYourArms(): Promise<void> {
       // populate budget amounts if they haven't been populated yet.
       const projId = existing.rows[0].id
       await ensureShootDays(projId)
+      await ensureFilmTeam(projId, ryanId, stephenId, alexId)
       // Re-set budget targets in case they were updated in code
       await pool.query(
         `UPDATE budgets SET production_target = 500000, post_target = 150000,
@@ -184,6 +207,30 @@ export async function seedBackInYourArms(): Promise<void> {
 
       // Populate budget line items with the amounts from the budget plan
       await populateBiyaBudgetAmounts(client, budgetId)
+
+      // Assign default film roles. Producer and Director have multiple
+      // people in real life (Ryan, Stephen, Alex on producer side; Ryan
+      // and Stephen on directing); we set the primary contact here and
+      // add all three as project members below.
+      const defaultOwners: Record<string, string> = {
+        writer: stephenId ?? ryanId,
+        producer: ryanId,
+        director: ryanId,
+        editor: alexId ?? ryanId,
+      }
+      await client.query(
+        `UPDATE projects SET default_owners = $1 WHERE id = $2`,
+        [JSON.stringify(defaultOwners), projId],
+      )
+
+      // Add Stephen + Alex as project members so they show up in role dropdowns
+      for (const id of [stephenId, alexId].filter((x): x is string => Boolean(x))) {
+        await client.query(
+          `INSERT INTO project_members (project_id, user_id) VALUES ($1, $2)
+           ON CONFLICT DO NOTHING`,
+          [projId, id],
+        )
+      }
 
       await client.query('COMMIT')
       logInfo('BIYA seed: created project + budget + 21 shoot days', {
@@ -375,6 +422,42 @@ async function populateBiyaBudgetAmounts(
   // INSURANCE (Admin)
   await setLine(client, budgetId, '58-00', 'production package', 12000)
   await setLine(client, budgetId, '58-00', 'e&o insurance', 4000)
+}
+
+async function ensureFilmTeam(
+  projectId: string,
+  ryanId: string,
+  stephenId: string | null,
+  alexId: string | null,
+): Promise<void> {
+  // Add Stephen + Alex as project members
+  for (const id of [stephenId, alexId].filter((x): x is string => Boolean(x))) {
+    await pool.query(
+      `INSERT INTO project_members (project_id, user_id) VALUES ($1, $2)
+       ON CONFLICT DO NOTHING`,
+      [projectId, id],
+    )
+  }
+  // Set default film roles if not already set
+  const proj = await pool.query<{ default_owners: Record<string, unknown> | null }>(
+    `SELECT default_owners FROM projects WHERE id = $1`,
+    [projectId],
+  )
+  const current = (proj.rows[0]?.default_owners ?? {}) as Record<string, unknown>
+  const filmRoleKeys = ['writer', 'producer', 'director', 'editor']
+  const hasFilmRoles = filmRoleKeys.some((k) => current[k])
+  if (!hasFilmRoles) {
+    const defaultOwners: Record<string, string> = {
+      writer: stephenId ?? ryanId,
+      producer: ryanId,
+      director: ryanId,
+      editor: alexId ?? ryanId,
+    }
+    await pool.query(
+      `UPDATE projects SET default_owners = $1 WHERE id = $2`,
+      [JSON.stringify(defaultOwners), projectId],
+    )
+  }
 }
 
 async function ensureShootDays(projectId: string): Promise<void> {

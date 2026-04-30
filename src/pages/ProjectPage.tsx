@@ -168,15 +168,18 @@ export default function ProjectPage() {
         </div>
       </div>
 
-      <div className="relative rounded-3xl border border-line/70 overflow-hidden">
-        <div className="absolute inset-0 bg-gradient-to-br from-stage-mastering/20 via-stage-producing/15 to-stage-mixing/20 opacity-80" />
-        <div className="absolute inset-0 bg-ink/50" />
-        <div className="relative p-6">
-          <StageDistribution songs={songs} labels={project.stageLabels} kind={project.kind} />
+      {project.kind !== 'film' && (
+        <div className="relative rounded-3xl border border-line/70 overflow-hidden">
+          <div className="absolute inset-0 bg-gradient-to-br from-stage-mastering/20 via-stage-producing/15 to-stage-mixing/20 opacity-80" />
+          <div className="absolute inset-0 bg-ink/50" />
+          <div className="relative p-6">
+            <StageDistribution songs={songs} labels={project.stageLabels} kind={project.kind} />
+          </div>
         </div>
-      </div>
+      )}
 
-      {isAdmin && <ProjectRolesSection project={project} members={members} onSaved={reload} />}
+      {isAdmin && project.kind !== 'film' && <ProjectRolesSection project={project} members={members} onSaved={reload} />}
+      {isAdmin && project.kind === 'film' && <FilmTeamSection project={project} members={members} onSaved={reload} />}
 
       {project.kind === 'film' && (
         <Stripboard projectId={project.id} isAdmin={isAdmin} projectName={project.name} />
@@ -196,7 +199,7 @@ export default function ProjectPage() {
       )}
 
       <div className="space-y-8">
-        {STAGES.map((stage) => {
+        {project.kind !== 'film' && STAGES.map((stage) => {
           const stageSongs = songs.filter((s) => s.stage === stage)
           if (stageSongs.length === 0) return null
           const c = STAGE_COLOR[stage]
@@ -257,6 +260,80 @@ export default function ProjectPage() {
         })}
       </div>
     </div>
+  )
+}
+
+// Film team — five canonical film roles. Stored in project.defaultOwners
+// under non-music keys so they don't collide with the music-stage workflow.
+const FILM_ROLES: Array<{ key: string; label: string; icon: string }> = [
+  { key: 'writer',        label: 'Writer',             icon: '✍️' },
+  { key: 'producer',      label: 'Producer',           icon: '🎬' },
+  { key: 'director',      label: 'Director',           icon: '🎥' },
+  { key: 'asst_director', label: 'Assistant Director', icon: '📋' },
+  { key: 'editor',        label: 'Editor',             icon: '✂️' },
+]
+
+function FilmTeamSection({
+  project,
+  members,
+  onSaved,
+}: {
+  project: ApiProject
+  members: ApiMember[]
+  onSaved: () => void | Promise<void>
+}) {
+  async function setRole(key: string, userId: string) {
+    const next: Record<string, string> = {}
+    for (const [k, owner] of Object.entries(project.defaultOwners ?? {})) {
+      if (owner) next[k] = owner.id
+    }
+    if (userId) next[key] = userId
+    else delete next[key]
+    await api.updateProject(project.id, { defaultOwners: next })
+    await onSaved()
+  }
+
+  return (
+    <section className="rounded-2xl border border-line bg-panel/60 p-6">
+      <div className="flex items-start justify-between gap-3 mb-4">
+        <div>
+          <h2 className="text-[11px] uppercase tracking-[0.2em] text-muted font-bold">
+            🎬 Film Team
+          </h2>
+          <p className="text-[11px] text-muted/80 mt-1">
+            Core creative team for this film. Producer and Director are
+            often multi-person on indie features (Ryan + Stephen + Alex =
+            producers on this one); pick the primary contact here and add
+            the rest as project members.
+          </p>
+        </div>
+      </div>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        {FILM_ROLES.map(({ key, label, icon }) => {
+          const owner = project.defaultOwners?.[key]
+          return (
+            <div key={key}>
+              <label className="block text-[11px] uppercase tracking-wider text-muted font-bold mb-1.5">
+                {icon} {label}
+              </label>
+              <select
+                value={owner?.id ?? ''}
+                onChange={(e) => void setRole(key, e.target.value)}
+                className="w-full rounded-xl bg-ink/40 border border-line text-text px-3 py-2.5 outline-none focus:border-stage-mastering text-sm"
+              >
+                <option value="">— Unassigned —</option>
+                {members.map((m) => (
+                  <option key={m.id} value={m.id}>
+                    {m.display_name || m.name}
+                    {m.role === 'admin' ? ' (admin)' : ''}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )
+        })}
+      </div>
+    </section>
   )
 }
 
