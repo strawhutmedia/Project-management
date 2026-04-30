@@ -1021,7 +1021,7 @@ function CellArea({
       onChange={(e) => onChange(e.target.value)}
       onBlur={onBlur}
       rows={1}
-      className="w-full bg-transparent text-xs px-1.5 py-1 rounded border border-transparent focus:border-stage-mastering/60 focus:bg-ink/40 outline-none resize-none leading-snug min-h-[28px] field-sizing-content"
+      className="w-full bg-transparent text-xs px-1.5 py-1 rounded border border-transparent focus:border-stage-mastering/60 focus:bg-ink/40 outline-none resize-y leading-snug min-h-[28px]"
     />
   )
 }
