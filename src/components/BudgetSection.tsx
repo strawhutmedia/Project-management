@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import {
   api,
   type ApiBudget,
@@ -828,67 +828,81 @@ function BudgetItemTable({
     }
   }
 
+  const draftTotal = (parseFloat(draft.amt) || 0) * (parseFloat(draft.x) || 0) * (parseFloat(draft.rate) || 0)
+
   return (
-    <div className="space-y-3">
-      <div className="overflow-x-auto -mx-3 px-3">
-        <table className="w-full text-xs min-w-[720px]">
-          <thead>
-            <tr className="text-[10px] uppercase tracking-wider text-muted">
-              <th className="text-left font-bold pb-2 pr-2 w-16">Code</th>
-              <th className="text-left font-bold pb-2 pr-2">Description</th>
-              <th className="text-right font-bold pb-2 pr-2 w-20">Amt</th>
-              <th className="text-left font-bold pb-2 pr-2 w-16">Units</th>
-              <th className="text-right font-bold pb-2 pr-2 w-12">×</th>
-              <th className="text-right font-bold pb-2 pr-2 w-24">Rate</th>
-              <th className="text-right font-bold pb-2 pr-2 w-24">Total</th>
-              <th className="text-left font-bold pb-2 pr-2 w-32">Vendor</th>
-              <th className="text-left font-bold pb-2 pr-2 w-28">Date</th>
-              <th className="w-8"></th>
-            </tr>
-          </thead>
-          <tbody>
-            {account.lineItems.length === 0 && (
-              <tr>
-                <td colSpan={10} className="text-muted/70 text-center py-3 italic">
-                  No line items yet — add one below.
-                </td>
-              </tr>
-            )}
-            {account.lineItems.map((item) => (
-              <BudgetItemRow key={item.id} item={item} currency={currency} onChanged={onChanged} />
-            ))}
-            <tr className="border-t border-line/40">
-              <td className="pr-2 pt-2"><Cell value={draft.code} onChange={(v) => setDraft({ ...draft, code: v })} placeholder="—" /></td>
-              <td className="pr-2 pt-2"><Cell value={draft.description} onChange={(v) => setDraft({ ...draft, description: v })} placeholder="New item…" /></td>
-              <td className="pr-2 pt-2"><Cell value={draft.amt} onChange={(v) => setDraft({ ...draft, amt: v })} align="right" /></td>
-              <td className="pr-2 pt-2"><Cell value={draft.units} onChange={(v) => setDraft({ ...draft, units: v })} placeholder="Days" /></td>
-              <td className="pr-2 pt-2"><Cell value={draft.x} onChange={(v) => setDraft({ ...draft, x: v })} align="right" /></td>
-              <td className="pr-2 pt-2"><Cell value={draft.rate} onChange={(v) => setDraft({ ...draft, rate: v })} align="right" /></td>
-              <td className="pr-2 pt-2 text-right font-mono text-muted">
-                {fmtMoney((parseFloat(draft.amt) || 0) * (parseFloat(draft.x) || 0) * (parseFloat(draft.rate) || 0), currency)}
-              </td>
-              <td className="pr-2 pt-2"><Cell value={draft.vendor} onChange={(v) => setDraft({ ...draft, vendor: v })} placeholder="—" /></td>
-              <td className="pr-2 pt-2"><Cell value={draft.datedAt} onChange={(v) => setDraft({ ...draft, datedAt: v })} type="date" /></td>
-              <td className="pt-2 text-right">
-                <button
-                  onClick={() => void add()}
-                  disabled={busy}
-                  className="text-stage-mastering hover:text-text text-base disabled:opacity-50"
-                  title="Add line item"
-                >
-                  +
-                </button>
-              </td>
-            </tr>
-          </tbody>
-        </table>
+    <div className="space-y-2">
+      {account.lineItems.length === 0 && (
+        <div className="text-muted/70 text-center py-3 italic text-xs">
+          No line items yet — add one below.
+        </div>
+      )}
+      {account.lineItems.map((item) => (
+        <BudgetItemCard key={item.id} item={item} currency={currency} onChanged={onChanged} />
+      ))}
+      <div className="rounded-lg border border-dashed border-line/60 bg-ink/20 p-2.5 space-y-2">
+        <div className="text-[10px] uppercase tracking-wider text-muted font-bold">+ Add new line item</div>
+        <div className="grid grid-cols-[auto_1fr] gap-2 items-start">
+          <div className="w-16">
+            <FieldLabel>Code</FieldLabel>
+            <Cell value={draft.code} onChange={(v) => setDraft({ ...draft, code: v })} placeholder="—" />
+          </div>
+          <div className="min-w-0">
+            <FieldLabel>Description</FieldLabel>
+            <CellArea value={draft.description} onChange={(v) => setDraft({ ...draft, description: v })} placeholder="New item…" />
+          </div>
+        </div>
+        <div className="grid grid-cols-3 gap-2">
+          <div>
+            <FieldLabel>Amt</FieldLabel>
+            <Cell value={draft.amt} onChange={(v) => setDraft({ ...draft, amt: v })} align="right" />
+          </div>
+          <div>
+            <FieldLabel>×</FieldLabel>
+            <Cell value={draft.x} onChange={(v) => setDraft({ ...draft, x: v })} align="right" />
+          </div>
+          <div>
+            <FieldLabel>Rate</FieldLabel>
+            <Cell value={draft.rate} onChange={(v) => setDraft({ ...draft, rate: v })} align="right" />
+          </div>
+        </div>
+        <div className="grid grid-cols-2 gap-2">
+          <div>
+            <FieldLabel>Units</FieldLabel>
+            <Cell value={draft.units} onChange={(v) => setDraft({ ...draft, units: v })} placeholder="Days" />
+          </div>
+          <div>
+            <FieldLabel>Date</FieldLabel>
+            <Cell value={draft.datedAt} onChange={(v) => setDraft({ ...draft, datedAt: v })} type="date" />
+          </div>
+        </div>
+        <div>
+          <FieldLabel>Vendor</FieldLabel>
+          <Cell value={draft.vendor} onChange={(v) => setDraft({ ...draft, vendor: v })} placeholder="—" />
+        </div>
+        <div className="flex items-center justify-between gap-2 pt-1">
+          <div className="text-xs text-muted">
+            Total: <span className="font-mono text-text">{fmtMoney(draftTotal, currency)}</span>
+          </div>
+          <button
+            onClick={() => void add()}
+            disabled={busy}
+            className="rounded-lg bg-gradient-to-r from-stage-producing to-stage-mastering text-white font-bold uppercase tracking-wider text-[11px] px-3 py-1.5 disabled:opacity-50"
+          >
+            + Add
+          </button>
+        </div>
       </div>
       {error && <p className="text-urgent text-xs">{error}</p>}
     </div>
   )
 }
 
-function BudgetItemRow({
+function FieldLabel({ children }: { children: ReactNode }) {
+  return <div className="text-[9px] uppercase tracking-wider text-muted/70 font-bold mb-0.5">{children}</div>
+}
+
+function BudgetItemCard({
   item,
   currency,
   onChanged,
@@ -931,26 +945,84 @@ function BudgetItemRow({
   const total = (parseFloat(amt) || 0) * (parseFloat(x) || 0) * (parseFloat(rate) || 0)
 
   return (
-    <tr className="border-t border-line/30 hover:bg-ink/30">
-      <td className="pr-2 py-1"><Cell value={code} onChange={setCode} onBlur={() => code !== (item.code ?? '') && void commit({ code })} /></td>
-      <td className="pr-2 py-1"><Cell value={description} onChange={setDescription} onBlur={() => description !== item.description && void commit({ description })} /></td>
-      <td className="pr-2 py-1"><Cell value={amt} onChange={setAmt} align="right" onBlur={() => parseFloat(amt) !== item.amt && void commit({ amt: parseFloat(amt) || 0 })} /></td>
-      <td className="pr-2 py-1"><Cell value={units} onChange={setUnits} onBlur={() => units !== (item.units ?? '') && void commit({ units })} /></td>
-      <td className="pr-2 py-1"><Cell value={x} onChange={setX} align="right" onBlur={() => parseFloat(x) !== item.x && void commit({ x: parseFloat(x) || 1 })} /></td>
-      <td className="pr-2 py-1"><Cell value={rate} onChange={setRate} align="right" onBlur={() => parseFloat(rate) !== item.rate && void commit({ rate: parseFloat(rate) || 0 })} /></td>
-      <td className="pr-2 py-1 text-right font-mono">{fmtMoney(total, currency)}</td>
-      <td className="pr-2 py-1"><Cell value={vendor} onChange={setVendor} onBlur={() => vendor !== (item.vendor ?? '') && void commit({ vendor })} /></td>
-      <td className="pr-2 py-1"><Cell value={datedAt} onChange={setDatedAt} type="date" onBlur={() => {
-        const next = datedAt || null
-        const prev = item.datedAt ? item.datedAt.slice(0, 10) : null
-        if (next !== prev) void commit({ datedAt: next })
-      }} /></td>
-      <td className="py-1 text-right">
-        <button onClick={() => void remove()} className="text-muted hover:text-urgent text-sm" title="Delete">
+    <div className="rounded-lg border border-line/40 bg-ink/30 p-2.5 space-y-2 hover:border-line/70 transition">
+      <div className="grid grid-cols-[auto_1fr_auto] gap-2 items-start">
+        <div className="w-16 shrink-0">
+          <FieldLabel>Code</FieldLabel>
+          <Cell value={code} onChange={setCode} onBlur={() => code !== (item.code ?? '') && void commit({ code })} placeholder="—" />
+        </div>
+        <div className="min-w-0">
+          <FieldLabel>Description</FieldLabel>
+          <CellArea value={description} onChange={setDescription} onBlur={() => description !== item.description && void commit({ description })} />
+        </div>
+        <button
+          onClick={() => void remove()}
+          className="text-muted hover:text-urgent text-sm shrink-0 mt-4 px-1"
+          title="Delete"
+        >
           ✕
         </button>
-      </td>
-    </tr>
+      </div>
+      <div className="grid grid-cols-3 gap-2">
+        <div>
+          <FieldLabel>Amt</FieldLabel>
+          <Cell value={amt} onChange={setAmt} align="right" onBlur={() => parseFloat(amt) !== item.amt && void commit({ amt: parseFloat(amt) || 0 })} />
+        </div>
+        <div>
+          <FieldLabel>×</FieldLabel>
+          <Cell value={x} onChange={setX} align="right" onBlur={() => parseFloat(x) !== item.x && void commit({ x: parseFloat(x) || 1 })} />
+        </div>
+        <div>
+          <FieldLabel>Rate</FieldLabel>
+          <Cell value={rate} onChange={setRate} align="right" onBlur={() => parseFloat(rate) !== item.rate && void commit({ rate: parseFloat(rate) || 0 })} />
+        </div>
+      </div>
+      <div className="grid grid-cols-2 gap-2">
+        <div>
+          <FieldLabel>Units</FieldLabel>
+          <Cell value={units} onChange={setUnits} onBlur={() => units !== (item.units ?? '') && void commit({ units })} placeholder="Days" />
+        </div>
+        <div>
+          <FieldLabel>Date</FieldLabel>
+          <Cell value={datedAt} onChange={setDatedAt} type="date" onBlur={() => {
+            const next = datedAt || null
+            const prev = item.datedAt ? item.datedAt.slice(0, 10) : null
+            if (next !== prev) void commit({ datedAt: next })
+          }} />
+        </div>
+      </div>
+      <div>
+        <FieldLabel>Vendor</FieldLabel>
+        <Cell value={vendor} onChange={setVendor} onBlur={() => vendor !== (item.vendor ?? '') && void commit({ vendor })} placeholder="—" />
+      </div>
+      <div className="flex items-center justify-between gap-2 border-t border-line/30 pt-2">
+        <div className="text-[10px] uppercase tracking-wider text-muted/70 font-bold">Line total</div>
+        <div className="font-mono font-bold text-sm text-text">{fmtMoney(total, currency)}</div>
+      </div>
+    </div>
+  )
+}
+
+function CellArea({
+  value,
+  onChange,
+  onBlur,
+  placeholder,
+}: {
+  value: string
+  onChange: (v: string) => void
+  onBlur?: () => void
+  placeholder?: string
+}) {
+  return (
+    <textarea
+      value={value}
+      placeholder={placeholder}
+      onChange={(e) => onChange(e.target.value)}
+      onBlur={onBlur}
+      rows={1}
+      className="w-full bg-transparent text-xs px-1.5 py-1 rounded border border-transparent focus:border-stage-mastering/60 focus:bg-ink/40 outline-none resize-none leading-snug min-h-[28px] field-sizing-content"
+    />
   )
 }
 

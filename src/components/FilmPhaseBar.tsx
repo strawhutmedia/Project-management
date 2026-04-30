@@ -41,7 +41,7 @@ export default function FilmPhaseBar({
       <div className="text-[11px] uppercase tracking-[0.2em] text-muted font-bold mb-3">
         🎞️ Film Phase
       </div>
-      <div className="grid grid-cols-4 gap-2">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
         {PHASES.map((phase, i) => {
           const isCurrent = phase.key === currentPhase
           const isPast = i < safeIndex
@@ -51,9 +51,9 @@ export default function FilmPhaseBar({
               key={phase.key}
               disabled={!isAdmin || busy}
               onClick={() => void setPhase(phase.key)}
-              className={`relative rounded-xl px-3 py-3 text-left transition border ${
+              className={`relative rounded-xl px-2 py-2.5 text-left transition border-2 min-w-0 ${
                 isCurrent
-                  ? 'border-stage-mastering bg-gradient-to-br from-stage-producing/30 to-stage-mastering/30 ring-2 ring-stage-mastering/50'
+                  ? 'border-stage-mastering bg-gradient-to-br from-stage-producing/30 to-stage-mastering/30 shadow-[0_0_0_2px_rgba(255,180,255,0.25)_inset]'
                   : isPast
                   ? 'border-stage-stems/40 bg-stage-stems/10 hover:bg-stage-stems/20'
                   : isFuture
@@ -61,12 +61,12 @@ export default function FilmPhaseBar({
                   : 'border-line bg-ink/30'
               } ${isAdmin ? 'cursor-pointer' : 'cursor-default'} disabled:opacity-50`}
             >
-              <div className="flex items-baseline gap-2 mb-1">
-                <span className="text-base leading-none">{phase.icon}</span>
-                {isPast && <span className="text-[10px] text-stage-stems font-bold">✓</span>}
-                {isCurrent && <span className="text-[10px] text-stage-mastering font-bold uppercase tracking-wider">Current</span>}
+              <div className="flex items-center gap-1.5 mb-1 min-w-0">
+                <span className="text-sm leading-none shrink-0">{phase.icon}</span>
+                {isPast && <span className="text-[10px] text-stage-stems font-bold shrink-0">✓</span>}
+                {isCurrent && <span className="text-[9px] text-stage-mastering font-bold uppercase tracking-wider shrink-0">Now</span>}
               </div>
-              <div className={`text-[11px] uppercase tracking-tight font-bold ${
+              <div className={`text-[10px] sm:text-[11px] uppercase tracking-tight font-bold leading-tight break-words ${
                 isCurrent ? 'text-text' : isPast ? 'text-stage-stems' : 'text-muted'
               }`}>
                 {phase.label}
