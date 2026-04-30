@@ -145,7 +145,7 @@ export default function ProjectPage() {
                 )}
               </div>
             )}
-            {isAdmin && (
+            {isAdmin && project.kind !== 'film' && (
               <div className="text-[11px] text-muted mt-1 font-mono">
                 📁 {channelLabel}s subfolder:{' '}
                 <InlineEdit
@@ -160,12 +160,14 @@ export default function ProjectPage() {
               </div>
             )}
           </div>
-          <button
-            onClick={() => void addChannel()}
-            className="rounded-xl bg-gradient-to-r from-stage-producing to-stage-mastering text-white font-bold uppercase tracking-wider text-xs px-3 py-2 whitespace-nowrap"
-          >
-            + New {channelLabel}
-          </button>
+          {project.kind !== 'film' && (
+            <button
+              onClick={() => void addChannel()}
+              className="rounded-xl bg-gradient-to-r from-stage-producing to-stage-mastering text-white font-bold uppercase tracking-wider text-xs px-3 py-2 whitespace-nowrap"
+            >
+              + New {channelLabel}
+            </button>
+          )}
         </div>
       </div>
 

@@ -113,6 +113,22 @@ export async function seedBackInYourArms(): Promise<void> {
       const projId = existing.rows[0].id
       await ensureShootDays(projId)
       await ensureFilmTeam(projId, ryanId, stephenId, alexId)
+
+      // If the .fdx has been imported but scenes are still unscheduled,
+      // apply Ryan's StudioBinder schedule automatically so we don't
+      // make him drag-drop manually after each .fdx revision.
+      const unscheduled = await pool.query<{ count: string }>(
+        `SELECT COUNT(*)::text AS count FROM scenes
+         WHERE project_id = $1 AND shoot_day_id IS NULL`,
+        [projId],
+      )
+      if (Number(unscheduled.rows[0].count) > 0) {
+        const result = await applyBackInYourArmsSchedule(projId)
+        logInfo('BIYA seed: auto-applied schedule to unscheduled scenes', {
+          projectId: projId,
+          ...result,
+        })
+      }
       // Re-set budget targets in case they were updated in code
       await pool.query(
         `UPDATE budgets SET production_target = 500000, post_target = 150000,
