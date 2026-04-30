@@ -3,6 +3,7 @@ import Layout from './components/Layout'
 import Dashboard from './pages/Dashboard'
 import ProjectPage from './pages/ProjectPage'
 import SongPage from './pages/SongPage'
+import StripboardPage from './pages/StripboardPage'
 import Login from './pages/Login'
 import Verify from './pages/Verify'
 import Profile from './pages/Profile'
@@ -37,6 +38,7 @@ export default function App() {
           <Route path="profile" element={<Profile />} />
           <Route path="settings" element={<Settings />} />
           <Route path="projects/:projectId" element={<ProjectPage />} />
+          <Route path="projects/:projectId/stripboard" element={<StripboardPage />} />
           <Route path="projects/:projectId/songs/:songId" element={<SongPage />} />
         </Route>
       </Routes>

@@ -7,7 +7,6 @@ import StageDistribution from '../components/StageDistribution'
 import InlineEdit from '../components/InlineEdit'
 import DropboxFolderPicker from '../components/DropboxFolderPicker'
 import BudgetSection from '../components/BudgetSection'
-import Stripboard from '../components/Stripboard'
 import FilmPhaseBar, { type FilmPhase } from '../components/FilmPhaseBar'
 import { useAuth } from '../auth'
 
@@ -194,10 +193,24 @@ export default function ProjectPage() {
       {isAdmin && project.kind === 'film' && <FilmTeamSection project={project} members={members} onSaved={reload} />}
 
       {project.kind === 'film' && (
-        <Stripboard projectId={project.id} isAdmin={isAdmin} projectName={project.name} />
+        <Link
+          to={`/projects/${project.id}/stripboard`}
+          className="block rounded-2xl border border-line bg-panel/60 p-5 hover:border-stage-mastering/60 hover:bg-panel transition group"
+        >
+          <div className="flex items-center justify-between gap-3">
+            <div className="min-w-0">
+              <div className="text-[11px] uppercase tracking-[0.2em] text-muted font-bold">🎬 Stripboard</div>
+              <div className="text-sm font-bold mt-1 text-text">Open shooting schedule →</div>
+              <div className="text-[11px] text-muted/80 mt-0.5">
+                Scenes by shoot day · upload .fdx · drag to reorder
+              </div>
+            </div>
+            <span className="text-2xl text-muted group-hover:text-stage-mastering transition shrink-0">›</span>
+          </div>
+        </Link>
       )}
 
-      <BudgetSection projectId={project.id} isAdmin={isAdmin} />
+      {project.kind === 'film' && <BudgetSection projectId={project.id} isAdmin={isAdmin} />}
 
       {showRootPicker && (
         <DropboxFolderPicker

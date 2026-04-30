@@ -322,27 +322,30 @@ function DayRow({
         </div>
       </button>
 
-      {/* Body — wrapped grid of strips */}
+      {/* Body — responsive grid of square scene cards */}
       {!collapsed && (
         <div
-          className="px-3 pb-3 pt-1 flex flex-wrap gap-1.5"
+          className="px-3 pb-3 pt-1"
           onDragOver={(e) => { if (isAdmin) e.preventDefault() }}
         >
-          {scenes.length === 0 && (
+          {scenes.length === 0 ? (
             <div className="text-[11px] text-muted/60 italic py-2">
               {isUnscheduled ? 'All scenes scheduled ✓' : isBreak ? 'Day off' : 'Drop scenes here'}
             </div>
+          ) : (
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2">
+              {scenes.map((s) => (
+                <SceneCard key={s.id} scene={s} isAdmin={isAdmin} />
+              ))}
+            </div>
           )}
-          {scenes.map((s) => (
-            <SceneStrip key={s.id} scene={s} isAdmin={isAdmin} />
-          ))}
         </div>
       )}
     </div>
   )
 }
 
-function SceneStrip({ scene, isAdmin }: { scene: ApiScene; isAdmin: boolean }) {
+function SceneCard({ scene, isAdmin }: { scene: ApiScene; isAdmin: boolean }) {
   const kind = stripKind(scene)
   const style = STRIP_STYLE[kind]
   return (
@@ -352,28 +355,37 @@ function SceneStrip({ scene, isAdmin }: { scene: ApiScene; isAdmin: boolean }) {
         e.dataTransfer.setData('text/scene-id', scene.id)
         e.dataTransfer.effectAllowed = 'move'
       }}
-      className={`relative flex-shrink-0 w-56 rounded-md border border-line bg-panel pl-3 pr-2 py-1.5 text-[11px] ${isAdmin ? 'cursor-grab active:cursor-grabbing' : ''} hover:border-stage-mastering/60 hover:shadow-md transition overflow-hidden`}
+      className={`relative aspect-square rounded-2xl border border-line bg-panel overflow-hidden ${
+        isAdmin ? 'cursor-grab active:cursor-grabbing' : ''
+      } hover:border-stage-mastering/60 hover:shadow-lg transition flex flex-col`}
       title={scene.slug}
     >
-      {/* Colored stripe at left edge — at-a-glance type indicator */}
-      <div className={`absolute left-0 top-0 bottom-0 w-1.5 ${style.stripe}`} />
+      {/* Colored stripe along the top — at-a-glance type indicator */}
+      <div className={`h-1.5 w-full ${style.stripe}`} />
 
-      <div className="flex items-baseline justify-between gap-2 mb-0.5">
-        <span className="font-mono font-bold text-[10px] text-muted">#{scene.number}</span>
-        <span className="text-[10px] font-mono text-muted">{fmtEighths(scene.pageEighths)}p</span>
-      </div>
-      <div className="font-bold uppercase tracking-tight leading-tight truncate text-text" title={scene.location ?? ''}>
-        {scene.location || scene.slug}
-      </div>
-      <div className="flex items-baseline justify-between gap-1 mt-0.5">
-        <span className={`text-[9px] uppercase tracking-wider font-bold ${style.label}`}>
-          {scene.intExt ?? ''} {scene.timeOfDay ?? ''}
-        </span>
-        {scene.characters.length > 0 && (
-          <span className="text-[9px] font-mono text-muted truncate" title={scene.characters.join(', ')}>
-            {scene.characters.slice(0, 3).join('·')}{scene.characters.length > 3 ? `+${scene.characters.length - 3}` : ''}
-          </span>
-        )}
+      <div className="flex-1 flex flex-col px-3 py-2.5 min-h-0">
+        <div className="flex items-baseline justify-between gap-2">
+          <span className="font-mono font-bold text-base text-text">#{scene.number}</span>
+          <span className="text-[10px] font-mono text-muted">{fmtEighths(scene.pageEighths)}p</span>
+        </div>
+
+        <div
+          className="mt-1 font-bold uppercase tracking-tight leading-tight text-text text-[11px] line-clamp-3 break-words"
+          title={scene.location ?? ''}
+        >
+          {scene.location || scene.slug}
+        </div>
+
+        <div className="mt-auto pt-1 space-y-0.5">
+          <div className={`text-[9px] uppercase tracking-wider font-bold ${style.label} truncate`}>
+            {scene.intExt ?? ''} {scene.timeOfDay ?? ''}
+          </div>
+          {scene.characters.length > 0 && (
+            <div className="text-[9px] font-mono text-muted truncate" title={scene.characters.join(', ')}>
+              {scene.characters.slice(0, 3).join('·')}{scene.characters.length > 3 ? `+${scene.characters.length - 3}` : ''}
+            </div>
+          )}
+        </div>
       </div>
     </div>
   )
