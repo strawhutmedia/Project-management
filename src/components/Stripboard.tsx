@@ -57,12 +57,19 @@ function fmtEighths(eighths: number): string {
   return `${whole} ${frac}/8`
 }
 
+type UndoEntry = { sceneId: string; shootDayId: string | null; dayPosition: number; sceneNumber: string }
+
 export default function Stripboard({ projectId, isAdmin, projectName }: { projectId: string; isAdmin: boolean; projectName?: string }) {
   const [board, setBoard] = useState<ApiStripboard | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [importing, setImporting] = useState(false)
   const [busy, setBusy] = useState(false)
+  const [undoStack, setUndoStack] = useState<UndoEntry[]>([])
   const fileInputRef = useRef<HTMLInputElement | null>(null)
+  // Mirror board in a ref so moveScene can read the freshest state without
+  // re-creating its closure on every render.
+  const boardRef = useRef<ApiStripboard | null>(null)
+  boardRef.current = board
 
   async function load() {
     try {
@@ -74,6 +81,61 @@ export default function Stripboard({ projectId, isAdmin, projectName }: { projec
   }
 
   useEffect(() => { void load() }, [projectId])
+
+  // Capture-and-apply scene move. Records the prior position to the undo
+  // stack BEFORE applying so an undo can restore it. Cap at 50 entries.
+  async function moveScene(sceneId: string, toDayId: string | null, toPosition: number) {
+    const cur = boardRef.current?.scenes.find((s) => s.id === sceneId)
+    if (!cur) return
+    const entry: UndoEntry = {
+      sceneId,
+      shootDayId: cur.shootDayId,
+      dayPosition: cur.dayPosition,
+      sceneNumber: cur.number,
+    }
+    try {
+      await api.updateScene(sceneId, { shootDayId: toDayId, dayPosition: toPosition })
+      setUndoStack((stack) => [...stack.slice(-49), entry])
+      await load()
+    } catch (err) {
+      console.error('move failed', err)
+    }
+  }
+
+  async function undo() {
+    setUndoStack((stack) => {
+      const last = stack[stack.length - 1]
+      if (!last) return stack
+      // Apply async without awaiting inside the setter
+      void (async () => {
+        try {
+          await api.updateScene(last.sceneId, {
+            shootDayId: last.shootDayId,
+            dayPosition: last.dayPosition,
+          })
+          await load()
+        } catch (err) {
+          console.error('undo failed', err)
+        }
+      })()
+      return stack.slice(0, -1)
+    })
+  }
+
+  // Cmd/Ctrl-Z keyboard shortcut for desktop.
+  useEffect(() => {
+    if (!isAdmin) return
+    function onKey(e: KeyboardEvent) {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'z' && !e.shiftKey) {
+        const target = e.target as HTMLElement | null
+        if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable)) return
+        e.preventDefault()
+        void undo()
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [isAdmin])
 
   async function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
@@ -225,7 +287,15 @@ export default function Stripboard({ projectId, isAdmin, projectName }: { projec
           </p>
         </div>
         {isAdmin && (
-          <div className="flex gap-2">
+          <div className="flex gap-2 flex-wrap">
+            <button
+              onClick={() => void undo()}
+              disabled={undoStack.length === 0}
+              title="Undo last move (⌘Z)"
+              className="text-[10px] uppercase tracking-wider text-text border border-line rounded-full px-3 py-1.5 hover:bg-ink/40 disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              ↶ Undo {undoStack.length > 0 ? `(${undoStack.length})` : ''}
+            </button>
             <input
               ref={fileInputRef}
               type="file"
@@ -275,7 +345,7 @@ export default function Stripboard({ projectId, isAdmin, projectName }: { projec
           label="UNSCHEDULED"
           scenes={grouped?.unscheduled ?? []}
           isAdmin={isAdmin}
-          onSceneMoved={load}
+          moveScene={moveScene}
           resolvedTod={resolvedTod}
         />
         {board.days.map((day) => (
@@ -285,7 +355,7 @@ export default function Stripboard({ projectId, isAdmin, projectName }: { projec
             label={day.isBreak ? `BREAK · DAY ${day.number}` : `DAY ${day.number}`}
             scenes={grouped?.byDay.get(day.id) ?? []}
             isAdmin={isAdmin}
-            onSceneMoved={load}
+            moveScene={moveScene}
             resolvedTod={resolvedTod}
           />
         ))}
@@ -299,14 +369,14 @@ function DayRow({
   label,
   scenes,
   isAdmin,
-  onSceneMoved,
+  moveScene,
   resolvedTod,
 }: {
   day: ApiShootDay | null
   label: string
   scenes: ApiScene[]
   isAdmin: boolean
-  onSceneMoved: () => void | Promise<void>
+  moveScene: (sceneId: string, toDayId: string | null, toPosition: number) => Promise<void>
   resolvedTod: Map<string, string>
 }) {
   const [over, setOver] = useState(false)
@@ -320,15 +390,7 @@ function DayRow({
     setOver(false)
     const sceneId = e.dataTransfer.getData('text/scene-id')
     if (!sceneId) return
-    try {
-      await api.updateScene(sceneId, {
-        shootDayId: day?.id ?? null,
-        dayPosition: scenes.length,
-      })
-      await onSceneMoved()
-    } catch (err) {
-      console.error('move failed', err)
-    }
+    await moveScene(sceneId, day?.id ?? null, scenes.length)
   }
 
   const isUnscheduled = day === null

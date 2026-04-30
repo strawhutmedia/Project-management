@@ -52,5 +52,18 @@ jobs:
             echo "no changes"
           else
             git commit -m "poll: $(date -u +%FT%TZ)"
-            git push origin status
+            # Status branch is also written by build-check.yml, so rebase
+            # on the latest before pushing in case it raced ahead of us.
+            for attempt in 1 2 3 4 5; do
+              if git push origin status; then
+                echo "pushed on attempt $attempt"
+                exit 0
+              fi
+              echo "push failed (attempt $attempt) — refreshing and retrying"
+              git fetch origin status
+              git rebase origin/status || git rebase --abort
+              sleep 2
+            done
+            echo "failed to push status after 5 attempts"
+            exit 1
           fi
