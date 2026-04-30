@@ -66,8 +66,12 @@ export default function BudgetSection({ projectId, isAdmin }: { projectId: strin
   const [loading, setLoading] = useState(true)
   const [missing, setMissing] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [openCategory, setOpenCategory] = useState<BudgetCategory | null>('above_line')
-  const [openAccountId, setOpenAccountId] = useState<string | null>(null)
+  // Allow multiple categories + accounts to be expanded at once. Default to
+  // ALL categories expanded so the itemized breakdown is immediately visible.
+  const [openCategories, setOpenCategories] = useState<Set<BudgetCategory>>(
+    new Set<BudgetCategory>(['above_line', 'production', 'post', 'other']),
+  )
+  const [openAccountIds, setOpenAccountIds] = useState<Set<string>>(new Set())
 
   async function load() {
     setLoading(true)
@@ -154,6 +158,7 @@ export default function BudgetSection({ projectId, isAdmin }: { projectId: strin
             {budget.productionTarget != null && (
               <GoalBar
                 label="🎬 Production"
+                hint="Above the Line + Production"
                 spent={bucketSpend(budget, 'production')}
                 target={budget.productionTarget}
                 currency={budget.currency}
@@ -162,6 +167,7 @@ export default function BudgetSection({ projectId, isAdmin }: { projectId: strin
             {budget.postTarget != null && (
               <GoalBar
                 label="✂️ Post"
+                hint="Post-Production category"
                 spent={bucketSpend(budget, 'post')}
                 target={budget.postTarget}
                 currency={budget.currency}
@@ -170,6 +176,7 @@ export default function BudgetSection({ projectId, isAdmin }: { projectId: strin
             {budget.marketingTarget != null && (
               <GoalBar
                 label="📣 Marketing / PR"
+                hint="Publicity (55-00) only"
                 spent={bucketSpend(budget, 'marketing')}
                 target={budget.marketingTarget}
                 currency={budget.currency}
@@ -177,7 +184,8 @@ export default function BudgetSection({ projectId, isAdmin }: { projectId: strin
             )}
             {budget.adminTarget != null && (
               <GoalBar
-                label="🛡️ Admin (Legal·Acct·Ins)"
+                label="🛡️ Admin"
+                hint="Legal · Accounting · Insurance · GE"
                 spent={bucketSpend(budget, 'admin')}
                 target={budget.adminTarget}
                 currency={budget.currency}
@@ -190,13 +198,21 @@ export default function BudgetSection({ projectId, isAdmin }: { projectId: strin
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         {totalsByCategory.map(({ cat, subtotal }) => {
           const a = CATEGORY_ACCENT[cat]
+          const isOpen = openCategories.has(cat)
           return (
             <button
               key={cat}
-              onClick={() => setOpenCategory(openCategory === cat ? null : cat)}
-              className={`text-left rounded-xl border ${a.border} ${a.bg} p-3 transition hover:bg-opacity-30 ${openCategory === cat ? 'ring-1 ring-inset ring-current' : ''}`}
+              onClick={() => {
+                const next = new Set(openCategories)
+                if (isOpen) next.delete(cat); else next.add(cat)
+                setOpenCategories(next)
+              }}
+              className={`text-left rounded-xl border ${a.border} ${a.bg} p-3 transition hover:bg-opacity-30 ${isOpen ? 'ring-1 ring-inset ring-current' : ''}`}
             >
-              <div className={`text-[10px] uppercase tracking-wider ${a.text} font-bold`}>{CATEGORY_LABEL[cat]}</div>
+              <div className={`text-[10px] uppercase tracking-wider ${a.text} font-bold flex items-center gap-1`}>
+                <span>{isOpen ? '▾' : '▸'}</span>
+                {CATEGORY_LABEL[cat]}
+              </div>
               <div className="font-display text-2xl mt-1">{fmtMoney(subtotal, budget.currency)}</div>
             </button>
           )
@@ -210,19 +226,60 @@ export default function BudgetSection({ projectId, isAdmin }: { projectId: strin
         <Stat label="Grand total" value={fmtMoney(grand, budget.currency)} accent />
       </div>
 
-      {openCategory && (
-        <div className="space-y-3">
-          {totalsByCategory.find((c) => c.cat === openCategory)!.accounts.map((acc) => {
-            const open = openAccountId === acc.id
+      <div className="rounded-lg bg-stage-mastering/10 border border-stage-mastering/30 px-3 py-2 flex items-center justify-between gap-3 flex-wrap">
+        <p className="text-[11px] text-stage-mastering/90">
+          📋 <strong>Click any account below to expand it</strong> — add, edit, or delete individual line items inside.
+        </p>
+        <div className="flex gap-2">
+          <button
+            onClick={() => {
+              const all = new Set<string>()
+              for (const acc of budget.accounts) all.add(acc.id)
+              setOpenAccountIds(all)
+              setOpenCategories(new Set(['above_line', 'production', 'post', 'other']))
+            }}
+            className="text-[10px] uppercase tracking-wider text-stage-mastering border border-stage-mastering/40 rounded-full px-2 py-1 hover:bg-stage-mastering/10"
+          >
+            Expand all
+          </button>
+          <button
+            onClick={() => {
+              setOpenAccountIds(new Set())
+            }}
+            className="text-[10px] uppercase tracking-wider text-muted border border-line rounded-full px-2 py-1 hover:bg-ink/40"
+          >
+            Collapse all
+          </button>
+        </div>
+      </div>
+
+      {openCategories.size > 0 && (
+        <div className="space-y-4">
+          {totalsByCategory.filter((c) => openCategories.has(c.cat)).map(({ cat, accounts: catAccounts }) => {
+            const a = CATEGORY_ACCENT[cat]
             return (
-              <BudgetAccount
-                key={acc.id}
-                account={acc}
-                currency={budget.currency}
-                open={open}
-                onToggle={() => setOpenAccountId(open ? null : acc.id)}
-                onChanged={load}
-              />
+              <div key={cat} className="space-y-2">
+                <div className={`text-[11px] uppercase tracking-[0.2em] font-bold ${a.text} pl-1`}>
+                  {CATEGORY_LABEL[cat]}
+                </div>
+                {catAccounts.map((acc) => {
+                  const open = openAccountIds.has(acc.id)
+                  return (
+                    <BudgetAccount
+                      key={acc.id}
+                      account={acc}
+                      currency={budget.currency}
+                      open={open}
+                      onToggle={() => {
+                        const next = new Set(openAccountIds)
+                        if (open) next.delete(acc.id); else next.add(acc.id)
+                        setOpenAccountIds(next)
+                      }}
+                      onChanged={load}
+                    />
+                  )
+                })}
+              </div>
             )
           })}
         </div>
@@ -233,12 +290,14 @@ export default function BudgetSection({ projectId, isAdmin }: { projectId: strin
 
 function GoalBar({
   label,
+  hint,
   spent,
   target,
   currency,
   big,
 }: {
   label: string
+  hint?: string
   spent: number
   target: number
   currency: string
@@ -272,6 +331,11 @@ function GoalBar({
           {over ? `Over by ${fmtMoney(spent - target, currency)}` : `${fmtMoney(remaining, currency)} left`}
         </div>
       </div>
+      {hint && (
+        <div className="text-[9px] uppercase tracking-wider text-muted/70 mt-0.5">
+          incl. {hint}
+        </div>
+      )}
       <div className="mt-1 flex items-baseline gap-2 flex-wrap">
         <div className={`font-display ${big ? 'text-3xl' : 'text-xl'}`}>{fmtMoney(spent, currency)}</div>
         <div className="text-muted text-xs">
@@ -671,16 +735,23 @@ function BudgetAccount({
     <div className={`rounded-xl border ${a.border} ${open ? a.bg : 'bg-ink/30'} overflow-hidden`}>
       <button
         onClick={onToggle}
-        className="w-full flex items-center justify-between gap-3 px-4 py-3 text-left hover:bg-ink/40"
+        className="w-full flex items-center justify-between gap-3 px-4 py-3 text-left hover:bg-ink/40 cursor-pointer transition group"
       >
         <div className="flex items-center gap-3 min-w-0">
+          <span className={`text-base ${a.text} font-bold transition-transform ${open ? '' : 'group-hover:translate-x-0.5'}`}>
+            {open ? '▾' : '▸'}
+          </span>
           <span className={`text-[10px] font-mono ${a.text} font-bold`}>{account.code}</span>
           <span className="font-bold text-sm uppercase tracking-wider truncate">{account.name}</span>
-          <span className="text-[10px] text-muted">{account.lineItems.length} items</span>
+          <span className="text-[10px] text-muted">{account.lineItems.length} {account.lineItems.length === 1 ? 'item' : 'items'}</span>
         </div>
         <div className="flex items-center gap-3">
           <span className="font-display text-lg">{fmtMoney(total, currency)}</span>
-          <span className={`text-xs ${a.text}`}>{open ? '▾' : '▸'}</span>
+          {!open && (
+            <span className="text-[9px] uppercase tracking-wider text-muted/70 group-hover:text-stage-mastering hidden sm:inline">
+              tap to edit
+            </span>
+          )}
         </div>
       </button>
       {open && (
