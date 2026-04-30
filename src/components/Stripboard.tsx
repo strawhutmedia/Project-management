@@ -8,21 +8,20 @@ import { api, type ApiScene, type ApiShootDay, type ApiStripboard } from '../api
 // night, amber=sunset/magic hour).
 type StripKind = 'EXT_DAY' | 'INT_DAY' | 'EXT_NIGHT' | 'INT_NIGHT' | 'SUNSET' | 'DEFAULT'
 
-// Each scene card gets a fun, saturated gradient by INT/EXT + time of day,
-// so the schedule reads like a colorful mood board at a glance.
-//   EXT DAY    — sunny gold / orange
-//   INT DAY    — warm peach / pink (cozy lit interior)
-//   EXT NIGHT  — deep emerald / teal (moonlit outdoors)
-//   INT NIGHT  — indigo / sky (lamp-lit interior at night)
-//   SUNSET     — orange → pink → fuchsia (magic hour)
-//   DEFAULT    — slate (no time-of-day metadata)
+// Each scene card gets a fun, saturated gradient. Two axes:
+//   EXT  = outdoors → nature / sky family (blues + greens)
+//   INT  = indoors  → room / lamp family  (pinks + purples)
+//   DAY  = brighter saturation
+//   NIGHT= deeper saturation
+// So at a glance you can tell INT vs EXT (warm vs cool family) AND
+// day vs night (light vs dark intensity) without reading the label.
 const STRIP_STYLE: Record<StripKind, { stripe: string; label: string; card: string }> = {
-  EXT_DAY:   { stripe: 'bg-amber-200',  label: 'text-amber-100',   card: 'bg-gradient-to-br from-amber-500 via-orange-500 to-yellow-500' },
-  INT_DAY:   { stripe: 'bg-rose-200',   label: 'text-rose-100',    card: 'bg-gradient-to-br from-rose-400 via-pink-500 to-orange-400' },
-  EXT_NIGHT: { stripe: 'bg-emerald-300', label: 'text-emerald-100', card: 'bg-gradient-to-br from-emerald-600 via-teal-700 to-cyan-800' },
-  INT_NIGHT: { stripe: 'bg-sky-300',    label: 'text-sky-100',     card: 'bg-gradient-to-br from-sky-600 via-blue-700 to-indigo-800' },
-  SUNSET:    { stripe: 'bg-orange-200', label: 'text-orange-100',  card: 'bg-gradient-to-br from-orange-500 via-pink-500 to-fuchsia-600' },
-  DEFAULT:   { stripe: 'bg-line',       label: 'text-white/70',    card: 'bg-gradient-to-br from-slate-600 to-slate-800' },
+  EXT_DAY:   { stripe: 'bg-cyan-200',    label: 'text-cyan-100',   card: 'bg-gradient-to-br from-sky-500 via-cyan-500 to-teal-500' },
+  INT_DAY:   { stripe: 'bg-rose-200',    label: 'text-rose-100',   card: 'bg-gradient-to-br from-rose-400 via-pink-500 to-amber-400' },
+  EXT_NIGHT: { stripe: 'bg-emerald-300', label: 'text-emerald-100', card: 'bg-gradient-to-br from-emerald-700 via-green-800 to-teal-900' },
+  INT_NIGHT: { stripe: 'bg-violet-300',  label: 'text-violet-100',  card: 'bg-gradient-to-br from-violet-600 via-purple-700 to-indigo-800' },
+  SUNSET:    { stripe: 'bg-orange-200',  label: 'text-orange-100', card: 'bg-gradient-to-br from-orange-500 via-pink-500 to-fuchsia-600' },
+  DEFAULT:   { stripe: 'bg-line',        label: 'text-white/70',   card: 'bg-gradient-to-br from-slate-600 to-slate-800' },
 }
 
 function stripKind(s: ApiScene): StripKind {
