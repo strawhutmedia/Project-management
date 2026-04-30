@@ -8,20 +8,23 @@ import { api, type ApiScene, type ApiShootDay, type ApiStripboard } from '../api
 // night, amber=sunset/magic hour).
 type StripKind = 'EXT_DAY' | 'INT_DAY' | 'EXT_NIGHT' | 'INT_NIGHT' | 'SUNSET' | 'DEFAULT'
 
-// Each scene card gets a fun, saturated gradient. Two axes:
-//   EXT  = outdoors → nature / sky family (blues + greens)
-//   INT  = indoors  → room / lamp family  (pinks + purples)
-//   DAY  = brighter saturation
-//   NIGHT= deeper saturation
-// So at a glance you can tell INT vs EXT (warm vs cool family) AND
-// day vs night (light vs dark intensity) without reading the label.
+// Five distinct hues — ~70° apart on the color wheel — so every
+// INT/EXT × DAY/NIGHT × SUNSET combo reads as its own color even
+// on a phone in bright light. Each card is a saturated gradient
+// within a single hue family for visual interest.
+//   EXT DAY    GOLD       sunshine (classic stripboard yellow)
+//   INT DAY    MAGENTA    warm-lit interior
+//   EXT NIGHT  GREEN      moonlit nature
+//   INT NIGHT  BLUE       lamp-lit room
+//   SUNSET     ORANGE-RED magic hour
+//   DEFAULT    GRAY       no time-of-day metadata
 const STRIP_STYLE: Record<StripKind, { stripe: string; label: string; card: string }> = {
-  EXT_DAY:   { stripe: 'bg-cyan-200',    label: 'text-cyan-100',   card: 'bg-gradient-to-br from-sky-500 via-cyan-500 to-teal-500' },
-  INT_DAY:   { stripe: 'bg-rose-200',    label: 'text-rose-100',   card: 'bg-gradient-to-br from-rose-400 via-pink-500 to-amber-400' },
-  EXT_NIGHT: { stripe: 'bg-emerald-300', label: 'text-emerald-100', card: 'bg-gradient-to-br from-emerald-700 via-green-800 to-teal-900' },
-  INT_NIGHT: { stripe: 'bg-violet-300',  label: 'text-violet-100',  card: 'bg-gradient-to-br from-violet-600 via-purple-700 to-indigo-800' },
-  SUNSET:    { stripe: 'bg-orange-200',  label: 'text-orange-100', card: 'bg-gradient-to-br from-orange-500 via-pink-500 to-fuchsia-600' },
-  DEFAULT:   { stripe: 'bg-line',        label: 'text-white/70',   card: 'bg-gradient-to-br from-slate-600 to-slate-800' },
+  EXT_DAY:   { stripe: 'bg-yellow-200',  label: 'text-yellow-50',   card: 'bg-gradient-to-br from-yellow-400 via-amber-500 to-yellow-600' },
+  INT_DAY:   { stripe: 'bg-pink-200',    label: 'text-pink-50',     card: 'bg-gradient-to-br from-pink-500 via-fuchsia-500 to-rose-600' },
+  EXT_NIGHT: { stripe: 'bg-emerald-300', label: 'text-emerald-50',  card: 'bg-gradient-to-br from-emerald-600 via-green-700 to-emerald-900' },
+  INT_NIGHT: { stripe: 'bg-blue-200',    label: 'text-blue-50',     card: 'bg-gradient-to-br from-blue-600 via-indigo-700 to-blue-900' },
+  SUNSET:    { stripe: 'bg-orange-200',  label: 'text-orange-50',   card: 'bg-gradient-to-br from-red-500 via-orange-500 to-red-600' },
+  DEFAULT:   { stripe: 'bg-line',        label: 'text-white/70',    card: 'bg-gradient-to-br from-slate-600 to-slate-800' },
 }
 
 function stripKind(s: ApiScene): StripKind {
@@ -370,25 +373,28 @@ function SceneCard({ scene, isAdmin }: { scene: ApiScene; isAdmin: boolean }) {
       {/* Inner gloss for a little dimension */}
       <div className={`h-1 w-full ${style.stripe} opacity-90`} />
 
-      <div className="flex-1 flex flex-col px-3 py-2.5 min-h-0">
+      {/* Bottom-up dark veil keeps white text legible on every hue, even gold */}
+      <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-black/10 to-transparent pointer-events-none" />
+
+      <div className="relative flex-1 flex flex-col px-3 py-2.5 min-h-0">
         <div className="flex items-baseline justify-between gap-2">
-          <span className="font-mono font-bold text-base text-white drop-shadow">#{scene.number}</span>
-          <span className="text-[10px] font-mono text-white/70">{fmtEighths(scene.pageEighths)}p</span>
+          <span className="font-mono font-bold text-base text-white [text-shadow:0_1px_2px_rgba(0,0,0,0.5)]">#{scene.number}</span>
+          <span className="text-[10px] font-mono text-white/80 [text-shadow:0_1px_2px_rgba(0,0,0,0.5)]">{fmtEighths(scene.pageEighths)}p</span>
         </div>
 
         <div
-          className="mt-1 font-bold uppercase tracking-tight leading-tight text-white text-[11px] line-clamp-3 break-words drop-shadow-sm"
+          className="mt-1 font-bold uppercase tracking-tight leading-tight text-white text-[11px] line-clamp-3 break-words [text-shadow:0_1px_2px_rgba(0,0,0,0.6)]"
           title={scene.location ?? ''}
         >
           {scene.location || scene.slug}
         </div>
 
         <div className="mt-auto pt-1 space-y-0.5">
-          <div className="text-[9px] uppercase tracking-wider font-bold text-white/90 truncate">
+          <div className="text-[9px] uppercase tracking-wider font-bold text-white truncate [text-shadow:0_1px_2px_rgba(0,0,0,0.6)]">
             {scene.intExt ?? ''} {scene.timeOfDay ?? ''}
           </div>
           {scene.characters.length > 0 && (
-            <div className="text-[9px] font-mono text-white/70 truncate" title={scene.characters.join(', ')}>
+            <div className="text-[9px] font-mono text-white/85 truncate [text-shadow:0_1px_2px_rgba(0,0,0,0.5)]" title={scene.characters.join(', ')}>
               {scene.characters.slice(0, 3).join('·')}{scene.characters.length > 3 ? `+${scene.characters.length - 3}` : ''}
             </div>
           )}
