@@ -23,7 +23,7 @@ import { logError, logInfo } from '../diag'
 export const transcriptsRouter = Router()
 transcriptsRouter.use(requireUser)
 
-const MAX_FILE_BYTES = 2 * 1024 * 1024 * 1024 // 2 GB
+const MAX_FILE_BYTES = 10 * 1024 * 1024 * 1024 // 10 GB — Deepgram bills by
 
 async function userCanAccessProject(userId: string, role: string, projectId: string): Promise<boolean> {
   if (role === 'admin') return true
@@ -135,7 +135,7 @@ transcriptsRouter.post('/', async (req, res) => {
   }
   if (meta.size && meta.size > MAX_FILE_BYTES) {
     res.status(413).json({
-      error: `file_too_large: ${(meta.size / 1024 / 1024 / 1024).toFixed(2)}GB exceeds 2GB cap`,
+      error: `file_too_large: ${(meta.size / 1024 / 1024 / 1024).toFixed(2)}GB exceeds 10GB cap`,
     }); return
   }
 
@@ -231,6 +231,25 @@ transcriptsRouter.delete('/:id', async (req, res) => {
 // SRT export. Uses edited_blocks + start_offset_ms. Splits long blocks
 // into ~42-char lines with a 7-second max duration per cue (broadcast
 // safety standard).
+// Get a fresh Dropbox temp link to stream the source media in the editor.
+// Temp links expire after 4 hours so the client should call this each time
+// it loads the editor (we don't persist the URL).
+transcriptsRouter.get('/:id/media-url', async (req, res) => {
+  const user = (req as typeof req & { user: SessionUser }).user
+  const { rows } = await pool.query<TranscriptRow>(
+    `SELECT * FROM transcripts WHERE id = $1`, [req.params.id],
+  )
+  if (rows.length === 0) { res.status(404).json({ error: 'not_found' }); return }
+  if (!(await userCanAccessProject(user.id, user.role, rows[0].project_id))) {
+    res.status(403).json({ error: 'forbidden' }); return
+  }
+  const link = await getTemporaryLink(rows[0].dropbox_path)
+  if (!link.ok || !link.url) {
+    res.status(502).json({ error: link.error || 'temporary_link_failed' }); return
+  }
+  res.json({ url: link.url, fileName: rows[0].file_name })
+})
+
 transcriptsRouter.get('/:id/srt', async (req, res) => {
   const user = (req as typeof req & { user: SessionUser }).user
   const { rows } = await pool.query<TranscriptRow>(

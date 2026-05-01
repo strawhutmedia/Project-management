@@ -43,8 +43,8 @@ export default function TranscriptsSection({
 
   async function startNew(path: string, _name: string, size?: number) {
     setPicking(false)
-    if (size && size > 2 * 1024 * 1024 * 1024) {
-      setError(`File is ${(size / 1e9).toFixed(2)} GB — over the 2 GB transcription cap.`)
+    if (size && size > 10 * 1024 * 1024 * 1024) {
+      setError(`File is ${(size / 1e9).toFixed(2)} GB — over the 10 GB transcription cap.`)
       return
     }
     setStarting(true)
