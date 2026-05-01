@@ -84,12 +84,10 @@ async function checkOverdue() {
 }
 
 // Once-per-day stuck-tasks digest for admin: tasks overdue 3+ days that
-// are still not done. Sends a single summary email per day per admin.
-let lastStuckDigestDate = ''
-
+// are still not done. The actual dedupe lives in sendAdminAlert via the
+// sent_admin_alerts table, so this survives Railway redeploys.
 async function checkStuckDigest() {
   const today = new Date().toISOString().slice(0, 10) // YYYY-MM-DD UTC
-  if (lastStuckDigestDate === today) return // already sent today
   const { rows } = await pool.query(
     `SELECT t.id, t.title, t.due_at, t.assignee_id,
             u.display_name AS assignee_display, u.name AS assignee_name,
@@ -103,10 +101,7 @@ async function checkStuckDigest() {
        AND t.due_at < now() - interval '3 days'
      ORDER BY t.due_at ASC`,
   )
-  if (rows.length === 0) {
-    lastStuckDigestDate = today
-    return
-  }
+  if (rows.length === 0) return
   const lines = rows.map((r: { title: string; due_at: string; assignee_display: string | null; assignee_name: string | null; song_title: string; song_subtitle: string | null; project_name: string }) => {
     const songLabel = r.song_subtitle ? `${r.song_title} (${r.song_subtitle})` : r.song_title
     const days = Math.floor((Date.now() - new Date(r.due_at).getTime()) / (1000 * 60 * 60 * 24))
@@ -115,7 +110,6 @@ async function checkStuckDigest() {
   })
   const body = `${rows.length} task(s) have been stuck for 3+ days:\n\n${lines.join('\n')}\n\nOpen Slate to triage.`
   await sendAdminAlert(`Stuck tasks digest (${rows.length})`, body, `stuck-digest-${today}`)
-  lastStuckDigestDate = today
   logInfo(`scheduler: stuck digest sent (${rows.length} tasks)`)
 }
 

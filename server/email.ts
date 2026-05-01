@@ -1,4 +1,5 @@
 import { Resend } from 'resend'
+import { pool } from './db'
 
 const apiKey = process.env.RESEND_API_KEY
 const resend = apiKey ? new Resend(apiKey) : null
@@ -6,7 +7,33 @@ const resend = apiKey ? new Resend(apiKey) : null
 const FROM = process.env.MAIL_FROM || 'Slate <slate@strawhutmedia.com>'
 const ADMIN_EMAIL = process.env.ADMIN_EMAIL || 'ryan@strawhutmedia.com'
 
-const recentAdminAlerts = new Map<string, number>()
+// Persistent admin-alert dedupe via the sent_admin_alerts table. An
+// in-memory Map would reset on every Railway redeploy and re-send the
+// same daily digest each boot.
+async function shouldSendAdminAlert(key: string, withinMinutes: number): Promise<boolean> {
+  try {
+    const { rows } = await pool.query<{ last_sent_at: string }>(
+      `SELECT last_sent_at FROM sent_admin_alerts WHERE key = $1`,
+      [key],
+    )
+    if (rows.length > 0) {
+      const last = new Date(rows[0].last_sent_at).getTime()
+      if (Date.now() - last < withinMinutes * 60 * 1000) return false
+    }
+    await pool.query(
+      `INSERT INTO sent_admin_alerts (key, last_sent_at)
+       VALUES ($1, now())
+       ON CONFLICT (key) DO UPDATE SET last_sent_at = now()`,
+      [key],
+    )
+    return true
+  } catch (err) {
+    // If dedupe DB call fails, fail open (send the email) rather than
+    // silently dropping a real alert.
+    console.error('[slate] shouldSendAdminAlert query failed; sending anyway', err)
+    return true
+  }
+}
 
 export async function sendAdminAlert(subject: string, body: string, key?: string) {
   if (!resend) {
@@ -14,10 +41,11 @@ export async function sendAdminAlert(subject: string, body: string, key?: string
     return
   }
   if (key) {
-    const last = recentAdminAlerts.get(key)
-    const now = Date.now()
-    if (last && now - last < 60 * 60 * 1000) return
-    recentAdminAlerts.set(key, now)
+    // Daily digests use date-suffixed keys (e.g. stuck-digest-2026-04-30)
+    // so a 24-hour window is appropriate; per-error keys want 1 hour.
+    const isDigest = key.includes('digest')
+    const ok = await shouldSendAdminAlert(key, isDigest ? 24 * 60 : 60)
+    if (!ok) return
   }
   try {
     await resend.emails.send({
