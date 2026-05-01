@@ -256,12 +256,14 @@ projectsRouter.patch('/:id', async (req, res) => {
     values.push(v || null)
   }
   if (defaultOwners && typeof defaultOwners === 'object') {
-    // Whitelist: music workflow stage keys + film role keys
+    // Whitelist: music stage keys + film role keys + podcast role keys
     const allowed = [
       // Music
       'writing', 'tracking', 'overdubs', 'producing', 'stems', 'mixing', 'mastering',
       // Film
       'writer', 'producer', 'director', 'asst_director', 'editor',
+      // Podcast (note: 'producer' and 'editor' are shared with film)
+      'project_manager', 'executive_producer',
     ]
     const cleaned: Record<string, string> = {}
     for (const k of allowed) {

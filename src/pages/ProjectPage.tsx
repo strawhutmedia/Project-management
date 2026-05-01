@@ -190,7 +190,8 @@ export default function ProjectPage() {
         />
       )}
 
-      {isAdmin && project.kind !== 'film' && <ProjectRolesSection project={project} members={members} onSaved={reload} />}
+      {isAdmin && project.kind === 'album' && <ProjectRolesSection project={project} members={members} onSaved={reload} />}
+      {isAdmin && project.kind === 'podcast' && <PodcastTeamSection project={project} members={members} onSaved={reload} />}
       {isAdmin && project.kind === 'film' && <FilmTeamSection project={project} members={members} onSaved={reload} />}
 
       {project.kind === 'film' && (
@@ -301,6 +302,15 @@ const FILM_ROLES: Array<{ key: string; label: string; icon: string }> = [
   { key: 'editor',        label: 'Editor',             icon: '✂️' },
 ]
 
+// Podcast team — four canonical podcast roles. Same default_owners JSON
+// store as film/album, with non-overlapping keys.
+const PODCAST_ROLES: Array<{ key: string; label: string; icon: string }> = [
+  { key: 'project_manager',    label: 'Project Manager',    icon: '🗂️' },
+  { key: 'producer',           label: 'Producer',           icon: '🎙️' },
+  { key: 'editor',             label: 'Editor',             icon: '✂️' },
+  { key: 'executive_producer', label: 'Executive Producer', icon: '⭐' },
+]
+
 function FilmTeamSection({
   project,
   members,
@@ -338,6 +348,68 @@ function FilmTeamSection({
       </div>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         {FILM_ROLES.map(({ key, label, icon }) => {
+          const owner = project.defaultOwners?.[key]
+          return (
+            <div key={key}>
+              <label className="block text-[11px] uppercase tracking-wider text-muted font-bold mb-1.5">
+                {icon} {label}
+              </label>
+              <select
+                value={owner?.id ?? ''}
+                onChange={(e) => void setRole(key, e.target.value)}
+                className="w-full rounded-xl bg-ink/40 border border-line text-text px-3 py-2.5 outline-none focus:border-stage-mastering text-sm"
+              >
+                <option value="">— Unassigned —</option>
+                {members.map((m) => (
+                  <option key={m.id} value={m.id}>
+                    {m.display_name || m.name}
+                    {m.role === 'admin' ? ' (admin)' : ''}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )
+        })}
+      </div>
+    </section>
+  )
+}
+
+function PodcastTeamSection({
+  project,
+  members,
+  onSaved,
+}: {
+  project: ApiProject
+  members: ApiMember[]
+  onSaved: () => void | Promise<void>
+}) {
+  async function setRole(key: string, userId: string) {
+    const next: Record<string, string> = {}
+    for (const [k, owner] of Object.entries(project.defaultOwners ?? {})) {
+      if (owner) next[k] = owner.id
+    }
+    if (userId) next[key] = userId
+    else delete next[key]
+    await api.updateProject(project.id, { defaultOwners: next })
+    await onSaved()
+  }
+
+  return (
+    <section className="rounded-2xl border border-line bg-panel/60 p-6">
+      <div className="flex items-start justify-between gap-3 mb-4">
+        <div>
+          <h2 className="text-[11px] uppercase tracking-[0.2em] text-muted font-bold">
+            🎙️ Podcast Team
+          </h2>
+          <p className="text-[11px] text-muted/80 mt-1">
+            Core team for this podcast. Add anyone else as a project member;
+            this is just the primary contact per role.
+          </p>
+        </div>
+      </div>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        {PODCAST_ROLES.map(({ key, label, icon }) => {
           const owner = project.defaultOwners?.[key]
           return (
             <div key={key}>
