@@ -1,9 +1,9 @@
 {
   "version": "0.2.2",
-  "now": "2026-05-01T17:05:56.260Z",
+  "now": "2026-05-01T18:02:45.680Z",
   "boot": {
-    "startedAt": "2026-05-01T17:05:56.077Z",
-    "completedAt": "2026-05-01T17:05:56.252Z",
+    "startedAt": "2026-05-01T18:02:45.196Z",
+    "completedAt": "2026-05-01T18:02:45.655Z",
     "error": null
   },
   "env": {
@@ -48,7 +48,8 @@
       "016_stripboard.sql",
       "017_film_phase.sql",
       "018_transcripts.sql",
-      "019_sent_admin_alerts.sql"
+      "019_sent_admin_alerts.sql",
+      "020_user_viewer_role.sql"
     ],
     "userCount": 8,
     "projectCount": 3
@@ -56,7 +57,7 @@
   "recentLog": [
     {
       "level": "info",
-      "ts": "2026-05-01T17:05:56.073Z",
+      "ts": "2026-05-01T18:02:45.193Z",
       "msg": "serving client from",
       "data": {
         "clientDir": "/app/dist"
@@ -64,7 +65,7 @@
     },
     {
       "level": "info",
-      "ts": "2026-05-01T17:05:56.077Z",
+      "ts": "2026-05-01T18:02:45.196Z",
       "msg": "boot starting",
       "data": {
         "cwd": "/app",
@@ -75,12 +76,12 @@
     },
     {
       "level": "info",
-      "ts": "2026-05-01T17:05:56.170Z",
+      "ts": "2026-05-01T18:02:45.420Z",
       "msg": "migrations complete"
     },
     {
       "level": "info",
-      "ts": "2026-05-01T17:05:56.237Z",
+      "ts": "2026-05-01T18:02:45.638Z",
       "msg": "BIYA seed: project already exists, ensured shoot days",
       "data": {
         "projectId": "12f53ed1-c6c7-4c11-8d7b-06d91744c9af"
@@ -88,20 +89,12 @@
     },
     {
       "level": "info",
-      "ts": "2026-05-01T17:05:56.247Z",
-      "msg": "podcast: backfilled executive_producer = admin",
-      "data": {
-        "projectId": "7116902a-ca1e-43ef-9eeb-e54f669cedd6"
-      }
-    },
-    {
-      "level": "info",
-      "ts": "2026-05-01T17:05:56.252Z",
+      "ts": "2026-05-01T18:02:45.655Z",
       "msg": "listening on :8080"
     },
     {
       "level": "info",
-      "ts": "2026-05-01T17:05:56.252Z",
+      "ts": "2026-05-01T18:02:45.656Z",
       "msg": "scheduler started (every 5 min)"
     }
   ]
