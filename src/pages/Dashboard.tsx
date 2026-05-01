@@ -34,7 +34,7 @@ export default function Dashboard() {
       <section>
         <h1 className="font-display text-6xl mb-2 text-rainbow">Projects</h1>
         <p className="text-muted text-sm max-w-xl">
-          Albums, podcast seasons, and films in production at Straw Hut Media. Color tells you
+          Albums, podcasts, and films in production at Straw Hut Media. Color tells you
           where each track stands.
         </p>
       </section>
@@ -84,7 +84,7 @@ export default function Dashboard() {
             className="rounded-3xl border-2 border-dashed border-line/70 bg-panel/20 p-6 text-left text-muted hover:text-text hover:border-stage-mastering/50 transition"
           >
             <div className="text-[10px] uppercase tracking-[0.3em] mb-1 font-bold">+ New project</div>
-            <div className="text-sm">Album, podcast season, or film.</div>
+            <div className="text-sm">Album, podcast, or film.</div>
           </button>
         </section>
       )}
