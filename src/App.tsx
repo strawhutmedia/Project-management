@@ -5,6 +5,7 @@ import ProjectPage from './pages/ProjectPage'
 import SongPage from './pages/SongPage'
 import StripboardPage from './pages/StripboardPage'
 import TranscriptPage from './pages/TranscriptPage'
+import TranscriptsLibraryPage from './pages/TranscriptsLibraryPage'
 import Login from './pages/Login'
 import Verify from './pages/Verify'
 import Profile from './pages/Profile'
@@ -40,6 +41,7 @@ export default function App() {
           <Route path="settings" element={<Settings />} />
           <Route path="projects/:projectId" element={<ProjectPage />} />
           <Route path="projects/:projectId/stripboard" element={<StripboardPage />} />
+          <Route path="projects/:projectId/transcripts" element={<TranscriptsLibraryPage />} />
           <Route path="projects/:projectId/transcripts/:transcriptId" element={<TranscriptPage />} />
           <Route path="projects/:projectId/songs/:songId" element={<SongPage />} />
         </Route>

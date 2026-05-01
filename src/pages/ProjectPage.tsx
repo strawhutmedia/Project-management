@@ -7,7 +7,6 @@ import StageDistribution from '../components/StageDistribution'
 import InlineEdit from '../components/InlineEdit'
 import DropboxFolderPicker from '../components/DropboxFolderPicker'
 import BudgetSection from '../components/BudgetSection'
-import TranscriptsSection from '../components/TranscriptsSection'
 import ProjectMembersSection from '../components/ProjectMembersSection'
 import FilmPhaseBar, { type FilmPhase } from '../components/FilmPhaseBar'
 import { useAuth } from '../auth'
@@ -219,7 +218,23 @@ export default function ProjectPage() {
 
       {project.kind === 'film' && <BudgetSection projectId={project.id} isAdmin={isAdmin} />}
 
-      {project.kind === 'podcast' && <TranscriptsSection projectId={project.id} isAdmin={isAdmin} />}
+      {project.kind === 'podcast' && (
+        <Link
+          to={`/projects/${project.id}/transcripts`}
+          className="block rounded-2xl border border-line bg-panel/60 p-5 hover:border-stage-mastering/60 hover:bg-panel transition group"
+        >
+          <div className="flex items-center justify-between gap-3">
+            <div className="min-w-0">
+              <div className="text-[11px] uppercase tracking-[0.2em] text-muted font-bold">📝 Transcripts</div>
+              <div className="text-sm font-bold mt-1 text-text">All transcriptions across episodes →</div>
+              <div className="text-[11px] text-muted/80 mt-0.5">
+                Per-episode transcripts live on each episode page · this is the project-wide library
+              </div>
+            </div>
+            <span className="text-2xl text-muted group-hover:text-stage-mastering transition shrink-0">›</span>
+          </div>
+        </Link>
+      )}
 
       {showRootPicker && (
         <DropboxFolderPicker

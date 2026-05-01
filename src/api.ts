@@ -38,6 +38,7 @@ export type ApiSongDetail = {
   id: string
   projectId: string
   projectName: string
+  projectKind: 'album' | 'podcast' | 'film'
   projectRoot: string | null
   projectStageLabels?: Partial<Record<Stage, { label?: string; icon?: string }>>
   title: string

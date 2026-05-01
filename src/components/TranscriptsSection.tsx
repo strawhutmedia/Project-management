@@ -1,4 +1,6 @@
-// Podcast project sidebar: list transcripts, start a new one, link to editor.
+// Episode-level transcripts panel. Each transcript belongs to a specific
+// episode (song); the project-level page just shows a read-only digest
+// of every transcript across the project, linking back to the episode.
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { api, type ApiTranscript } from '../api'
@@ -6,9 +8,11 @@ import DropboxFilePicker from './DropboxFilePicker'
 
 export default function TranscriptsSection({
   projectId,
+  songId,
   isAdmin,
 }: {
   projectId: string
+  songId?: string
   isAdmin: boolean
 }) {
   const [transcripts, setTranscripts] = useState<ApiTranscript[] | null>(null)
@@ -19,16 +23,14 @@ export default function TranscriptsSection({
   async function load() {
     try {
       const { transcripts } = await api.transcripts(projectId)
-      setTranscripts(transcripts)
+      // Filter to this episode only if a songId is provided.
+      setTranscripts(songId ? transcripts.filter((t) => t.songId === songId) : transcripts)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'failed')
     }
   }
 
-  useEffect(() => {
-    void load()
-    // Poll every 5s if any transcript is still processing
-  }, [projectId])
+  useEffect(() => { void load() }, [projectId, songId])
 
   // Refresh while any transcript is queued/transcribing
   useEffect(() => {
@@ -48,7 +50,7 @@ export default function TranscriptsSection({
     setStarting(true)
     setError(null)
     try {
-      await api.startTranscript({ projectId, dropboxPath: path })
+      await api.startTranscript({ projectId, songId, dropboxPath: path })
       await load()
     } catch (err) {
       setError(err instanceof Error ? err.message : 'failed to start transcription')
@@ -76,7 +78,7 @@ export default function TranscriptsSection({
             Pick a media file from Dropbox · auto-transcribed via Deepgram · edit + export SRT.
           </p>
         </div>
-        {isAdmin && (
+        {isAdmin && songId && (
           <button
             onClick={() => setPicking(true)}
             disabled={starting}
@@ -93,7 +95,9 @@ export default function TranscriptsSection({
         <p className="text-muted text-sm">Loading…</p>
       ) : transcripts.length === 0 ? (
         <p className="text-muted/70 text-sm italic py-4 text-center border border-dashed border-line/60 rounded-xl">
-          No transcripts yet. Tap "+ New transcription" to pick a Dropbox file.
+          {songId
+            ? 'No transcripts for this episode yet. Tap "+ New transcription".'
+            : 'No transcripts yet. Open an episode to start one.'}
         </p>
       ) : (
         <div className="space-y-2">

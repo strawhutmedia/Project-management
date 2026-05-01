@@ -7,6 +7,7 @@ import InlineEdit from '../components/InlineEdit'
 import AddLinkModal from '../components/AddLinkModal'
 import MentionInput, { renderWithMentions } from '../components/MentionInput'
 import DueDateChip from '../components/DueDateChip'
+import TranscriptsSection from '../components/TranscriptsSection'
 import { useAuth } from '../auth'
 
 export default function SongPage() {
@@ -160,6 +161,9 @@ export default function SongPage() {
         <div className="lg:col-span-2 space-y-5">
           <PeoplePanel song={song} members={members} onChange={reload} />
           <TasksPanel song={song} members={members} onChange={reload} />
+          {song.projectKind === 'podcast' && (
+            <TranscriptsSection projectId={song.projectId} songId={song.id} isAdmin={user?.role === 'admin'} />
+          )}
           <CommentsPanel song={song} members={members} onChange={reload} userId={user?.id ?? ''} userRole={user?.role ?? 'user'} />
         </div>
         <aside className="space-y-5">
