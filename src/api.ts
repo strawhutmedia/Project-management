@@ -13,7 +13,7 @@ export type ApiUser = {
   email: string
   name: string
   display_name: string | null
-  role: 'admin' | 'user'
+  role: 'admin' | 'user' | 'viewer'
   timezone: string
 }
 
@@ -60,7 +60,7 @@ export type ApiMember = {
   email: string
   name: string
   display_name: string | null
-  role: 'admin' | 'user'
+  role: 'admin' | 'user' | 'viewer'
 }
 
 export type ApiNotification = {
@@ -104,7 +104,7 @@ export type ApiAdminUser = {
   email: string | null
   name: string
   display_name: string | null
-  role: 'admin' | 'user'
+  role: 'admin' | 'user' | 'viewer'
   timezone: string
   created_at: string
   projects: Array<{ id: string; name: string }>
@@ -351,14 +351,14 @@ export const api = {
     email: string
     name: string
     displayName?: string
-    role?: 'admin' | 'user'
+    role?: 'admin' | 'user' | 'viewer'
     timezone?: string
     projectIds?: string[]
     songIds?: string[]
   }) => request<{ user: ApiAdminUser }>('/api/admin/users', { method: 'POST', body: JSON.stringify(body) }),
   adminDeleteUser: (id: string) =>
     request<{ ok: true }>(`/api/admin/users/${id}`, { method: 'DELETE' }),
-  adminUpdateUser: (id: string, patch: { displayName?: string; name?: string; role?: 'admin' | 'user'; timezone?: string; email?: string }) =>
+  adminUpdateUser: (id: string, patch: { displayName?: string; name?: string; role?: 'admin' | 'user' | 'viewer'; timezone?: string; email?: string }) =>
     request<{ ok: true }>(`/api/admin/users/${id}`, { method: 'PATCH', body: JSON.stringify(patch) }),
   adminGrantProject: (userId: string, projectId: string) =>
     request<{ ok: true }>(`/api/admin/users/${userId}/projects/${projectId}`, { method: 'POST' }),

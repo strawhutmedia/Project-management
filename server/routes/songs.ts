@@ -1,10 +1,10 @@
 import { Router } from 'express'
 import { pool } from '../db'
-import { requireUser, type SessionUser } from '../auth'
+import { requireUser, blockViewerWrites, type SessionUser } from '../auth'
 import { findMentionedUsers, notify } from '../notifications'
 
 export const songsRouter = Router()
-songsRouter.use(requireUser)
+songsRouter.use(requireUser, blockViewerWrites)
 
 const STAGES = new Set([
   'writing',

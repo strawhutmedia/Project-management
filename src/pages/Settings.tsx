@@ -174,13 +174,17 @@ function UsersSection({ currentUserId }: { currentUserId: string }) {
                 <div className="flex-1 min-w-0">
                   <div className="flex items-baseline gap-2 flex-wrap">
                     <span className="font-bold">{u.display_name || u.name}</span>
-                    {u.role === 'admin' && (
-                      <span className="text-[10px] uppercase tracking-wider text-stage-mastering bg-stage-mastering/10 border border-stage-mastering/40 rounded-full px-2 py-0.5 font-bold">
-                        Admin
-                      </span>
-                    )}
-                    {u.id === currentUserId && (
-                      <span className="text-[10px] uppercase tracking-wider text-muted">(you)</span>
+                    {u.id === currentUserId ? (
+                      <>
+                        {u.role === 'admin' && (
+                          <span className="text-[10px] uppercase tracking-wider text-stage-mastering bg-stage-mastering/10 border border-stage-mastering/40 rounded-full px-2 py-0.5 font-bold">
+                            Admin
+                          </span>
+                        )}
+                        <span className="text-[10px] uppercase tracking-wider text-muted">(you)</span>
+                      </>
+                    ) : (
+                      <RoleSelect user={u} onSaved={load} />
                     )}
                   </div>
                   <div className="text-[11px] text-muted flex items-center gap-2 flex-wrap">
@@ -241,6 +245,38 @@ function UsersSection({ currentUserId }: { currentUserId: string }) {
         />
       )}
     </section>
+  )
+}
+
+function RoleSelect({ user, onSaved }: { user: ApiAdminUser; onSaved: () => void | Promise<void> }) {
+  const [busy, setBusy] = useState(false)
+  async function change(next: 'admin' | 'user' | 'viewer') {
+    if (next === user.role) return
+    if (next === 'admin' && !confirm(`Make ${user.display_name || user.name} an admin? They'll get full control of all projects.`)) return
+    setBusy(true)
+    try {
+      await api.adminUpdateUser(user.id, { role: next })
+      await onSaved()
+    } finally {
+      setBusy(false)
+    }
+  }
+  const styleByRole: Record<string, string> = {
+    admin: 'text-stage-mastering bg-stage-mastering/10 border-stage-mastering/40',
+    user: 'text-text bg-ink/30 border-line',
+    viewer: 'text-stage-stems bg-stage-stems/10 border-stage-stems/40',
+  }
+  return (
+    <select
+      value={user.role}
+      disabled={busy}
+      onChange={(e) => void change(e.target.value as 'admin' | 'user' | 'viewer')}
+      className={`text-[10px] uppercase tracking-wider font-bold rounded-full px-2 py-0.5 border outline-none ${styleByRole[user.role]}`}
+    >
+      <option value="admin">Admin</option>
+      <option value="user">User</option>
+      <option value="viewer">Viewer</option>
+    </select>
   )
 }
 
@@ -319,7 +355,7 @@ function InviteModal({
   const [email, setEmail] = useState('')
   const [name, setName] = useState('')
   const [displayName, setDisplayName] = useState('')
-  const [role, setRole] = useState<'admin' | 'user'>('user')
+  const [role, setRole] = useState<'admin' | 'user' | 'viewer'>('user')
   const [timezone, setTimezone] = useState('America/Los_Angeles')
   const [accessByProject, setAccessByProject] = useState<Record<string, { mode: 'none' | 'full' | 'songs'; songIds: Set<string> }>>(
     () => {
@@ -418,11 +454,12 @@ function InviteModal({
             <Field label="Role">
               <select
                 value={role}
-                onChange={(e) => setRole(e.target.value as 'admin' | 'user')}
+                onChange={(e) => setRole(e.target.value as 'admin' | 'user' | 'viewer')}
                 className="w-full rounded-xl bg-ink/40 border border-line text-text px-3 py-2.5 outline-none focus:border-stage-mastering text-sm"
               >
-                <option value="user">User</option>
-                <option value="admin">Admin</option>
+                <option value="user">User — can edit</option>
+                <option value="viewer">Viewer — read only</option>
+                <option value="admin">Admin — full control</option>
               </select>
             </Field>
             <Field label="Timezone">

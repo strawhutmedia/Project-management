@@ -133,7 +133,7 @@ export type User = {
   id: string
   name: string
   email: string
-  role: 'admin' | 'user'
+  role: 'admin' | 'user' | 'viewer'
   timezone: string
 }
 

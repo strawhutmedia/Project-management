@@ -26,6 +26,14 @@ export default function Layout() {
                 Admin
               </span>
             )}
+            {user?.role === 'viewer' && (
+              <span
+                title="Read-only account — you can browse but not make changes."
+                className="inline-flex items-center gap-1.5 text-[11px] uppercase tracking-wider text-stage-stems bg-stage-stems/10 border border-stage-stems/40 rounded-full px-2.5 py-1 font-bold"
+              >
+                👀 Read-only
+              </span>
+            )}
 
             <NotificationsBell />
 

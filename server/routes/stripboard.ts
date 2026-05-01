@@ -1,11 +1,11 @@
 import { Router } from 'express'
 import { pool } from '../db'
-import { requireUser, type SessionUser } from '../auth'
+import { requireUser, blockViewerWrites, type SessionUser } from '../auth'
 import { parseFdx } from '../fdx_parser'
 import { applyBackInYourArmsSchedule } from '../seeds/back_in_your_arms'
 
 export const stripboardRouter = Router()
-stripboardRouter.use(requireUser)
+stripboardRouter.use(requireUser, blockViewerWrites)
 
 async function userCanAccessProject(userId: string, role: string, projectId: string): Promise<boolean> {
   if (role === 'admin') return true

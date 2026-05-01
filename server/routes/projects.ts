@@ -1,6 +1,6 @@
 import { Router } from 'express'
 import { pool } from '../db'
-import { requireUser, type SessionUser } from '../auth'
+import { requireUser, blockViewerWrites, type SessionUser } from '../auth'
 import { logInfo, logError } from '../diag'
 
 // Look up the admin user (Ryan) by ADMIN_EMAIL so we can auto-assign
@@ -42,7 +42,7 @@ export async function ensureRyanIsPodcastEp(): Promise<void> {
 
 export const projectsRouter = Router()
 
-projectsRouter.use(requireUser)
+projectsRouter.use(requireUser, blockViewerWrites)
 
 projectsRouter.get('/', async (req, res) => {
   const user = (req as typeof req & { user: SessionUser }).user

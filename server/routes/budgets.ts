@@ -1,11 +1,11 @@
 import { Router } from 'express'
 import { pool } from '../db'
-import { requireUser, type SessionUser } from '../auth'
+import { requireUser, blockViewerWrites, type SessionUser } from '../auth'
 import { STUDIOBINDER_ACCOUNTS } from '../budget_template'
 import { logInfo } from '../diag'
 
 export const budgetsRouter = Router()
-budgetsRouter.use(requireUser)
+budgetsRouter.use(requireUser, blockViewerWrites)
 
 async function userCanAccessProject(userId: string, role: string, projectId: string): Promise<boolean> {
   if (role === 'admin') return true

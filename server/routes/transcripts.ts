@@ -14,13 +14,13 @@
 // to free up the HTTP connection.
 import { Router } from 'express'
 import { pool } from '../db'
-import { requireUser, type SessionUser } from '../auth'
+import { requireUser, blockViewerWrites, type SessionUser } from '../auth'
 import { getFileMetadata, getTemporaryLink } from '../dropbox'
 import { hasDeepgramKey, paragraphsToBlocks, transcribeUrl, type EditedBlock } from '../deepgram'
 import { logError, logInfo } from '../diag'
 
 export const transcriptsRouter = Router()
-transcriptsRouter.use(requireUser)
+transcriptsRouter.use(requireUser, blockViewerWrites)
 
 const MAX_FILE_BYTES = 2 * 1024 * 1024 * 1024 // 2 GB
 

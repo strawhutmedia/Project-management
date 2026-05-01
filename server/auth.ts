@@ -9,13 +9,35 @@ export function makeToken(bytes = 32): string {
   return crypto.randomBytes(bytes).toString('base64url')
 }
 
+export type UserRole = 'admin' | 'user' | 'viewer'
+
 export type SessionUser = {
   id: string
   email: string
   name: string
   display_name: string | null
-  role: 'admin' | 'user'
+  role: UserRole
   timezone: string
+}
+
+// Convenience: returns true for viewer accounts (read-only). Used by
+// any route that allows non-admin writes — songs, tasks, comments,
+// transcripts, budget edits, stripboard moves, etc.
+export function isViewer(user: { role: UserRole }): boolean {
+  return user.role === 'viewer'
+}
+
+// Router-level middleware: blocks viewer accounts from any write request
+// (POST/PATCH/PUT/DELETE) on the router it's attached to. Reads are
+// always allowed. Mount AFTER requireUser so req.user is populated.
+export function blockViewerWrites(req: Request, res: Response, next: NextFunction) {
+  const u = (req as Request & { user?: SessionUser }).user
+  if (!u) { next(); return } // requireUser will have rejected already
+  if (!isViewer(u)) { next(); return }
+  if (req.method === 'GET' || req.method === 'HEAD' || req.method === 'OPTIONS') {
+    next(); return
+  }
+  res.status(403).json({ error: 'read_only' })
 }
 
 export async function createSession(userId: string): Promise<string> {
