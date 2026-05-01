@@ -157,6 +157,35 @@ export type ApiBudget = {
   accounts: ApiBudgetAccount[]
 }
 
+export type ApiTranscriptBlock = {
+  id: string
+  speaker: string
+  start: number
+  end: number
+  text: string
+  words: Array<{ word: string; start: number; end: number }>
+}
+
+export type ApiTranscript = {
+  id: string
+  projectId: string
+  songId: string | null
+  dropboxPath: string
+  fileName: string
+  fileSizeBytes: number | null
+  durationSeconds: number | null
+  status: 'queued' | 'transcribing' | 'done' | 'failed'
+  language: string
+  startOffsetMs: number
+  frameRate: number
+  dropFrame: boolean
+  error: string | null
+  createdAt: string
+  updatedAt: string
+  // Only present in single-transcript responses, not list responses
+  editedBlocks?: ApiTranscriptBlock[]
+}
+
 export type ApiShootDay = {
   id: string
   number: number
@@ -415,6 +444,30 @@ export const api = {
       `/api/stripboard/projects/${projectId}/apply-biya-schedule`,
       { method: 'POST' },
     ),
+  // Transcripts
+  transcripts: (projectId: string) =>
+    request<{ transcripts: ApiTranscript[] }>(`/api/transcripts?projectId=${projectId}`),
+  transcript: (id: string) =>
+    request<{ transcript: ApiTranscript }>(`/api/transcripts/${id}`),
+  startTranscript: (body: { projectId: string; dropboxPath: string; songId?: string | null; language?: string }) =>
+    request<{ transcript: ApiTranscript }>('/api/transcripts', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+  updateTranscript: (id: string, patch: {
+    editedBlocks?: ApiTranscriptBlock[]
+    startOffsetMs?: number
+    frameRate?: number
+    dropFrame?: boolean
+  }) =>
+    request<{ transcript: ApiTranscript }>(`/api/transcripts/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(patch),
+    }),
+  deleteTranscript: (id: string) =>
+    request<{ ok: true }>(`/api/transcripts/${id}`, { method: 'DELETE' }),
+  transcriptSrtUrl: (id: string) => `/api/transcripts/${id}/srt`,
+
   // Notifications
   notifications: () => request<{ notifications: ApiNotification[]; unreadCount: number }>('/api/notifications'),
   notificationRead: (id: string) =>

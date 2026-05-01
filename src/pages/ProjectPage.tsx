@@ -7,6 +7,7 @@ import StageDistribution from '../components/StageDistribution'
 import InlineEdit from '../components/InlineEdit'
 import DropboxFolderPicker from '../components/DropboxFolderPicker'
 import BudgetSection from '../components/BudgetSection'
+import TranscriptsSection from '../components/TranscriptsSection'
 import FilmPhaseBar, { type FilmPhase } from '../components/FilmPhaseBar'
 import { useAuth } from '../auth'
 
@@ -211,6 +212,8 @@ export default function ProjectPage() {
       )}
 
       {project.kind === 'film' && <BudgetSection projectId={project.id} isAdmin={isAdmin} />}
+
+      {project.kind === 'podcast' && <TranscriptsSection projectId={project.id} isAdmin={isAdmin} />}
 
       {showRootPicker && (
         <DropboxFolderPicker

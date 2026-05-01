@@ -387,6 +387,37 @@ export async function createSharedLink(filePath: string): Promise<{ ok: boolean;
   return { ok: false, error: `dropbox_${res.status}: ${text.slice(0, 200)}` }
 }
 
+// File metadata — used to size-check before submitting to Deepgram so we
+// can refuse files that exceed our 2GB cap with a clear error.
+export async function getFileMetadata(filePath: string): Promise<{
+  ok: boolean
+  size?: number
+  name?: string
+  modified?: string
+  error?: string
+}> {
+  await ensureRootNamespace()
+  const headers = await buildHeaders({ 'Content-Type': 'application/json' })
+  if (!headers) return { ok: false, error: 'not_connected' }
+  const res = await fetch(`${DROPBOX_API}/files/get_metadata`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({ path: filePath, include_deleted: false }),
+  })
+  if (!res.ok) {
+    const text = await res.text()
+    return { ok: false, error: `dropbox_${res.status}: ${text.slice(0, 200)}` }
+  }
+  const data = (await res.json()) as {
+    '.tag': 'file' | 'folder'
+    name: string
+    size?: number
+    server_modified?: string
+  }
+  if (data['.tag'] !== 'file') return { ok: false, error: 'not_a_file' }
+  return { ok: true, size: data.size, name: data.name, modified: data.server_modified }
+}
+
 export async function getCurrentAccount(): Promise<{ ok: boolean; name?: string; email?: string; error?: string }> {
   const token = await getValidAccessToken()
   if (!token) return { ok: false, error: 'not_connected' }

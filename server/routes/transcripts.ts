@@ -1,0 +1,310 @@
+// Transcript REST endpoints.
+//
+//   POST   /api/transcripts                 → start a new transcription
+//   GET    /api/transcripts?projectId=…     → list for a project
+//   GET    /api/transcripts/:id             → single (with edited_blocks)
+//   PATCH  /api/transcripts/:id             → save edits / settings
+//   DELETE /api/transcripts/:id             → remove
+//   GET    /api/transcripts/:id/srt         → export SRT
+//
+// Phase 1: synchronous Deepgram call from the POST route (Deepgram's
+// pre-recorded API blocks until the result is ready, typically <2 min for
+// a 1-hour file). Status flips queued → transcribing → done|failed in one
+// request. A future phase can move this to a background worker if we want
+// to free up the HTTP connection.
+import { Router } from 'express'
+import { pool } from '../db'
+import { requireUser, type SessionUser } from '../auth'
+import { getFileMetadata, getTemporaryLink } from '../dropbox'
+import { hasDeepgramKey, paragraphsToBlocks, transcribeUrl, type EditedBlock } from '../deepgram'
+import { logError, logInfo } from '../diag'
+
+export const transcriptsRouter = Router()
+transcriptsRouter.use(requireUser)
+
+const MAX_FILE_BYTES = 2 * 1024 * 1024 * 1024 // 2 GB
+
+async function userCanAccessProject(userId: string, role: string, projectId: string): Promise<boolean> {
+  if (role === 'admin') return true
+  const { rows } = await pool.query(
+    `SELECT 1 FROM projects p
+       LEFT JOIN project_members m ON m.project_id = p.id AND m.user_id = $1
+      WHERE p.id = $2 AND (p.created_by = $1 OR m.user_id IS NOT NULL) LIMIT 1`,
+    [userId, projectId],
+  )
+  return rows.length > 0
+}
+
+type TranscriptRow = {
+  id: string
+  project_id: string
+  song_id: string | null
+  dropbox_path: string
+  file_name: string
+  file_size_bytes: string | null
+  duration_seconds: string | null
+  status: 'queued' | 'transcribing' | 'done' | 'failed'
+  deepgram_request_id: string | null
+  language: string
+  raw_json: unknown
+  edited_blocks: EditedBlock[] | null
+  start_offset_ms: number
+  frame_rate: string
+  drop_frame: boolean
+  error: string | null
+  created_by: string | null
+  created_at: string
+  updated_at: string
+}
+
+function rowToApi(row: TranscriptRow, includeBlocks = false) {
+  const out: Record<string, unknown> = {
+    id: row.id,
+    projectId: row.project_id,
+    songId: row.song_id,
+    dropboxPath: row.dropbox_path,
+    fileName: row.file_name,
+    fileSizeBytes: row.file_size_bytes ? Number(row.file_size_bytes) : null,
+    durationSeconds: row.duration_seconds ? Number(row.duration_seconds) : null,
+    status: row.status,
+    language: row.language,
+    startOffsetMs: row.start_offset_ms,
+    frameRate: Number(row.frame_rate),
+    dropFrame: row.drop_frame,
+    error: row.error,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  }
+  if (includeBlocks) out.editedBlocks = row.edited_blocks ?? []
+  return out
+}
+
+// LIST
+transcriptsRouter.get('/', async (req, res) => {
+  const user = (req as typeof req & { user: SessionUser }).user
+  const projectId = String(req.query.projectId || '')
+  if (!projectId) {
+    res.status(400).json({ error: 'projectId required' }); return
+  }
+  if (!(await userCanAccessProject(user.id, user.role, projectId))) {
+    res.status(403).json({ error: 'forbidden' }); return
+  }
+  const { rows } = await pool.query<TranscriptRow>(
+    `SELECT * FROM transcripts WHERE project_id = $1 ORDER BY created_at DESC`,
+    [projectId],
+  )
+  res.json({ transcripts: rows.map((r) => rowToApi(r)) })
+})
+
+// READ ONE
+transcriptsRouter.get('/:id', async (req, res) => {
+  const user = (req as typeof req & { user: SessionUser }).user
+  const { rows } = await pool.query<TranscriptRow>(
+    `SELECT * FROM transcripts WHERE id = $1`,
+    [req.params.id],
+  )
+  if (rows.length === 0) { res.status(404).json({ error: 'not_found' }); return }
+  if (!(await userCanAccessProject(user.id, user.role, rows[0].project_id))) {
+    res.status(403).json({ error: 'forbidden' }); return
+  }
+  res.json({ transcript: rowToApi(rows[0], true) })
+})
+
+// CREATE — kicks off transcription. Body: { projectId, dropboxPath, songId?, language? }
+transcriptsRouter.post('/', async (req, res) => {
+  const user = (req as typeof req & { user: SessionUser }).user
+  const { projectId, dropboxPath, songId, language } = req.body as {
+    projectId?: string
+    dropboxPath?: string
+    songId?: string | null
+    language?: string
+  }
+  if (!projectId || !dropboxPath) {
+    res.status(400).json({ error: 'projectId and dropboxPath required' }); return
+  }
+  if (!(await userCanAccessProject(user.id, user.role, projectId))) {
+    res.status(403).json({ error: 'forbidden' }); return
+  }
+  if (!hasDeepgramKey()) {
+    res.status(503).json({ error: 'transcription_unavailable: DEEPGRAM_API_KEY not configured' }); return
+  }
+
+  // Size-check via Dropbox metadata first
+  const meta = await getFileMetadata(dropboxPath)
+  if (!meta.ok) {
+    res.status(400).json({ error: meta.error || 'dropbox_metadata_failed' }); return
+  }
+  if (meta.size && meta.size > MAX_FILE_BYTES) {
+    res.status(413).json({
+      error: `file_too_large: ${(meta.size / 1024 / 1024 / 1024).toFixed(2)}GB exceeds 2GB cap`,
+    }); return
+  }
+
+  // Insert as queued, then attempt transcription. If transcription fails
+  // the row stays so the user can see the error and retry.
+  const inserted = await pool.query<TranscriptRow>(
+    `INSERT INTO transcripts (project_id, song_id, dropbox_path, file_name, file_size_bytes, language, status, created_by)
+     VALUES ($1, $2, $3, $4, $5, $6, 'transcribing', $7)
+     RETURNING *`,
+    [projectId, songId ?? null, dropboxPath, meta.name ?? dropboxPath, meta.size ?? null, language ?? 'en', user.id],
+  )
+  const id = inserted.rows[0].id
+
+  // Respond right away; do the actual Deepgram work in the background.
+  res.json({ transcript: rowToApi(inserted.rows[0]) })
+
+  // Fire-and-forget background work. Errors are written back to the row.
+  ;(async () => {
+    try {
+      const link = await getTemporaryLink(dropboxPath)
+      if (!link.ok || !link.url) throw new Error(link.error || 'temporary_link_failed')
+      const result = await transcribeUrl(link.url, language ?? 'en')
+      const blocks = paragraphsToBlocks(result)
+      await pool.query(
+        `UPDATE transcripts
+         SET status = 'done',
+             raw_json = $2::jsonb,
+             edited_blocks = $3::jsonb,
+             deepgram_request_id = $4,
+             duration_seconds = $5,
+             updated_at = now()
+         WHERE id = $1`,
+        [id, JSON.stringify(result), JSON.stringify(blocks), result.request_id ?? null, result.duration_seconds ?? null],
+      )
+      logInfo('transcript: done', { id, duration: result.duration_seconds, blocks: blocks.length })
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err)
+      logError('transcript: failed', { id, error: msg })
+      await pool.query(
+        `UPDATE transcripts SET status = 'failed', error = $2, updated_at = now() WHERE id = $1`,
+        [id, msg],
+      )
+    }
+  })()
+})
+
+// UPDATE — patch edited_blocks and/or settings.
+transcriptsRouter.patch('/:id', async (req, res) => {
+  const user = (req as typeof req & { user: SessionUser }).user
+  const { rows: existing } = await pool.query<TranscriptRow>(
+    `SELECT * FROM transcripts WHERE id = $1`,
+    [req.params.id],
+  )
+  if (existing.length === 0) { res.status(404).json({ error: 'not_found' }); return }
+  if (!(await userCanAccessProject(user.id, user.role, existing[0].project_id))) {
+    res.status(403).json({ error: 'forbidden' }); return
+  }
+  const { editedBlocks, startOffsetMs, frameRate, dropFrame } = req.body as {
+    editedBlocks?: EditedBlock[]
+    startOffsetMs?: number
+    frameRate?: number
+    dropFrame?: boolean
+  }
+  const updates: string[] = []
+  const vals: unknown[] = []
+  let i = 1
+  if (editedBlocks !== undefined) {
+    updates.push(`edited_blocks = $${i++}::jsonb`); vals.push(JSON.stringify(editedBlocks))
+  }
+  if (startOffsetMs !== undefined) { updates.push(`start_offset_ms = $${i++}`); vals.push(startOffsetMs) }
+  if (frameRate !== undefined) { updates.push(`frame_rate = $${i++}`); vals.push(frameRate) }
+  if (dropFrame !== undefined) { updates.push(`drop_frame = $${i++}`); vals.push(dropFrame) }
+  if (updates.length === 0) { res.json({ transcript: rowToApi(existing[0], true) }); return }
+  vals.push(req.params.id)
+  const { rows } = await pool.query<TranscriptRow>(
+    `UPDATE transcripts SET ${updates.join(', ')}, updated_at = now() WHERE id = $${i} RETURNING *`,
+    vals,
+  )
+  res.json({ transcript: rowToApi(rows[0], true) })
+})
+
+// DELETE
+transcriptsRouter.delete('/:id', async (req, res) => {
+  const user = (req as typeof req & { user: SessionUser }).user
+  const { rows } = await pool.query<TranscriptRow>(
+    `SELECT project_id FROM transcripts WHERE id = $1`,
+    [req.params.id],
+  )
+  if (rows.length === 0) { res.status(404).json({ error: 'not_found' }); return }
+  if (!(await userCanAccessProject(user.id, user.role, rows[0].project_id))) {
+    res.status(403).json({ error: 'forbidden' }); return
+  }
+  await pool.query(`DELETE FROM transcripts WHERE id = $1`, [req.params.id])
+  res.json({ ok: true })
+})
+
+// SRT export. Uses edited_blocks + start_offset_ms. Splits long blocks
+// into ~42-char lines with a 7-second max duration per cue (broadcast
+// safety standard).
+transcriptsRouter.get('/:id/srt', async (req, res) => {
+  const user = (req as typeof req & { user: SessionUser }).user
+  const { rows } = await pool.query<TranscriptRow>(
+    `SELECT * FROM transcripts WHERE id = $1`,
+    [req.params.id],
+  )
+  if (rows.length === 0) { res.status(404).json({ error: 'not_found' }); return }
+  if (!(await userCanAccessProject(user.id, user.role, rows[0].project_id))) {
+    res.status(403).json({ error: 'forbidden' }); return
+  }
+  const t = rows[0]
+  const blocks = t.edited_blocks ?? []
+  const offsetSec = t.start_offset_ms / 1000
+  const srt = blocksToSrt(blocks, offsetSec)
+  const filename = `${t.file_name.replace(/\.[^.]+$/, '')}.srt`
+  res.setHeader('Content-Type', 'application/x-subrip; charset=utf-8')
+  res.setHeader('Content-Disposition', `attachment; filename="${filename}"`)
+  res.send(srt)
+})
+
+function pad(n: number, width = 2): string {
+  return String(n).padStart(width, '0')
+}
+
+function srtTimecode(totalSeconds: number): string {
+  if (totalSeconds < 0) totalSeconds = 0
+  const ms = Math.round((totalSeconds % 1) * 1000)
+  const total = Math.floor(totalSeconds)
+  const h = Math.floor(total / 3600)
+  const m = Math.floor((total % 3600) / 60)
+  const s = total % 60
+  return `${pad(h)}:${pad(m)}:${pad(s)},${pad(ms, 3)}`
+}
+
+function blocksToSrt(blocks: EditedBlock[], offsetSec: number): string {
+  let cueIndex = 1
+  const lines: string[] = []
+  for (const b of blocks) {
+    const start = b.start + offsetSec
+    const end = b.end + offsetSec
+    lines.push(String(cueIndex++))
+    lines.push(`${srtTimecode(start)} --> ${srtTimecode(end)}`)
+    // Two-line cap with ~42 chars per line (broadcast safe area)
+    const text = b.text.trim()
+    lines.push(wrapForCaption(text))
+    lines.push('')
+  }
+  return lines.join('\n')
+}
+
+function wrapForCaption(text: string, maxLen = 42, maxLines = 2): string {
+  const words = text.split(/\s+/)
+  const out: string[] = []
+  let cur = ''
+  for (const w of words) {
+    if (out.length >= maxLines) {
+      cur = cur ? `${cur} ${w}` : w
+      continue
+    }
+    if (cur.length === 0) { cur = w; continue }
+    if (`${cur} ${w}`.length <= maxLen) {
+      cur = `${cur} ${w}`
+    } else {
+      out.push(cur); cur = w
+    }
+  }
+  if (cur) {
+    if (out.length < maxLines) out.push(cur)
+    else out[out.length - 1] = `${out[out.length - 1]} ${cur}`
+  }
+  return out.join('\n')
+}

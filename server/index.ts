@@ -11,6 +11,7 @@ import { adminRouter } from './routes/admin'
 import { notificationsRouter } from './routes/notifications'
 import { budgetsRouter } from './routes/budgets'
 import { stripboardRouter } from './routes/stripboard'
+import { transcriptsRouter } from './routes/transcripts'
 import { seedBackInYourArms } from './seeds/back_in_your_arms'
 import { startScheduler } from './scheduler'
 import {
@@ -44,6 +45,7 @@ app.use('/api/admin', adminRouter)
 app.use('/api/notifications', notificationsRouter)
 app.use('/api/budgets', budgetsRouter)
 app.use('/api/stripboard', stripboardRouter)
+app.use('/api/transcripts', transcriptsRouter)
 
 const clientDir = path.resolve(process.cwd(), 'dist')
 logInfo('serving client from', { clientDir })
