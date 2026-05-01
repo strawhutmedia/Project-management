@@ -8,6 +8,7 @@ import InlineEdit from '../components/InlineEdit'
 import DropboxFolderPicker from '../components/DropboxFolderPicker'
 import BudgetSection from '../components/BudgetSection'
 import TranscriptsSection from '../components/TranscriptsSection'
+import ProjectMembersSection from '../components/ProjectMembersSection'
 import FilmPhaseBar, { type FilmPhase } from '../components/FilmPhaseBar'
 import { useAuth } from '../auth'
 
@@ -193,6 +194,10 @@ export default function ProjectPage() {
       {isAdmin && project.kind === 'album' && <ProjectRolesSection project={project} members={members} onSaved={reload} />}
       {isAdmin && project.kind === 'podcast' && <PodcastTeamSection project={project} members={members} onSaved={reload} />}
       {isAdmin && project.kind === 'film' && <FilmTeamSection project={project} members={members} onSaved={reload} />}
+
+      {isAdmin && user?.id && (
+        <ProjectMembersSection projectId={project.id} members={members} currentUserId={user.id} onChanged={reload} />
+      )}
 
       {project.kind === 'film' && (
         <Link

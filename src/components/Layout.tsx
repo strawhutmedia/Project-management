@@ -23,15 +23,7 @@ export default function Layout() {
           <div className="flex items-center gap-2">
             {user?.role === 'admin' && (
               <span className="hidden sm:inline-flex items-center gap-1.5 text-[11px] uppercase tracking-wider text-stage-mastering bg-stage-mastering/10 border border-stage-mastering/40 rounded-full px-2.5 py-1 font-bold">
-                Admin
-              </span>
-            )}
-            {user?.role === 'viewer' && (
-              <span
-                title="Read-only account — you can browse but not make changes."
-                className="inline-flex items-center gap-1.5 text-[11px] uppercase tracking-wider text-stage-stems bg-stage-stems/10 border border-stage-stems/40 rounded-full px-2.5 py-1 font-bold"
-              >
-                👀 Read-only
+                Super Admin
               </span>
             )}
 

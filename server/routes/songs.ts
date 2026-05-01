@@ -1,10 +1,11 @@
 import { Router } from 'express'
 import { pool } from '../db'
-import { requireUser, blockViewerWrites, type SessionUser } from '../auth'
+import { requireUser, type SessionUser } from '../auth'
+import { assertSongWriter } from '../permissions'
 import { findMentionedUsers, notify } from '../notifications'
 
 export const songsRouter = Router()
-songsRouter.use(requireUser, blockViewerWrites)
+songsRouter.use(requireUser)
 
 const STAGES = new Set([
   'writing',
@@ -183,10 +184,7 @@ songsRouter.get('/:id', async (req, res) => {
 songsRouter.patch('/:id', async (req, res) => {
   const user = (req as typeof req & { user: SessionUser }).user
   const songId = req.params.id
-  if (!(await userCanAccessSong(user.id, user.role, songId))) {
-    res.status(403).json({ error: 'forbidden' })
-    return
-  }
+  if (!await assertSongWriter(user, songId, res)) return
   const { stage, title, subtitle, dropboxFolder, producerId, mixerId, writerId, trackerId, overdubId, stemsId, masterId } = req.body ?? {}
   const updates: string[] = []
   const values: unknown[] = []
@@ -274,10 +272,7 @@ songsRouter.patch('/:id', async (req, res) => {
 songsRouter.post('/:id/tasks', async (req, res) => {
   const user = (req as typeof req & { user: SessionUser }).user
   const songId = req.params.id
-  if (!(await userCanAccessSong(user.id, user.role, songId))) {
-    res.status(403).json({ error: 'forbidden' })
-    return
-  }
+  if (!await assertSongWriter(user, songId, res)) return
   const { title, stage, dueAt, assigneeId } = req.body ?? {}
   if (typeof title !== 'string' || title.trim().length === 0) {
     res.status(400).json({ error: 'title_required' })
@@ -349,10 +344,7 @@ songsRouter.patch('/tasks/:taskId', async (req, res) => {
     res.status(404).json({ error: 'not_found' })
     return
   }
-  if (!(await userCanAccessSong(user.id, user.role, accessRes.rows[0].song_id))) {
-    res.status(403).json({ error: 'forbidden' })
-    return
-  }
+  if (!await assertSongWriter(user, accessRes.rows[0].song_id, res)) return
   const { title, done, dueAt, assigneeId, stage } = req.body ?? {}
   const updates: string[] = []
   const values: unknown[] = []
@@ -423,10 +415,7 @@ songsRouter.delete('/tasks/:taskId', async (req, res) => {
     res.status(404).json({ error: 'not_found' })
     return
   }
-  if (!(await userCanAccessSong(user.id, user.role, accessRes.rows[0].song_id))) {
-    res.status(403).json({ error: 'forbidden' })
-    return
-  }
+  if (!await assertSongWriter(user, accessRes.rows[0].song_id, res)) return
   await pool.query(`DELETE FROM tasks WHERE id = $1`, [taskId])
   res.json({ ok: true })
 })
@@ -435,10 +424,7 @@ songsRouter.delete('/tasks/:taskId', async (req, res) => {
 songsRouter.post('/:id/comments', async (req, res) => {
   const user = (req as typeof req & { user: SessionUser }).user
   const songId = req.params.id
-  if (!(await userCanAccessSong(user.id, user.role, songId))) {
-    res.status(403).json({ error: 'forbidden' })
-    return
-  }
+  if (!await assertSongWriter(user, songId, res)) return
   const { body } = req.body ?? {}
   if (typeof body !== 'string' || body.trim().length === 0) {
     res.status(400).json({ error: 'body_required' })
@@ -501,6 +487,7 @@ songsRouter.delete('/comments/:commentId', async (req, res) => {
     return
   }
   const c = rows[0]
+  if (!await assertSongWriter(user, c.song_id, res)) return
   if (c.author_id !== user.id && user.role !== 'admin') {
     res.status(403).json({ error: 'forbidden' })
     return
@@ -527,10 +514,7 @@ songsRouter.get('/:id/links', async (req, res) => {
 songsRouter.post('/:id/links', async (req, res) => {
   const user = (req as typeof req & { user: SessionUser }).user
   const songId = req.params.id
-  if (!(await userCanAccessSong(user.id, user.role, songId))) {
-    res.status(403).json({ error: 'forbidden' })
-    return
-  }
+  if (!await assertSongWriter(user, songId, res)) return
   const { label, url } = req.body ?? {}
   if (typeof label !== 'string' || label.trim().length === 0) {
     res.status(400).json({ error: 'label_required' })
@@ -557,10 +541,7 @@ songsRouter.patch('/links/:linkId', async (req, res) => {
     res.status(404).json({ error: 'not_found' })
     return
   }
-  if (!(await userCanAccessSong(user.id, user.role, rows[0].song_id))) {
-    res.status(403).json({ error: 'forbidden' })
-    return
-  }
+  if (!await assertSongWriter(user, rows[0].song_id, res)) return
   const { label, url } = req.body ?? {}
   const updates: string[] = []
   const values: unknown[] = []
@@ -590,10 +571,7 @@ songsRouter.delete('/links/:linkId', async (req, res) => {
     res.status(404).json({ error: 'not_found' })
     return
   }
-  if (!(await userCanAccessSong(user.id, user.role, rows[0].song_id))) {
-    res.status(403).json({ error: 'forbidden' })
-    return
-  }
+  if (!await assertSongWriter(user, rows[0].song_id, res)) return
   await pool.query(`DELETE FROM links WHERE id = $1`, [linkId])
   res.json({ ok: true })
 })

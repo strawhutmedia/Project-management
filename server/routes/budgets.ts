@@ -1,11 +1,12 @@
 import { Router } from 'express'
 import { pool } from '../db'
-import { requireUser, blockViewerWrites, type SessionUser } from '../auth'
+import { requireUser, type SessionUser } from '../auth'
+import { assertWriter } from '../permissions'
 import { STUDIOBINDER_ACCOUNTS } from '../budget_template'
 import { logInfo } from '../diag'
 
 export const budgetsRouter = Router()
-budgetsRouter.use(requireUser, blockViewerWrites)
+budgetsRouter.use(requireUser)
 
 async function userCanAccessProject(userId: string, role: string, projectId: string): Promise<boolean> {
   if (role === 'admin') return true
@@ -90,9 +91,7 @@ budgetsRouter.get('/projects/:projectId', async (req, res) => {
 budgetsRouter.post('/projects/:projectId', async (req, res) => {
   const user = (req as typeof req & { user: SessionUser }).user
   const projectId = req.params.projectId
-  if (!(await userCanAccessProject(user.id, user.role, projectId))) {
-    res.status(403).json({ error: 'forbidden' }); return
-  }
+  if (!await assertWriter(user, projectId, res)) return
   const existing = await pool.query(`SELECT id FROM budgets WHERE project_id = $1`, [projectId])
   if (existing.rows.length > 0) {
     res.json({ budget: { id: existing.rows[0].id }, created: false }); return
@@ -157,13 +156,11 @@ budgetsRouter.post('/projects/:projectId', async (req, res) => {
 budgetsRouter.patch('/:budgetId', async (req, res) => {
   const user = (req as typeof req & { user: SessionUser }).user
   const budgetId = req.params.budgetId
-  const access = await pool.query(
-    `SELECT b.id FROM budgets b JOIN projects p ON p.id = b.project_id
-     LEFT JOIN project_members m ON m.project_id = p.id AND m.user_id = $1
-     WHERE b.id = $2 AND ($3 = 'admin' OR p.created_by = $1 OR m.user_id IS NOT NULL)`,
-    [user.id, budgetId, user.role],
+  const lookup = await pool.query<{ project_id: string }>(
+    `SELECT project_id FROM budgets WHERE id = $1`, [budgetId],
   )
-  if (access.rows.length === 0) { res.status(403).json({ error: 'forbidden' }); return }
+  if (lookup.rows.length === 0) { res.status(404).json({ error: 'not_found' }); return }
+  if (!await assertWriter(user, lookup.rows[0].project_id, res)) return
   const { currency, shootDays, bondPct, contingencyPct, productionTarget, postTarget, marketingTarget, adminTarget, totalTarget } = req.body ?? {}
   const updates: string[] = []
   const values: unknown[] = []
@@ -198,15 +195,12 @@ budgetsRouter.patch('/:budgetId', async (req, res) => {
 budgetsRouter.post('/accounts/:accountId/items', async (req, res) => {
   const user = (req as typeof req & { user: SessionUser }).user
   const accountId = req.params.accountId
-  const access = await pool.query(
-    `SELECT a.id FROM budget_accounts a
-     JOIN budgets b ON b.id = a.budget_id
-     JOIN projects p ON p.id = b.project_id
-     LEFT JOIN project_members m ON m.project_id = p.id AND m.user_id = $1
-     WHERE a.id = $2 AND ($3 = 'admin' OR p.created_by = $1 OR m.user_id IS NOT NULL)`,
-    [user.id, accountId, user.role],
+  const lookup = await pool.query<{ project_id: string }>(
+    `SELECT b.project_id FROM budget_accounts a
+       JOIN budgets b ON b.id = a.budget_id WHERE a.id = $1`, [accountId],
   )
-  if (access.rows.length === 0) { res.status(403).json({ error: 'forbidden' }); return }
+  if (lookup.rows.length === 0) { res.status(404).json({ error: 'not_found' }); return }
+  if (!await assertWriter(user, lookup.rows[0].project_id, res)) return
   const { code, description, amt, units, x, rate, vendor, datedAt, notes } = req.body ?? {}
   if (typeof description !== 'string' || description.trim().length === 0) {
     res.status(400).json({ error: 'description_required' }); return
@@ -242,16 +236,13 @@ budgetsRouter.post('/accounts/:accountId/items', async (req, res) => {
 budgetsRouter.patch('/items/:itemId', async (req, res) => {
   const user = (req as typeof req & { user: SessionUser }).user
   const itemId = req.params.itemId
-  const access = await pool.query(
-    `SELECT li.id FROM budget_line_items li
-     JOIN budget_accounts a ON a.id = li.account_id
-     JOIN budgets b ON b.id = a.budget_id
-     JOIN projects p ON p.id = b.project_id
-     LEFT JOIN project_members m ON m.project_id = p.id AND m.user_id = $1
-     WHERE li.id = $2 AND ($3 = 'admin' OR p.created_by = $1 OR m.user_id IS NOT NULL)`,
-    [user.id, itemId, user.role],
+  const lookup = await pool.query<{ project_id: string }>(
+    `SELECT b.project_id FROM budget_line_items li
+       JOIN budget_accounts a ON a.id = li.account_id
+       JOIN budgets b ON b.id = a.budget_id WHERE li.id = $1`, [itemId],
   )
-  if (access.rows.length === 0) { res.status(403).json({ error: 'forbidden' }); return }
+  if (lookup.rows.length === 0) { res.status(404).json({ error: 'not_found' }); return }
+  if (!await assertWriter(user, lookup.rows[0].project_id, res)) return
   const map: Array<[string, string, (v: unknown) => unknown]> = [
     ['code', 'code', (v) => (typeof v === 'string' ? v : null)],
     ['description', 'description', (v) => (typeof v === 'string' ? v.trim().slice(0, 200) : null)],
@@ -281,16 +272,13 @@ budgetsRouter.patch('/items/:itemId', async (req, res) => {
 budgetsRouter.delete('/items/:itemId', async (req, res) => {
   const user = (req as typeof req & { user: SessionUser }).user
   const itemId = req.params.itemId
-  const access = await pool.query(
-    `SELECT li.id FROM budget_line_items li
-     JOIN budget_accounts a ON a.id = li.account_id
-     JOIN budgets b ON b.id = a.budget_id
-     JOIN projects p ON p.id = b.project_id
-     LEFT JOIN project_members m ON m.project_id = p.id AND m.user_id = $1
-     WHERE li.id = $2 AND ($3 = 'admin' OR p.created_by = $1 OR m.user_id IS NOT NULL)`,
-    [user.id, itemId, user.role],
+  const lookup = await pool.query<{ project_id: string }>(
+    `SELECT b.project_id FROM budget_line_items li
+       JOIN budget_accounts a ON a.id = li.account_id
+       JOIN budgets b ON b.id = a.budget_id WHERE li.id = $1`, [itemId],
   )
-  if (access.rows.length === 0) { res.status(403).json({ error: 'forbidden' }); return }
+  if (lookup.rows.length === 0) { res.status(404).json({ error: 'not_found' }); return }
+  if (!await assertWriter(user, lookup.rows[0].project_id, res)) return
   await pool.query(`DELETE FROM budget_line_items WHERE id = $1`, [itemId])
   res.json({ ok: true })
 })

@@ -61,6 +61,9 @@ export type ApiMember = {
   name: string
   display_name: string | null
   role: 'admin' | 'user' | 'viewer'
+  // Per-project role on the project this member list was fetched for.
+  // 'admin' for super admins (auto-access); explicit role for everyone else.
+  project_role: 'admin' | 'user' | 'viewer' | null
 }
 
 export type ApiNotification = {
@@ -295,6 +298,18 @@ export const api = {
     request<{ ok: true }>(`/api/songs/${id}`, { method: 'PATCH', body: JSON.stringify(patch) }),
   projectMembers: (projectId: string) =>
     request<{ members: ApiMember[] }>(`/api/projects/${projectId}/members`),
+  addProjectMember: (projectId: string, body: { userId: string; role: 'admin' | 'user' | 'viewer' }) =>
+    request<{ ok: true }>(`/api/projects/${projectId}/members`, {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+  setProjectMemberRole: (projectId: string, userId: string, role: 'admin' | 'user' | 'viewer') =>
+    request<{ ok: true }>(`/api/projects/${projectId}/members/${userId}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ role }),
+    }),
+  removeProjectMember: (projectId: string, userId: string) =>
+    request<{ ok: true }>(`/api/projects/${projectId}/members/${userId}`, { method: 'DELETE' }),
   addTask: (songId: string, body: { title: string; stage?: Stage; dueAt?: string; assigneeId?: string }) =>
     request<{ task: ApiTaskFull }>(`/api/songs/${songId}/tasks`, { method: 'POST', body: JSON.stringify(body) }),
   updateTask: (taskId: string, patch: { title?: string; done?: boolean; dueAt?: string | null; assigneeId?: string | null; stage?: Stage }) =>

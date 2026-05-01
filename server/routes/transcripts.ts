@@ -14,13 +14,14 @@
 // to free up the HTTP connection.
 import { Router } from 'express'
 import { pool } from '../db'
-import { requireUser, blockViewerWrites, type SessionUser } from '../auth'
+import { requireUser, type SessionUser } from '../auth'
+import { assertWriter } from '../permissions'
 import { getFileMetadata, getTemporaryLink } from '../dropbox'
 import { hasDeepgramKey, paragraphsToBlocks, transcribeUrl, type EditedBlock } from '../deepgram'
 import { logError, logInfo } from '../diag'
 
 export const transcriptsRouter = Router()
-transcriptsRouter.use(requireUser, blockViewerWrites)
+transcriptsRouter.use(requireUser)
 
 const MAX_FILE_BYTES = 2 * 1024 * 1024 * 1024 // 2 GB
 
@@ -122,9 +123,7 @@ transcriptsRouter.post('/', async (req, res) => {
   if (!projectId || !dropboxPath) {
     res.status(400).json({ error: 'projectId and dropboxPath required' }); return
   }
-  if (!(await userCanAccessProject(user.id, user.role, projectId))) {
-    res.status(403).json({ error: 'forbidden' }); return
-  }
+  if (!await assertWriter(user, projectId, res)) return
   if (!hasDeepgramKey()) {
     res.status(503).json({ error: 'transcription_unavailable: DEEPGRAM_API_KEY not configured' }); return
   }
@@ -191,9 +190,7 @@ transcriptsRouter.patch('/:id', async (req, res) => {
     [req.params.id],
   )
   if (existing.length === 0) { res.status(404).json({ error: 'not_found' }); return }
-  if (!(await userCanAccessProject(user.id, user.role, existing[0].project_id))) {
-    res.status(403).json({ error: 'forbidden' }); return
-  }
+  if (!await assertWriter(user, existing[0].project_id, res)) return
   const { editedBlocks, startOffsetMs, frameRate, dropFrame } = req.body as {
     editedBlocks?: EditedBlock[]
     startOffsetMs?: number
@@ -226,9 +223,7 @@ transcriptsRouter.delete('/:id', async (req, res) => {
     [req.params.id],
   )
   if (rows.length === 0) { res.status(404).json({ error: 'not_found' }); return }
-  if (!(await userCanAccessProject(user.id, user.role, rows[0].project_id))) {
-    res.status(403).json({ error: 'forbidden' }); return
-  }
+  if (!await assertWriter(user, rows[0].project_id, res)) return
   await pool.query(`DELETE FROM transcripts WHERE id = $1`, [req.params.id])
   res.json({ ok: true })
 })

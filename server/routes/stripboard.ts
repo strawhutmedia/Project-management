@@ -1,11 +1,12 @@
 import { Router } from 'express'
 import { pool } from '../db'
-import { requireUser, blockViewerWrites, type SessionUser } from '../auth'
+import { requireUser, type SessionUser } from '../auth'
+import { assertWriter } from '../permissions'
 import { parseFdx } from '../fdx_parser'
 import { applyBackInYourArmsSchedule } from '../seeds/back_in_your_arms'
 
 export const stripboardRouter = Router()
-stripboardRouter.use(requireUser, blockViewerWrites)
+stripboardRouter.use(requireUser)
 
 async function userCanAccessProject(userId: string, role: string, projectId: string): Promise<boolean> {
   if (role === 'admin') return true
@@ -76,10 +77,7 @@ stripboardRouter.get('/projects/:projectId', async (req, res) => {
 stripboardRouter.post('/projects/:projectId/import-fdx', async (req, res) => {
   const user = (req as typeof req & { user: SessionUser }).user
   const projectId = req.params.projectId
-  if (user.role !== 'admin') {
-    const access = await userCanAccessProject(user.id, user.role, projectId)
-    if (!access) { res.status(403).json({ error: 'forbidden' }); return }
-  }
+  if (!await assertWriter(user, projectId, res)) return
   const xml = typeof req.body?.xml === 'string' ? req.body.xml : null
   if (!xml || xml.length < 100) {
     res.status(400).json({ error: 'xml_required' }); return
@@ -168,9 +166,7 @@ stripboardRouter.post('/projects/:projectId/import-fdx', async (req, res) => {
 stripboardRouter.post('/projects/:projectId/days', async (req, res) => {
   const user = (req as typeof req & { user: SessionUser }).user
   const projectId = req.params.projectId
-  if (!(await userCanAccessProject(user.id, user.role, projectId))) {
-    res.status(403).json({ error: 'forbidden' }); return
-  }
+  if (!await assertWriter(user, projectId, res)) return
   const number = Number(req.body?.number)
   const isBreak = Boolean(req.body?.isBreak)
   const shootDate = typeof req.body?.shootDate === 'string' ? req.body.shootDate : null
@@ -222,9 +218,7 @@ stripboardRouter.patch('/scenes/:sceneId', async (req, res) => {
 stripboardRouter.post('/projects/:projectId/apply-biya-schedule', async (req, res) => {
   const user = (req as typeof req & { user: SessionUser }).user
   const projectId = req.params.projectId
-  if (!(await userCanAccessProject(user.id, user.role, projectId))) {
-    res.status(403).json({ error: 'forbidden' }); return
-  }
+  if (!await assertWriter(user, projectId, res)) return
   const proj = await pool.query<{ name: string }>(
     `SELECT name FROM projects WHERE id = $1`,
     [projectId],

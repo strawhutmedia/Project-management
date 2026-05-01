@@ -1,6 +1,7 @@
 import { Router } from 'express'
 import { pool } from '../db'
-import { requireUser, blockViewerWrites, type SessionUser } from '../auth'
+import { requireUser, type SessionUser } from '../auth'
+import { getProjectRole, assertWriter, assertProjectAdmin } from '../permissions'
 import { logInfo, logError } from '../diag'
 
 // Look up the admin user (Ryan) by ADMIN_EMAIL so we can auto-assign
@@ -42,7 +43,7 @@ export async function ensureRyanIsPodcastEp(): Promise<void> {
 
 export const projectsRouter = Router()
 
-projectsRouter.use(requireUser, blockViewerWrites)
+projectsRouter.use(requireUser)
 
 projectsRouter.get('/', async (req, res) => {
   const user = (req as typeof req & { user: SessionUser }).user
@@ -140,8 +141,8 @@ projectsRouter.post('/', async (req, res) => {
   )
   const project = rows[0]
   await pool.query(
-    `INSERT INTO project_members (project_id, user_id) VALUES ($1, $2)
-     ON CONFLICT DO NOTHING`,
+    `INSERT INTO project_members (project_id, user_id, role) VALUES ($1, $2, 'admin')
+     ON CONFLICT (project_id, user_id) DO UPDATE SET role = 'admin'`,
     [project.id, user.id],
   )
   logInfo('project created', { id: project.id, name: project.name, kind, by: user.id })
@@ -171,19 +172,7 @@ projectsRouter.post('/:id/songs', async (req, res) => {
     return
   }
 
-  // Verify access
-  if (user.role !== 'admin') {
-    const access = await pool.query(
-      `SELECT 1 FROM projects p
-       LEFT JOIN project_members pm ON pm.project_id = p.id AND pm.user_id = $1
-       WHERE p.id = $2 AND (p.created_by = $1 OR pm.user_id IS NOT NULL) LIMIT 1`,
-      [user.id, projectId],
-    )
-    if (access.rows.length === 0) {
-      res.status(403).json({ error: 'forbidden' })
-      return
-    }
-  }
+  if (!await assertWriter(user, projectId, res)) return
 
   const projRes = await pool.query(
     `SELECT dropbox_folder, channels_subfolder FROM projects WHERE id = $1`,
@@ -245,11 +234,17 @@ projectsRouter.get('/:id/members', async (req, res) => {
       }
     }
 
+    // Returns each user's project_role (the per-project role) so the
+    // member-management UI can show + edit it. System admins not in the
+    // members table are surfaced as 'admin' (they have implicit auto-access).
     const { rows } = await pool.query(
-      `SELECT u.id, u.email, u.name, u.display_name, u.role
+      `SELECT u.id, u.email, u.name, u.display_name, u.role,
+              COALESCE(pm.role, CASE WHEN u.role = 'admin' THEN 'admin' END) AS project_role
        FROM users u
+       LEFT JOIN project_members pm
+         ON pm.user_id = u.id AND pm.project_id = $1
        WHERE u.role = 'admin'
-          OR u.id IN (SELECT user_id FROM project_members WHERE project_id = $1)
+          OR pm.user_id IS NOT NULL
           OR u.id IN (SELECT created_by FROM projects WHERE id = $1)
           OR u.id IN (
             SELECT sm.user_id FROM song_members sm
@@ -274,13 +269,10 @@ projectsRouter.patch('/:id', async (req, res) => {
   const user = (req as typeof req & { user: SessionUser }).user
   const projectId = req.params.id
   // Project-level config (name, subtitle, Dropbox root, channels subfolder,
-  // default roles, stage labels) is admin-only. Operational edits — adding
-  // channels, editing channel titles, tasks, comments — happen through
-  // their own routes and remain available to project members.
-  if (user.role !== 'admin') {
-    res.status(403).json({ error: 'admin_only' })
-    return
-  }
+  // default roles, stage labels) is project-admin-only. Operational edits —
+  // adding channels, editing channel titles, tasks, comments — go through
+  // their own routes and remain available to project users.
+  if (!await assertProjectAdmin(user, projectId, res)) return
   const { name, subtitle, dropboxFolder, defaultOwners } = req.body ?? {}
   const updates: string[] = []
   const values: unknown[] = []
@@ -447,4 +439,63 @@ projectsRouter.get('/:id', async (req, res) => {
       })),
     },
   })
+})
+
+// ===== Per-project member management =====
+// Add an existing workspace user to a project at a given role.
+projectsRouter.post('/:id/members', async (req, res) => {
+  const user = (req as typeof req & { user: SessionUser }).user
+  const projectId = req.params.id
+  if (!await assertProjectAdmin(user, projectId, res)) return
+  const { userId, role } = req.body as { userId?: string; role?: 'admin' | 'user' | 'viewer' }
+  if (!userId || !role || !['admin', 'user', 'viewer'].includes(role)) {
+    res.status(400).json({ error: 'userId and role required' }); return
+  }
+  await pool.query(
+    `INSERT INTO project_members (project_id, user_id, role) VALUES ($1, $2, $3)
+     ON CONFLICT (project_id, user_id) DO UPDATE SET role = EXCLUDED.role`,
+    [projectId, userId, role],
+  )
+  res.json({ ok: true })
+})
+
+projectsRouter.patch('/:id/members/:userId', async (req, res) => {
+  const user = (req as typeof req & { user: SessionUser }).user
+  const projectId = req.params.id
+  if (!await assertProjectAdmin(user, projectId, res)) return
+  const { role } = req.body as { role?: 'admin' | 'user' | 'viewer' }
+  if (!role || !['admin', 'user', 'viewer'].includes(role)) {
+    res.status(400).json({ error: 'role required' }); return
+  }
+  await pool.query(
+    `INSERT INTO project_members (project_id, user_id, role) VALUES ($1, $2, $3)
+     ON CONFLICT (project_id, user_id) DO UPDATE SET role = EXCLUDED.role`,
+    [projectId, req.params.userId, role],
+  )
+  res.json({ ok: true })
+})
+
+projectsRouter.delete('/:id/members/:userId', async (req, res) => {
+  const user = (req as typeof req & { user: SessionUser }).user
+  const projectId = req.params.id
+  if (!await assertProjectAdmin(user, projectId, res)) return
+  // Don't let the last project admin be removed.
+  const target = await pool.query<{ role: string }>(
+    `SELECT role FROM project_members WHERE project_id = $1 AND user_id = $2`,
+    [projectId, req.params.userId],
+  )
+  if (target.rows[0]?.role === 'admin') {
+    const count = await pool.query<{ n: string }>(
+      `SELECT COUNT(*)::text AS n FROM project_members WHERE project_id = $1 AND role = 'admin'`,
+      [projectId],
+    )
+    if (Number(count.rows[0].n) <= 1) {
+      res.status(400).json({ error: 'cannot_remove_last_admin' }); return
+    }
+  }
+  await pool.query(
+    `DELETE FROM project_members WHERE project_id = $1 AND user_id = $2`,
+    [projectId, req.params.userId],
+  )
+  res.json({ ok: true })
 })

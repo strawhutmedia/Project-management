@@ -250,9 +250,9 @@ function UsersSection({ currentUserId }: { currentUserId: string }) {
 
 function RoleSelect({ user, onSaved }: { user: ApiAdminUser; onSaved: () => void | Promise<void> }) {
   const [busy, setBusy] = useState(false)
-  async function change(next: 'admin' | 'user' | 'viewer') {
+  async function change(next: 'admin' | 'user') {
     if (next === user.role) return
-    if (next === 'admin' && !confirm(`Make ${user.display_name || user.name} an admin? They'll get full control of all projects.`)) return
+    if (next === 'admin' && !confirm(`Make ${user.display_name || user.name} a Super Admin? They'll get auto-access to every project.`)) return
     setBusy(true)
     try {
       await api.adminUpdateUser(user.id, { role: next })
@@ -269,13 +269,13 @@ function RoleSelect({ user, onSaved }: { user: ApiAdminUser; onSaved: () => void
   return (
     <select
       value={user.role}
-      disabled={busy}
-      onChange={(e) => void change(e.target.value as 'admin' | 'user' | 'viewer')}
+      disabled={busy || user.role === 'viewer'}
+      onChange={(e) => void change(e.target.value as 'admin' | 'user')}
+      title={user.role === 'viewer' ? 'Viewer is a per-project role; manage from the project page.' : 'Workspace role'}
       className={`text-[10px] uppercase tracking-wider font-bold rounded-full px-2 py-0.5 border outline-none ${styleByRole[user.role]}`}
     >
-      <option value="admin">Admin</option>
+      <option value="admin">Super Admin</option>
       <option value="user">User</option>
-      <option value="viewer">Viewer</option>
     </select>
   )
 }
@@ -457,9 +457,8 @@ function InviteModal({
                 onChange={(e) => setRole(e.target.value as 'admin' | 'user' | 'viewer')}
                 className="w-full rounded-xl bg-ink/40 border border-line text-text px-3 py-2.5 outline-none focus:border-stage-mastering text-sm"
               >
-                <option value="user">User — can edit</option>
-                <option value="viewer">Viewer — read only</option>
-                <option value="admin">Admin — full control</option>
+                <option value="user">User — default</option>
+                <option value="admin">Super Admin — auto-access to every project</option>
               </select>
             </Field>
             <Field label="Timezone">
