@@ -87,6 +87,10 @@ export type StoredIntegration = {
   // Dropbox path root for team folder access (vs personal namespace).
   // Set to the team's root_namespace_id when the user is on a team account.
   root_namespace_id?: string
+  // Workspace-wide default starting folder for file/folder pickers.
+  // Lets the admin point Slate at the team folder so picker dialogs
+  // never expose anyone's personal Dropbox tree.
+  picker_start_path?: string
 }
 
 export async function saveIntegration(token: DropboxTokenData, accountName?: string, rootNamespaceId?: string): Promise<void> {

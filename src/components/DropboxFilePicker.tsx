@@ -14,15 +14,28 @@ type Props = {
 const MEDIA_EXT = ['.mp4', '.m4a', '.mp3', '.mov', '.wav', '.webm', '.ogg', '.flac', '.aac']
 
 export default function DropboxFilePicker({
-  initialPath = '',
+  initialPath,
   acceptExtensions = MEDIA_EXT,
   title = 'Pick a file',
   onSelect,
   onCancel,
 }: Props) {
-  const [currentPath, setCurrentPath] = useState(initialPath || '')
+  // If no initialPath is passed, fall back to the workspace-level default
+  // so users never land on the Dropbox personal root.
+  const [currentPath, setCurrentPath] = useState(initialPath ?? '')
   const [entries, setEntries] = useState<ApiDropboxEntry[] | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [resolvedDefault, setResolvedDefault] = useState(initialPath !== undefined)
+
+  useEffect(() => {
+    if (resolvedDefault) return
+    api.dropboxStatus()
+      .then((s) => {
+        if (s.pickerStartPath) setCurrentPath(s.pickerStartPath)
+      })
+      .catch(() => {})
+      .finally(() => setResolvedDefault(true))
+  }, [resolvedDefault])
 
   async function load(path: string) {
     setEntries(null)
@@ -44,7 +57,10 @@ export default function DropboxFilePicker({
     }
   }
 
-  useEffect(() => { void load(currentPath) }, [currentPath])
+  useEffect(() => {
+    if (!resolvedDefault) return
+    void load(currentPath)
+  }, [currentPath, resolvedDefault])
 
   function navigateUp() {
     if (!currentPath || currentPath === '/' || currentPath === '') return

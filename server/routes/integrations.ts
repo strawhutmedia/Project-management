@@ -1,5 +1,6 @@
 import express, { Router } from 'express'
 import crypto from 'crypto'
+import { pool } from '../db'
 import { requireAdmin, requireUser, type SessionUser } from '../auth'
 import {
   buildAuthorizeUrl,
@@ -29,7 +30,30 @@ integrationsRouter.get('/dropbox/status', requireUser, async (_req, res) => {
     connected: true,
     configured: true,
     accountName: integration.account_name ?? null,
+    pickerStartPath: integration.picker_start_path ?? null,
   })
+})
+
+// Admin-only: set the default starting folder for Dropbox file/folder
+// pickers. Used so users opening "Pick a media file" land on the team
+// folder instead of the personal Dropbox root.
+integrationsRouter.post('/dropbox/picker-start', requireAdmin, async (req, res) => {
+  const integration = await getIntegration()
+  if (!integration) {
+    res.status(400).json({ error: 'not_connected' }); return
+  }
+  const raw = String(req.body?.path ?? '').trim()
+  // Normalize: empty string clears the override; otherwise enforce a
+  // leading slash and strip trailing slashes.
+  const path = raw === '' ? '' : ('/' + raw.replace(/^\/+/, '').replace(/\/+$/, ''))
+  await pool.query(
+    `UPDATE integrations
+       SET data = data || jsonb_build_object('picker_start_path', $1::text),
+           updated_at = now()
+     WHERE kind = 'dropbox'`,
+    [path],
+  )
+  res.json({ ok: true, pickerStartPath: path })
 })
 
 // Admin-only: start OAuth.

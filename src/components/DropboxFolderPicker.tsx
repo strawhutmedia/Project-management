@@ -7,13 +7,26 @@ type Props = {
   onCancel: () => void
 }
 
-export default function DropboxFolderPicker({ initialPath = '', onSelect, onCancel }: Props) {
-  const [currentPath, setCurrentPath] = useState(initialPath || '')
+export default function DropboxFolderPicker({ initialPath, onSelect, onCancel }: Props) {
+  // Empty initialPath ('') is allowed and means root; undefined falls back
+  // to the workspace pickerStartPath so users don't see personal folders.
+  const [currentPath, setCurrentPath] = useState(initialPath ?? '')
   const [entries, setEntries] = useState<ApiDropboxEntry[] | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [creating, setCreating] = useState(false)
   const [showNewFolder, setShowNewFolder] = useState(false)
   const [newFolderName, setNewFolderName] = useState('')
+  const [resolvedDefault, setResolvedDefault] = useState(initialPath !== undefined)
+
+  useEffect(() => {
+    if (resolvedDefault) return
+    api.dropboxStatus()
+      .then((s) => {
+        if (s.pickerStartPath) setCurrentPath(s.pickerStartPath)
+      })
+      .catch(() => {})
+      .finally(() => setResolvedDefault(true))
+  }, [resolvedDefault])
 
   async function load(path: string) {
     setEntries(null)
@@ -36,8 +49,9 @@ export default function DropboxFolderPicker({ initialPath = '', onSelect, onCanc
   }
 
   useEffect(() => {
+    if (!resolvedDefault) return
     void load(currentPath)
-  }, [currentPath])
+  }, [currentPath, resolvedDefault])
 
   function navigateUp() {
     if (!currentPath || currentPath === '/' || currentPath === '') return

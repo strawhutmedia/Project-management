@@ -93,6 +93,8 @@ export type ApiDropboxStatus = {
   configured: boolean
   connected: boolean
   accountName?: string | null
+  // Workspace default starting folder for file/folder pickers.
+  pickerStartPath?: string | null
 }
 
 export type ApiDropboxEntry = {
@@ -322,6 +324,11 @@ export const api = {
   deleteComment: (commentId: string) =>
     request<{ ok: true }>(`/api/songs/comments/${commentId}`, { method: 'DELETE' }),
   dropboxStatus: () => request<ApiDropboxStatus>('/api/integrations/dropbox/status'),
+  setDropboxPickerStart: (path: string) =>
+    request<{ ok: true; pickerStartPath: string }>('/api/integrations/dropbox/picker-start', {
+      method: 'POST',
+      body: JSON.stringify({ path }),
+    }),
   dropboxDisconnect: () => request<{ ok: true }>('/api/integrations/dropbox/disconnect', { method: 'POST' }),
   dropboxList: (path: string) =>
     request<{ entries: ApiDropboxEntry[] }>(`/api/integrations/dropbox/list?path=${encodeURIComponent(path)}`),

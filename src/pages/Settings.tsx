@@ -79,6 +79,12 @@ export default function Settings() {
               .
             </p>
             {isAdmin && (
+              <PickerStartPathControl
+                current={status.pickerStartPath ?? ''}
+                onSaved={load}
+              />
+            )}
+            {isAdmin && (
               <button
                 onClick={async () => {
                   if (!confirm('Disconnect Dropbox? File lists will stop loading until reconnected.')) return
@@ -105,6 +111,7 @@ export default function Settings() {
 
       {/* Admin: Users */}
       {isAdmin && <UsersSection currentUserId={user.id} />}
+
 
       {!isAdmin && (
         <p className="text-[11px] text-muted">
@@ -573,6 +580,53 @@ function Field({ label, hint, children }: { label: string; hint?: string; childr
       </label>
       {children}
       {hint && <p className="text-[11px] text-muted/70 mt-1">{hint}</p>}
+    </div>
+  )
+}
+
+function PickerStartPathControl({ current, onSaved }: { current: string; onSaved: () => void | Promise<void> }) {
+  const [value, setValue] = useState(current)
+  const [busy, setBusy] = useState(false)
+  const [err, setErr] = useState<string | null>(null)
+  const dirty = value !== current
+
+  async function save() {
+    setBusy(true); setErr(null)
+    try {
+      await api.setDropboxPickerStart(value.trim())
+      await onSaved()
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : 'failed')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <div className="rounded-xl border border-line bg-ink/30 p-3 space-y-2">
+      <div className="text-[10px] uppercase tracking-wider text-muted/70 font-bold">
+        Default folder for file pickers
+      </div>
+      <p className="text-[11px] text-muted/80">
+        Where Slate's "Pick a folder/file" dialogs land first. Set this to your team folder
+        so users never see anyone's personal Dropbox tree. Leave blank for Dropbox root.
+      </p>
+      <div className="flex gap-2 items-center flex-wrap">
+        <input
+          value={value}
+          onChange={(e) => setValue(e.target.value)}
+          placeholder="/Straw Hut Team Folder"
+          className="flex-1 min-w-[200px] rounded-lg bg-ink/40 border border-line text-text px-3 py-1.5 text-sm font-mono outline-none focus:border-stage-mastering"
+        />
+        <button
+          onClick={() => void save()}
+          disabled={!dirty || busy}
+          className="rounded-lg bg-stage-mastering/20 border border-stage-mastering/40 text-stage-mastering font-bold uppercase tracking-wider text-[10px] px-3 py-1.5 disabled:opacity-50"
+        >
+          {busy ? 'Saving…' : 'Save'}
+        </button>
+      </div>
+      {err && <p className="text-urgent text-xs">{err}</p>}
     </div>
   )
 }
