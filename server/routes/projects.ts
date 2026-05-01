@@ -3,6 +3,43 @@ import { pool } from '../db'
 import { requireUser, type SessionUser } from '../auth'
 import { logInfo, logError } from '../diag'
 
+// Look up the admin user (Ryan) by ADMIN_EMAIL so we can auto-assign
+// the Executive Producer role on every new podcast project. Falls back
+// to any user with role='admin' if the env email isn't found.
+async function findAdminUserId(): Promise<string | null> {
+  const adminEmail = process.env.ADMIN_EMAIL || 'ryan@strawhutmedia.com'
+  const byEmail = await pool.query<{ id: string }>(
+    `SELECT id FROM users WHERE email = $1 LIMIT 1`,
+    [adminEmail],
+  )
+  if (byEmail.rows.length > 0) return byEmail.rows[0].id
+  const byRole = await pool.query<{ id: string }>(
+    `SELECT id FROM users WHERE role = 'admin' ORDER BY created_at ASC LIMIT 1`,
+  )
+  return byRole.rows[0]?.id ?? null
+}
+
+// Backfill helper: for every existing podcast project, ensure the
+// Executive Producer slot is set to the admin. Idempotent — only writes
+// if the slot is currently empty. Called once at boot.
+export async function ensureRyanIsPodcastEp(): Promise<void> {
+  const ryanId = await findAdminUserId()
+  if (!ryanId) return
+  const { rows } = await pool.query<{ id: string; default_owners: Record<string, unknown> | null }>(
+    `SELECT id, default_owners FROM projects WHERE kind = 'podcast'`,
+  )
+  for (const r of rows) {
+    const current = (r.default_owners ?? {}) as Record<string, unknown>
+    if (current.executive_producer) continue
+    const next = { ...current, executive_producer: ryanId }
+    await pool.query(
+      `UPDATE projects SET default_owners = $1::jsonb WHERE id = $2`,
+      [JSON.stringify(next), r.id],
+    )
+    logInfo('podcast: backfilled executive_producer = admin', { projectId: r.id })
+  }
+}
+
 export const projectsRouter = Router()
 
 projectsRouter.use(requireUser)
@@ -85,11 +122,21 @@ projectsRouter.post('/', async (req, res) => {
   const stageLabels = kind === 'podcast' ? PODCAST_LABELS : {}
   const channelsSubfolder = kind === 'podcast' ? 'episodes' : null
 
+  // For podcasts, auto-default the Executive Producer slot to the
+  // workspace admin (Ryan). Project creator gets Project Manager unless
+  // they're Ryan, in which case PM stays unassigned for explicit picking.
+  const defaultOwners: Record<string, string> = {}
+  if (kind === 'podcast') {
+    const ryanId = await findAdminUserId()
+    if (ryanId) defaultOwners.executive_producer = ryanId
+    if (ryanId && user.id !== ryanId) defaultOwners.project_manager = user.id
+  }
+
   const { rows } = await pool.query(
-    `INSERT INTO projects (name, subtitle, kind, created_by, dropbox_folder, stage_labels, channels_subfolder)
-     VALUES ($1, $2, $3, $4, $5, $6::jsonb, $7)
+    `INSERT INTO projects (name, subtitle, kind, created_by, dropbox_folder, stage_labels, channels_subfolder, default_owners)
+     VALUES ($1, $2, $3, $4, $5, $6::jsonb, $7, $8::jsonb)
      RETURNING id, name, subtitle, kind, dropbox_folder, stage_labels, channels_subfolder`,
-    [name.slice(0, 200), subtitle, kind, user.id, dropboxFolder, JSON.stringify(stageLabels), channelsSubfolder],
+    [name.slice(0, 200), subtitle, kind, user.id, dropboxFolder, JSON.stringify(stageLabels), channelsSubfolder, JSON.stringify(defaultOwners)],
   )
   const project = rows[0]
   await pool.query(

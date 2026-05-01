@@ -13,6 +13,7 @@ import { budgetsRouter } from './routes/budgets'
 import { stripboardRouter } from './routes/stripboard'
 import { transcriptsRouter } from './routes/transcripts'
 import { seedBackInYourArms } from './seeds/back_in_your_arms'
+import { ensureRyanIsPodcastEp } from './routes/projects'
 import { startScheduler } from './scheduler'
 import {
   diagRouter,
@@ -76,6 +77,7 @@ async function start() {
     await runMigrations()
     logInfo('migrations complete')
     await seedBackInYourArms()
+    await ensureRyanIsPodcastEp()
   } catch (err) {
     logError('migrations failed', { error: err instanceof Error ? err.message : String(err) })
     markBootError(err)
