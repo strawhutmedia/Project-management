@@ -161,9 +161,12 @@ export default function SongPage() {
         <div className="lg:col-span-2 space-y-5">
           <PeoplePanel song={song} members={members} onChange={reload} />
           <TasksPanel song={song} members={members} onChange={reload} />
-          {song.projectKind === 'podcast' && (
-            <TranscriptsSection projectId={song.projectId} songId={song.id} isAdmin={user?.role === 'admin'} />
-          )}
+          {song.projectKind === 'podcast' && (() => {
+            const me = members.find((m) => m.id === user?.id)
+            const myProjectRole = me?.project_role ?? (user?.role === 'admin' ? 'admin' : null)
+            const canWrite = myProjectRole === 'admin' || myProjectRole === 'user'
+            return <TranscriptsSection projectId={song.projectId} songId={song.id} canWrite={canWrite} />
+          })()}
           <CommentsPanel song={song} members={members} onChange={reload} userId={user?.id ?? ''} userRole={user?.role ?? 'user'} />
         </div>
         <aside className="space-y-5">

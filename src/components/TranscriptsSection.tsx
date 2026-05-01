@@ -9,11 +9,11 @@ import DropboxFilePicker from './DropboxFilePicker'
 export default function TranscriptsSection({
   projectId,
   songId,
-  isAdmin,
+  canWrite,
 }: {
   projectId: string
   songId?: string
-  isAdmin: boolean
+  canWrite: boolean
 }) {
   const [transcripts, setTranscripts] = useState<ApiTranscript[] | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -78,7 +78,7 @@ export default function TranscriptsSection({
             Pick a media file from Dropbox · auto-transcribed via Deepgram · edit + export SRT.
           </p>
         </div>
-        {isAdmin && songId && (
+        {canWrite && songId && (
           <button
             onClick={() => setPicking(true)}
             disabled={starting}
@@ -102,7 +102,7 @@ export default function TranscriptsSection({
       ) : (
         <div className="space-y-2">
           {transcripts.map((t) => (
-            <TranscriptRow key={t.id} t={t} projectId={projectId} isAdmin={isAdmin} onDelete={() => void remove(t.id, t.fileName)} />
+            <TranscriptRow key={t.id} t={t} projectId={projectId} canWrite={canWrite} onDelete={() => void remove(t.id, t.fileName)} />
           ))}
         </div>
       )}
@@ -121,12 +121,12 @@ export default function TranscriptsSection({
 function TranscriptRow({
   t,
   projectId,
-  isAdmin,
+  canWrite,
   onDelete,
 }: {
   t: ApiTranscript
   projectId: string
-  isAdmin: boolean
+  canWrite: boolean
   onDelete: () => void
 }) {
   const statusColor =
@@ -156,7 +156,7 @@ function TranscriptRow({
             Open
           </Link>
         )}
-        {isAdmin && (
+        {canWrite && (
           <button
             onClick={onDelete}
             className="text-[11px] uppercase tracking-wider text-muted border border-line rounded-full px-2.5 py-1 hover:text-urgent hover:border-urgent/50"
