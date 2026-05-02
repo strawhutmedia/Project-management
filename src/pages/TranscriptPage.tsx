@@ -175,12 +175,29 @@ export default function TranscriptPage() {
             options={['Yes', 'No']}
             onChange={(v) => scheduleSave({ ...transcript, dropFrame: v === 'Yes' })}
           />
-          <a
-            href={api.transcriptSrtUrl(transcript.id)}
-            className="rounded-xl bg-gradient-to-r from-stage-producing to-stage-mastering text-white font-bold uppercase tracking-wider text-xs px-3 py-2 self-end text-center"
-          >
-            ⬇ Export SRT
-          </a>
+          <div className="self-end grid grid-cols-3 gap-1">
+            <a
+              href={api.transcriptSrtUrl(transcript.id)}
+              title="Subtitles for video editors / social tools"
+              className="rounded-lg bg-gradient-to-r from-stage-producing to-stage-mastering text-white font-bold uppercase tracking-wider text-[10px] px-2 py-2 text-center"
+            >
+              ⬇ SRT
+            </a>
+            <a
+              href={api.transcriptVttUrl(transcript.id)}
+              title="WebVTT — DaVinci Resolve, YouTube web, HTML5"
+              className="rounded-lg border border-stage-mastering/40 text-stage-mastering font-bold uppercase tracking-wider text-[10px] px-2 py-2 text-center hover:bg-stage-mastering/10"
+            >
+              ⬇ VTT
+            </a>
+            <a
+              href={api.transcriptTxtUrl(transcript.id)}
+              title="Plain text with speakers — show notes, blog, summarise"
+              className="rounded-lg border border-stage-stems/40 text-stage-stems font-bold uppercase tracking-wider text-[10px] px-2 py-2 text-center hover:bg-stage-stems/10"
+            >
+              ⬇ TXT
+            </a>
+          </div>
         </div>
       </header>
 

@@ -270,6 +270,49 @@ transcriptsRouter.get('/:id/srt', async (req, res) => {
   res.send(srt)
 })
 
+// WebVTT export. Same as SRT but with WEBVTT header and "." for ms.
+// Preferred by DaVinci Resolve, YouTube web upload, HTML5 <track>.
+transcriptsRouter.get('/:id/vtt', async (req, res) => {
+  const user = (req as typeof req & { user: SessionUser }).user
+  const { rows } = await pool.query<TranscriptRow>(
+    `SELECT * FROM transcripts WHERE id = $1`,
+    [req.params.id],
+  )
+  if (rows.length === 0) { res.status(404).json({ error: 'not_found' }); return }
+  if (!(await userCanAccessProject(user.id, user.role, rows[0].project_id))) {
+    res.status(403).json({ error: 'forbidden' }); return
+  }
+  const t = rows[0]
+  const blocks = t.edited_blocks ?? []
+  const offsetSec = t.start_offset_ms / 1000
+  const vtt = blocksToVtt(blocks, offsetSec)
+  const filename = `${t.file_name.replace(/\.[^.]+$/, '')}.vtt`
+  res.setHeader('Content-Type', 'text/vtt; charset=utf-8')
+  res.setHeader('Content-Disposition', `attachment; filename="${filename}"`)
+  res.send(vtt)
+})
+
+// Plain-text export. One paragraph per block, prefixed with the speaker.
+// Useful for show notes, blog posts, AI summarisation.
+transcriptsRouter.get('/:id/txt', async (req, res) => {
+  const user = (req as typeof req & { user: SessionUser }).user
+  const { rows } = await pool.query<TranscriptRow>(
+    `SELECT * FROM transcripts WHERE id = $1`,
+    [req.params.id],
+  )
+  if (rows.length === 0) { res.status(404).json({ error: 'not_found' }); return }
+  if (!(await userCanAccessProject(user.id, user.role, rows[0].project_id))) {
+    res.status(403).json({ error: 'forbidden' }); return
+  }
+  const t = rows[0]
+  const blocks = t.edited_blocks ?? []
+  const txt = blocksToTxt(blocks)
+  const filename = `${t.file_name.replace(/\.[^.]+$/, '')}.txt`
+  res.setHeader('Content-Type', 'text/plain; charset=utf-8')
+  res.setHeader('Content-Disposition', `attachment; filename="${filename}"`)
+  res.send(txt)
+})
+
 function pad(n: number, width = 2): string {
   return String(n).padStart(width, '0')
 }
@@ -282,6 +325,36 @@ function srtTimecode(totalSeconds: number): string {
   const m = Math.floor((total % 3600) / 60)
   const s = total % 60
   return `${pad(h)}:${pad(m)}:${pad(s)},${pad(ms, 3)}`
+}
+
+function vttTimecode(totalSeconds: number): string {
+  return srtTimecode(totalSeconds).replace(',', '.')
+}
+
+function blocksToVtt(blocks: EditedBlock[], offsetSec: number): string {
+  const lines: string[] = ['WEBVTT', '']
+  for (const b of blocks) {
+    const start = b.start + offsetSec
+    const end = b.end + offsetSec
+    lines.push(`${vttTimecode(start)} --> ${vttTimecode(end)}`)
+    lines.push(wrapForCaption(b.text.trim()))
+    lines.push('')
+  }
+  return lines.join('\n')
+}
+
+function blocksToTxt(blocks: EditedBlock[]): string {
+  const out: string[] = []
+  let lastSpeaker = ''
+  for (const b of blocks) {
+    if (b.speaker !== lastSpeaker) {
+      if (out.length > 0) out.push('')
+      out.push(`${b.speaker}:`)
+      lastSpeaker = b.speaker
+    }
+    out.push(b.text.trim())
+  }
+  return out.join('\n')
 }
 
 function blocksToSrt(blocks: EditedBlock[], offsetSec: number): string {

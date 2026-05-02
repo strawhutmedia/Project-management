@@ -490,6 +490,8 @@ export const api = {
   deleteTranscript: (id: string) =>
     request<{ ok: true }>(`/api/transcripts/${id}`, { method: 'DELETE' }),
   transcriptSrtUrl: (id: string) => `/api/transcripts/${id}/srt`,
+  transcriptVttUrl: (id: string) => `/api/transcripts/${id}/vtt`,
+  transcriptTxtUrl: (id: string) => `/api/transcripts/${id}/txt`,
   transcriptMediaUrl: (id: string) =>
     request<{ url: string; fileName: string }>(`/api/transcripts/${id}/media-url`),
 
