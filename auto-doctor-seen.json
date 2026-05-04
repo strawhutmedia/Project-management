@@ -1,0 +1,8 @@
+{
+  "unhandled error::{\"message\":\"request aborted\",\"stack\":\"BadRequestError: request aborted\\n    at I": {
+    "attemptedAt": "2026-05-04T16:23:08.162Z",
+    "outcome": "fixed",
+    "summary": "Added filtering in Express error handler to ignore client abort errors (\"request aborted\", ECONNRESET, ECONNABORTED) and log them as info instead of error, preventing false alarms and unnecessary admin alerts.",
+    "iterations": 12
+  }
+}
