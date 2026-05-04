@@ -60,7 +60,19 @@ app.get('*', (_req, res) => {
   })
 })
 
-app.use((err: Error, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
+app.use((err: Error, req: express.Request, res: express.Response, _next: express.NextFunction) => {
+  // Ignore client-side connection errors (e.g., browser closed during upload)
+  // These are normal and shouldn't be logged as server errors
+  const isClientAbort = err.message === 'request aborted' || 
+                        (err as any).code === 'ECONNRESET' ||
+                        (err as any).code === 'ECONNABORTED'
+  
+  if (isClientAbort) {
+    // Silently ignore - no need to log or send response (client is gone)
+    logInfo('client aborted request', { method: req.method, path: req.path })
+    return
+  }
+  
   logError('unhandled error', { message: err.message, stack: err.stack })
   res.status(500).json({ error: 'internal_error', message: err.message })
 })
