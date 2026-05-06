@@ -196,7 +196,10 @@ function UsersSection({ currentUserId }: { currentUserId: string }) {
                   </div>
                   <div className="text-[11px] text-muted flex items-center gap-2 flex-wrap">
                     {u.email ? (
-                      <span>{u.email}</span>
+                      <>
+                        <span>{u.email}</span>
+                        <EditEmailButton userId={u.id} currentEmail={u.email} onSaved={load} />
+                      </>
                     ) : (
                       <>
                         <span className="text-stage-tracking font-bold text-[10px] uppercase tracking-wider bg-stage-tracking/10 border border-stage-tracking/40 rounded px-1.5 py-0.5">
@@ -284,6 +287,78 @@ function RoleSelect({ user, onSaved }: { user: ApiAdminUser; onSaved: () => void
       <option value="admin">Super Admin</option>
       <option value="user">User</option>
     </select>
+  )
+}
+
+function EditEmailButton({
+  userId,
+  currentEmail,
+  onSaved,
+}: {
+  userId: string
+  currentEmail: string
+  onSaved: () => void | Promise<void>
+}) {
+  const [editing, setEditing] = useState(false)
+  const [email, setEmail] = useState(currentEmail)
+  const [saving, setSaving] = useState(false)
+  const [err, setErr] = useState<string | null>(null)
+
+  async function save() {
+    const next = email.trim()
+    if (!next || next === currentEmail) { setEditing(false); return }
+    setSaving(true); setErr(null)
+    try {
+      await api.adminUpdateUser(userId, { email: next })
+      await onSaved()
+      setEditing(false)
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : 'failed')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  if (!editing) {
+    return (
+      <button
+        onClick={() => { setEmail(currentEmail); setErr(null); setEditing(true) }}
+        className="text-[10px] text-muted hover:text-stage-mastering underline"
+        title="Change email"
+      >
+        edit
+      </button>
+    )
+  }
+
+  return (
+    <span className="inline-flex items-center gap-1.5">
+      <input
+        type="email"
+        value={email}
+        onChange={(e) => setEmail(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') void save()
+          if (e.key === 'Escape') setEditing(false)
+        }}
+        autoFocus
+        className="rounded bg-ink/40 border border-line text-text px-1.5 py-0.5 text-[11px] outline-none focus:border-stage-mastering"
+      />
+      <button
+        onClick={() => void save()}
+        disabled={saving || !email.trim()}
+        className="text-[10px] text-stage-mastering hover:text-text disabled:opacity-50"
+      >
+        {saving ? '…' : 'save'}
+      </button>
+      <button
+        onClick={() => setEditing(false)}
+        className="text-[10px] text-muted hover:text-text"
+      >
+        cancel
+      </button>
+      {err && <span className="text-urgent text-[10px]">{err}</span>}
+    </span>
   )
 }
 
