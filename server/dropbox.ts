@@ -205,13 +205,25 @@ export async function listFolder(folderPath: string): Promise<{ ok: true; entrie
   if (!headers) return { ok: false, error: 'not_connected' }
   // Dropbox API quirk: root folder is empty string, not "/"
   const apiPath = folderPath === '/' ? '' : folderPath.replace(/\/$/, '')
-  const res = await fetch(`${DROPBOX_API}/files/list_folder`, {
-    method: 'POST',
-    headers,
-    body: JSON.stringify({ path: apiPath, recursive: false, include_deleted: false }),
-  })
+  let res: Response
+  try {
+    // 20s ceiling so a hung Dropbox call doesn't outlive iOS Safari's
+    // network timeout — we'd rather return a 504 than have the client
+    // throw the generic "Load failed".
+    res = await fetch(`${DROPBOX_API}/files/list_folder`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ path: apiPath, recursive: false, include_deleted: false }),
+      signal: AbortSignal.timeout(20_000),
+    })
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err)
+    logError('dropbox.listFolder fetch failed', { path: folderPath, error: msg })
+    return { ok: false, error: `dropbox_unreachable: ${msg.slice(0, 200)}` }
+  }
   if (!res.ok) {
     const text = await res.text()
+    logError('dropbox.listFolder non-2xx', { path: folderPath, status: res.status, body: text.slice(0, 500) })
     if (res.status === 409) {
       // path/not_found etc. — surface as a soft error
       return { ok: false, error: `not_found: ${folderPath}` }

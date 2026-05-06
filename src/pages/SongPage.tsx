@@ -637,10 +637,17 @@ function DropboxPanel({
       setEntries(entries)
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'failed'
+      // iOS Safari throws a generic "TypeError: Load failed" / "Failed to fetch"
+      // on network-level failures; surface those as transient so the user can
+      // retry, and treat anything other than "not_found"/"not_connected" the
+      // same way (it's almost always a hiccup or a missing folder).
+      const isTransient = /load failed|failed to fetch|networkerror|aborted|timeout|unreachable/i.test(msg)
       if (msg.startsWith('not_found')) {
         setError('Folder not yet created in Dropbox.')
       } else if (msg === 'not_connected') {
         setError("Dropbox isn't connected. Admin can connect from Settings.")
+      } else if (isTransient) {
+        setError("Dropbox didn't respond. Tap Retry, or create the folder if it doesn't exist yet.")
       } else {
         setError(msg)
       }
@@ -786,8 +793,25 @@ function DropboxPanel({
           </button>
         </div>
       ) : error ? (
-        <div className="text-sm text-muted py-4 text-center border border-dashed border-line rounded-xl">
-          {error}
+        <div className="text-sm text-muted space-y-3 py-4 text-center border border-dashed border-line rounded-xl">
+          <p className="break-words px-3">{error}</p>
+          <div className="flex items-center justify-center gap-2 flex-wrap">
+            <button
+              onClick={() => void load(currentPath)}
+              className="text-xs uppercase tracking-wider font-bold text-stage-mastering border border-stage-mastering/40 rounded-full px-3 py-1.5 hover:bg-stage-mastering/10"
+            >
+              ↻ Retry
+            </button>
+            {song.dropboxFolder && currentPath === song.dropboxFolder && (
+              <button
+                onClick={() => void createSongFolder()}
+                disabled={creating}
+                className="text-xs uppercase tracking-wider font-bold text-stage-stems border border-stage-stems/40 rounded-full px-3 py-1.5 hover:bg-stage-stems/10 disabled:opacity-50"
+              >
+                {creating ? 'Creating…' : '+ Create folder in Dropbox'}
+              </button>
+            )}
+          </div>
         </div>
       ) : !entries ? (
         <p className="text-sm text-muted">Loading…</p>
