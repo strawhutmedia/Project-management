@@ -50,8 +50,21 @@ app.use('/api/transcripts', transcriptsRouter)
 
 const clientDir = path.resolve(process.cwd(), 'dist')
 logInfo('serving client from', { clientDir })
-app.use(express.static(clientDir, { index: false, maxAge: '1h' }))
+// Hashed assets (index-XXXX.js, index-YYYY.css) are cache-immutable; everything
+// else (notably index.html) must NOT be cached or iOS Safari can pin the user
+// to a stale bundle for up to an hour after a deploy.
+app.use(express.static(clientDir, {
+  index: false,
+  setHeaders(res, file) {
+    if (/\/assets\/.+\.(js|css|woff2?|ttf|svg|png|jpg|webp)$/.test(file)) {
+      res.setHeader('Cache-Control', 'public, max-age=31536000, immutable')
+    } else {
+      res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate')
+    }
+  },
+}))
 app.get('*', (_req, res) => {
+  res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate')
   res.sendFile(path.join(clientDir, 'index.html'), (err) => {
     if (err) {
       logError('sendFile failed', { error: err.message, clientDir })
