@@ -4,6 +4,7 @@ import { api, type ApiDropboxEntry, type ApiMember, type ApiSongDetail } from '.
 import { STAGES, STAGE_COLOR, STAGE_LABEL, STAGE_ICON, stageLabel, stageIcon, type Stage, type StageLabels } from '../types'
 import StagePill from '../components/StagePill'
 import InlineEdit from '../components/InlineEdit'
+import DropboxFolderPicker from '../components/DropboxFolderPicker'
 import AddLinkModal from '../components/AddLinkModal'
 import MentionInput, { renderWithMentions } from '../components/MentionInput'
 import DueDateChip from '../components/DueDateChip'
@@ -618,6 +619,7 @@ function DropboxPanel({
   const [uploadError, setUploadError] = useState<string | null>(null)
   const [currentPath, setCurrentPath] = useState(song.dropboxFolder ?? '')
   const [showNewFolder, setShowNewFolder] = useState(false)
+  const [showPicker, setShowPicker] = useState(false)
   const [newFolderName, setNewFolderName] = useState('')
   const fileInputRef = useRef<HTMLInputElement>(null)
 
@@ -746,14 +748,23 @@ function DropboxPanel({
         )}
       </div>
 
-      <div className="text-[11px] text-muted mb-2 break-all font-mono">
-        <span className="opacity-60">My folder:</span>{' '}
-        <InlineEdit
-          value={song.dropboxFolder ?? ''}
-          onSave={onSaveFolder}
-          emptyLabel="+ Set folder path"
-          inputClassName="text-[11px] font-mono"
-        />
+      <div className="text-[11px] text-muted mb-2 break-all font-mono flex items-center flex-wrap gap-2">
+        <span>
+          <span className="opacity-60">My folder:</span>{' '}
+          <InlineEdit
+            value={song.dropboxFolder ?? ''}
+            onSave={onSaveFolder}
+            emptyLabel="+ Set folder path"
+            inputClassName="text-[11px] font-mono"
+          />
+        </span>
+        <button
+          onClick={() => setShowPicker(true)}
+          className="text-[10px] uppercase tracking-wider text-stage-stems border border-stage-stems/40 rounded-full px-2 py-0.5 hover:bg-stage-stems/10"
+          title="Browse Dropbox to pick the right folder"
+        >
+          📁 Pick
+        </button>
       </div>
       {crumbs.length > 0 && (
         <div className="text-[11px] mb-3 flex items-center flex-wrap gap-x-1 gap-y-0.5">
@@ -899,6 +910,17 @@ function DropboxPanel({
             {uploadError && <p className="text-urgent text-xs">{uploadError}</p>}
           </div>
         </>
+      )}
+
+      {showPicker && (
+        <DropboxFolderPicker
+          initialPath={song.dropboxFolder ?? ''}
+          onCancel={() => setShowPicker(false)}
+          onSelect={(path) => {
+            setShowPicker(false)
+            void onSaveFolder(path)
+          }}
+        />
       )}
     </section>
   )
