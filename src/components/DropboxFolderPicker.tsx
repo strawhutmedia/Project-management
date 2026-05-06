@@ -17,16 +17,29 @@ export default function DropboxFolderPicker({ initialPath, onSelect, onCancel }:
   const [showNewFolder, setShowNewFolder] = useState(false)
   const [newFolderName, setNewFolderName] = useState('')
   const [resolvedDefault, setResolvedDefault] = useState(initialPath !== undefined)
+  const [teamFolder, setTeamFolder] = useState<string>('')
 
   useEffect(() => {
     if (resolvedDefault) return
     api.dropboxStatus()
       .then((s) => {
-        if (s.pickerStartPath) setCurrentPath(s.pickerStartPath)
+        if (s.pickerStartPath) {
+          setCurrentPath(s.pickerStartPath)
+          setTeamFolder(s.pickerStartPath)
+        }
       })
       .catch(() => {})
       .finally(() => setResolvedDefault(true))
   }, [resolvedDefault])
+
+  useEffect(() => {
+    // Always remember the workspace team folder for the reset button,
+    // even if a caller passed an explicit initialPath.
+    if (teamFolder) return
+    api.dropboxStatus().then((s) => {
+      if (s.pickerStartPath) setTeamFolder(s.pickerStartPath)
+    }).catch(() => {})
+  }, [teamFolder])
 
   async function load(path: string) {
     setEntries(null)
@@ -39,7 +52,17 @@ export default function DropboxFolderPicker({ initialPath, onSelect, onCancel }:
       const msg = err instanceof Error ? err.message : 'failed'
       if (msg === 'not_connected') {
         setError("Dropbox isn't connected. Admin can connect from Settings.")
-      } else if (msg.startsWith('not_found')) {
+        setEntries([])
+        return
+      }
+      // not_found / dropbox_409 → walk up to nearest valid ancestor so the
+      // user always sees a useful folder list instead of a dead end.
+      if (msg.startsWith('not_found') || msg.startsWith('dropbox_4')) {
+        if (path !== '' && path !== '/') {
+          const parent = path.replace(/\/[^/]+\/?$/, '') || ''
+          setCurrentPath(parent)
+          return
+        }
         setError("This folder doesn't exist in Dropbox.")
       } else {
         setError(msg)
@@ -95,13 +118,22 @@ export default function DropboxFolderPicker({ initialPath, onSelect, onCancel }:
             </div>
             <div className="text-sm font-mono break-all">{displayPath}</div>
           </div>
-          <div className="flex gap-1.5">
+          <div className="flex gap-1.5 flex-wrap">
             {currentPath && (
               <button
                 onClick={navigateUp}
                 className="text-[11px] uppercase tracking-wider text-stage-stems border border-stage-stems/40 rounded-full px-2.5 py-1 hover:bg-stage-stems/10"
               >
                 ← Up
+              </button>
+            )}
+            {teamFolder && currentPath !== teamFolder && (
+              <button
+                onClick={() => setCurrentPath(teamFolder)}
+                title={`Reset to ${teamFolder}`}
+                className="text-[11px] uppercase tracking-wider text-stage-mastering border border-stage-mastering/40 rounded-full px-2.5 py-1 hover:bg-stage-mastering/10"
+              >
+                🏠 Team folder
               </button>
             )}
             <button

@@ -26,16 +26,27 @@ export default function DropboxFilePicker({
   const [entries, setEntries] = useState<ApiDropboxEntry[] | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [resolvedDefault, setResolvedDefault] = useState(initialPath !== undefined)
+  const [teamFolder, setTeamFolder] = useState<string>('')
 
   useEffect(() => {
     if (resolvedDefault) return
     api.dropboxStatus()
       .then((s) => {
-        if (s.pickerStartPath) setCurrentPath(s.pickerStartPath)
+        if (s.pickerStartPath) {
+          setCurrentPath(s.pickerStartPath)
+          setTeamFolder(s.pickerStartPath)
+        }
       })
       .catch(() => {})
       .finally(() => setResolvedDefault(true))
   }, [resolvedDefault])
+
+  useEffect(() => {
+    if (teamFolder) return
+    api.dropboxStatus().then((s) => {
+      if (s.pickerStartPath) setTeamFolder(s.pickerStartPath)
+    }).catch(() => {})
+  }, [teamFolder])
 
   async function load(path: string) {
     setEntries(null)
@@ -48,7 +59,17 @@ export default function DropboxFilePicker({
       const msg = err instanceof Error ? err.message : 'failed'
       if (msg === 'not_connected') {
         setError("Dropbox isn't connected. Admin can connect from Settings.")
-      } else if (msg.startsWith('not_found')) {
+        setEntries([])
+        return
+      }
+      // Auto-walk up to nearest valid ancestor when the saved path doesn't
+      // exist anymore, instead of leaving the user staring at a dead end.
+      if (msg.startsWith('not_found') || msg.startsWith('dropbox_4')) {
+        if (path !== '' && path !== '/') {
+          const parent = path.replace(/\/[^/]+\/?$/, '') || ''
+          setCurrentPath(parent)
+          return
+        }
         setError("This folder doesn't exist in Dropbox.")
       } else {
         setError(msg)
@@ -101,14 +122,25 @@ export default function DropboxFilePicker({
             <div className="text-[11px] uppercase tracking-wider text-muted font-bold mb-0.5">Current</div>
             <div className="text-sm font-mono break-all">{displayPath}</div>
           </div>
-          {currentPath && (
-            <button
-              onClick={navigateUp}
-              className="text-[11px] uppercase tracking-wider text-stage-stems border border-stage-stems/40 rounded-full px-2.5 py-1 hover:bg-stage-stems/10"
-            >
-              ← Up
-            </button>
-          )}
+          <div className="flex gap-1.5 flex-wrap shrink-0">
+            {currentPath && (
+              <button
+                onClick={navigateUp}
+                className="text-[11px] uppercase tracking-wider text-stage-stems border border-stage-stems/40 rounded-full px-2.5 py-1 hover:bg-stage-stems/10"
+              >
+                ← Up
+              </button>
+            )}
+            {teamFolder && currentPath !== teamFolder && (
+              <button
+                onClick={() => setCurrentPath(teamFolder)}
+                title={`Reset to ${teamFolder}`}
+                className="text-[11px] uppercase tracking-wider text-stage-mastering border border-stage-mastering/40 rounded-full px-2.5 py-1 hover:bg-stage-mastering/10"
+              >
+                🏠 Team folder
+              </button>
+            )}
+          </div>
         </div>
 
         <div className="flex-1 overflow-y-auto p-3 space-y-1">
