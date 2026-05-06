@@ -172,7 +172,21 @@ export default function SongPage() {
         </div>
         <aside className="space-y-5">
           <LinksPanel song={song} onChange={reload} />
-          <DropboxPanel song={song} onChange={reload} onSaveFolder={saveDropboxFolder} />
+          {(() => {
+            const me = members.find((m) => m.id === user?.id)
+            const myProjectRole = me?.project_role ?? (user?.role === 'admin' ? 'admin' : null)
+            const canWrite = myProjectRole === 'admin' || myProjectRole === 'user'
+            const isProjectAdmin = myProjectRole === 'admin'
+            return (
+              <DropboxPanel
+                song={song}
+                onChange={reload}
+                onSaveFolder={saveDropboxFolder}
+                canWrite={canWrite}
+                isProjectAdmin={isProjectAdmin}
+              />
+            )
+          })()}
         </aside>
       </div>
     </div>
@@ -607,10 +621,17 @@ function DropboxPanel({
   song,
   onChange,
   onSaveFolder,
+  canWrite,
+  isProjectAdmin,
 }: {
   song: ApiSongDetail
   onChange: () => void | Promise<void>
   onSaveFolder: (next: string) => Promise<void>
+  // canWrite: project admin OR user role — can upload + create folders
+  canWrite: boolean
+  // isProjectAdmin: only this role can re-anchor the song's folder or
+  // navigate above the song's folder via ← Up
+  isProjectAdmin: boolean
 }) {
   const [entries, setEntries] = useState<ApiDropboxEntry[] | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -635,7 +656,9 @@ function DropboxPanel({
       return
     }
     try {
-      const { entries } = await api.dropboxList(path)
+      // Pass scopeSongId for non-admins so the server enforces the song
+      // folder boundary; admins call unscoped so they can navigate above.
+      const { entries } = await api.dropboxList(path, isProjectAdmin ? undefined : song.id)
       setEntries(entries)
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'failed'
@@ -664,7 +687,7 @@ function DropboxPanel({
   async function createFolderAt(path: string) {
     setCreating(true)
     try {
-      await api.dropboxCreateFolder(path)
+      await api.dropboxCreateFolder(path, isProjectAdmin ? undefined : song.id)
       await load(currentPath)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'failed')
@@ -693,7 +716,7 @@ function DropboxPanel({
     setUploading(true)
     setUploadError(null)
     try {
-      await api.dropboxUpload(currentPath, file)
+      await api.dropboxUpload(currentPath, file, isProjectAdmin ? undefined : song.id)
       await load(currentPath)
       await onChange()
     } catch (err) {
@@ -737,35 +760,63 @@ function DropboxPanel({
   }
   const crumbs = buildCrumbs()
 
+  // ← Up is hidden at the song's anchor for non-admins, so they can navigate
+  // INTO subfolders but never above the song's assigned folder.
+  const showUp = !atRoot && (isProjectAdmin || !projectRoot || currentPath !== projectRoot)
+  // Always-on "Open in Dropbox" link for the current folder so users can use
+  // Dropbox's native ZIP-download for the whole folder.
+  const openInDropboxUrl = currentPath
+    ? `https://www.dropbox.com/home${encodeURI(currentPath)}`
+    : null
+
   return (
     <section className="rounded-2xl border border-line bg-panel/60 p-6">
-      <div className="flex items-center justify-between mb-3">
+      <div className="flex items-center justify-between mb-3 gap-2 flex-wrap">
         <h2 className="text-[11px] uppercase tracking-[0.2em] text-muted font-bold">📦 Dropbox</h2>
-        {!atRoot && (
-          <button onClick={navigateUp} className="text-[11px] text-stage-stems hover:underline">
-            ← Up
-          </button>
-        )}
+        <div className="flex items-center gap-2">
+          {openInDropboxUrl && (
+            <a
+              href={openInDropboxUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="text-[11px] text-stage-mastering hover:underline"
+              title="Open this folder in Dropbox (download as ZIP from there)"
+            >
+              ↗ Open in Dropbox
+            </a>
+          )}
+          {showUp && (
+            <button onClick={navigateUp} className="text-[11px] text-stage-stems hover:underline">
+              ← Up
+            </button>
+          )}
+        </div>
       </div>
 
-      <div className="text-[11px] text-muted mb-2 break-all font-mono flex items-center flex-wrap gap-2">
-        <span>
-          <span className="opacity-60">My folder:</span>{' '}
-          <InlineEdit
-            value={song.dropboxFolder ?? ''}
-            onSave={onSaveFolder}
-            emptyLabel="+ Set folder path"
-            inputClassName="text-[11px] font-mono"
-          />
-        </span>
-        <button
-          onClick={() => setShowPicker(true)}
-          className="text-[10px] uppercase tracking-wider text-stage-stems border border-stage-stems/40 rounded-full px-2 py-0.5 hover:bg-stage-stems/10"
-          title="Browse Dropbox to pick the right folder"
-        >
-          📁 Pick
-        </button>
-      </div>
+      {isProjectAdmin ? (
+        <div className="text-[11px] text-muted mb-2 break-all font-mono flex items-center flex-wrap gap-2">
+          <span>
+            <span className="opacity-60">My folder:</span>{' '}
+            <InlineEdit
+              value={song.dropboxFolder ?? ''}
+              onSave={onSaveFolder}
+              emptyLabel="+ Set folder path"
+              inputClassName="text-[11px] font-mono"
+            />
+          </span>
+          <button
+            onClick={() => setShowPicker(true)}
+            className="text-[10px] uppercase tracking-wider text-stage-stems border border-stage-stems/40 rounded-full px-2 py-0.5 hover:bg-stage-stems/10"
+            title="Browse Dropbox to pick the right folder"
+          >
+            📁 Pick
+          </button>
+        </div>
+      ) : (
+        <div className="text-[11px] text-muted mb-2 break-all font-mono opacity-70">
+          <span className="opacity-60">My folder:</span> {song.dropboxFolder || <em className="not-italic">— not set —</em>}
+        </div>
+      )}
       {crumbs.length > 0 && (
         <div className="text-[11px] mb-3 flex items-center flex-wrap gap-x-1 gap-y-0.5">
           {crumbs.map((c, idx) => (
@@ -861,7 +912,8 @@ function DropboxPanel({
             ))}
           </ul>
 
-          {/* Actions */}
+          {/* Actions — only visible to project members with write access */}
+          {canWrite && (
           <div className="flex flex-col gap-2">
             <input
               ref={fileInputRef}
@@ -909,6 +961,7 @@ function DropboxPanel({
             )}
             {uploadError && <p className="text-urgent text-xs">{uploadError}</p>}
           </div>
+          )}
         </>
       )}
 

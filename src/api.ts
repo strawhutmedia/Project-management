@@ -330,21 +330,29 @@ export const api = {
       body: JSON.stringify({ path }),
     }),
   dropboxDisconnect: () => request<{ ok: true }>('/api/integrations/dropbox/disconnect', { method: 'POST' }),
-  dropboxList: (path: string) =>
-    request<{ entries: ApiDropboxEntry[] }>(`/api/integrations/dropbox/list?path=${encodeURIComponent(path)}`),
-  dropboxCreateFolder: (path: string) =>
-    request<{ ok: true }>('/api/integrations/dropbox/create-folder', { method: 'POST', body: JSON.stringify({ path }) }),
+  dropboxList: (path: string, scopeSongId?: string) => {
+    const qs = new URLSearchParams({ path })
+    if (scopeSongId) qs.set('scopeSongId', scopeSongId)
+    return request<{ entries: ApiDropboxEntry[] }>(`/api/integrations/dropbox/list?${qs.toString()}`)
+  },
+  dropboxCreateFolder: (path: string, scopeSongId?: string) =>
+    request<{ ok: true }>('/api/integrations/dropbox/create-folder', {
+      method: 'POST',
+      body: JSON.stringify({ path, scopeSongId }),
+    }),
   dropboxShareLink: (path: string) =>
     request<{ url: string }>('/api/integrations/dropbox/share-link', { method: 'POST', body: JSON.stringify({ path }) }),
-  dropboxUpload: async (folderPath: string, file: File): Promise<{ ok: true; path: string }> => {
+  dropboxUpload: async (folderPath: string, file: File, scopeSongId?: string): Promise<{ ok: true; path: string }> => {
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/octet-stream',
+      'X-Folder-Path': folderPath,
+      'X-File-Name': encodeURIComponent(file.name),
+    }
+    if (scopeSongId) headers['X-Scope-Song-Id'] = scopeSongId
     const res = await fetch('/api/integrations/dropbox/upload', {
       method: 'POST',
       credentials: 'include',
-      headers: {
-        'Content-Type': 'application/octet-stream',
-        'X-Folder-Path': folderPath,
-        'X-File-Name': encodeURIComponent(file.name),
-      },
+      headers,
       body: file,
     })
     if (!res.ok) {

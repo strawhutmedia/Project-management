@@ -102,12 +102,55 @@ integrationsRouter.post('/dropbox/disconnect', requireAdmin, async (_req, res) =
   res.json({ ok: true })
 })
 
+// Scope guard: every Dropbox file operation must either come from a
+// workspace admin (Super Admin — can browse anywhere, used by the
+// admin-only folder pickers) OR carry a scopeSongId, in which case
+// the requested path must live inside that song's assigned Dropbox
+// folder. This prevents non-admin users from poking around the rest
+// of Dropbox via the API.
+function isPathWithin(child: string, parent: string): boolean {
+  if (!parent) return false
+  const c = child.replace(/\/+$/, '')
+  const p = parent.replace(/\/+$/, '')
+  return c === p || c.startsWith(p + '/')
+}
+
+async function assertDropboxPathAllowed(
+  user: SessionUser,
+  path: string,
+  scopeSongId: string | null,
+): Promise<{ ok: true } | { ok: false; status: number; error: string }> {
+  if (user.role === 'admin') return { ok: true }
+  if (!scopeSongId) return { ok: false, status: 403, error: 'scope_required' }
+  const { rows } = await pool.query<{ dropbox_folder: string | null; project_id: string }>(
+    `SELECT s.dropbox_folder, s.project_id FROM songs s WHERE s.id = $1`,
+    [scopeSongId],
+  )
+  if (rows.length === 0) return { ok: false, status: 404, error: 'song_not_found' }
+  const songRoot = rows[0].dropbox_folder
+  if (!songRoot) return { ok: false, status: 400, error: 'song_has_no_folder' }
+  // Verify the user has any access to the song's project
+  const access = await pool.query(
+    `SELECT 1 FROM project_members WHERE project_id = $1 AND user_id = $2 LIMIT 1`,
+    [rows[0].project_id, user.id],
+  )
+  if (access.rows.length === 0) return { ok: false, status: 403, error: 'forbidden' }
+  if (!isPathWithin(path, songRoot)) {
+    return { ok: false, status: 403, error: `out_of_scope:path_must_be_within:${songRoot}` }
+  }
+  return { ok: true }
+}
+
 integrationsRouter.get('/dropbox/list', requireUser, async (req, res) => {
+  const user = (req as typeof req & { user: SessionUser }).user
   const folder = String(req.query.path || '')
+  const scopeSongId = req.query.scopeSongId ? String(req.query.scopeSongId) : null
   if (!folder) {
     res.status(400).json({ error: 'path_required' })
     return
   }
+  const guard = await assertDropboxPathAllowed(user, folder, scopeSongId)
+  if (!guard.ok) { res.status(guard.status).json({ error: guard.error }); return }
   const result = await listFolder(folder)
   if (!result.ok) {
     res.status(404).json({ error: result.error })
@@ -117,12 +160,15 @@ integrationsRouter.get('/dropbox/list', requireUser, async (req, res) => {
 })
 
 integrationsRouter.post('/dropbox/create-folder', requireUser, async (req, res) => {
-  const _user = (req as typeof req & { user: SessionUser }).user
+  const user = (req as typeof req & { user: SessionUser }).user
   const folder = String(req.body?.path || '')
+  const scopeSongId = req.body?.scopeSongId ? String(req.body.scopeSongId) : null
   if (!folder) {
     res.status(400).json({ error: 'path_required' })
     return
   }
+  const guard = await assertDropboxPathAllowed(user, folder, scopeSongId)
+  if (!guard.ok) { res.status(guard.status).json({ error: guard.error }); return }
   const result = await createFolder(folder)
   if (!result.ok) {
     res.status(500).json({ error: result.error })
@@ -138,12 +184,18 @@ integrationsRouter.post(
   requireUser,
   express.raw({ type: 'application/octet-stream', limit: MAX_UPLOAD }),
   async (req, res) => {
+    const user = (req as typeof req & { user: SessionUser }).user
     const folderPath = String(req.headers['x-folder-path'] || '')
     const fileName = String(req.headers['x-file-name'] || '')
+    const scopeSongId = req.headers['x-scope-song-id']
+      ? String(req.headers['x-scope-song-id'])
+      : null
     if (!folderPath || !fileName) {
       res.status(400).json({ error: 'missing_headers' })
       return
     }
+    const guard = await assertDropboxPathAllowed(user, folderPath, scopeSongId)
+    if (!guard.ok) { res.status(guard.status).json({ error: guard.error }); return }
     if (!Buffer.isBuffer(req.body) || req.body.length === 0) {
       res.status(400).json({ error: 'empty_body' })
       return
