@@ -1,7 +1,8 @@
 import { Router } from 'express'
 import { pool } from '../db'
 import { requireUser, type SessionUser } from '../auth'
-import { assertSongWriter } from '../permissions'
+import { assertSongWriter, getSongRole } from '../permissions'
+import { logInfo } from '../diag'
 import { findMentionedUsers, notify } from '../notifications'
 
 export const songsRouter = Router()
@@ -187,6 +188,24 @@ songsRouter.patch('/:id', async (req, res) => {
   const songId = req.params.id
   if (!await assertSongWriter(user, songId, res)) return
   const { stage, title, subtitle, dropboxFolder, producerId, mixerId, writerId, trackerId, overdubId, stemsId, masterId } = req.body ?? {}
+
+  // The Dropbox folder anchor is project-structural config, not an
+  // operational edit — only Project Admins (and Super Admins) may
+  // change it. A regular User changing it once accidentally points the
+  // whole song at the wrong place for everyone.
+  if (typeof dropboxFolder === 'string') {
+    const role = await getSongRole(user.id, user.role, songId)
+    if (role !== 'admin') {
+      res.status(403).json({ error: 'project_admin_only_for_dropbox_folder' })
+      return
+    }
+    logInfo('song.dropbox_folder changed', {
+      songId,
+      by: user.id,
+      byEmail: user.email,
+      newValue: dropboxFolder.trim() || null,
+    })
+  }
   const updates: string[] = []
   const values: unknown[] = []
   let i = 1
