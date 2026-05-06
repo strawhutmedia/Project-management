@@ -710,6 +710,22 @@ function DropboxPanel({
     setShowNewFolder(false)
   }
 
+  // Download a folder (or file) by generating a Dropbox shared link and
+  // hitting it with ?dl=1 — Dropbox returns a ZIP for folders and the raw
+  // file for files. No local zipping required.
+  async function downloadFolder(path: string) {
+    try {
+      const { url } = await api.dropboxShareLink(path, isProjectAdmin ? undefined : song.id)
+      const dl = url.includes('?')
+        ? `${url}&dl=1`
+        : `${url}?dl=1`
+      window.open(dl, '_blank', 'noopener')
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'failed'
+      alert(`Couldn't generate download link: ${msg}`)
+    }
+  }
+
   async function onUpload(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
     if (!file) return
@@ -886,27 +902,45 @@ function DropboxPanel({
             {entries.map((e) => (
               <li key={e.path}>
                 {e.type === 'folder' ? (
-                  <button
-                    onClick={() => setCurrentPath(e.path)}
-                    className="w-full text-left text-sm flex items-center gap-2 rounded-lg border border-line bg-ink/30 px-3 py-2 hover:bg-ink/60"
-                  >
-                    <span>📁</span>
-                    <span className="flex-1 truncate">{e.name}</span>
-                    <span className="text-muted text-xs">→</span>
-                  </button>
+                  <div className="flex items-stretch gap-1.5">
+                    <button
+                      onClick={() => setCurrentPath(e.path)}
+                      className="flex-1 text-left text-sm flex items-center gap-2 rounded-lg border border-line bg-ink/30 px-3 py-2 hover:bg-ink/60 min-w-0"
+                    >
+                      <span>📁</span>
+                      <span className="flex-1 truncate">{e.name}</span>
+                      <span className="text-muted text-xs shrink-0">→</span>
+                    </button>
+                    <button
+                      onClick={() => void downloadFolder(e.path)}
+                      title="Download folder as ZIP"
+                      className="rounded-lg border border-stage-mastering/40 bg-stage-mastering/5 text-stage-mastering text-xs px-2.5 hover:bg-stage-mastering/15 shrink-0"
+                    >
+                      ↓
+                    </button>
+                  </div>
                 ) : (
-                  <a
-                    href={`https://www.dropbox.com/home${encodeURI(e.path)}`}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="text-sm flex items-center gap-2 rounded-lg border border-line bg-ink/30 px-3 py-2 hover:bg-ink/60"
-                  >
-                    <span>{fileEmoji(e.name)}</span>
-                    <span className="flex-1 truncate">{e.name}</span>
-                    {e.size != null && (
-                      <span className="text-[11px] text-muted">{formatBytes(e.size)}</span>
-                    )}
-                  </a>
+                  <div className="flex items-stretch gap-1.5">
+                    <a
+                      href={`https://www.dropbox.com/home${encodeURI(e.path)}`}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="flex-1 text-sm flex items-center gap-2 rounded-lg border border-line bg-ink/30 px-3 py-2 hover:bg-ink/60 min-w-0"
+                    >
+                      <span>{fileEmoji(e.name)}</span>
+                      <span className="flex-1 truncate">{e.name}</span>
+                      {e.size != null && (
+                        <span className="text-[11px] text-muted shrink-0">{formatBytes(e.size)}</span>
+                      )}
+                    </a>
+                    <button
+                      onClick={() => void downloadFolder(e.path)}
+                      title="Download file"
+                      className="rounded-lg border border-stage-mastering/40 bg-stage-mastering/5 text-stage-mastering text-xs px-2.5 hover:bg-stage-mastering/15 shrink-0"
+                    >
+                      ↓
+                    </button>
+                  </div>
                 )}
               </li>
             ))}

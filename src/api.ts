@@ -340,8 +340,11 @@ export const api = {
       method: 'POST',
       body: JSON.stringify({ path, scopeSongId }),
     }),
-  dropboxShareLink: (path: string) =>
-    request<{ url: string }>('/api/integrations/dropbox/share-link', { method: 'POST', body: JSON.stringify({ path }) }),
+  dropboxShareLink: (path: string, scopeSongId?: string) =>
+    request<{ url: string }>('/api/integrations/dropbox/share-link', {
+      method: 'POST',
+      body: JSON.stringify({ path, scopeSongId }),
+    }),
   dropboxUpload: async (folderPath: string, file: File, scopeSongId?: string): Promise<{ ok: true; path: string }> => {
     const headers: Record<string, string> = {
       'Content-Type': 'application/octet-stream',

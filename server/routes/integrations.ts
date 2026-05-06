@@ -215,11 +215,15 @@ integrationsRouter.post(
 
 // Get a shared link for a Dropbox path (used when adding a Dropbox file as a song "Link").
 integrationsRouter.post('/dropbox/share-link', requireUser, async (req, res) => {
+  const user = (req as typeof req & { user: SessionUser }).user
   const path = String(req.body?.path || '')
+  const scopeSongId = req.body?.scopeSongId ? String(req.body.scopeSongId) : null
   if (!path) {
     res.status(400).json({ error: 'path_required' })
     return
   }
+  const guard = await assertDropboxPathAllowed(user, path, scopeSongId)
+  if (!guard.ok) { res.status(guard.status).json({ error: guard.error }); return }
   const result = await createSharedLink(path)
   if (!result.ok) {
     res.status(500).json({ error: result.error })
