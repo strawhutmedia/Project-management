@@ -833,29 +833,14 @@ function DropboxPanel({
           <span className="opacity-60">My folder:</span> {song.dropboxFolder || <em className="not-italic">— not set —</em>}
         </div>
       )}
-      {crumbs.length > 0 && (
-        <div className="text-[11px] mb-3 flex items-center flex-wrap gap-x-1 gap-y-0.5">
-          {crumbs.map((c, idx) => (
-            <span key={c.path} className="inline-flex items-center gap-1">
-              <button
-                onClick={() => setCurrentPath(c.path)}
-                className={`hover:underline ${
-                  c.path === currentPath ? 'text-text font-bold' : 'text-stage-stems'
-                }`}
-              >
-                {c.label}
-              </button>
-              {idx < crumbs.length - 1 && <span className="text-muted/50">/</span>}
-            </span>
-          ))}
-          {song.dropboxFolder && currentPath !== song.dropboxFolder && (
-            <button
-              onClick={() => setCurrentPath(song.dropboxFolder ?? '')}
-              className="ml-2 text-[10px] uppercase tracking-wider text-stage-stems border border-stage-stems/40 rounded-full px-2 py-0.5 hover:bg-stage-stems/10"
-            >
-              ↩ My folder
-            </button>
-          )}
+      {song.dropboxFolder && currentPath !== song.dropboxFolder && (
+        <div className="mb-3">
+          <button
+            onClick={() => setCurrentPath(song.dropboxFolder ?? '')}
+            className="text-[10px] uppercase tracking-wider text-stage-stems border border-stage-stems/40 rounded-full px-2 py-0.5 hover:bg-stage-stems/10"
+          >
+            ↩ My folder
+          </button>
         </div>
       )}
 
