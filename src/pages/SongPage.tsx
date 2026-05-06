@@ -759,22 +759,6 @@ function DropboxPanel({
 
   const atRoot = !!projectRoot && currentPath === projectRoot
 
-  // Build breadcrumbs from project root → currentPath
-  function buildCrumbs(): Array<{ label: string; path: string }> {
-    if (!currentPath || !projectRoot) return []
-    if (!currentPath.startsWith(projectRoot)) return [{ label: currentPath, path: currentPath }]
-    const rest = currentPath.slice(projectRoot.length).split('/').filter(Boolean)
-    const crumbs: Array<{ label: string; path: string }> = [
-      { label: projectRoot.split('/').filter(Boolean).pop() || '/', path: projectRoot },
-    ]
-    let acc = projectRoot
-    for (const part of rest) {
-      acc = `${acc}/${part}`
-      crumbs.push({ label: part, path: acc })
-    }
-    return crumbs
-  }
-  const crumbs = buildCrumbs()
 
   // ← Up is hidden at the song's anchor for non-admins, so they can navigate
   // INTO subfolders but never above the song's assigned folder.
