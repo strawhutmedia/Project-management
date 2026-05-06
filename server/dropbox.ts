@@ -223,11 +223,13 @@ export async function listFolder(folderPath: string): Promise<{ ok: true; entrie
   }
   if (!res.ok) {
     const text = await res.text()
-    logError('dropbox.listFolder non-2xx', { path: folderPath, status: res.status, body: text.slice(0, 500) })
     if (res.status === 409) {
-      // path/not_found etc. — surface as a soft error
+      // path/not_found etc. — expected condition, not an error
+      logInfo('dropbox.listFolder path not found', { path: folderPath, status: res.status })
       return { ok: false, error: `not_found: ${folderPath}` }
     }
+    // Unexpected errors (auth failures, rate limits, etc.)
+    logError('dropbox.listFolder non-2xx', { path: folderPath, status: res.status, body: text.slice(0, 500) })
     return { ok: false, error: `dropbox_${res.status}: ${text.slice(0, 200)}` }
   }
   const data = (await res.json()) as {
