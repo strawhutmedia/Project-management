@@ -1,5 +1,3 @@
-{"ts":"2026-04-30T23:50:31.126Z","msg":"boot","data":{"node":"v20.20.2","has_anthropic_key":true,"has_github_token":true,"cwd":"/home/runner/work/Project-management/Project-management"}}
-{"ts":"2026-04-30T23:50:31.288Z","msg":"no_errors_file"}
 {"ts":"2026-04-30T23:50:31.288Z","msg":"done"}
 {"ts":"2026-05-01T02:43:23.144Z","msg":"boot","data":{"node":"v20.20.2","has_anthropic_key":true,"has_github_token":true,"cwd":"/home/runner/work/Project-management/Project-management"}}
 {"ts":"2026-05-01T02:43:23.349Z","msg":"no_errors_file"}
@@ -499,3 +497,5 @@
 {"ts":"2026-05-16T08:27:47.394Z","msg":"done"}
 {"ts":"2026-05-16T09:57:05.259Z","msg":"boot","data":{"node":"v20.20.2","has_anthropic_key":true,"has_github_token":true,"cwd":"/home/runner/work/Project-management/Project-management"}}
 {"ts":"2026-05-16T09:57:05.813Z","msg":"done"}
+{"ts":"2026-05-16T11:03:02.986Z","msg":"boot","data":{"node":"v20.20.2","has_anthropic_key":true,"has_github_token":true,"cwd":"/home/runner/work/Project-management/Project-management"}}
+{"ts":"2026-05-16T11:03:03.650Z","msg":"done"}
