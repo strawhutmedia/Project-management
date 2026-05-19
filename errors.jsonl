@@ -46,3 +46,4 @@
 {"level":"error","ts":"2026-05-06T21:19:17.024Z","msg":"dropbox.listFolder non-2xx","data":{"path":"/2_CLIENTS/Maggie Glass Record/Lionheart","status":409,"body":"{\"error_summary\": \"path/not_found/..\", \"error\": {\".tag\": \"path\", \"path\": {\".tag\": \"not_found\"}}}"}}
 {"level":"error","ts":"2026-05-06T21:19:58.526Z","msg":"dropbox.listFolder non-2xx","data":{"path":"/2_CLIENTS/Maggie Glass Record/I Know","status":409,"body":"{\"error_summary\": \"path/not_found/...\", \"error\": {\".tag\": \"path\", \"path\": {\".tag\": \"not_found\"}}}"}}
 {"level":"error","ts":"2026-05-06T21:20:00.983Z","msg":"dropbox.listFolder non-2xx","data":{"path":"/2_CLIENTS/Maggie Glass Record/I Know","status":409,"body":"{\"error_summary\": \"path/not_found/\", \"error\": {\".tag\": \"path\", \"path\": {\".tag\": \"not_found\"}}}"}}
+{"level":"error","ts":"2026-05-19T22:43:30.967Z","msg":"scheduler tick failed","data":{"error":"getaddrinfo EAI_AGAIN postgres.railway.internal"}}
