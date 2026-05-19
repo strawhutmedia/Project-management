@@ -5,6 +5,35 @@ import { sendAdminAlert } from './email'
 
 const TICK_MS = 5 * 60 * 1000 // every 5 min
 
+// Retry helper for transient network/DNS errors
+async function withRetry<T>(fn: () => Promise<T>, maxRetries = 3, baseDelay = 1000): Promise<T> {
+  let lastError: Error | unknown
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    try {
+      return await fn()
+    } catch (err) {
+      lastError = err
+      const errMsg = err instanceof Error ? err.message : String(err)
+      // Check if it's a transient network/DNS error
+      const isTransient = errMsg.includes('EAI_AGAIN') || 
+                         errMsg.includes('ENOTFOUND') || 
+                         errMsg.includes('ETIMEDOUT') ||
+                         errMsg.includes('ECONNREFUSED') ||
+                         errMsg.includes('ECONNRESET')
+      
+      if (!isTransient || attempt === maxRetries) {
+        throw err
+      }
+      
+      // Exponential backoff with jitter
+      const delay = baseDelay * Math.pow(2, attempt) + Math.random() * 1000
+      logInfo(`scheduler: transient error, retrying in ${Math.round(delay)}ms (attempt ${attempt + 1}/${maxRetries})`, { error: errMsg })
+      await new Promise(resolve => setTimeout(resolve, delay))
+    }
+  }
+  throw lastError
+}
+
 async function checkDueSoon() {
   // Tasks due within next 8 hours, not done, not yet reminded, with assignee
   const { rows } = await pool.query(
@@ -116,11 +145,22 @@ async function checkStuckDigest() {
 export function startScheduler() {
   async function tick() {
     try {
-      await checkDueSoon()
-      await checkOverdue()
-      await checkStuckDigest()
+      await withRetry(async () => {
+        await checkDueSoon()
+        await checkOverdue()
+        await checkStuckDigest()
+      })
     } catch (err) {
-      logError('scheduler tick failed', { error: err instanceof Error ? err.message : String(err) })
+      const errMsg = err instanceof Error ? err.message : String(err)
+      // Only log as error if it's not a transient DNS issue
+      const isTransient = errMsg.includes('EAI_AGAIN') || 
+                         errMsg.includes('ENOTFOUND') || 
+                         errMsg.includes('ETIMEDOUT')
+      if (isTransient) {
+        logInfo('scheduler tick skipped due to transient network error (will retry next tick)', { error: errMsg })
+      } else {
+        logError('scheduler tick failed', { error: errMsg })
+      }
     }
   }
   setInterval(() => void tick(), TICK_MS)
