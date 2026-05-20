@@ -69,3 +69,4 @@
 {"level":"error","ts":"2026-05-20T00:23:31.052Z","msg":"scheduler tick failed","data":{"error":"getaddrinfo EAI_AGAIN postgres.railway.internal"}}
 {"level":"error","ts":"2026-05-20T00:28:31.057Z","msg":"scheduler tick failed","data":{"error":"getaddrinfo EAI_AGAIN postgres.railway.internal"}}
 {"level":"error","ts":"2026-05-20T00:33:31.061Z","msg":"scheduler tick failed","data":{"error":"getaddrinfo EAI_AGAIN postgres.railway.internal"}}
+{"level":"error","ts":"2026-05-20T00:38:31.065Z","msg":"scheduler tick failed","data":{"error":"getaddrinfo EAI_AGAIN postgres.railway.internal"}}
