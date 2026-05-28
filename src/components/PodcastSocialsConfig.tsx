@@ -5,11 +5,15 @@
 import { useState } from 'react'
 import { api, type ApiMember, type ApiProject } from '../api'
 
-const KIND_OPTIONS: Array<{ key: 'text_post' | 'story_text' | 'reel_concept' | 'photo_concept'; label: string }> = [
-  { key: 'text_post',    label: '📝 Text posts'     },
-  { key: 'story_text',   label: '💬 Stories'        },
-  { key: 'reel_concept', label: '🎬 Reel concepts'  },
-  { key: 'photo_concept', label: '📷 Photo concepts' },
+// Text posts deliberately omitted — those are AI options for Caroline /
+// the producer to pick from, not pre-assigned work. Story items split
+// by medium because video stories go to the editor and photo stories
+// go to Ana.
+const KIND_OPTIONS: Array<{ key: 'story_video' | 'story_photo' | 'reel_concept' | 'photo_concept'; label: string; hint: string }> = [
+  { key: 'story_video',   label: '💬🎬 Stories (video)',  hint: 'Video editor cuts the clip' },
+  { key: 'story_photo',   label: '💬📷 Stories (photo)',  hint: 'Photo person produces the still' },
+  { key: 'reel_concept',  label: '🎬 Reels',              hint: 'Video editor cuts the reel' },
+  { key: 'photo_concept', label: '📷 Photos',             hint: 'Photo person shoots / sources the image' },
 ]
 
 export default function PodcastSocialsConfig({
@@ -110,7 +114,7 @@ export default function PodcastSocialsConfig({
       <div>
         <div className="text-[10px] uppercase tracking-wider text-muted/70 font-bold mb-2">Default assignees</div>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          {KIND_OPTIONS.map(({ key, label }) => (
+          {KIND_OPTIONS.map(({ key, label, hint }) => (
             <label key={key} className="block">
               <div className="text-[10px] uppercase tracking-wider text-muted/70 font-bold mb-1">{label}</div>
               <select
@@ -123,6 +127,7 @@ export default function PodcastSocialsConfig({
                   <option key={m.id} value={m.id}>{m.display_name || m.name}</option>
                 ))}
               </select>
+              <div className="text-[10px] text-muted/60 mt-0.5">{hint}</div>
             </label>
           ))}
         </div>

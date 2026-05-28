@@ -308,7 +308,7 @@ projectsRouter.patch('/:id', async (req, res) => {
     values.push(JSON.stringify(cleaned))
   }
   if (req.body?.socialsDefaultAssignees && typeof req.body.socialsDefaultAssignees === 'object') {
-    const allowedKinds = ['text_post', 'story_text', 'reel_concept', 'photo_concept']
+    const allowedKinds = ['story_video', 'story_photo', 'reel_concept', 'photo_concept']
     const cleaned: Record<string, string> = {}
     for (const k of allowedKinds) {
       const v = (req.body.socialsDefaultAssignees as Record<string, unknown>)[k]

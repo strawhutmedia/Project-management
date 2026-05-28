@@ -34,21 +34,33 @@ async function userCanAccessProject(userId: string, role: string, projectId: str
 }
 
 export type SocialItem =
-  | { id: string; kind: 'text_post'; status: ItemStatus; assignee_user_id: string | null; ai_text: string; text: string }
-  | { id: string; kind: 'story_text'; status: ItemStatus; assignee_user_id: string | null; ai_text: string; text: string }
+  | { id: string; kind: 'text_post'; status: ItemStatus; ai_text: string; text: string }
+  | { id: string; kind: 'story_concept'; status: ItemStatus; assignee_user_id: string | null; medium: 'video' | 'photo'; description: string; caption: string; suggested_clip: string; image_direction: string }
   | { id: string; kind: 'reel_concept'; status: ItemStatus; assignee_user_id: string | null; hook: string; talking_points: string[]; suggested_clip: string }
   | { id: string; kind: 'photo_concept'; status: ItemStatus; assignee_user_id: string | null; image_direction: string; caption: string; vibe: string }
 
-type ItemStatus = 'idea' | 'drafted' | 'scheduled' | 'posted'
+type ItemStatus = 'idea' | 'drafted' | 'selected' | 'rejected' | 'scheduled' | 'posted'
 
 function rawPlanToItems(plan: RawSocialPlan, defaults: Record<string, string | undefined>): SocialItem[] {
-  const a = (kind: string): string | null => defaults[kind] ?? null
+  const a = (key: string): string | null => defaults[key] ?? null
   const items: SocialItem[] = []
   for (const p of plan.text_posts) {
-    items.push({ id: crypto.randomUUID(), kind: 'text_post', status: 'drafted', assignee_user_id: a('text_post'), ai_text: p.text, text: p.text })
+    items.push({ id: crypto.randomUUID(), kind: 'text_post', status: 'drafted', ai_text: p.text, text: p.text })
   }
-  for (const s of plan.story_texts) {
-    items.push({ id: crypto.randomUUID(), kind: 'story_text', status: 'drafted', assignee_user_id: a('story_text'), ai_text: s.text, text: s.text })
+  for (const s of plan.story_concepts) {
+    items.push({
+      id: crypto.randomUUID(),
+      kind: 'story_concept',
+      status: 'idea',
+      // story_video / story_photo defaults route each item to the right
+      // human owner without the admin having to manually reassign.
+      assignee_user_id: s.medium === 'video' ? a('story_video') : a('story_photo'),
+      medium: s.medium,
+      description: s.description,
+      caption: s.caption,
+      suggested_clip: s.suggested_clip,
+      image_direction: s.image_direction,
+    })
   }
   for (const r of plan.reel_concepts) {
     items.push({
@@ -279,8 +291,8 @@ socialsRouter.patch('/:id', async (req, res) => {
   // Whitelist editable fields per kind so the model output's shape stays intact.
   const item = items[idx]
   const allowed: Record<string, string[]> = {
-    text_post: ['status', 'text', 'assignee_user_id'],
-    story_text: ['status', 'text', 'assignee_user_id'],
+    text_post: ['status', 'text'],
+    story_concept: ['status', 'description', 'caption', 'suggested_clip', 'image_direction', 'medium', 'assignee_user_id'],
     reel_concept: ['status', 'hook', 'talking_points', 'suggested_clip', 'assignee_user_id'],
     photo_concept: ['status', 'image_direction', 'caption', 'vibe', 'assignee_user_id'],
   }
@@ -297,6 +309,25 @@ socialsRouter.patch('/:id', async (req, res) => {
   )
   const updated = await pool.query<PlanRow>(`SELECT * FROM social_plans WHERE id = $1`, [req.params.id])
   res.json({ plan: rowToApi(updated.rows[0]) })
+})
+
+// TXT export — dumps all "selected" text posts as plain text the producer
+// can save / paste into their scheduler. Falls back to all text posts when
+// nothing has been explicitly selected yet.
+socialsRouter.get('/:id/text-posts.txt', async (req, res) => {
+  const user = (req as typeof req & { user: SessionUser }).user
+  const { rows } = await pool.query<PlanRow>(`SELECT * FROM social_plans WHERE id = $1`, [req.params.id])
+  if (rows.length === 0) { res.status(404).json({ error: 'not_found' }); return }
+  if (!(await userCanAccessProject(user.id, user.role, rows[0].project_id))) {
+    res.status(403).json({ error: 'forbidden' }); return
+  }
+  const items = rows[0].items.filter((i): i is Extract<SocialItem, { kind: 'text_post' }> => i.kind === 'text_post')
+  const selectedOnly = items.filter((i) => i.status === 'selected' || i.status === 'scheduled' || i.status === 'posted')
+  const toExport = selectedOnly.length > 0 ? selectedOnly : items
+  const body = toExport.map((i) => i.text).join('\n\n---\n\n')
+  res.setHeader('Content-Type', 'text/plain; charset=utf-8')
+  res.setHeader('Content-Disposition', `attachment; filename="text-posts-${rows[0].id.slice(0, 8)}.txt"`)
+  res.send(body)
 })
 
 // DELETE
