@@ -81,6 +81,10 @@ async function collectSnapshot() {
     HAS_DATABASE_URL: Boolean(process.env.DATABASE_URL),
     HAS_RESEND_API_KEY: Boolean(process.env.RESEND_API_KEY),
     HAS_GITHUB_TOKEN: Boolean(process.env.GITHUB_TOKEN),
+    HAS_DEEPGRAM_API_KEY: Boolean(process.env.DEEPGRAM_API_KEY),
+    HAS_OPUSCLIP_API_KEY: Boolean(process.env.OPUSCLIP_API_KEY),
+    HAS_ANTHROPIC_API_KEY: Boolean(process.env.ANTHROPIC_API_KEY),
+    HAS_DROPBOX_APP_KEY: Boolean(process.env.DROPBOX_APP_KEY),
     APP_BASE_URL: process.env.APP_BASE_URL ?? null,
     ADMIN_EMAIL: process.env.ADMIN_EMAIL ?? 'ryan@strawhutmedia.com',
   }

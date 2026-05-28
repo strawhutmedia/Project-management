@@ -2,7 +2,7 @@
 // content (text posts + stories + reel + photo concepts) from the
 // episode's transcript via Claude API.
 import { useEffect, useState } from 'react'
-import { api, type ApiSocialItem, type ApiSocialPlan } from '../api'
+import { api, type ApiMember, type ApiSocialItem, type ApiSocialPlan } from '../api'
 
 const KIND_LABEL: Record<ApiSocialItem['kind'], string> = {
   text_post: '📝 Text post',
@@ -22,10 +22,12 @@ export default function SocialsSection({
   projectId,
   songId,
   canWrite,
+  members,
 }: {
   projectId: string
   songId: string
   canWrite: boolean
+  members: ApiMember[]
 }) {
   const [plans, setPlans] = useState<ApiSocialPlan[] | null>(null)
   const [hasDoneTranscript, setHasDoneTranscript] = useState<boolean | null>(null)
@@ -119,7 +121,7 @@ export default function SocialsSection({
       ) : (
         <div className="space-y-4">
           {plans.map((p) => (
-            <PlanCard key={p.id} plan={p} canWrite={canWrite} onChanged={load} onDelete={() => void remove(p.id)} />
+            <PlanCard key={p.id} plan={p} canWrite={canWrite} members={members} onChanged={load} onDelete={() => void remove(p.id)} />
           ))}
         </div>
       )}
@@ -130,11 +132,13 @@ export default function SocialsSection({
 function PlanCard({
   plan,
   canWrite,
+  members,
   onChanged,
   onDelete,
 }: {
   plan: ApiSocialPlan
   canWrite: boolean
+  members: ApiMember[]
   onChanged: () => void | Promise<void>
   onDelete: () => void
 }) {
@@ -178,7 +182,7 @@ function PlanCard({
                 <div className="text-[10px] uppercase tracking-wider text-muted/70 font-bold">{KIND_LABEL[kind]} ({buckets[kind].length})</div>
                 <div className="space-y-2">
                   {buckets[kind].map((item) => (
-                    <ItemCard key={item.id} planId={plan.id} item={item} canWrite={canWrite} onChanged={onChanged} />
+                    <ItemCard key={item.id} planId={plan.id} item={item} canWrite={canWrite} members={members} onChanged={onChanged} />
                   ))}
                 </div>
               </div>
@@ -194,11 +198,13 @@ function ItemCard({
   planId,
   item,
   canWrite,
+  members,
   onChanged,
 }: {
   planId: string
   item: ApiSocialItem
   canWrite: boolean
+  members: ApiMember[]
   onChanged: () => void | Promise<void>
 }) {
   const [busy, setBusy] = useState(false)
@@ -215,8 +221,12 @@ function ItemCard({
 
   return (
     <div className="rounded-lg border border-line/60 bg-panel/40 p-2.5 space-y-2">
-      <div className="flex items-center justify-between gap-2">
-        <StatusPill status={item.status} canWrite={canWrite} onChange={(s) => void save({ status: s })} />
+      <div className="flex items-center justify-between gap-2 flex-wrap">
+        <div className="flex items-center gap-1.5 flex-wrap">
+          <StatusPill status={item.status} canWrite={canWrite} onChange={(s) => void save({ status: s })} />
+          <AssigneePill assigneeId={item.assignee_user_id} members={members} canWrite={canWrite}
+            onChange={(v) => void save({ assignee_user_id: v })} />
+        </div>
         {busy && <span className="text-[10px] text-muted">saving…</span>}
       </div>
       {(item.kind === 'text_post' || item.kind === 'story_text') && (
@@ -262,6 +272,41 @@ function ItemCard({
         </div>
       )}
     </div>
+  )
+}
+
+function AssigneePill({
+  assigneeId,
+  members,
+  canWrite,
+  onChange,
+}: {
+  assigneeId: string | null
+  members: ApiMember[]
+  canWrite: boolean
+  onChange: (next: string | null) => void
+}) {
+  const current = members.find((m) => m.id === assigneeId)
+  const label = current ? (current.display_name || current.name) : 'Unassigned'
+  if (!canWrite) {
+    return (
+      <span className="text-[10px] uppercase tracking-wider font-bold rounded-full px-2 py-0.5 border border-line bg-ink/20 text-muted">
+        👤 {label}
+      </span>
+    )
+  }
+  return (
+    <select
+      value={assigneeId ?? ''}
+      onChange={(e) => onChange(e.target.value || null)}
+      className="text-[10px] uppercase tracking-wider font-bold rounded-full px-2 py-0.5 border border-line bg-ink/20 text-text outline-none"
+      title="Assigned to"
+    >
+      <option value="">👤 Unassigned</option>
+      {members.map((m) => (
+        <option key={m.id} value={m.id}>👤 {m.display_name || m.name}</option>
+      ))}
+    </select>
   )
 }
 

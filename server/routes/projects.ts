@@ -307,6 +307,16 @@ projectsRouter.patch('/:id', async (req, res) => {
     updates.push(`socials_example_posts = $${i++}::jsonb`)
     values.push(JSON.stringify(cleaned))
   }
+  if (req.body?.socialsDefaultAssignees && typeof req.body.socialsDefaultAssignees === 'object') {
+    const allowedKinds = ['text_post', 'story_text', 'reel_concept', 'photo_concept']
+    const cleaned: Record<string, string> = {}
+    for (const k of allowedKinds) {
+      const v = (req.body.socialsDefaultAssignees as Record<string, unknown>)[k]
+      if (typeof v === 'string' && v.length > 0) cleaned[k] = v
+    }
+    updates.push(`socials_default_assignees = $${i++}::jsonb`)
+    values.push(JSON.stringify(cleaned))
+  }
   if (defaultOwners && typeof defaultOwners === 'object') {
     // Whitelist: music stage keys + film role keys + podcast role keys
     const allowed = [
@@ -346,7 +356,7 @@ projectsRouter.get('/:id', async (req, res) => {
   const projectId = req.params.id
   const projRes = await pool.query(
     `SELECT id, name, subtitle, kind, dropbox_folder, default_owners, stage_labels, channels_subfolder, film_phase,
-            socials_brand_voice, socials_example_posts
+            socials_brand_voice, socials_example_posts, socials_default_assignees
        FROM projects WHERE id = $1`,
     [projectId],
   )
@@ -445,6 +455,8 @@ projectsRouter.get('/:id', async (req, res) => {
       filmPhase: project.film_phase || 'pre',
       socialsBrandVoice: project.socials_brand_voice ?? null,
       socialsExamplePosts: Array.isArray(project.socials_example_posts) ? project.socials_example_posts : [],
+      socialsDefaultAssignees: (project.socials_default_assignees && typeof project.socials_default_assignees === 'object')
+        ? project.socials_default_assignees : {},
       songs: songs.rows.map((s: { id: string; title: string; subtitle: string | null; stage: string }) => ({
         id: s.id,
         title: s.title,

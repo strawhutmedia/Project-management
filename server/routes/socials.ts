@@ -34,26 +34,28 @@ async function userCanAccessProject(userId: string, role: string, projectId: str
 }
 
 export type SocialItem =
-  | { id: string; kind: 'text_post'; status: ItemStatus; ai_text: string; text: string }
-  | { id: string; kind: 'story_text'; status: ItemStatus; ai_text: string; text: string }
-  | { id: string; kind: 'reel_concept'; status: ItemStatus; hook: string; talking_points: string[]; suggested_clip: string }
-  | { id: string; kind: 'photo_concept'; status: ItemStatus; image_direction: string; caption: string; vibe: string }
+  | { id: string; kind: 'text_post'; status: ItemStatus; assignee_user_id: string | null; ai_text: string; text: string }
+  | { id: string; kind: 'story_text'; status: ItemStatus; assignee_user_id: string | null; ai_text: string; text: string }
+  | { id: string; kind: 'reel_concept'; status: ItemStatus; assignee_user_id: string | null; hook: string; talking_points: string[]; suggested_clip: string }
+  | { id: string; kind: 'photo_concept'; status: ItemStatus; assignee_user_id: string | null; image_direction: string; caption: string; vibe: string }
 
 type ItemStatus = 'idea' | 'drafted' | 'scheduled' | 'posted'
 
-function rawPlanToItems(plan: RawSocialPlan): SocialItem[] {
+function rawPlanToItems(plan: RawSocialPlan, defaults: Record<string, string | undefined>): SocialItem[] {
+  const a = (kind: string): string | null => defaults[kind] ?? null
   const items: SocialItem[] = []
   for (const p of plan.text_posts) {
-    items.push({ id: crypto.randomUUID(), kind: 'text_post', status: 'drafted', ai_text: p.text, text: p.text })
+    items.push({ id: crypto.randomUUID(), kind: 'text_post', status: 'drafted', assignee_user_id: a('text_post'), ai_text: p.text, text: p.text })
   }
   for (const s of plan.story_texts) {
-    items.push({ id: crypto.randomUUID(), kind: 'story_text', status: 'drafted', ai_text: s.text, text: s.text })
+    items.push({ id: crypto.randomUUID(), kind: 'story_text', status: 'drafted', assignee_user_id: a('story_text'), ai_text: s.text, text: s.text })
   }
   for (const r of plan.reel_concepts) {
     items.push({
       id: crypto.randomUUID(),
       kind: 'reel_concept',
       status: 'idea',
+      assignee_user_id: a('reel_concept'),
       hook: r.hook,
       talking_points: r.talking_points,
       suggested_clip: r.suggested_clip,
@@ -64,6 +66,7 @@ function rawPlanToItems(plan: RawSocialPlan): SocialItem[] {
       id: crypto.randomUUID(),
       kind: 'photo_concept',
       status: 'idea',
+      assignee_user_id: a('photo_concept'),
       image_direction: ph.image_direction,
       caption: ph.caption,
       vibe: ph.vibe,
@@ -154,11 +157,13 @@ socialsRouter.post('/', async (req, res) => {
     project_subtitle: string | null
     brand_voice: string | null
     example_posts: string[] | null
+    default_assignees: Record<string, string> | null
   }>(
     `SELECT s.project_id, s.title AS song_title, s.subtitle AS song_subtitle,
             p.name AS project_name, p.subtitle AS project_subtitle,
             p.socials_brand_voice AS brand_voice,
-            p.socials_example_posts AS example_posts
+            p.socials_example_posts AS example_posts,
+            p.socials_default_assignees AS default_assignees
        FROM songs s JOIN projects p ON p.id = s.project_id
       WHERE s.id = $1`,
     [songId],
@@ -219,7 +224,8 @@ socialsRouter.post('/', async (req, res) => {
         episodeTranscript: transcriptText,
         date: new Date().toISOString().slice(0, 10),
       })
-      const items = rawPlanToItems(result.plan)
+      const defaults = (ctx.default_assignees ?? {}) as Record<string, string>
+      const items = rawPlanToItems(result.plan, defaults)
       await pool.query(
         `UPDATE social_plans
             SET status = 'generated',
@@ -273,10 +279,10 @@ socialsRouter.patch('/:id', async (req, res) => {
   // Whitelist editable fields per kind so the model output's shape stays intact.
   const item = items[idx]
   const allowed: Record<string, string[]> = {
-    text_post: ['status', 'text'],
-    story_text: ['status', 'text'],
-    reel_concept: ['status', 'hook', 'talking_points', 'suggested_clip'],
-    photo_concept: ['status', 'image_direction', 'caption', 'vibe'],
+    text_post: ['status', 'text', 'assignee_user_id'],
+    story_text: ['status', 'text', 'assignee_user_id'],
+    reel_concept: ['status', 'hook', 'talking_points', 'suggested_clip', 'assignee_user_id'],
+    photo_concept: ['status', 'image_direction', 'caption', 'vibe', 'assignee_user_id'],
   }
   const fields = allowed[item.kind] ?? ['status']
   const next: SocialItem = { ...item }

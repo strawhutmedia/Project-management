@@ -164,10 +164,10 @@ export type ApiBudget = {
 }
 
 export type ApiSocialItem =
-  | { id: string; kind: 'text_post'; status: 'idea' | 'drafted' | 'scheduled' | 'posted'; ai_text: string; text: string }
-  | { id: string; kind: 'story_text'; status: 'idea' | 'drafted' | 'scheduled' | 'posted'; ai_text: string; text: string }
-  | { id: string; kind: 'reel_concept'; status: 'idea' | 'drafted' | 'scheduled' | 'posted'; hook: string; talking_points: string[]; suggested_clip: string }
-  | { id: string; kind: 'photo_concept'; status: 'idea' | 'drafted' | 'scheduled' | 'posted'; image_direction: string; caption: string; vibe: string }
+  | { id: string; kind: 'text_post'; status: 'idea' | 'drafted' | 'scheduled' | 'posted'; assignee_user_id: string | null; ai_text: string; text: string }
+  | { id: string; kind: 'story_text'; status: 'idea' | 'drafted' | 'scheduled' | 'posted'; assignee_user_id: string | null; ai_text: string; text: string }
+  | { id: string; kind: 'reel_concept'; status: 'idea' | 'drafted' | 'scheduled' | 'posted'; assignee_user_id: string | null; hook: string; talking_points: string[]; suggested_clip: string }
+  | { id: string; kind: 'photo_concept'; status: 'idea' | 'drafted' | 'scheduled' | 'posted'; assignee_user_id: string | null; image_direction: string; caption: string; vibe: string }
 
 export type ApiSocialPlan = {
   id: string
@@ -300,6 +300,7 @@ export type ApiProject = {
   filmPhase?: 'pre' | 'production' | 'post' | 'wrapped'
   socialsBrandVoice?: string | null
   socialsExamplePosts?: string[]
+  socialsDefaultAssignees?: Partial<Record<'text_post' | 'story_text' | 'reel_concept' | 'photo_concept', string>>
   songs: ApiSong[]
 }
 
@@ -414,7 +415,7 @@ export const api = {
     return res.json() as Promise<{ ok: true; path: string }>
   },
   // Project edit
-  updateProject: (id: string, patch: { name?: string; subtitle?: string; dropboxFolder?: string; channelsSubfolder?: string | null; defaultOwners?: Record<string, string>; filmPhase?: 'pre' | 'production' | 'post' | 'wrapped'; socialsBrandVoice?: string | null; socialsExamplePosts?: string[] }) =>
+  updateProject: (id: string, patch: { name?: string; subtitle?: string; dropboxFolder?: string; channelsSubfolder?: string | null; defaultOwners?: Record<string, string>; filmPhase?: 'pre' | 'production' | 'post' | 'wrapped'; socialsBrandVoice?: string | null; socialsExamplePosts?: string[]; socialsDefaultAssignees?: Partial<Record<'text_post' | 'story_text' | 'reel_concept' | 'photo_concept', string>> }) =>
     request<{ ok: true }>(`/api/projects/${id}`, { method: 'PATCH', body: JSON.stringify(patch) }),
   addSong: (projectId: string, body: { title: string; subtitle?: string }) =>
     request<{ song: { id: string; title: string } }>(`/api/projects/${projectId}/songs`, { method: 'POST', body: JSON.stringify(body) }),
