@@ -12,6 +12,7 @@ import { notificationsRouter } from './routes/notifications'
 import { budgetsRouter } from './routes/budgets'
 import { stripboardRouter } from './routes/stripboard'
 import { transcriptsRouter } from './routes/transcripts'
+import { clipsRouter } from './routes/clips'
 import { seedBackInYourArms } from './seeds/back_in_your_arms'
 import { ensureRyanIsPodcastEp } from './routes/projects'
 import { startScheduler } from './scheduler'
@@ -47,6 +48,7 @@ app.use('/api/notifications', notificationsRouter)
 app.use('/api/budgets', budgetsRouter)
 app.use('/api/stripboard', stripboardRouter)
 app.use('/api/transcripts', transcriptsRouter)
+app.use('/api/clips', clipsRouter)
 
 const clientDir = path.resolve(process.cwd(), 'dist')
 logInfo('serving client from', { clientDir })

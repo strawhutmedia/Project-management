@@ -9,6 +9,7 @@ import AddLinkModal from '../components/AddLinkModal'
 import MentionInput, { renderWithMentions } from '../components/MentionInput'
 import DueDateChip from '../components/DueDateChip'
 import TranscriptsSection from '../components/TranscriptsSection'
+import ClipsSection from '../components/ClipsSection'
 import { useAuth } from '../auth'
 
 export default function SongPage() {
@@ -166,7 +167,12 @@ export default function SongPage() {
             const me = members.find((m) => m.id === user?.id)
             const myProjectRole = me?.project_role ?? (user?.role === 'admin' ? 'admin' : null)
             const canWrite = myProjectRole === 'admin' || myProjectRole === 'user'
-            return <TranscriptsSection projectId={song.projectId} songId={song.id} canWrite={canWrite} />
+            return (
+              <>
+                <TranscriptsSection projectId={song.projectId} songId={song.id} canWrite={canWrite} />
+                <ClipsSection projectId={song.projectId} songId={song.id} canWrite={canWrite} />
+              </>
+            )
           })()}
           <CommentsPanel song={song} members={members} onChange={reload} userId={user?.id ?? ''} userRole={user?.role ?? 'user'} />
         </div>

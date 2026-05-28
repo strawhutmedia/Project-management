@@ -163,6 +163,29 @@ export type ApiBudget = {
   accounts: ApiBudgetAccount[]
 }
 
+export type ApiClip = {
+  id: string
+  title: string | null
+  durationSeconds: number | null
+  previewUrl: string | null
+  downloadUrl: string | null
+  thumbnailUrl: string | null
+  score: number | null
+}
+
+export type ApiClipJob = {
+  id: string
+  projectId: string
+  songId: string | null
+  dropboxPath: string
+  fileName: string
+  status: 'queued' | 'processing' | 'done' | 'failed'
+  error: string | null
+  createdAt: string
+  updatedAt: string
+  clips: ApiClip[]
+}
+
 export type ApiTranscriptBlock = {
   id: string
   speaker: string
@@ -500,6 +523,19 @@ export const api = {
     }),
   deleteTranscript: (id: string) =>
     request<{ ok: true }>(`/api/transcripts/${id}`, { method: 'DELETE' }),
+  // Clips (OpusClip)
+  clipJobs: (songId: string) =>
+    request<{ jobs: ApiClipJob[] }>(`/api/clips?songId=${songId}`),
+  clipJob: (id: string) =>
+    request<{ job: ApiClipJob }>(`/api/clips/${id}`),
+  startClipJob: (body: { projectId: string; songId: string; dropboxPath: string }) =>
+    request<{ job: ApiClipJob }>('/api/clips', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+  deleteClipJob: (id: string) =>
+    request<{ ok: true }>(`/api/clips/${id}`, { method: 'DELETE' }),
+
   transcriptSrtUrl: (id: string) => `/api/transcripts/${id}/srt`,
   transcriptVttUrl: (id: string) => `/api/transcripts/${id}/vtt`,
   transcriptTxtUrl: (id: string) => `/api/transcripts/${id}/txt`,
