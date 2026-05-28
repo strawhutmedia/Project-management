@@ -119,24 +119,44 @@ async function assertDropboxPathAllowed(
   user: SessionUser,
   path: string,
   scopeSongId: string | null,
+  scopeProjectId: string | null = null,
 ): Promise<{ ok: true } | { ok: false; status: number; error: string }> {
   if (user.role === 'admin') return { ok: true }
-  if (!scopeSongId) return { ok: false, status: 403, error: 'scope_required' }
-  const { rows } = await pool.query<{ dropbox_folder: string | null; project_id: string }>(
-    `SELECT s.dropbox_folder, s.project_id FROM songs s WHERE s.id = $1`,
-    [scopeSongId],
+  if (!scopeSongId && !scopeProjectId) return { ok: false, status: 403, error: 'scope_required' }
+  // Song scope: stricter — must be inside the song's folder.
+  if (scopeSongId) {
+    const { rows } = await pool.query<{ dropbox_folder: string | null; project_id: string }>(
+      `SELECT s.dropbox_folder, s.project_id FROM songs s WHERE s.id = $1`,
+      [scopeSongId],
+    )
+    if (rows.length === 0) return { ok: false, status: 404, error: 'song_not_found' }
+    const songRoot = rows[0].dropbox_folder
+    if (!songRoot) return { ok: false, status: 400, error: 'song_has_no_folder' }
+    const access = await pool.query(
+      `SELECT 1 FROM project_members WHERE project_id = $1 AND user_id = $2 LIMIT 1`,
+      [rows[0].project_id, user.id],
+    )
+    if (access.rows.length === 0) return { ok: false, status: 403, error: 'forbidden' }
+    if (!isPathWithin(path, songRoot)) {
+      return { ok: false, status: 403, error: `out_of_scope:path_must_be_within:${songRoot}` }
+    }
+    return { ok: true }
+  }
+  // Project scope: looser — anywhere inside the project's root folder.
+  const { rows } = await pool.query<{ dropbox_folder: string | null }>(
+    `SELECT dropbox_folder FROM projects WHERE id = $1`,
+    [scopeProjectId],
   )
-  if (rows.length === 0) return { ok: false, status: 404, error: 'song_not_found' }
-  const songRoot = rows[0].dropbox_folder
-  if (!songRoot) return { ok: false, status: 400, error: 'song_has_no_folder' }
-  // Verify the user has any access to the song's project
+  if (rows.length === 0) return { ok: false, status: 404, error: 'project_not_found' }
+  const projectRoot = rows[0].dropbox_folder
+  if (!projectRoot) return { ok: false, status: 400, error: 'project_has_no_folder' }
   const access = await pool.query(
     `SELECT 1 FROM project_members WHERE project_id = $1 AND user_id = $2 LIMIT 1`,
-    [rows[0].project_id, user.id],
+    [scopeProjectId, user.id],
   )
   if (access.rows.length === 0) return { ok: false, status: 403, error: 'forbidden' }
-  if (!isPathWithin(path, songRoot)) {
-    return { ok: false, status: 403, error: `out_of_scope:path_must_be_within:${songRoot}` }
+  if (!isPathWithin(path, projectRoot)) {
+    return { ok: false, status: 403, error: `out_of_scope:path_must_be_within:${projectRoot}` }
   }
   return { ok: true }
 }
@@ -145,11 +165,12 @@ integrationsRouter.get('/dropbox/list', requireUser, async (req, res) => {
   const user = (req as typeof req & { user: SessionUser }).user
   const folder = String(req.query.path || '')
   const scopeSongId = req.query.scopeSongId ? String(req.query.scopeSongId) : null
+  const scopeProjectId = req.query.scopeProjectId ? String(req.query.scopeProjectId) : null
   if (!folder) {
     res.status(400).json({ error: 'path_required' })
     return
   }
-  const guard = await assertDropboxPathAllowed(user, folder, scopeSongId)
+  const guard = await assertDropboxPathAllowed(user, folder, scopeSongId, scopeProjectId)
   if (!guard.ok) { res.status(guard.status).json({ error: guard.error }); return }
   const result = await listFolder(folder)
   if (!result.ok) {
@@ -163,11 +184,12 @@ integrationsRouter.post('/dropbox/create-folder', requireUser, async (req, res) 
   const user = (req as typeof req & { user: SessionUser }).user
   const folder = String(req.body?.path || '')
   const scopeSongId = req.body?.scopeSongId ? String(req.body.scopeSongId) : null
+  const scopeProjectId = req.body?.scopeProjectId ? String(req.body.scopeProjectId) : null
   if (!folder) {
     res.status(400).json({ error: 'path_required' })
     return
   }
-  const guard = await assertDropboxPathAllowed(user, folder, scopeSongId)
+  const guard = await assertDropboxPathAllowed(user, folder, scopeSongId, scopeProjectId)
   if (!guard.ok) { res.status(guard.status).json({ error: guard.error }); return }
   const result = await createFolder(folder)
   if (!result.ok) {
@@ -190,11 +212,14 @@ integrationsRouter.post(
     const scopeSongId = req.headers['x-scope-song-id']
       ? String(req.headers['x-scope-song-id'])
       : null
+    const scopeProjectId = req.headers['x-scope-project-id']
+      ? String(req.headers['x-scope-project-id'])
+      : null
     if (!folderPath || !fileName) {
       res.status(400).json({ error: 'missing_headers' })
       return
     }
-    const guard = await assertDropboxPathAllowed(user, folderPath, scopeSongId)
+    const guard = await assertDropboxPathAllowed(user, folderPath, scopeSongId, scopeProjectId)
     if (!guard.ok) { res.status(guard.status).json({ error: guard.error }); return }
     if (!Buffer.isBuffer(req.body) || req.body.length === 0) {
       res.status(400).json({ error: 'empty_body' })
@@ -218,11 +243,12 @@ integrationsRouter.post('/dropbox/share-link', requireUser, async (req, res) => 
   const user = (req as typeof req & { user: SessionUser }).user
   const path = String(req.body?.path || '')
   const scopeSongId = req.body?.scopeSongId ? String(req.body.scopeSongId) : null
+  const scopeProjectId = req.body?.scopeProjectId ? String(req.body.scopeProjectId) : null
   if (!path) {
     res.status(400).json({ error: 'path_required' })
     return
   }
-  const guard = await assertDropboxPathAllowed(user, path, scopeSongId)
+  const guard = await assertDropboxPathAllowed(user, path, scopeSongId, scopeProjectId)
   if (!guard.ok) { res.status(guard.status).json({ error: guard.error }); return }
   const result = await createSharedLink(path)
   if (!result.ok) {

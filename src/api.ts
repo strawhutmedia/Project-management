@@ -382,28 +382,30 @@ export const api = {
       body: JSON.stringify({ path }),
     }),
   dropboxDisconnect: () => request<{ ok: true }>('/api/integrations/dropbox/disconnect', { method: 'POST' }),
-  dropboxList: (path: string, scopeSongId?: string) => {
+  dropboxList: (path: string, opts?: { scopeSongId?: string; scopeProjectId?: string }) => {
     const qs = new URLSearchParams({ path })
-    if (scopeSongId) qs.set('scopeSongId', scopeSongId)
+    if (opts?.scopeSongId) qs.set('scopeSongId', opts.scopeSongId)
+    if (opts?.scopeProjectId) qs.set('scopeProjectId', opts.scopeProjectId)
     return request<{ entries: ApiDropboxEntry[] }>(`/api/integrations/dropbox/list?${qs.toString()}`)
   },
-  dropboxCreateFolder: (path: string, scopeSongId?: string) =>
+  dropboxCreateFolder: (path: string, opts?: { scopeSongId?: string; scopeProjectId?: string }) =>
     request<{ ok: true }>('/api/integrations/dropbox/create-folder', {
       method: 'POST',
-      body: JSON.stringify({ path, scopeSongId }),
+      body: JSON.stringify({ path, scopeSongId: opts?.scopeSongId, scopeProjectId: opts?.scopeProjectId }),
     }),
-  dropboxShareLink: (path: string, scopeSongId?: string) =>
+  dropboxShareLink: (path: string, opts?: { scopeSongId?: string; scopeProjectId?: string }) =>
     request<{ url: string }>('/api/integrations/dropbox/share-link', {
       method: 'POST',
-      body: JSON.stringify({ path, scopeSongId }),
+      body: JSON.stringify({ path, scopeSongId: opts?.scopeSongId, scopeProjectId: opts?.scopeProjectId }),
     }),
-  dropboxUpload: async (folderPath: string, file: File, scopeSongId?: string): Promise<{ ok: true; path: string }> => {
+  dropboxUpload: async (folderPath: string, file: File, opts?: { scopeSongId?: string; scopeProjectId?: string }): Promise<{ ok: true; path: string }> => {
     const headers: Record<string, string> = {
       'Content-Type': 'application/octet-stream',
       'X-Folder-Path': folderPath,
       'X-File-Name': encodeURIComponent(file.name),
     }
-    if (scopeSongId) headers['X-Scope-Song-Id'] = scopeSongId
+    if (opts?.scopeSongId) headers['X-Scope-Song-Id'] = opts.scopeSongId
+    if (opts?.scopeProjectId) headers['X-Scope-Project-Id'] = opts.scopeProjectId
     const res = await fetch('/api/integrations/dropbox/upload', {
       method: 'POST',
       credentials: 'include',

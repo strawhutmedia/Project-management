@@ -10,10 +10,14 @@ export default function TranscriptsSection({
   projectId,
   songId,
   canWrite,
+  projectRoot,
 }: {
   projectId: string
   songId?: string
   canWrite: boolean
+  // Project's Dropbox root, so the file picker is scoped to the show's
+  // folder tree — users can navigate into subfolders but never above.
+  projectRoot?: string | null
 }) {
   const [transcripts, setTranscripts] = useState<ApiTranscript[] | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -110,6 +114,9 @@ export default function TranscriptsSection({
       {picking && (
         <DropboxFilePicker
           title="Pick a media file"
+          initialPath={projectRoot ?? undefined}
+          restrictAbove={projectRoot ?? undefined}
+          scopeProjectId={projectId}
           onSelect={(path, name, size) => void startNew(path, name, size)}
           onCancel={() => setPicking(false)}
         />

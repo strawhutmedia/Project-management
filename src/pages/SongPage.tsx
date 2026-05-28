@@ -170,9 +170,11 @@ export default function SongPage() {
             const canWrite = myProjectRole === 'admin' || myProjectRole === 'user'
             return (
               <>
-                <TranscriptsSection projectId={song.projectId} songId={song.id} canWrite={canWrite} />
+                <TranscriptsSection projectId={song.projectId} songId={song.id} canWrite={canWrite}
+                  projectRoot={song.projectRoot} />
                 <SocialsSection projectId={song.projectId} songId={song.id} canWrite={canWrite} members={members} />
-                <ClipsSection projectId={song.projectId} songId={song.id} canWrite={canWrite} />
+                <ClipsSection projectId={song.projectId} songId={song.id} canWrite={canWrite}
+                  projectRoot={song.projectRoot} />
               </>
             )
           })()}
@@ -666,7 +668,7 @@ function DropboxPanel({
     try {
       // Pass scopeSongId for non-admins so the server enforces the song
       // folder boundary; admins call unscoped so they can navigate above.
-      const { entries } = await api.dropboxList(path, isProjectAdmin ? undefined : song.id)
+      const { entries } = await api.dropboxList(path, isProjectAdmin ? undefined : { scopeSongId: song.id })
       setEntries(entries)
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'failed'
@@ -695,7 +697,7 @@ function DropboxPanel({
   async function createFolderAt(path: string) {
     setCreating(true)
     try {
-      await api.dropboxCreateFolder(path, isProjectAdmin ? undefined : song.id)
+      await api.dropboxCreateFolder(path, isProjectAdmin ? undefined : { scopeSongId: song.id })
       await load(currentPath)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'failed')
@@ -723,7 +725,7 @@ function DropboxPanel({
   // file for files. No local zipping required.
   async function downloadFolder(path: string) {
     try {
-      const { url } = await api.dropboxShareLink(path, isProjectAdmin ? undefined : song.id)
+      const { url } = await api.dropboxShareLink(path, isProjectAdmin ? undefined : { scopeSongId: song.id })
       const dl = url.includes('?')
         ? `${url}&dl=1`
         : `${url}?dl=1`
@@ -740,7 +742,7 @@ function DropboxPanel({
     setUploading(true)
     setUploadError(null)
     try {
-      await api.dropboxUpload(currentPath, file, isProjectAdmin ? undefined : song.id)
+      await api.dropboxUpload(currentPath, file, isProjectAdmin ? undefined : { scopeSongId: song.id })
       await load(currentPath)
       await onChange()
     } catch (err) {

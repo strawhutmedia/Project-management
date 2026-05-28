@@ -9,10 +9,12 @@ export default function ClipsSection({
   projectId,
   songId,
   canWrite,
+  projectRoot,
 }: {
   projectId: string
   songId: string
   canWrite: boolean
+  projectRoot?: string | null
 }) {
   const [jobs, setJobs] = useState<ApiClipJob[] | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -114,6 +116,9 @@ export default function ClipsSection({
         <DropboxFilePicker
           title="Pick a video for clip generation"
           acceptExtensions={['.mp4', '.mov', '.webm', '.m4v', '.mkv']}
+          initialPath={projectRoot ?? undefined}
+          restrictAbove={projectRoot ?? undefined}
+          scopeProjectId={projectId}
           onSelect={(path, name, size) => void startNew(path, name, size)}
           onCancel={() => setPicking(false)}
         />

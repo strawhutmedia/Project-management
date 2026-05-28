@@ -5,6 +5,14 @@ import { api, type ApiDropboxEntry } from '../api'
 
 type Props = {
   initialPath?: string
+  // Hard ceiling — user cannot navigate above this path. Hides the ← Up
+  // button when currentPath === restrictAbove. Used to lock the picker
+  // to a project's or song's folder tree.
+  restrictAbove?: string
+  // Server-side scope. Passed to api.dropboxList so non-admin users get
+  // 403 if they try to read outside scope (defense in depth).
+  scopeProjectId?: string
+  scopeSongId?: string
   acceptExtensions?: string[]
   title?: string
   onSelect: (path: string, name: string, size?: number) => void
@@ -15,17 +23,20 @@ const MEDIA_EXT = ['.mp4', '.m4a', '.mp3', '.mov', '.wav', '.webm', '.ogg', '.fl
 
 export default function DropboxFilePicker({
   initialPath,
+  restrictAbove,
+  scopeProjectId,
+  scopeSongId,
   acceptExtensions = MEDIA_EXT,
   title = 'Pick a file',
   onSelect,
   onCancel,
 }: Props) {
-  // If no initialPath is passed, fall back to the workspace-level default
-  // so users never land on the Dropbox personal root.
-  const [currentPath, setCurrentPath] = useState(initialPath ?? '')
+  // Priority: initialPath > restrictAbove (lock root) > workspace default.
+  const initial = initialPath ?? restrictAbove
+  const [currentPath, setCurrentPath] = useState(initial ?? '')
   const [entries, setEntries] = useState<ApiDropboxEntry[] | null>(null)
   const [error, setError] = useState<string | null>(null)
-  const [resolvedDefault, setResolvedDefault] = useState(initialPath !== undefined)
+  const [resolvedDefault, setResolvedDefault] = useState(initial !== undefined)
   const [teamFolder, setTeamFolder] = useState<string>('')
 
   useEffect(() => {
@@ -53,7 +64,7 @@ export default function DropboxFilePicker({
     setError(null)
     try {
       const apiPath = path === '' || path === '/' ? '/' : path
-      const { entries } = await api.dropboxList(apiPath)
+      const { entries } = await api.dropboxList(apiPath, { scopeProjectId, scopeSongId })
       setEntries(entries)
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'failed'
@@ -85,9 +96,13 @@ export default function DropboxFilePicker({
 
   function navigateUp() {
     if (!currentPath || currentPath === '/' || currentPath === '') return
+    if (restrictAbove && currentPath === restrictAbove) return
     const parent = currentPath.replace(/\/[^/]+\/?$/, '')
     setCurrentPath(parent || '')
   }
+
+  // Show ← Up unless we're at the show's locked root.
+  const canGoUp = currentPath !== '' && currentPath !== '/' && currentPath !== restrictAbove
 
   function isAcceptedFile(name: string): boolean {
     const lower = name.toLowerCase()
@@ -123,7 +138,7 @@ export default function DropboxFilePicker({
             <div className="text-sm font-mono break-all">{displayPath}</div>
           </div>
           <div className="flex gap-1.5 flex-wrap shrink-0">
-            {currentPath && (
+            {canGoUp && (
               <button
                 onClick={navigateUp}
                 className="text-[11px] uppercase tracking-wider text-stage-stems border border-stage-stems/40 rounded-full px-2.5 py-1 hover:bg-stage-stems/10"
@@ -131,7 +146,16 @@ export default function DropboxFilePicker({
                 ← Up
               </button>
             )}
-            {teamFolder && currentPath !== teamFolder && (
+            {restrictAbove && currentPath !== restrictAbove && (
+              <button
+                onClick={() => setCurrentPath(restrictAbove)}
+                title={`Reset to show root: ${restrictAbove}`}
+                className="text-[11px] uppercase tracking-wider text-stage-stems border border-stage-stems/40 rounded-full px-2.5 py-1 hover:bg-stage-stems/10"
+              >
+                ↩ Show root
+              </button>
+            )}
+            {!restrictAbove && teamFolder && currentPath !== teamFolder && (
               <button
                 onClick={() => setCurrentPath(teamFolder)}
                 title={`Reset to ${teamFolder}`}
