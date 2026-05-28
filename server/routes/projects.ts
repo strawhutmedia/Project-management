@@ -294,6 +294,19 @@ projectsRouter.patch('/:id', async (req, res) => {
     updates.push(`channels_subfolder = $${i++}`)
     values.push(v || null)
   }
+  if ('socialsBrandVoice' in (req.body ?? {})) {
+    const v = req.body.socialsBrandVoice
+    updates.push(`socials_brand_voice = $${i++}`)
+    values.push(typeof v === 'string' && v.trim() ? v.trim().slice(0, 8000) : null)
+  }
+  if (Array.isArray(req.body?.socialsExamplePosts)) {
+    const cleaned = (req.body.socialsExamplePosts as unknown[])
+      .filter((x): x is string => typeof x === 'string' && x.trim().length > 0)
+      .map((x) => x.trim().slice(0, 1000))
+      .slice(0, 20)
+    updates.push(`socials_example_posts = $${i++}::jsonb`)
+    values.push(JSON.stringify(cleaned))
+  }
   if (defaultOwners && typeof defaultOwners === 'object') {
     // Whitelist: music stage keys + film role keys + podcast role keys
     const allowed = [
@@ -332,7 +345,9 @@ projectsRouter.get('/:id', async (req, res) => {
   const user = (req as typeof req & { user: SessionUser }).user
   const projectId = req.params.id
   const projRes = await pool.query(
-    `SELECT id, name, subtitle, kind, dropbox_folder, default_owners, stage_labels, channels_subfolder, film_phase FROM projects WHERE id = $1`,
+    `SELECT id, name, subtitle, kind, dropbox_folder, default_owners, stage_labels, channels_subfolder, film_phase,
+            socials_brand_voice, socials_example_posts
+       FROM projects WHERE id = $1`,
     [projectId],
   )
   if (projRes.rows.length === 0) {
@@ -428,6 +443,8 @@ projectsRouter.get('/:id', async (req, res) => {
       stageLabels: project.stage_labels || {},
       channelsSubfolder: project.channels_subfolder,
       filmPhase: project.film_phase || 'pre',
+      socialsBrandVoice: project.socials_brand_voice ?? null,
+      socialsExamplePosts: Array.isArray(project.socials_example_posts) ? project.socials_example_posts : [],
       songs: songs.rows.map((s: { id: string; title: string; subtitle: string | null; stage: string }) => ({
         id: s.id,
         title: s.title,

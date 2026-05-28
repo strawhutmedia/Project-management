@@ -163,6 +163,30 @@ export type ApiBudget = {
   accounts: ApiBudgetAccount[]
 }
 
+export type ApiSocialItem =
+  | { id: string; kind: 'text_post'; status: 'idea' | 'drafted' | 'scheduled' | 'posted'; ai_text: string; text: string }
+  | { id: string; kind: 'story_text'; status: 'idea' | 'drafted' | 'scheduled' | 'posted'; ai_text: string; text: string }
+  | { id: string; kind: 'reel_concept'; status: 'idea' | 'drafted' | 'scheduled' | 'posted'; hook: string; talking_points: string[]; suggested_clip: string }
+  | { id: string; kind: 'photo_concept'; status: 'idea' | 'drafted' | 'scheduled' | 'posted'; image_direction: string; caption: string; vibe: string }
+
+export type ApiSocialPlan = {
+  id: string
+  projectId: string
+  songId: string
+  transcriptId: string | null
+  items: ApiSocialItem[]
+  status: 'generating' | 'generated' | 'failed'
+  error: string | null
+  usage: {
+    inputTokens: number | null
+    outputTokens: number | null
+    cacheReadTokens: number | null
+    cacheCreateTokens: number | null
+  }
+  createdAt: string
+  updatedAt: string
+}
+
 export type ApiClip = {
   id: string
   title: string | null
@@ -274,6 +298,8 @@ export type ApiProject = {
   defaultOwners?: Record<string, { id: string; name: string } | null>
   stageLabels?: Partial<Record<Stage, { label?: string; icon?: string }>>
   filmPhase?: 'pre' | 'production' | 'post' | 'wrapped'
+  socialsBrandVoice?: string | null
+  socialsExamplePosts?: string[]
   songs: ApiSong[]
 }
 
@@ -388,7 +414,7 @@ export const api = {
     return res.json() as Promise<{ ok: true; path: string }>
   },
   // Project edit
-  updateProject: (id: string, patch: { name?: string; subtitle?: string; dropboxFolder?: string; channelsSubfolder?: string | null; defaultOwners?: Record<string, string>; filmPhase?: 'pre' | 'production' | 'post' | 'wrapped' }) =>
+  updateProject: (id: string, patch: { name?: string; subtitle?: string; dropboxFolder?: string; channelsSubfolder?: string | null; defaultOwners?: Record<string, string>; filmPhase?: 'pre' | 'production' | 'post' | 'wrapped'; socialsBrandVoice?: string | null; socialsExamplePosts?: string[] }) =>
     request<{ ok: true }>(`/api/projects/${id}`, { method: 'PATCH', body: JSON.stringify(patch) }),
   addSong: (projectId: string, body: { title: string; subtitle?: string }) =>
     request<{ song: { id: string; title: string } }>(`/api/projects/${projectId}/songs`, { method: 'POST', body: JSON.stringify(body) }),
@@ -523,6 +549,24 @@ export const api = {
     }),
   deleteTranscript: (id: string) =>
     request<{ ok: true }>(`/api/transcripts/${id}`, { method: 'DELETE' }),
+  // Socials (Claude-generated daily content plans)
+  socialPlans: (songId: string) =>
+    request<{ plans: ApiSocialPlan[] }>(`/api/socials?songId=${songId}`),
+  socialPlan: (id: string) =>
+    request<{ plan: ApiSocialPlan }>(`/api/socials/${id}`),
+  generateSocialPlan: (songId: string) =>
+    request<{ plan: ApiSocialPlan }>('/api/socials', {
+      method: 'POST',
+      body: JSON.stringify({ songId }),
+    }),
+  updateSocialItem: (planId: string, itemId: string, patch: Record<string, unknown>) =>
+    request<{ plan: ApiSocialPlan }>(`/api/socials/${planId}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ itemId, patch }),
+    }),
+  deleteSocialPlan: (id: string) =>
+    request<{ ok: true }>(`/api/socials/${id}`, { method: 'DELETE' }),
+
   // Clips (OpusClip)
   clipJobs: (songId: string) =>
     request<{ jobs: ApiClipJob[] }>(`/api/clips?songId=${songId}`),

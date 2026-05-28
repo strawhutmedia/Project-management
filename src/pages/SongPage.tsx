@@ -10,6 +10,7 @@ import MentionInput, { renderWithMentions } from '../components/MentionInput'
 import DueDateChip from '../components/DueDateChip'
 import TranscriptsSection from '../components/TranscriptsSection'
 import ClipsSection from '../components/ClipsSection'
+import SocialsSection from '../components/SocialsSection'
 import { useAuth } from '../auth'
 
 export default function SongPage() {
@@ -170,6 +171,7 @@ export default function SongPage() {
             return (
               <>
                 <TranscriptsSection projectId={song.projectId} songId={song.id} canWrite={canWrite} />
+                <SocialsSection projectId={song.projectId} songId={song.id} canWrite={canWrite} />
                 <ClipsSection projectId={song.projectId} songId={song.id} canWrite={canWrite} />
               </>
             )
