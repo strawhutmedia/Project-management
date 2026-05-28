@@ -1,9 +1,9 @@
 {
   "version": "0.2.2",
-  "now": "2026-05-28T20:11:36.847Z",
+  "now": "2026-05-28T20:35:56.980Z",
   "boot": {
-    "startedAt": "2026-05-28T20:11:36.604Z",
-    "completedAt": "2026-05-28T20:11:36.840Z",
+    "startedAt": "2026-05-28T20:35:56.789Z",
+    "completedAt": "2026-05-28T20:35:56.971Z",
     "error": null
   },
   "env": {
@@ -12,6 +12,10 @@
     "HAS_DATABASE_URL": true,
     "HAS_RESEND_API_KEY": true,
     "HAS_GITHUB_TOKEN": true,
+    "HAS_DEEPGRAM_API_KEY": true,
+    "HAS_OPUSCLIP_API_KEY": true,
+    "HAS_ANTHROPIC_API_KEY": true,
+    "HAS_DROPBOX_APP_KEY": true,
     "APP_BASE_URL": null,
     "ADMIN_EMAIL": "ryan@strawhutmedia.com"
   },
@@ -52,7 +56,8 @@
       "020_user_viewer_role.sql",
       "021_project_member_role.sql",
       "022_clip_jobs.sql",
-      "023_social_plans.sql"
+      "023_social_plans.sql",
+      "024_socials_default_assignees.sql"
     ],
     "userCount": 8,
     "projectCount": 3
@@ -60,7 +65,7 @@
   "recentLog": [
     {
       "level": "info",
-      "ts": "2026-05-28T20:11:36.602Z",
+      "ts": "2026-05-28T20:35:56.787Z",
       "msg": "serving client from",
       "data": {
         "clientDir": "/app/dist"
@@ -68,7 +73,7 @@
     },
     {
       "level": "info",
-      "ts": "2026-05-28T20:11:36.604Z",
+      "ts": "2026-05-28T20:35:56.789Z",
       "msg": "boot starting",
       "data": {
         "cwd": "/app",
@@ -79,12 +84,12 @@
     },
     {
       "level": "info",
-      "ts": "2026-05-28T20:11:36.751Z",
+      "ts": "2026-05-28T20:35:56.890Z",
       "msg": "migrations complete"
     },
     {
       "level": "info",
-      "ts": "2026-05-28T20:11:36.834Z",
+      "ts": "2026-05-28T20:35:56.965Z",
       "msg": "BIYA seed: project already exists, ensured shoot days",
       "data": {
         "projectId": "12f53ed1-c6c7-4c11-8d7b-06d91744c9af"
@@ -92,12 +97,12 @@
     },
     {
       "level": "info",
-      "ts": "2026-05-28T20:11:36.840Z",
+      "ts": "2026-05-28T20:35:56.971Z",
       "msg": "listening on :8080"
     },
     {
       "level": "info",
-      "ts": "2026-05-28T20:11:36.840Z",
+      "ts": "2026-05-28T20:35:56.972Z",
       "msg": "scheduler started (every 5 min)"
     }
   ]
