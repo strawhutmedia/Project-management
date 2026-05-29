@@ -9,6 +9,7 @@ import DropboxFolderPicker from '../components/DropboxFolderPicker'
 import BudgetSection from '../components/BudgetSection'
 import ProjectMembersSection from '../components/ProjectMembersSection'
 import PodcastSocialsConfig from '../components/PodcastSocialsConfig'
+import PodcastRssConfig from '../components/PodcastRssConfig'
 import FilmPhaseBar, { type FilmPhase } from '../components/FilmPhaseBar'
 import { useAuth } from '../auth'
 
@@ -193,6 +194,7 @@ export default function ProjectPage() {
 
       {isAdmin && project.kind === 'album' && <ProjectRolesSection project={project} members={members} onSaved={reload} />}
       {isAdmin && project.kind === 'podcast' && <PodcastTeamSection project={project} members={members} onSaved={reload} />}
+      {isAdmin && project.kind === 'podcast' && <PodcastRssConfig project={project} onSaved={reload} />}
       {isAdmin && project.kind === 'podcast' && <PodcastSocialsConfig project={project} members={members} onSaved={reload} />}
       {isAdmin && project.kind === 'film' && <FilmTeamSection project={project} members={members} onSaved={reload} />}
 

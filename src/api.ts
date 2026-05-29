@@ -39,6 +39,7 @@ export type ApiSongDetail = {
   projectId: string
   projectName: string
   projectKind: 'album' | 'podcast' | 'film'
+  projectCoverArtUrl?: string | null
   projectRoot: string | null
   projectStageLabels?: Partial<Record<Stage, { label?: string; icon?: string }>>
   title: string
@@ -303,6 +304,8 @@ export type ApiProject = {
   socialsBrandVoice?: string | null
   socialsExamplePosts?: string[]
   socialsDefaultAssignees?: Partial<Record<'story_video' | 'story_photo' | 'reel_concept' | 'photo_concept', string>>
+  rssFeedUrl?: string | null
+  coverArtUrl?: string | null
   songs: ApiSong[]
 }
 
@@ -419,7 +422,7 @@ export const api = {
     return res.json() as Promise<{ ok: true; path: string }>
   },
   // Project edit
-  updateProject: (id: string, patch: { name?: string; subtitle?: string; dropboxFolder?: string; channelsSubfolder?: string | null; defaultOwners?: Record<string, string>; filmPhase?: 'pre' | 'production' | 'post' | 'wrapped'; socialsBrandVoice?: string | null; socialsExamplePosts?: string[]; socialsDefaultAssignees?: Partial<Record<'story_video' | 'story_photo' | 'reel_concept' | 'photo_concept', string>> }) =>
+  updateProject: (id: string, patch: { name?: string; subtitle?: string; dropboxFolder?: string; channelsSubfolder?: string | null; defaultOwners?: Record<string, string>; filmPhase?: 'pre' | 'production' | 'post' | 'wrapped'; socialsBrandVoice?: string | null; socialsExamplePosts?: string[]; socialsDefaultAssignees?: Partial<Record<'story_video' | 'story_photo' | 'reel_concept' | 'photo_concept', string>>; rssFeedUrl?: string | null; coverArtUrl?: string | null }) =>
     request<{ ok: true }>(`/api/projects/${id}`, { method: 'PATCH', body: JSON.stringify(patch) }),
   addSong: (projectId: string, body: { title: string; subtitle?: string }) =>
     request<{ song: { id: string; title: string } }>(`/api/projects/${projectId}/songs`, { method: 'POST', body: JSON.stringify(body) }),
@@ -572,6 +575,11 @@ export const api = {
   deleteSocialPlan: (id: string) =>
     request<{ ok: true }>(`/api/socials/${id}`, { method: 'DELETE' }),
   socialTextPostsTxtUrl: (planId: string) => `/api/socials/${planId}/text-posts.txt`,
+  importPodcastRss: (projectId: string, rssFeedUrl: string) =>
+    request<{ rssFeedUrl: string; coverArtUrl: string | null; title: string | null; description: string | null }>(
+      `/api/projects/${projectId}/import-rss`,
+      { method: 'POST', body: JSON.stringify({ rssFeedUrl }) },
+    ),
 
   // Clips (OpusClip)
   clipJobs: (songId: string) =>

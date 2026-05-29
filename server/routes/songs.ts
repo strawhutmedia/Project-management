@@ -52,7 +52,8 @@ songsRouter.get('/:id', async (req, res) => {
             mau.display_name AS master_name, mau.name AS master_full_name,
             p.name AS project_name, p.kind AS project_kind, p.dropbox_folder AS project_root,
             p.default_owners AS project_default_owners,
-            p.stage_labels AS project_stage_labels
+            p.stage_labels AS project_stage_labels,
+            p.cover_art_url AS project_cover_art_url
      FROM songs s
      JOIN projects p ON p.id = s.project_id
      LEFT JOIN users wu ON wu.id = s.writer_id
@@ -128,6 +129,7 @@ songsRouter.get('/:id', async (req, res) => {
       projectId: song.project_id,
       projectName: song.project_name,
       projectKind: song.project_kind,
+      projectCoverArtUrl: song.project_cover_art_url ?? null,
       projectRoot: song.project_root,
       projectStageLabels: song.project_stage_labels || {},
       title: song.title,

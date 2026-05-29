@@ -1,18 +1,22 @@
 // Renders an Instagram-portrait (1080×1350) text-post image with the
 // post copy laid out over a warm cream background, the show name in
-// small caps at the top, and a thin rule between them. Returns the
-// canvas — caller can display it directly or convert to a Blob for
-// download.
+// small caps at the top, and a thin rule between them.
 //
-// Future work: per-project template config (background color, accent
-// color, font, optional logo). For now this is one good-looking
-// default that reads as editorial / podcast-y, not generic AI slop.
+// Accent color is pulled from the podcast's cover art when available, so
+// every show's text posts feel on-brand. Cover-art extraction happens
+// asynchronously via extractAccentColor() below — the caller passes the
+// extracted accent in, so rendering itself stays synchronous and matches
+// the on-screen preview byte-for-byte.
 
 const DISPLAY_RATIO = 0.45 // ~486×608 preview in the UI
+
+const DEFAULT_ACCENT = '#8B6F47'
 
 export type PostImageInput = {
   text: string
   showName: string
+  // Hex like '#RRGGBB'. Optional — defaults to a warm terracotta.
+  accent?: string | null
 }
 
 export function renderTextPostCanvas(input: PostImageInput, opts: { fullSize: boolean } = { fullSize: false }): HTMLCanvasElement {
@@ -29,13 +33,16 @@ export function renderTextPostCanvas(input: PostImageInput, opts: { fullSize: bo
   ctx.fillStyle = '#F4F1EA'
   ctx.fillRect(0, 0, W, H)
 
-  // Subtle texture rectangle border
-  ctx.strokeStyle = 'rgba(139, 111, 71, 0.18)'
+  const accent = normalizeHex(input.accent) ?? DEFAULT_ACCENT
+  const accentRGB = hexToRgb(accent)
+
+  // Subtle texture rectangle border in the accent color
+  ctx.strokeStyle = `rgba(${accentRGB.r}, ${accentRGB.g}, ${accentRGB.b}, 0.22)`
   ctx.lineWidth = 1 * scale
   ctx.strokeRect(40 * scale, 40 * scale, W - 80 * scale, H - 80 * scale)
 
-  // Show name (small caps, kerned, terracotta)
-  ctx.fillStyle = '#8B6F47'
+  // Show name (small caps, kerned, in the show's accent)
+  ctx.fillStyle = accent
   ctx.font = `600 ${Math.round(22 * scale)}px Georgia, serif`
   ctx.textAlign = 'center'
   ctx.textBaseline = 'middle'
@@ -43,7 +50,7 @@ export function renderTextPostCanvas(input: PostImageInput, opts: { fullSize: bo
   ctx.fillText(spaceForKerning(showLabel), W / 2, 110 * scale)
 
   // Thin rule under show name
-  ctx.strokeStyle = 'rgba(139, 111, 71, 0.45)'
+  ctx.strokeStyle = `rgba(${accentRGB.r}, ${accentRGB.g}, ${accentRGB.b}, 0.55)`
   ctx.lineWidth = 1 * scale
   ctx.beginPath()
   ctx.moveTo(W / 2 - 40 * scale, 150 * scale)
@@ -66,11 +73,84 @@ export function renderTextPostCanvas(input: PostImageInput, opts: { fullSize: bo
   })
 
   // Footer mark — a small accent on the bottom
-  ctx.fillStyle = '#8B6F47'
+  ctx.fillStyle = accent
   ctx.font = `400 ${Math.round(14 * scale)}px Georgia, serif`
   ctx.fillText('·', W / 2, H - 90 * scale)
 
   return canvas
+}
+
+// Loads the cover art (anonymous CORS so the image is "tainted-free" and
+// pixels can be read), downscales to 64×64, builds a histogram of
+// quantized colors, ignores near-blacks / near-whites / near-greys, and
+// returns the most-prominent saturated color as #RRGGBB. Falls back to
+// null on CORS errors or load failures — caller uses the default accent.
+export async function extractAccentColor(coverArtUrl: string): Promise<string | null> {
+  return new Promise((resolve) => {
+    const img = new Image()
+    img.crossOrigin = 'anonymous'
+    let settled = false
+    const done = (v: string | null) => { if (!settled) { settled = true; resolve(v) } }
+    setTimeout(() => done(null), 8000)
+    img.onload = () => {
+      try {
+        const size = 64
+        const canvas = document.createElement('canvas')
+        canvas.width = size; canvas.height = size
+        const ctx = canvas.getContext('2d')
+        if (!ctx) return done(null)
+        ctx.drawImage(img, 0, 0, size, size)
+        const data = ctx.getImageData(0, 0, size, size).data
+        const buckets = new Map<string, { r: number; g: number; b: number; score: number }>()
+        for (let i = 0; i < data.length; i += 4) {
+          const r = data[i], g = data[i + 1], b = data[i + 2], a = data[i + 3]
+          if (a < 200) continue
+          // Skip near-black, near-white, low-saturation greys
+          const max = Math.max(r, g, b), min = Math.min(r, g, b)
+          if (max < 30 || min > 230) continue
+          if (max - min < 24) continue
+          // Quantize to 32-step buckets to group similar shades together
+          const qr = (r >> 5) << 5
+          const qg = (g >> 5) << 5
+          const qb = (b >> 5) << 5
+          const key = `${qr}-${qg}-${qb}`
+          // Score = vote count weighted by saturation so a vivid teal beats
+          // a more numerous beige.
+          const saturation = (max - min) / max
+          const cur = buckets.get(key) ?? { r: qr + 16, g: qg + 16, b: qb + 16, score: 0 }
+          cur.score += 1 + saturation
+          buckets.set(key, cur)
+        }
+        const sorted = [...buckets.values()].sort((a, b) => b.score - a.score)
+        const top = sorted[0]
+        if (!top) return done(null)
+        done(rgbToHex(top.r, top.g, top.b))
+      } catch {
+        done(null)
+      }
+    }
+    img.onerror = () => done(null)
+    img.src = coverArtUrl
+  })
+}
+
+function normalizeHex(v?: string | null): string | null {
+  if (!v) return null
+  const s = v.trim()
+  const m = /^#?([0-9a-f]{6})$/i.exec(s)
+  if (!m) return null
+  return `#${m[1].toLowerCase()}`
+}
+
+function hexToRgb(hex: string): { r: number; g: number; b: number } {
+  const m = /^#([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i.exec(hex)
+  if (!m) return { r: 139, g: 111, b: 71 } // fallback
+  return { r: parseInt(m[1], 16), g: parseInt(m[2], 16), b: parseInt(m[3], 16) }
+}
+
+function rgbToHex(r: number, g: number, b: number): string {
+  const h = (n: number) => Math.max(0, Math.min(255, Math.round(n))).toString(16).padStart(2, '0')
+  return `#${h(r)}${h(g)}${h(b)}`
 }
 
 // Try sequentially smaller font sizes until the wrapped text fits the box.

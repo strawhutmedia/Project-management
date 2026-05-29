@@ -2,6 +2,7 @@ import { Router } from 'express'
 import { pool } from '../db'
 import { requireUser, type SessionUser } from '../auth'
 import { getProjectRole, assertWriter, assertProjectAdmin } from '../permissions'
+import { fetchPodcastFeed } from '../rss'
 import { logInfo, logError } from '../diag'
 
 // Look up the admin user (Ryan) by ADMIN_EMAIL so we can auto-assign
@@ -317,6 +318,16 @@ projectsRouter.patch('/:id', async (req, res) => {
     updates.push(`socials_default_assignees = $${i++}::jsonb`)
     values.push(JSON.stringify(cleaned))
   }
+  if ('rssFeedUrl' in (req.body ?? {})) {
+    const v = req.body.rssFeedUrl
+    updates.push(`rss_feed_url = $${i++}`)
+    values.push(typeof v === 'string' && v.trim() ? v.trim().slice(0, 2000) : null)
+  }
+  if ('coverArtUrl' in (req.body ?? {})) {
+    const v = req.body.coverArtUrl
+    updates.push(`cover_art_url = $${i++}`)
+    values.push(typeof v === 'string' && v.trim() ? v.trim().slice(0, 2000) : null)
+  }
   if (defaultOwners && typeof defaultOwners === 'object') {
     // Whitelist: music stage keys + film role keys + podcast role keys
     const allowed = [
@@ -356,7 +367,8 @@ projectsRouter.get('/:id', async (req, res) => {
   const projectId = req.params.id
   const projRes = await pool.query(
     `SELECT id, name, subtitle, kind, dropbox_folder, default_owners, stage_labels, channels_subfolder, film_phase,
-            socials_brand_voice, socials_example_posts, socials_default_assignees
+            socials_brand_voice, socials_example_posts, socials_default_assignees,
+            rss_feed_url, cover_art_url
        FROM projects WHERE id = $1`,
     [projectId],
   )
@@ -457,6 +469,8 @@ projectsRouter.get('/:id', async (req, res) => {
       socialsExamplePosts: Array.isArray(project.socials_example_posts) ? project.socials_example_posts : [],
       socialsDefaultAssignees: (project.socials_default_assignees && typeof project.socials_default_assignees === 'object')
         ? project.socials_default_assignees : {},
+      rssFeedUrl: project.rss_feed_url ?? null,
+      coverArtUrl: project.cover_art_url ?? null,
       songs: songs.rows.map((s: { id: string; title: string; subtitle: string | null; stage: string }) => ({
         id: s.id,
         title: s.title,
@@ -527,4 +541,33 @@ projectsRouter.delete('/:id/members/:userId', async (req, res) => {
     [projectId, req.params.userId],
   )
   res.json({ ok: true })
+})
+
+// Fetch + parse the project's RSS feed, extract show-level metadata
+// (title, description, cover art URL), persist what's useful, and return
+// it. Admin-only because it touches project config. Idempotent — safe to
+// re-run when the show updates artwork.
+projectsRouter.post('/:id/import-rss', async (req, res) => {
+  const user = (req as typeof req & { user: SessionUser }).user
+  const projectId = req.params.id
+  if (!await assertProjectAdmin(user, projectId, res)) return
+  const url = String(req.body?.rssFeedUrl || '').trim()
+  if (!url) {
+    res.status(400).json({ error: 'rssFeedUrl required' }); return
+  }
+  let meta
+  try {
+    meta = await fetchPodcastFeed(url)
+  } catch (err) {
+    res.status(502).json({ error: err instanceof Error ? err.message : String(err) }); return
+  }
+  await pool.query(
+    `UPDATE projects
+        SET rss_feed_url = $2,
+            cover_art_url = COALESCE($3, cover_art_url),
+            subtitle = COALESCE(NULLIF(subtitle, ''), $4)
+      WHERE id = $1`,
+    [projectId, url, meta.coverArtUrl, meta.description],
+  )
+  res.json({ rssFeedUrl: url, coverArtUrl: meta.coverArtUrl, title: meta.title, description: meta.description })
 })
