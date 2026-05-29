@@ -167,10 +167,10 @@ export type ApiBudget = {
 export type SocialItemStatus = 'idea' | 'drafted' | 'selected' | 'rejected' | 'scheduled' | 'posted'
 
 export type ApiSocialItem =
-  | { id: string; kind: 'text_post'; status: SocialItemStatus; ai_text: string; text: string }
-  | { id: string; kind: 'story_concept'; status: SocialItemStatus; assignee_user_id: string | null; medium: 'video' | 'photo'; description: string; caption: string; suggested_clip: string; image_direction: string }
-  | { id: string; kind: 'reel_concept'; status: SocialItemStatus; assignee_user_id: string | null; hook: string; talking_points: string[]; suggested_clip: string }
-  | { id: string; kind: 'photo_concept'; status: SocialItemStatus; assignee_user_id: string | null; image_direction: string; caption: string; vibe: string }
+  | { id: string; kind: 'text_post'; status: SocialItemStatus; ai_text: string; text: string; pushed_to_scheduler_at?: string | null }
+  | { id: string; kind: 'story_concept'; status: SocialItemStatus; assignee_user_id: string | null; medium: 'video' | 'photo'; description: string; caption: string; suggested_clip: string; image_direction: string; pushed_to_scheduler_at?: string | null }
+  | { id: string; kind: 'reel_concept'; status: SocialItemStatus; assignee_user_id: string | null; hook: string; talking_points: string[]; suggested_clip: string; pushed_to_scheduler_at?: string | null }
+  | { id: string; kind: 'photo_concept'; status: SocialItemStatus; assignee_user_id: string | null; image_direction: string; caption: string; vibe: string; pushed_to_scheduler_at?: string | null }
 
 export type ApiSocialPlan = {
   id: string
@@ -188,6 +188,39 @@ export type ApiSocialPlan = {
   }
   createdAt: string
   updatedAt: string
+}
+
+export type SchedulerSlotKind = 'text_post' | 'photo_concept' | 'reel_concept' | 'story_concept'
+
+export type ApiSchedulerItem = {
+  planId: string
+  itemId: string
+  projectId: string
+  projectName: string
+  songId: string
+  songTitle: string
+  projectCoverArtUrl: string | null
+  item: ApiSocialItem
+}
+
+export type ApiSchedulerSlot = {
+  id: string
+  kind: SchedulerSlotKind
+  index: number
+  scheduledTime: string // "HH:MM" Pacific time
+  platforms: string[]
+  status: 'planned' | 'posted' | 'skipped'
+  item: ApiSchedulerItem | null
+}
+
+export type ApiSchedulerDay = {
+  date: string // YYYY-MM-DD
+  slots: ApiSchedulerSlot[]
+}
+
+export type ApiSchedulerResponse = {
+  days: ApiSchedulerDay[]
+  backlog: ApiSchedulerItem[]
 }
 
 export type ApiPodcastSearchResult = {
@@ -592,6 +625,29 @@ export const api = {
     ),
   searchPodcasts: (q: string) =>
     request<{ results: ApiPodcastSearchResult[] }>(`/api/podcasts/search?q=${encodeURIComponent(q)}`),
+
+  // Social content scheduler
+  scheduler: (from: string, to: string) =>
+    request<ApiSchedulerResponse>(`/api/scheduler?from=${from}&to=${to}`),
+  updateSchedulerSlot: (slotId: string, patch: {
+    planId?: string | null
+    itemId?: string | null
+    scheduledTime?: string
+    platforms?: string[]
+  }) => request<{ ok: true }>(`/api/scheduler/slots/${slotId}`, {
+    method: 'PATCH',
+    body: JSON.stringify(patch),
+  }),
+  pushToScheduler: (planId: string, itemId: string) =>
+    request<{ ok: true }>('/api/scheduler/push', {
+      method: 'POST',
+      body: JSON.stringify({ planId, itemId }),
+    }),
+  unpushFromScheduler: (planId: string, itemId: string) =>
+    request<{ ok: true }>('/api/scheduler/unpush', {
+      method: 'POST',
+      body: JSON.stringify({ planId, itemId }),
+    }),
 
   // Clips (OpusClip)
   clipJobs: (songId: string) =>

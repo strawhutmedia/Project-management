@@ -330,6 +330,7 @@ function TextPostsBucket({
           return (
             <TextPostCard
               key={item.id}
+              planId={planId}
               item={item}
               canWrite={canWrite}
               showName={showName}
@@ -338,6 +339,7 @@ function TextPostsBucket({
               isRejected={isRejected}
               onStatus={(s) => void setStatus(item.id, s)}
               onText={(t) => void setText(item.id, t)}
+              onChanged={onChanged}
             />
           )
         })}
@@ -347,6 +349,7 @@ function TextPostsBucket({
 }
 
 function TextPostCard({
+  planId,
   item,
   canWrite,
   showName,
@@ -355,7 +358,9 @@ function TextPostCard({
   isRejected,
   onStatus,
   onText,
+  onChanged,
 }: {
+  planId: string
   item: Extract<ApiSocialItem, { kind: 'text_post' }>
   canWrite: boolean
   showName: string
@@ -364,6 +369,7 @@ function TextPostCard({
   isRejected: boolean
   onStatus: (next: SocialItemStatus) => void
   onText: (next: string) => void
+  onChanged: () => void | Promise<void>
 }) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null)
 
@@ -438,7 +444,14 @@ function TextPostCard({
         placeholder="Caption text"
         className="w-full bg-transparent text-xs leading-snug outline-none border border-transparent focus:border-stage-mastering/40 rounded p-1 resize-y disabled:opacity-70"
       />
-      <div className="flex items-center justify-end">
+      <div className="flex items-center justify-end gap-1.5">
+        <PushToSchedulerButton
+          planId={planId}
+          itemId={item.id}
+          isPushed={!!item.pushed_to_scheduler_at}
+          canWrite={canWrite}
+          onChanged={onChanged}
+        />
         <button
           onClick={() => void downloadOne()}
           className="text-[10px] uppercase tracking-wider font-bold text-stage-mastering border border-stage-mastering/40 rounded-full px-2.5 py-0.5 hover:bg-stage-mastering/10"
@@ -494,6 +507,13 @@ function ConceptBucket({
                     onChange={(v) => void save(item.id, { assignee_user_id: v })}
                   />
                 </div>
+                <PushToSchedulerButton
+                  planId={planId}
+                  itemId={item.id}
+                  isPushed={!!item.pushed_to_scheduler_at}
+                  canWrite={canWrite}
+                  onChanged={onChanged}
+                />
               </div>
               {renderItem(item)}
             </div>
@@ -677,5 +697,48 @@ function AssigneePill({
         <option key={m.id} value={m.id}>👤 {m.display_name || m.name}</option>
       ))}
     </select>
+  )
+}
+
+// Sends an item to the workspace scheduler backlog (or pulls it back). The
+// scheduler page handles placing it on a day/slot from there.
+function PushToSchedulerButton({
+  planId,
+  itemId,
+  isPushed,
+  canWrite,
+  onChanged,
+}: {
+  planId: string
+  itemId: string
+  isPushed: boolean
+  canWrite: boolean
+  onChanged: () => void | Promise<void>
+}) {
+  const [busy, setBusy] = useState(false)
+  if (!canWrite) return null
+  async function toggle() {
+    setBusy(true)
+    try {
+      if (isPushed) await api.unpushFromScheduler(planId, itemId)
+      else await api.pushToScheduler(planId, itemId)
+      await onChanged()
+    } finally {
+      setBusy(false)
+    }
+  }
+  return (
+    <button
+      onClick={() => void toggle()}
+      disabled={busy}
+      title={isPushed ? 'Pull back from the scheduler backlog' : 'Send to the workspace scheduler backlog'}
+      className={`text-[10px] uppercase tracking-wider font-bold rounded-full px-2.5 py-0.5 border transition disabled:opacity-50 ${
+        isPushed
+          ? 'text-stage-mastering border-stage-mastering/40 bg-stage-mastering/10 hover:bg-stage-mastering/15'
+          : 'text-muted border-line hover:text-stage-mastering hover:border-stage-mastering/40'
+      }`}
+    >
+      {busy ? '…' : (isPushed ? '✓ Queued' : '📅 Queue')}
+    </button>
   )
 }
