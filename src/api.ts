@@ -190,6 +190,16 @@ export type ApiSocialPlan = {
   updatedAt: string
 }
 
+export type ApiPodcastSearchResult = {
+  itunesId: number | null
+  title: string
+  artist: string | null
+  feedUrl: string
+  artworkUrl: string | null
+  trackCount: number | null
+  genre: string | null
+}
+
 export type ApiClip = {
   id: string
   title: string | null
@@ -580,6 +590,8 @@ export const api = {
       `/api/projects/${projectId}/import-rss`,
       { method: 'POST', body: JSON.stringify({ rssFeedUrl }) },
     ),
+  searchPodcasts: (q: string) =>
+    request<{ results: ApiPodcastSearchResult[] }>(`/api/podcasts/search?q=${encodeURIComponent(q)}`),
 
   // Clips (OpusClip)
   clipJobs: (songId: string) =>

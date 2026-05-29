@@ -99,7 +99,16 @@ export default function ProjectPage() {
           ← Projects
         </Link>
         <div className="mt-3 flex items-end justify-between flex-wrap gap-4">
-          <div className="flex-1 min-w-0">
+          <div className="flex-1 min-w-0 flex items-start gap-5">
+            {project.kind === 'podcast' && project.coverArtUrl && (
+              <img
+                src={project.coverArtUrl}
+                alt={`${project.name} cover art`}
+                crossOrigin="anonymous"
+                className="w-24 h-24 sm:w-28 sm:h-28 rounded-xl object-cover border border-line shrink-0 shadow-lg"
+              />
+            )}
+            <div className="flex-1 min-w-0">
             <div className="text-[10px] uppercase tracking-[0.3em] text-muted mb-2 font-bold">
               {project.kind}
             </div>
@@ -161,6 +170,7 @@ export default function ProjectPage() {
                 </span>
               </div>
             )}
+            </div>
           </div>
           {project.kind !== 'film' && (
             <button
