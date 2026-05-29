@@ -172,7 +172,7 @@ export default function SongPage() {
               <>
                 <TranscriptsSection projectId={song.projectId} songId={song.id} canWrite={canWrite}
                   projectRoot={song.projectRoot} />
-                <SocialsSection projectId={song.projectId} songId={song.id} canWrite={canWrite} members={members} />
+                <SocialsSection projectId={song.projectId} songId={song.id} canWrite={canWrite} members={members} showName={song.projectName} />
                 <ClipsSection projectId={song.projectId} songId={song.id} canWrite={canWrite}
                   projectRoot={song.projectRoot} />
               </>
