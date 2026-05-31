@@ -71,7 +71,7 @@ function itemBlurb(item: ApiSocialItem): string {
 export default function SchedulerPage() {
   const { user } = useAuth()
   const isAdmin = user?.role === 'admin'
-  const [weekStart, setWeekStart] = useState<string>(pacificToday())
+  const [currentDate, setCurrentDate] = useState<string>(pacificToday())
   const [data, setData] = useState<ApiSchedulerResponse | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -80,8 +80,6 @@ export default function SchedulerPage() {
   const [composeOpen, setComposeOpen] = useState(false)
   const [projects, setProjects] = useState<ApiProject[] | null>(null)
 
-  const weekEnd = useMemo(() => addDays(weekStart, 6), [weekStart])
-
   useEffect(() => {
     void api.projects().then((res) => setProjects(res.projects)).catch(() => setProjects([]))
   }, [])
@@ -89,14 +87,16 @@ export default function SchedulerPage() {
   const load = useCallback(async () => {
     setLoading(true); setError(null)
     try {
-      const res = await api.scheduler(weekStart, weekEnd)
+      // Single-day fetch — the scheduler shows one date at a time so the
+      // team can focus on each day's plan instead of scanning a week.
+      const res = await api.scheduler(currentDate, currentDate)
       setData(res)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'failed')
     } finally {
       setLoading(false)
     }
-  }, [weekStart, weekEnd])
+  }, [currentDate])
 
   useEffect(() => { void load() }, [load])
 
@@ -194,22 +194,22 @@ export default function SchedulerPage() {
         </div>
         <div className="flex items-center gap-2">
           <button
-            onClick={() => setWeekStart(addDays(weekStart, -7))}
+            onClick={() => setCurrentDate(addDays(currentDate, -1))}
             className="rounded-lg border border-line px-3 py-1.5 text-xs font-bold uppercase tracking-wider text-muted hover:text-text"
           >
-            ← Prev week
+            ← Prev day
           </button>
           <button
-            onClick={() => setWeekStart(pacificToday())}
+            onClick={() => setCurrentDate(pacificToday())}
             className="rounded-lg bg-gradient-to-r from-stage-mastering to-stage-tracking text-white font-bold uppercase tracking-wider text-xs px-3 py-1.5"
           >
             Today
           </button>
           <button
-            onClick={() => setWeekStart(addDays(weekStart, 7))}
+            onClick={() => setCurrentDate(addDays(currentDate, 1))}
             className="rounded-lg border border-line px-3 py-1.5 text-xs font-bold uppercase tracking-wider text-muted hover:text-text"
           >
-            Next week →
+            Next day →
           </button>
         </div>
       </div>
@@ -220,26 +220,22 @@ export default function SchedulerPage() {
         </div>
       )}
 
-      <div className="grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-5 items-start">
-        {/* Week grid */}
+      <div className="grid grid-cols-1 lg:grid-cols-[1fr_360px] gap-5 items-start">
+        {/* Single-day column */}
         <div className="rounded-2xl border border-line bg-panel/40 overflow-hidden">
           {loading && !data ? (
-            <div className="p-10 text-center text-muted text-sm">Loading week…</div>
-          ) : data ? (
-            <div className="grid grid-cols-7 divide-x divide-line/60 min-h-[600px]">
-              {data.days.map((day) => (
-                <DayColumn
-                  key={day.date}
-                  day={day}
-                  isAdmin={isAdmin}
-                  busySlotId={busySlotId}
-                  onAssign={assignSlot}
-                  onClear={clearSlot}
-                  onTimeChange={changeTime}
-                  onTogglePosted={togglePosted}
-                />
-              ))}
-            </div>
+            <div className="p-10 text-center text-muted text-sm">Loading…</div>
+          ) : data && data.days[0] ? (
+            <DayColumn
+              key={data.days[0].date}
+              day={data.days[0]}
+              isAdmin={isAdmin}
+              busySlotId={busySlotId}
+              onAssign={assignSlot}
+              onClear={clearSlot}
+              onTimeChange={changeTime}
+              onTogglePosted={togglePosted}
+            />
           ) : null}
         </div>
 
@@ -292,19 +288,19 @@ function DayColumn({
   }))
   return (
     <div className={`flex flex-col ${header.isToday ? 'bg-stage-mastering/[0.04]' : ''}`}>
-      <div className={`p-2.5 border-b border-line/60 ${header.isToday ? 'bg-stage-mastering/10' : 'bg-ink/40'}`}>
-        <div className="text-[10px] uppercase tracking-wider text-muted font-bold">{header.weekday}</div>
-        <div className={`text-sm font-bold ${header.isToday ? 'text-stage-mastering' : 'text-text'}`}>
-          {header.date}
+      <div className={`p-4 border-b border-line/60 ${header.isToday ? 'bg-stage-mastering/10' : 'bg-ink/40'}`}>
+        <div className="text-[11px] uppercase tracking-[0.2em] text-muted font-bold">{header.weekday}</div>
+        <div className={`text-2xl font-display mt-0.5 ${header.isToday ? 'text-stage-mastering' : 'text-text'}`}>
+          {header.date}{header.isToday && <span className="ml-2 text-[10px] uppercase tracking-wider align-middle">· Today</span>}
         </div>
       </div>
-      <div className="flex-1 p-1.5 space-y-3">
+      <div className="flex-1 p-4 space-y-5">
         {buckets.map(({ kind, slots }) => (
           <div key={kind}>
-            <div className={`text-[9px] uppercase tracking-wider font-bold px-1 mb-1 ${KIND_STYLES[kind].label_text}`}>
-              {KIND_STYLES[kind].emoji} {KIND_STYLES[kind].shortLabel}
+            <div className={`text-[11px] uppercase tracking-wider font-bold mb-2 ${KIND_STYLES[kind].label_text}`}>
+              {KIND_STYLES[kind].emoji} {KIND_STYLES[kind].label.replace(KIND_STYLES[kind].emoji + ' ', '')} ({slots.length})
             </div>
-            <div className="space-y-1">
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2">
               {slots.map((slot) => (
                 <Slot
                   key={slot.id}

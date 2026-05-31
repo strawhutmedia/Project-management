@@ -100,6 +100,101 @@ export async function fetchOpusClips(projectId: string, orgId: string | null): P
   return { ready: clips.length > 0, clips, raw: data }
 }
 
+// Tries a handful of likely "account" / "quota" / "credits" endpoints
+// since OpusClip's docs don't pin down a single one. Returns the first
+// 200 response with a JSON body, plus the path that worked so we can
+// pin the integration later. Returns null if none respond.
+export type OpusAccountInfo = {
+  endpoint: string
+  raw: unknown
+  // Best-effort parsed values pulled from common field names. Any
+  // can be null if the response shape doesn't match.
+  creditsRemaining: number | null
+  creditsTotal: number | null
+  minutesRemaining: number | null
+  minutesTotal: number | null
+  planName: string | null
+}
+
+const ACCOUNT_PATH_CANDIDATES = [
+  '/account',
+  '/me',
+  '/account/usage',
+  '/account/credits',
+  '/credits',
+  '/quota',
+  '/usage',
+  '/billing',
+  '/billing/credits',
+  '/organizations/me',
+]
+
+export async function fetchOpusAccountInfo(): Promise<OpusAccountInfo | null> {
+  for (const path of ACCOUNT_PATH_CANDIDATES) {
+    try {
+      const res = await fetch(`${OPUS_API}${path}`, {
+        headers: authHeaders(),
+        signal: AbortSignal.timeout(5_000),
+      })
+      if (!res.ok) continue
+      const data = (await res.json().catch(() => null)) as unknown
+      if (!data) continue
+      logInfo('opus: account endpoint hit', { path })
+      return {
+        endpoint: path,
+        raw: data,
+        ...parseAccountFields(data as Record<string, unknown>),
+      }
+    } catch {
+      // Try the next candidate
+    }
+  }
+  return null
+}
+
+function parseAccountFields(d: Record<string, unknown>): {
+  creditsRemaining: number | null
+  creditsTotal: number | null
+  minutesRemaining: number | null
+  minutesTotal: number | null
+  planName: string | null
+} {
+  const num = (...keys: string[]): number | null => {
+    for (const k of keys) {
+      const v = pickDeep(d, k)
+      if (typeof v === 'number' && Number.isFinite(v)) return v
+      if (typeof v === 'string' && /^-?\d+(\.\d+)?$/.test(v)) return Number(v)
+    }
+    return null
+  }
+  const str = (...keys: string[]): string | null => {
+    for (const k of keys) {
+      const v = pickDeep(d, k)
+      if (typeof v === 'string' && v.length > 0) return v
+    }
+    return null
+  }
+  return {
+    creditsRemaining: num('creditsRemaining', 'creditsLeft', 'remainingCredits', 'credits'),
+    creditsTotal: num('creditsTotal', 'totalCredits', 'creditLimit'),
+    minutesRemaining: num('minutesRemaining', 'minutesLeft', 'remainingMinutes', 'minutes'),
+    minutesTotal: num('minutesTotal', 'totalMinutes', 'minuteLimit', 'monthlyMinutes'),
+    planName: str('planName', 'plan', 'tier', 'subscriptionName'),
+  }
+}
+
+// Shallow + one-level-deep key lookup so {usage: {credits: 42}} matches "credits".
+function pickDeep(d: Record<string, unknown>, key: string): unknown {
+  if (d[key] !== undefined) return d[key]
+  for (const v of Object.values(d)) {
+    if (v && typeof v === 'object' && !Array.isArray(v)) {
+      const nested = (v as Record<string, unknown>)[key]
+      if (nested !== undefined) return nested
+    }
+  }
+  return undefined
+}
+
 function normalizeClip(c: Record<string, unknown>): OpusClip {
   // OpusClip's response is still beta-shifting; pull whichever field
   // names we recognize and stash the raw blob for later.
