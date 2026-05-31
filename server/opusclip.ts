@@ -139,17 +139,14 @@ export type OpusAccountInfo = {
   planName: string | null
 }
 
+// Only the three most-likely patterns. With a 2s timeout each, the
+// worst case is 6s — fast enough that a first-page-load doesn't 502
+// even if every candidate fails. Successful or failed result is then
+// cached for 5 minutes so subsequent calls are instant.
 const ACCOUNT_PATH_CANDIDATES = [
   '/account',
   '/me',
-  '/account/usage',
-  '/account/credits',
   '/credits',
-  '/quota',
-  '/usage',
-  '/billing',
-  '/billing/credits',
-  '/organizations/me',
 ]
 
 // In-memory cache so every ClipsSection mount doesn't fan out 10
