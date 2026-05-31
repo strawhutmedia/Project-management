@@ -76,21 +76,28 @@ The plan has the following structure and counts:
                                 an actual moment from the transcript.
   - 3 photo_concepts: each is { image_direction, caption, vibe }.
                        image_direction describes an ACTUAL PHOTOGRAPH
-                       to be shot — a real scene with a real subject in
-                       a real setting. Think shot list, not Canva
-                       template. NOT a typographic graphic, NOT text on
-                       a colored background, NOT a poll sticker, NOT a
-                       slide with a quote — those are graphic-design
-                       assets, not photos. Examples that are GOOD:
-                         "Host at the mixing desk during the interview,
-                          warm window light from the left, mid-shot,
-                          headphones around neck."
-                         "Close-up of the guest's hands holding a
-                          vintage cassette they brought to show off."
-                         "Behind-the-scenes wide: producer at the
-                          board, talent in the booth in the background,
-                          studio neon glow."
+                       — the kinds the team has on hand from the
+                       recording session, not staged graphic assets.
+                       Pull from this menu:
+                         (a) Headshot / portrait of the GUEST (alone,
+                             in the studio, looking at camera or 3/4).
+                         (b) Host + guest together — at the desk,
+                             mid-laugh, candid moment.
+                         (c) BTS — producer at the board, mic setup,
+                             cables, behind-the-glass wide shot, etc.
+                         (d) A specific MOMENT FROM THE INTERVIEW:
+                             reference a real beat from the transcript
+                             ("Guest reacting to the question about
+                              their dad — eyes wide, hand on chest"),
+                             so the photographer/editor can pull that
+                             frame from the recording or restage it.
                        Specify subject + setting + light/framing.
+                       NEVER a typographic graphic, NEVER text on a
+                       colored background, NEVER a poll sticker, NEVER
+                       a Canva-style template — those are design
+                       assets, not photos.
+                       Aim for variety across the 3 (don't propose
+                       three headshots — mix the categories above).
                        caption is the IG caption text.
                        vibe is a 2-4 word mood.
 
