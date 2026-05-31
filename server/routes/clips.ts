@@ -14,7 +14,7 @@ import { pool } from '../db'
 import { requireUser, type SessionUser } from '../auth'
 import { assertWriter } from '../permissions'
 import { getFileMetadata, getTemporaryLink } from '../dropbox'
-import { hasOpusKey, createOpusProject, fetchOpusClips, type OpusClip } from '../opusclip'
+import { hasOpusKey, createOpusProject, fetchOpusClips, fetchOpusAccountInfo, type OpusClip, type OpusCreateOptions } from '../opusclip'
 import { logError, logInfo } from '../diag'
 
 export const clipsRouter = Router()
@@ -42,6 +42,7 @@ type ClipJobRow = {
   status: 'queued' | 'processing' | 'done' | 'failed'
   opus_project_id: string | null
   opus_org_id: string | null
+  options: { prompt?: string | null; clipCount?: number | null; minDuration?: number | null; maxDuration?: number | null } | null
   error: string | null
   last_polled_at: string | null
   created_by: string | null
@@ -72,6 +73,11 @@ function jobToApi(row: ClipJobRow, clips: ClipRow[] = []) {
     error: row.error,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
+    // Exposing the OpusClip project id lets the UI show an "Open in
+    // OpusClip" link as an escape hatch while in-app previews aren't
+    // reliable.
+    opusProjectId: row.opus_project_id,
+    options: row.options,
     clips: clips.map((c) => ({
       id: c.id,
       title: c.title,
@@ -97,7 +103,12 @@ async function maybeRefreshJob(job: ClipJobRow): Promise<ClipJobRow> {
   }
   try {
     const result = await fetchOpusClips(job.opus_project_id, job.opus_org_id)
-    await pool.query(`UPDATE clip_jobs SET last_polled_at = now() WHERE id = $1`, [job.id])
+    // Stash the raw response on every poll so the admin inspector can
+    // see exactly what OpusClip returned the last time we asked.
+    await pool.query(
+      `UPDATE clip_jobs SET last_polled_at = now(), raw_poll_response = $2::jsonb WHERE id = $1`,
+      [job.id, JSON.stringify(result.raw)],
+    )
     if (result.ready) {
       // Insert/upsert clips, then mark job done
       for (const c of result.clips) {
@@ -194,10 +205,11 @@ clipsRouter.get('/:id', async (req, res) => {
 // CREATE
 clipsRouter.post('/', async (req, res) => {
   const user = (req as typeof req & { user: SessionUser }).user
-  const { projectId, songId, dropboxPath } = req.body as {
+  const { projectId, songId, dropboxPath, options } = req.body as {
     projectId?: string
     songId?: string | null
     dropboxPath?: string
+    options?: OpusCreateOptions
   }
   if (!projectId || !dropboxPath) {
     res.status(400).json({ error: 'projectId and dropboxPath required' }); return
@@ -216,11 +228,19 @@ clipsRouter.post('/', async (req, res) => {
     }); return
   }
 
+  // Sanitize options once so the same shape lands in DB + OpusClip body.
+  const cleanOpts: OpusCreateOptions | null = options ? {
+    prompt: typeof options.prompt === 'string' && options.prompt.trim() ? options.prompt.trim().slice(0, 1000) : null,
+    clipCount: typeof options.clipCount === 'number' && options.clipCount > 0 && options.clipCount <= 50 ? Math.round(options.clipCount) : null,
+    minDuration: typeof options.minDuration === 'number' && options.minDuration > 0 ? Math.round(options.minDuration) : null,
+    maxDuration: typeof options.maxDuration === 'number' && options.maxDuration > 0 ? Math.round(options.maxDuration) : null,
+  } : null
+
   const inserted = await pool.query<ClipJobRow>(
-    `INSERT INTO clip_jobs (project_id, song_id, dropbox_path, file_name, status, created_by)
-     VALUES ($1, $2, $3, $4, 'queued', $5)
+    `INSERT INTO clip_jobs (project_id, song_id, dropbox_path, file_name, status, options, created_by)
+     VALUES ($1, $2, $3, $4, 'queued', $5::jsonb, $6)
      RETURNING *`,
-    [projectId, songId ?? null, dropboxPath, meta.name ?? dropboxPath, user.id],
+    [projectId, songId ?? null, dropboxPath, meta.name ?? dropboxPath, cleanOpts ? JSON.stringify(cleanOpts) : null, user.id],
   )
   const jobId = inserted.rows[0].id
   res.json({ job: jobToApi(inserted.rows[0]) })
@@ -230,7 +250,7 @@ clipsRouter.post('/', async (req, res) => {
     try {
       const link = await getTemporaryLink(dropboxPath)
       if (!link.ok || !link.url) throw new Error(link.error || 'temporary_link_failed')
-      const opus = await createOpusProject(link.url)
+      const opus = await createOpusProject(link.url, cleanOpts ?? undefined)
       await pool.query(
         `UPDATE clip_jobs SET status = 'processing',
                               opus_project_id = $2,
@@ -250,6 +270,48 @@ clipsRouter.post('/', async (req, res) => {
       )
     }
   })()
+})
+
+// GET /api/clips/account — best-effort fetch of OpusClip plan/credits.
+// Probes a few common endpoint patterns since OpusClip's docs don't
+// pin one down. Returns null fields if their API doesn't expose them
+// via the patterns we try.
+clipsRouter.get('/account', async (_req, res) => {
+  if (!hasOpusKey()) { res.status(503).json({ error: 'OPUSCLIP_API_KEY not configured' }); return }
+  const info = await fetchOpusAccountInfo()
+  if (!info) {
+    res.json({ available: false })
+    return
+  }
+  res.json({
+    available: true,
+    endpoint: info.endpoint,
+    planName: info.planName,
+    creditsRemaining: info.creditsRemaining,
+    creditsTotal: info.creditsTotal,
+    minutesRemaining: info.minutesRemaining,
+    minutesTotal: info.minutesTotal,
+  })
+})
+
+// GET /api/clips/:id/raw — admin/writer only inspector. Returns the
+// raw OpusClip create + poll responses so we can refine the parser.
+clipsRouter.get('/:id/raw', async (req, res) => {
+  const user = (req as typeof req & { user: SessionUser }).user
+  const { rows } = await pool.query<{
+    project_id: string
+    raw_create_response: unknown
+    raw_poll_response: unknown
+  }>(
+    `SELECT project_id, raw_create_response, raw_poll_response FROM clip_jobs WHERE id = $1`,
+    [req.params.id],
+  )
+  if (rows.length === 0) { res.status(404).json({ error: 'not_found' }); return }
+  if (!await assertWriter(user, rows[0].project_id, res)) return
+  res.json({
+    createResponse: rows[0].raw_create_response,
+    pollResponse: rows[0].raw_poll_response,
+  })
 })
 
 // DELETE

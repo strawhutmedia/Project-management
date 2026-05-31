@@ -269,6 +269,13 @@ export type ApiClip = {
   score: number | null
 }
 
+export type ClipJobOptions = {
+  prompt?: string | null
+  clipCount?: number | null
+  minDuration?: number | null
+  maxDuration?: number | null
+}
+
 export type ApiClipJob = {
   id: string
   projectId: string
@@ -279,7 +286,19 @@ export type ApiClipJob = {
   error: string | null
   createdAt: string
   updatedAt: string
+  opusProjectId?: string | null
+  options?: ClipJobOptions | null
   clips: ApiClip[]
+}
+
+export type ApiOpusAccount = {
+  available: boolean
+  endpoint?: string
+  planName?: string | null
+  creditsRemaining?: number | null
+  creditsTotal?: number | null
+  minutesRemaining?: number | null
+  minutesTotal?: number | null
 }
 
 export type ApiTranscriptBlock = {
@@ -706,13 +725,16 @@ export const api = {
     request<{ jobs: ApiClipJob[] }>(`/api/clips?songId=${songId}`),
   clipJob: (id: string) =>
     request<{ job: ApiClipJob }>(`/api/clips/${id}`),
-  startClipJob: (body: { projectId: string; songId: string; dropboxPath: string }) =>
+  startClipJob: (body: { projectId: string; songId: string; dropboxPath: string; options?: ClipJobOptions }) =>
     request<{ job: ApiClipJob }>('/api/clips', {
       method: 'POST',
       body: JSON.stringify(body),
     }),
   deleteClipJob: (id: string) =>
     request<{ ok: true }>(`/api/clips/${id}`, { method: 'DELETE' }),
+  opusAccount: () => request<ApiOpusAccount>('/api/clips/account'),
+  clipJobRaw: (id: string) =>
+    request<{ createResponse: unknown; pollResponse: unknown }>(`/api/clips/${id}/raw`),
 
   transcriptSrtUrl: (id: string) => `/api/transcripts/${id}/srt`,
   transcriptVttUrl: (id: string) => `/api/transcripts/${id}/vtt`,

@@ -24,14 +24,37 @@ export type OpusCreateResult = {
   raw: unknown
 }
 
+export type OpusCreateOptions = {
+  // Plain-English direction to give their AI ("focus on funny moments
+  // about parenting", "highlight Jay's interview answers", etc.). Sent
+  // as `prompt` since that's the dominant naming across AI APIs.
+  prompt?: string | null
+  // Desired number of output clips, if their API honors a count hint.
+  clipCount?: number | null
+  // Target durations in seconds.
+  minDuration?: number | null
+  maxDuration?: number | null
+}
+
 // POST /clip-projects — kicks off clip generation. Accepts public URLs
 // (YouTube, Google Drive, Vimeo, S3, Dropbox temp links, etc.) so we
 // hand it a Dropbox temporary link with no upload.
-export async function createOpusProject(videoUrl: string): Promise<OpusCreateResult> {
+//
+// Options are sent best-effort — OpusClip's API still doesn't document a
+// stable param set publicly. Unknown fields should be ignored by their
+// validator; we surface the raw response so admins can inspect what
+// actually came back.
+export async function createOpusProject(videoUrl: string, opts?: OpusCreateOptions): Promise<OpusCreateResult> {
+  const body: Record<string, unknown> = { videoUrl }
+  if (opts?.prompt && opts.prompt.trim()) body.prompt = opts.prompt.trim().slice(0, 1000)
+  if (opts?.clipCount != null) body.clipCount = opts.clipCount
+  if (opts?.minDuration != null) body.minDuration = opts.minDuration
+  if (opts?.maxDuration != null) body.maxDuration = opts.maxDuration
+
   const res = await fetch(`${OPUS_API}/clip-projects`, {
     method: 'POST',
     headers: authHeaders(),
-    body: JSON.stringify({ videoUrl }),
+    body: JSON.stringify(body),
   })
   if (!res.ok) {
     const body = await res.text()
