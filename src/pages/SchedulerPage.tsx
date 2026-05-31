@@ -235,6 +235,7 @@ export default function SchedulerPage() {
               onClear={clearSlot}
               onTimeChange={changeTime}
               onTogglePosted={togglePosted}
+              onReload={load}
             />
           ) : null}
         </div>
@@ -272,6 +273,7 @@ function DayColumn({
   onClear,
   onTimeChange,
   onTogglePosted,
+  onReload,
 }: {
   day: ApiSchedulerDay
   isAdmin: boolean
@@ -280,6 +282,7 @@ function DayColumn({
   onClear: (slotId: string) => void
   onTimeChange: (slotId: string, time: string) => void
   onTogglePosted: (slotId: string, nextPosted: boolean) => void
+  onReload: () => void | Promise<void>
 }) {
   const header = formatDayHeader(day.date)
   const buckets = KIND_ORDER.map((kind) => ({
@@ -311,6 +314,7 @@ function DayColumn({
                   onClear={onClear}
                   onTimeChange={onTimeChange}
                   onTogglePosted={onTogglePosted}
+                  onReload={onReload}
                 />
               ))}
             </div>
@@ -329,6 +333,7 @@ function Slot({
   onClear,
   onTimeChange,
   onTogglePosted,
+  onReload,
 }: {
   slot: ApiSchedulerSlot
   isAdmin: boolean
@@ -337,6 +342,7 @@ function Slot({
   onClear: (slotId: string) => void
   onTimeChange: (slotId: string, time: string) => void
   onTogglePosted: (slotId: string, nextPosted: boolean) => void
+  onReload: () => void | Promise<void>
 }) {
   const kindStyle = KIND_STYLES[slot.kind]
   const isPosted = slot.status === 'posted'
@@ -458,7 +464,9 @@ function Slot({
         <SlotDetailModal
           slotItem={slot.item}
           slot={slot}
+          canEdit={isAdmin}
           onClose={() => setDetailOpen(false)}
+          onChanged={onReload}
         />
       )}
     </div>
@@ -823,20 +831,29 @@ function Field({
 function SlotDetailModal({
   slotItem,
   slot,
+  canEdit,
   onClose,
+  onChanged,
 }: {
   slotItem: ApiSchedulerItem
   slot: ApiSchedulerSlot
+  canEdit: boolean
   onClose: () => void
+  onChanged: () => void | Promise<void>
 }) {
   const style = KIND_STYLES[slot.kind]
   const item = slotItem.item
-  // Esc to close
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
   }, [onClose])
+
+  async function save(patch: Record<string, unknown>) {
+    await api.updateSocialItem(slotItem.planId, slotItem.itemId, patch)
+    await onChanged()
+  }
+
   return (
     <div className="fixed inset-0 z-50 bg-ink/80 backdrop-blur-sm grid place-items-center p-4" onClick={onClose}>
       <div
@@ -846,11 +863,7 @@ function SlotDetailModal({
         <div className="p-5 space-y-4">
           <div className="flex items-start gap-3">
             {slotItem.projectCoverArtUrl ? (
-              <img
-                src={slotItem.projectCoverArtUrl}
-                alt=""
-                className="w-14 h-14 rounded-lg border border-line/60 shrink-0"
-              />
+              <img src={slotItem.projectCoverArtUrl} alt="" className="w-14 h-14 rounded-lg border border-line/60 shrink-0" />
             ) : (
               <div className="w-14 h-14 rounded-lg bg-ink/40 border border-line/60 shrink-0 grid place-items-center text-xs text-muted">
                 {style.emoji}
@@ -880,35 +893,30 @@ function SlotDetailModal({
             )}
           </div>
 
-          {/* Per-kind body */}
+          {/* Per-kind body — every field saves on blur. */}
           {item.kind === 'text_post' && (
-            <DetailField label="Caption" value={item.text || item.ai_text} mono />
+            <EditableField label="Caption" value={item.text} canEdit={canEdit} mono rows={6} onSave={(v) => save({ text: v })} />
           )}
 
           {item.kind === 'photo_concept' && (
             <>
-              <DetailField label="Image direction" value={item.image_direction} />
-              <DetailField label="Caption" value={item.caption} />
-              <DetailField label="Vibe" value={item.vibe} />
+              <EditableField label="Image direction" value={item.image_direction} canEdit={canEdit} onSave={(v) => save({ image_direction: v })} />
+              <EditableField label="Caption" value={item.caption} canEdit={canEdit} onSave={(v) => save({ caption: v })} />
+              <EditableField label="Vibe" value={item.vibe} canEdit={canEdit} singleLine onSave={(v) => save({ vibe: v })} />
             </>
           )}
 
           {item.kind === 'reel_concept' && (
             <>
-              <DetailField label="Hook" value={item.hook} />
-              {item.talking_points.length > 0 && (
-                <div>
-                  <div className="text-[10px] uppercase tracking-wider text-muted/70 font-bold mb-1.5">
-                    Talking points
-                  </div>
-                  <ul className="space-y-1 pl-4 list-disc text-sm">
-                    {item.talking_points.map((p, i) => (
-                      <li key={i}>{p}</li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-              <DetailField label="Suggested clip" value={item.suggested_clip} />
+              <EditableField label="Hook" value={item.hook} canEdit={canEdit} onSave={(v) => save({ hook: v })} />
+              <EditableField
+                label="Talking points (one per line)"
+                value={item.talking_points.join('\n')}
+                canEdit={canEdit}
+                rows={4}
+                onSave={(v) => save({ talking_points: v.split('\n').map((s) => s.trim()).filter(Boolean) })}
+              />
+              <EditableField label="Suggested clip" value={item.suggested_clip} canEdit={canEdit} onSave={(v) => save({ suggested_clip: v })} />
             </>
           )}
 
@@ -916,15 +924,31 @@ function SlotDetailModal({
             <>
               <div>
                 <div className="text-[10px] uppercase tracking-wider text-muted/70 font-bold mb-1">Medium</div>
-                <span className="text-[11px] uppercase tracking-wider font-bold rounded-full px-2 py-0.5 border border-violet-400/40 bg-violet-400/10 text-violet-200">
-                  {item.medium === 'video' ? '🎞 Video' : '📸 Photo'}
-                </span>
+                {canEdit ? (
+                  <div className="inline-flex rounded-lg border border-line bg-ink/40 p-0.5">
+                    {(['video', 'photo'] as const).map((m) => (
+                      <button
+                        key={m}
+                        onClick={() => void save({ medium: m })}
+                        className={`px-3 py-1 rounded-md text-[10px] uppercase tracking-wider font-bold ${
+                          item.medium === m ? 'bg-violet-400/20 text-violet-200' : 'text-muted'
+                        }`}
+                      >
+                        {m === 'video' ? '🎞 Video' : '📸 Photo'}
+                      </button>
+                    ))}
+                  </div>
+                ) : (
+                  <span className="text-[11px] uppercase tracking-wider font-bold rounded-full px-2 py-0.5 border border-violet-400/40 bg-violet-400/10 text-violet-200">
+                    {item.medium === 'video' ? '🎞 Video' : '📸 Photo'}
+                  </span>
+                )}
               </div>
-              <DetailField label="Concept" value={item.description} />
-              <DetailField label="Overlay caption" value={item.caption} />
+              <EditableField label="Concept" value={item.description} canEdit={canEdit} onSave={(v) => save({ description: v })} />
+              <EditableField label="Overlay caption" value={item.caption} canEdit={canEdit} onSave={(v) => save({ caption: v })} />
               {item.medium === 'video'
-                ? <DetailField label="Suggested clip" value={item.suggested_clip} />
-                : <DetailField label="Image direction" value={item.image_direction} />}
+                ? <EditableField label="Suggested clip" value={item.suggested_clip} canEdit={canEdit} onSave={(v) => save({ suggested_clip: v })} />
+                : <EditableField label="Image direction" value={item.image_direction} canEdit={canEdit} onSave={(v) => save({ image_direction: v })} />}
             </>
           )}
         </div>
@@ -933,14 +957,81 @@ function SlotDetailModal({
   )
 }
 
-function DetailField({ label, value, mono }: { label: string; value: string; mono?: boolean }) {
-  if (!value || !value.trim()) return null
+// Auto-saving field. Click to enter edit mode (or always-editable when
+// canEdit). Saves on blur if the value actually changed.
+function EditableField({
+  label,
+  value,
+  canEdit,
+  onSave,
+  rows,
+  singleLine,
+  mono,
+}: {
+  label: string
+  value: string
+  canEdit: boolean
+  onSave: (next: string) => void | Promise<void>
+  rows?: number
+  singleLine?: boolean
+  mono?: boolean
+}) {
+  const [draft, setDraft] = useState(value)
+  const [saving, setSaving] = useState(false)
+  const [savedAt, setSavedAt] = useState<number | null>(null)
+  // Re-sync when the source value changes (e.g. parent reload).
+  useEffect(() => { setDraft(value) }, [value])
+
+  async function commit() {
+    if (draft === value) return
+    setSaving(true)
+    try {
+      await onSave(draft)
+      setSavedAt(Date.now())
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const baseInput = `w-full rounded-lg bg-ink/40 border border-line text-text px-3 py-2 text-sm outline-none focus:border-stage-mastering/60 ${mono ? 'font-mono text-[13px]' : ''}`
+
+  if (!canEdit) {
+    if (!value || !value.trim()) return null
+    return (
+      <div>
+        <div className="text-[10px] uppercase tracking-wider text-muted/70 font-bold mb-1">{label}</div>
+        <p className={`text-sm leading-snug whitespace-pre-wrap ${mono ? 'font-mono text-[13px]' : ''}`}>{value}</p>
+      </div>
+    )
+  }
+
   return (
     <div>
-      <div className="text-[10px] uppercase tracking-wider text-muted/70 font-bold mb-1">{label}</div>
-      <p className={`text-sm leading-snug whitespace-pre-wrap ${mono ? 'font-mono text-[13px]' : ''}`}>
-        {value}
-      </p>
+      <div className="flex items-center justify-between mb-1">
+        <div className="text-[10px] uppercase tracking-wider text-muted/70 font-bold">{label}</div>
+        {saving ? (
+          <span className="text-[10px] text-muted italic">saving…</span>
+        ) : savedAt && Date.now() - savedAt < 2000 ? (
+          <span className="text-[10px] text-stage-stems">saved ✓</span>
+        ) : null}
+      </div>
+      {singleLine ? (
+        <input
+          type="text"
+          value={draft}
+          onChange={(e) => setDraft(e.target.value)}
+          onBlur={() => void commit()}
+          className={baseInput}
+        />
+      ) : (
+        <textarea
+          value={draft}
+          onChange={(e) => setDraft(e.target.value)}
+          onBlur={() => void commit()}
+          rows={rows ?? 3}
+          className={`${baseInput} resize-y`}
+        />
+      )}
     </div>
   )
 }
