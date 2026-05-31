@@ -342,6 +342,7 @@ function Slot({
   const isPosted = slot.status === 'posted'
   const [over, setOver] = useState(false)
   const [editingTime, setEditingTime] = useState(false)
+  const [detailOpen, setDetailOpen] = useState(false)
 
   function onDrop(e: React.DragEvent) {
     e.preventDefault()
@@ -432,7 +433,9 @@ function Slot({
         <div
           draggable={isAdmin}
           onDragStart={startDrag}
-          className="px-1.5 pb-1.5 cursor-grab active:cursor-grabbing"
+          onClick={() => setDetailOpen(true)}
+          className={`px-1.5 pb-1.5 ${isAdmin ? 'cursor-grab active:cursor-grabbing' : 'cursor-pointer'}`}
+          title="Click to see full details"
         >
           {slot.item.projectCoverArtUrl && (
             <div className="flex items-center gap-1 mt-0.5 mb-1">
@@ -450,6 +453,13 @@ function Slot({
         </div>
       ) : (
         <div className="px-1.5 pb-1.5 text-[9px] text-muted/40 italic">empty</div>
+      )}
+      {detailOpen && slot.item && (
+        <SlotDetailModal
+          slotItem={slot.item}
+          slot={slot}
+          onClose={() => setDetailOpen(false)}
+        />
       )}
     </div>
   )
@@ -804,5 +814,133 @@ function Field({
         />
       )}
     </label>
+  )
+}
+
+// Click-into-the-slot detail view. Shows everything the team needs to
+// actually produce or post the item: cover art, show name, episode
+// (or "Freeform"), scheduled time, full body fields per kind.
+function SlotDetailModal({
+  slotItem,
+  slot,
+  onClose,
+}: {
+  slotItem: ApiSchedulerItem
+  slot: ApiSchedulerSlot
+  onClose: () => void
+}) {
+  const style = KIND_STYLES[slot.kind]
+  const item = slotItem.item
+  // Esc to close
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [onClose])
+  return (
+    <div className="fixed inset-0 z-50 bg-ink/80 backdrop-blur-sm grid place-items-center p-4" onClick={onClose}>
+      <div
+        onClick={(e) => e.stopPropagation()}
+        className={`w-full max-w-xl rounded-2xl border ${style.filled} max-h-[90vh] overflow-y-auto`}
+      >
+        <div className="p-5 space-y-4">
+          <div className="flex items-start gap-3">
+            {slotItem.projectCoverArtUrl ? (
+              <img
+                src={slotItem.projectCoverArtUrl}
+                alt=""
+                className="w-14 h-14 rounded-lg border border-line/60 shrink-0"
+              />
+            ) : (
+              <div className="w-14 h-14 rounded-lg bg-ink/40 border border-line/60 shrink-0 grid place-items-center text-xs text-muted">
+                {style.emoji}
+              </div>
+            )}
+            <div className="flex-1 min-w-0">
+              <div className={`text-[10px] uppercase tracking-[0.2em] font-bold ${style.label_text}`}>
+                {style.emoji} {style.shortLabel}
+              </div>
+              <div className="text-base font-bold truncate">{slotItem.projectName}</div>
+              <div className="text-[11px] text-muted truncate">
+                {slotItem.songTitle ?? 'Freeform post'}
+              </div>
+            </div>
+            <button onClick={onClose} className="text-muted hover:text-text text-xl leading-none">×</button>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2 text-[11px] text-muted">
+            <span className="font-mono">⏰ {format12h(slot.scheduledTime)} PT</span>
+            <span>·</span>
+            <span>{slot.platforms.join(' + ')}</span>
+            {slot.status === 'posted' && (
+              <>
+                <span>·</span>
+                <span className="text-emerald-300 font-bold uppercase tracking-wider">✓ Posted</span>
+              </>
+            )}
+          </div>
+
+          {/* Per-kind body */}
+          {item.kind === 'text_post' && (
+            <DetailField label="Caption" value={item.text || item.ai_text} mono />
+          )}
+
+          {item.kind === 'photo_concept' && (
+            <>
+              <DetailField label="Image direction" value={item.image_direction} />
+              <DetailField label="Caption" value={item.caption} />
+              <DetailField label="Vibe" value={item.vibe} />
+            </>
+          )}
+
+          {item.kind === 'reel_concept' && (
+            <>
+              <DetailField label="Hook" value={item.hook} />
+              {item.talking_points.length > 0 && (
+                <div>
+                  <div className="text-[10px] uppercase tracking-wider text-muted/70 font-bold mb-1.5">
+                    Talking points
+                  </div>
+                  <ul className="space-y-1 pl-4 list-disc text-sm">
+                    {item.talking_points.map((p, i) => (
+                      <li key={i}>{p}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+              <DetailField label="Suggested clip" value={item.suggested_clip} />
+            </>
+          )}
+
+          {item.kind === 'story_concept' && (
+            <>
+              <div>
+                <div className="text-[10px] uppercase tracking-wider text-muted/70 font-bold mb-1">Medium</div>
+                <span className="text-[11px] uppercase tracking-wider font-bold rounded-full px-2 py-0.5 border border-violet-400/40 bg-violet-400/10 text-violet-200">
+                  {item.medium === 'video' ? '🎞 Video' : '📸 Photo'}
+                </span>
+              </div>
+              <DetailField label="Concept" value={item.description} />
+              <DetailField label="Overlay caption" value={item.caption} />
+              {item.medium === 'video'
+                ? <DetailField label="Suggested clip" value={item.suggested_clip} />
+                : <DetailField label="Image direction" value={item.image_direction} />}
+            </>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function DetailField({ label, value, mono }: { label: string; value: string; mono?: boolean }) {
+  if (!value || !value.trim()) return null
+  return (
+    <div>
+      <div className="text-[10px] uppercase tracking-wider text-muted/70 font-bold mb-1">{label}</div>
+      <p className={`text-sm leading-snug whitespace-pre-wrap ${mono ? 'font-mono text-[13px]' : ''}`}>
+        {value}
+      </p>
+    </div>
   )
 }
