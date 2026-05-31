@@ -1,9 +1,9 @@
 {
   "version": "0.2.2",
-  "now": "2026-05-31T19:00:21.051Z",
+  "now": "2026-05-31T19:01:50.653Z",
   "boot": {
-    "startedAt": "2026-05-31T19:00:20.510Z",
-    "completedAt": "2026-05-31T19:00:21.024Z",
+    "startedAt": "2026-05-31T19:01:50.429Z",
+    "completedAt": "2026-05-31T19:01:50.643Z",
     "error": null
   },
   "env": {
@@ -73,7 +73,7 @@
   "recentLog": [
     {
       "level": "info",
-      "ts": "2026-05-31T19:00:20.508Z",
+      "ts": "2026-05-31T19:01:50.427Z",
       "msg": "serving client from",
       "data": {
         "clientDir": "/app/dist"
@@ -81,7 +81,7 @@
     },
     {
       "level": "info",
-      "ts": "2026-05-31T19:00:20.510Z",
+      "ts": "2026-05-31T19:01:50.429Z",
       "msg": "boot starting",
       "data": {
         "cwd": "/app",
@@ -92,12 +92,12 @@
     },
     {
       "level": "info",
-      "ts": "2026-05-31T19:00:20.789Z",
+      "ts": "2026-05-31T19:01:50.545Z",
       "msg": "migrations complete"
     },
     {
       "level": "info",
-      "ts": "2026-05-31T19:00:21.009Z",
+      "ts": "2026-05-31T19:01:50.637Z",
       "msg": "BIYA seed: project already exists, ensured shoot days",
       "data": {
         "projectId": "12f53ed1-c6c7-4c11-8d7b-06d91744c9af"
@@ -105,12 +105,12 @@
     },
     {
       "level": "info",
-      "ts": "2026-05-31T19:00:21.024Z",
+      "ts": "2026-05-31T19:01:50.643Z",
       "msg": "listening on :8080"
     },
     {
       "level": "info",
-      "ts": "2026-05-31T19:00:21.025Z",
+      "ts": "2026-05-31T19:01:50.643Z",
       "msg": "scheduler started (every 5 min)"
     }
   ]
