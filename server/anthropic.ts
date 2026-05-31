@@ -384,24 +384,24 @@ const BRAND_PROFILE_SCHEMA = {
       additionalProperties: false,
       required: ['text', 'photo', 'reel', 'story'],
       properties: {
-        text:  { type: 'array', items: { type: 'string', pattern: '^[0-2][0-9]:[0-5][0-9]$' } },
-        photo: { type: 'array', items: { type: 'string', pattern: '^[0-2][0-9]:[0-5][0-9]$' } },
-        reel:  { type: 'array', items: { type: 'string', pattern: '^[0-2][0-9]:[0-5][0-9]$' } },
-        story: { type: 'array', items: { type: 'string', pattern: '^[0-2][0-9]:[0-5][0-9]$' } },
+        text:  { type: 'array', items: { type: 'string' } },
+        photo: { type: 'array', items: { type: 'string' } },
+        reel:  { type: 'array', items: { type: 'string' } },
+        story: { type: 'array', items: { type: 'string' } },
       },
-      description: 'Best Pacific-time slots per kind for THIS show\'s audience. 24h HH:MM format.',
+      description: 'Best Pacific-time slots per kind for this show. Each entry must be 24h HH:MM (e.g. "08:00", "20:30").',
     },
     weekly_cadence: {
       type: 'object',
       additionalProperties: false,
       required: ['text', 'photo', 'reel', 'story'],
       properties: {
-        text:  { type: 'integer', minimum: 0, maximum: 50 },
-        photo: { type: 'integer', minimum: 0, maximum: 50 },
-        reel:  { type: 'integer', minimum: 0, maximum: 50 },
-        story: { type: 'integer', minimum: 0, maximum: 50 },
+        text:  { type: 'integer' },
+        photo: { type: 'integer' },
+        reel:  { type: 'integer' },
+        story: { type: 'integer' },
       },
-      description: 'How many of each kind to post per week for this show. Be realistic given one episode/week.',
+      description: 'How many of each kind to post per week for this show. Realistic given one episode/week — each value should be 0–50.',
     },
     default_assignees: {
       type: 'object',
@@ -457,6 +457,8 @@ ${usersBlock}
 
 Return your brand profile as JSON matching the schema. Requirements:
 - Provide exactly 5 example posts.
+- posting_times values: each string is 24h "HH:MM" Pacific time (e.g. "08:00", "20:30").
+- weekly_cadence values: integers between 0 and 50.
 - For default_assignees, use user_ids from the AVAILABLE TEAM MEMBERS list
   above, or null if you have no basis to pick one.`
 
