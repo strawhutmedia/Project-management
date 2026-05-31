@@ -75,9 +75,28 @@ The plan has the following structure and counts:
                                 suggested_clip }. Suggested_clip references
                                 an actual moment from the transcript.
   - 3 photo_concepts: each is { image_direction, caption, vibe }.
-                       image_direction is a brief direction for the
-                       photographer. caption is the IG caption text.
+                       image_direction describes an ACTUAL PHOTOGRAPH
+                       to be shot — a real scene with a real subject in
+                       a real setting. Think shot list, not Canva
+                       template. NOT a typographic graphic, NOT text on
+                       a colored background, NOT a poll sticker, NOT a
+                       slide with a quote — those are graphic-design
+                       assets, not photos. Examples that are GOOD:
+                         "Host at the mixing desk during the interview,
+                          warm window light from the left, mid-shot,
+                          headphones around neck."
+                         "Close-up of the guest's hands holding a
+                          vintage cassette they brought to show off."
+                         "Behind-the-scenes wide: producer at the
+                          board, talent in the booth in the background,
+                          studio neon glow."
+                       Specify subject + setting + light/framing.
+                       caption is the IG caption text.
                        vibe is a 2-4 word mood.
+
+For story_concepts with medium='photo': same rule — image_direction
+must describe a real photograph (subject, setting, light), not a
+graphic-design asset.
 
 Voice:
   - Match the show's brand voice exactly. The provided EXAMPLES are
@@ -833,9 +852,9 @@ const REGEN_SCHEMAS: Record<RegenItemKind, Record<string, unknown>> = {
 
 const REGEN_KIND_INSTRUCTIONS: Record<RegenItemKind, string> = {
   text_post: 'one Instagram caption following the show\'s voice and the established IG-text-post rules from the system prompt',
-  story_concept: 'one story concept with medium (video or photo), description, overlay caption (<100 chars), suggested_clip (with [HH:MM:SS – HH:MM:SS] timecode prefix), and image_direction. Pick the format that fits the idea best',
+  story_concept: 'one story concept with medium (video or photo), description, overlay caption (<100 chars), suggested_clip (with [HH:MM:SS – HH:MM:SS] timecode prefix for video; empty string for photo), and image_direction (for photo medium: describe a real photograph — subject + setting + light; never a graphic-design asset). Pick the format that fits the idea best',
   reel_concept: 'one reel concept with hook, 3–5 talking_points, and suggested_clip (with [HH:MM:SS – HH:MM:SS] timecode prefix)',
-  photo_concept: 'one photo concept with image_direction, caption, and a 2–4 word vibe',
+  photo_concept: 'one photo concept. image_direction must describe an ACTUAL PHOTOGRAPH to shoot — real subject in a real setting with real light/framing. NEVER a typographic graphic, NEVER text on a colored background, NEVER a poll sticker. Think shot list, not Canva. Then caption (IG caption text) and a 2–4 word vibe',
 }
 
 export async function regenerateSocialItem(input: RegenInput): Promise<RegenResult> {
