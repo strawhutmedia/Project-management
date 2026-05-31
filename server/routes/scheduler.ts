@@ -19,6 +19,7 @@
 //   - PATCH slots (drag/drop, time changes): workspace admin only — this
 //     is the single canonical posting calendar.
 import { Router } from 'express'
+import crypto from 'crypto'
 import { pool } from '../db'
 import { requireUser, type SessionUser } from '../auth'
 import { assertWriter } from '../permissions'
@@ -58,8 +59,8 @@ type PlanRow = {
   id: string
   project_id: string
   project_name: string
-  song_id: string
-  song_title: string
+  song_id: string | null
+  song_title: string | null
   project_cover_art_url: string | null
   items: SocialItem[]
 }
@@ -119,7 +120,7 @@ async function loadRelevantPlans(slots: SlotRow[]): Promise<Map<string, PlanRow>
             p.cover_art_url AS project_cover_art_url, sp.items
        FROM social_plans sp
        JOIN projects p ON p.id = sp.project_id
-       JOIN songs s ON s.id = sp.song_id
+       LEFT JOIN songs s ON s.id = sp.song_id
       WHERE sp.id = ANY($1::uuid[])
          OR sp.items @? '$[*] ? (@.pushed_to_scheduler_at != null)'`,
     [slotPlanIds],
@@ -134,8 +135,8 @@ type ApiSlotItem = {
   itemId: string
   projectId: string
   projectName: string
-  songId: string
-  songTitle: string
+  songId: string | null
+  songTitle: string | null
   projectCoverArtUrl: string | null
   item: SocialItem
 }
@@ -260,6 +261,7 @@ schedulerRouter.patch('/slots/:id', async (req, res) => {
     itemId?: string | null
     scheduledTime?: string
     platforms?: string[]
+    status?: 'planned' | 'posted' | 'skipped'
   }
 
   const sets: string[] = []
@@ -308,6 +310,13 @@ schedulerRouter.patch('/slots/:id', async (req, res) => {
     sets.push(`platforms = $${p++}::text[]`); params.push(cleaned)
   }
 
+  if (typeof body.status === 'string') {
+    if (!['planned', 'posted', 'skipped'].includes(body.status)) {
+      res.status(400).json({ error: 'invalid status' }); return
+    }
+    sets.push(`status = $${p++}`); params.push(body.status)
+  }
+
   if (sets.length === 0) { res.json({ ok: true }); return }
   sets.push(`updated_at = now()`)
   params.push(slot.id)
@@ -316,6 +325,112 @@ schedulerRouter.patch('/slots/:id', async (req, res) => {
     params,
   )
   res.json({ ok: true })
+})
+
+// POST /api/scheduler/items — author an ad-hoc post (no episode required).
+// The new item is inserted into the project's freeform plan (song_id IS
+// NULL; created on first use) and immediately marked as pushed so it
+// shows up in the backlog.
+//
+// Body: { projectId, kind, fields: { … } }
+//   text_post:     { text }
+//   photo_concept: { image_direction, caption, vibe }
+//   reel_concept:  { hook, talking_points, suggested_clip }
+//   story_concept: { medium, description, caption, suggested_clip, image_direction }
+schedulerRouter.post('/items', async (req, res) => {
+  const user = (req as typeof req & { user: SessionUser }).user
+  const body = req.body as {
+    projectId?: string
+    kind?: SlotKind
+    fields?: Record<string, unknown>
+  }
+  const projectId = body.projectId
+  const kind = body.kind
+  const fields = body.fields ?? {}
+  if (!projectId || !kind) { res.status(400).json({ error: 'projectId and kind required' }); return }
+  if (!SLOT_KINDS.includes(kind)) { res.status(400).json({ error: `invalid kind: ${kind}` }); return }
+  if (!await assertWriter(user, projectId, res)) return
+
+  // Find or lazily create the project's freeform plan.
+  let planId: string
+  const existing = await pool.query<{ id: string; items: SocialItem[] }>(
+    `SELECT id, items FROM social_plans WHERE project_id = $1 AND song_id IS NULL LIMIT 1`,
+    [projectId],
+  )
+  let items: SocialItem[]
+  if (existing.rows.length > 0) {
+    planId = existing.rows[0].id
+    items = existing.rows[0].items
+  } else {
+    const inserted = await pool.query<{ id: string }>(
+      `INSERT INTO social_plans (project_id, song_id, status, items, created_by)
+       VALUES ($1, NULL, 'generated', '[]'::jsonb, $2) RETURNING id`,
+      [projectId, user.id],
+    )
+    planId = inserted.rows[0].id
+    items = []
+  }
+
+  // Build the item from the per-kind fields. Mirrors the shape produced
+  // by the Claude generator so the rest of the app can consume it
+  // uniformly.
+  const itemId = crypto.randomUUID()
+  const pushedAt = new Date().toISOString()
+  let item: SocialItem
+  const s = (k: string, fallback = ''): string => {
+    const v = fields[k]
+    return typeof v === 'string' ? v : fallback
+  }
+  const arr = (k: string): string[] => {
+    const v = fields[k]
+    return Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string') : []
+  }
+  switch (kind) {
+    case 'text_post': {
+      const text = s('text').trim()
+      if (!text) { res.status(400).json({ error: 'text required' }); return }
+      item = { id: itemId, kind: 'text_post', status: 'drafted', ai_text: text, text }
+      break
+    }
+    case 'photo_concept':
+      item = {
+        id: itemId, kind: 'photo_concept', status: 'drafted',
+        assignee_user_id: null,
+        image_direction: s('image_direction'),
+        caption: s('caption'),
+        vibe: s('vibe'),
+      }
+      break
+    case 'reel_concept':
+      item = {
+        id: itemId, kind: 'reel_concept', status: 'drafted',
+        assignee_user_id: null,
+        hook: s('hook'),
+        talking_points: arr('talking_points'),
+        suggested_clip: s('suggested_clip'),
+      }
+      break
+    case 'story_concept': {
+      const medium = s('medium') === 'photo' ? 'photo' : 'video'
+      item = {
+        id: itemId, kind: 'story_concept', status: 'drafted',
+        assignee_user_id: null,
+        medium,
+        description: s('description'),
+        caption: s('caption'),
+        suggested_clip: s('suggested_clip'),
+        image_direction: s('image_direction'),
+      }
+      break
+    }
+  }
+  ;(item as unknown as Record<string, unknown>).pushed_to_scheduler_at = pushedAt
+  items.push(item)
+  await pool.query(
+    `UPDATE social_plans SET items = $2::jsonb, updated_at = now() WHERE id = $1`,
+    [planId, JSON.stringify(items)],
+  )
+  res.json({ ok: true, planId, itemId })
 })
 
 // POST /api/scheduler/push — mark a social item as queued for scheduling.

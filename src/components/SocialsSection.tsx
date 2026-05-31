@@ -14,6 +14,7 @@ import { useEffect, useRef, useState } from 'react'
 import JSZip from 'jszip'
 import { api, type ApiMember, type ApiSocialItem, type ApiSocialPlan, type SocialItemStatus } from '../api'
 import { renderTextPostCanvas, canvasToBlob, safeFilename, extractAccentColor } from '../lib/textPostImage'
+import { KIND_STYLES } from '../lib/kindStyles'
 
 const STATUS_LABEL: Record<SocialItemStatus, string> = {
   idea: 'Idea',
@@ -216,17 +217,17 @@ function PlanCard({
             <TextPostsBucket planId={plan.id} items={buckets.text_post} canWrite={canWrite} showName={showName} accent={accent} onChanged={onChanged} />
           )}
           {buckets.story_concept.length > 0 && (
-            <ConceptBucket label="💬 Stories" items={buckets.story_concept} planId={plan.id}
+            <ConceptBucket kind="story_concept" items={buckets.story_concept} planId={plan.id}
               canWrite={canWrite} members={members} onChanged={onChanged}
               renderItem={(item) => item.kind === 'story_concept' ? <StoryBody item={item} /> : null} />
           )}
           {buckets.reel_concept.length > 0 && (
-            <ConceptBucket label="🎬 Reels" items={buckets.reel_concept} planId={plan.id}
+            <ConceptBucket kind="reel_concept" items={buckets.reel_concept} planId={plan.id}
               canWrite={canWrite} members={members} onChanged={onChanged}
               renderItem={(item) => item.kind === 'reel_concept' ? <ReelBody item={item} /> : null} />
           )}
           {buckets.photo_concept.length > 0 && (
-            <ConceptBucket label="📷 Photos" items={buckets.photo_concept} planId={plan.id}
+            <ConceptBucket kind="photo_concept" items={buckets.photo_concept} planId={plan.id}
               canWrite={canWrite} members={members} onChanged={onChanged}
               renderItem={(item) => item.kind === 'photo_concept' ? <PhotoBody item={item} /> : null} />
           )}
@@ -301,8 +302,8 @@ function TextPostsBucket({
   return (
     <div className="space-y-2">
       <div className="flex items-center justify-between gap-2 flex-wrap">
-        <div className="text-[10px] uppercase tracking-wider text-muted/70 font-bold">
-          📝 Text posts ({items.length} options · {selected.length} selected)
+        <div className={`text-[10px] uppercase tracking-wider font-bold ${KIND_STYLES.text_post.label_text}`}>
+          {KIND_STYLES.text_post.label} ({items.length} options · {selected.length} selected)
         </div>
         <div className="flex items-center gap-1.5 flex-wrap">
           <button
@@ -401,9 +402,9 @@ function TextPostCard({
   return (
     <div
       className={`rounded-xl border p-2.5 space-y-2 transition ${
-        isSelected ? 'border-stage-stems/60 bg-stage-stems/5' :
+        isSelected ? `${KIND_STYLES.text_post.filled} ring-1 ${KIND_STYLES.text_post.ring}` :
         isRejected ? 'border-line/30 bg-ink/10 opacity-50' :
-        'border-line/60 bg-panel/40'
+        KIND_STYLES.text_post.filled
       }`}
     >
       <div className="flex items-center justify-between gap-2 flex-wrap">
@@ -466,7 +467,7 @@ function TextPostCard({
 // ---------- Concept buckets (stories / reels / photos) ----------
 
 function ConceptBucket({
-  label,
+  kind,
   items,
   planId,
   canWrite,
@@ -474,7 +475,7 @@ function ConceptBucket({
   onChanged,
   renderItem,
 }: {
-  label: string
+  kind: 'story_concept' | 'reel_concept' | 'photo_concept'
   items: ApiSocialItem[]
   planId: string
   canWrite: boolean
@@ -482,18 +483,19 @@ function ConceptBucket({
   onChanged: () => void | Promise<void>
   renderItem: (item: ApiSocialItem) => React.ReactNode
 }) {
+  const style = KIND_STYLES[kind]
   async function save(itemId: string, patch: Record<string, unknown>) {
     await api.updateSocialItem(planId, itemId, patch)
     await onChanged()
   }
   return (
     <div className="space-y-1.5">
-      <div className="text-[10px] uppercase tracking-wider text-muted/70 font-bold">{label} ({items.length})</div>
+      <div className={`text-[10px] uppercase tracking-wider font-bold ${style.label_text}`}>{style.label} ({items.length})</div>
       <div className="space-y-2">
         {items.map((item) => {
           if (item.kind === 'text_post') return null
           return (
-            <div key={item.id} className="rounded-lg border border-line/60 bg-panel/40 p-2.5 space-y-2">
+            <div key={item.id} className={`rounded-lg border p-2.5 space-y-2 ${style.filled}`}>
               <div className="flex items-center justify-between gap-2 flex-wrap">
                 <div className="flex items-center gap-1.5 flex-wrap">
                   <StatusPill status={item.status} kind={item.kind} canWrite={canWrite} onChange={(s) => void save(item.id, { status: s })} />

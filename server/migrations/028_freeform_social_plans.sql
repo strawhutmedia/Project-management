@@ -1,0 +1,12 @@
+-- Freeform social posts.
+--
+-- Until now every social item belonged to a per-episode plan (social_plans
+-- with a NOT NULL song_id). For the scheduler, the team also wants to
+-- author ad-hoc posts — quick text posts, photo concepts, etc. — that
+-- aren't tied to any episode.
+--
+-- We model these by reusing social_plans with song_id IS NULL. Each
+-- project gets one freeform "plan" that accumulates ad-hoc items over
+-- time; the scheduler route already reads items from social_plans via
+-- the existing JSONB structure, so no new tables are needed.
+ALTER TABLE social_plans ALTER COLUMN song_id DROP NOT NULL;

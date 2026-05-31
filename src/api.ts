@@ -197,8 +197,8 @@ export type ApiSchedulerItem = {
   itemId: string
   projectId: string
   projectName: string
-  songId: string
-  songTitle: string
+  songId: string | null
+  songTitle: string | null
   projectCoverArtUrl: string | null
   item: ApiSocialItem
 }
@@ -634,6 +634,7 @@ export const api = {
     itemId?: string | null
     scheduledTime?: string
     platforms?: string[]
+    status?: 'planned' | 'posted' | 'skipped'
   }) => request<{ ok: true }>(`/api/scheduler/slots/${slotId}`, {
     method: 'PATCH',
     body: JSON.stringify(patch),
@@ -648,6 +649,14 @@ export const api = {
       method: 'POST',
       body: JSON.stringify({ planId, itemId }),
     }),
+  createSchedulerItem: (body: {
+    projectId: string
+    kind: SchedulerSlotKind
+    fields: Record<string, unknown>
+  }) => request<{ ok: true; planId: string; itemId: string }>('/api/scheduler/items', {
+    method: 'POST',
+    body: JSON.stringify(body),
+  }),
 
   // Clips (OpusClip)
   clipJobs: (songId: string) =>

@@ -12,6 +12,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   api,
+  type ApiProject,
   type ApiSchedulerDay,
   type ApiSchedulerItem,
   type ApiSchedulerResponse,
@@ -21,13 +22,7 @@ import {
 } from '../api'
 import { useAuth } from '../auth'
 import { Link } from 'react-router-dom'
-
-const KIND_LABEL: Record<SchedulerSlotKind, string> = {
-  text_post: '✍️ Text',
-  photo_concept: '📷 Photo',
-  reel_concept: '🎬 Reel',
-  story_concept: '💬 Story',
-}
+import { KIND_STYLES, POSTED_STYLE, POSTED_LABEL_TEXT } from '../lib/kindStyles'
 
 const KIND_ORDER: SchedulerSlotKind[] = ['text_post', 'photo_concept', 'reel_concept', 'story_concept']
 
@@ -82,8 +77,14 @@ export default function SchedulerPage() {
   const [error, setError] = useState<string | null>(null)
   const [busySlotId, setBusySlotId] = useState<string | null>(null)
   const [showFilter, setShowFilter] = useState<string>('all')
+  const [composeOpen, setComposeOpen] = useState(false)
+  const [projects, setProjects] = useState<ApiProject[] | null>(null)
 
   const weekEnd = useMemo(() => addDays(weekStart, 6), [weekStart])
+
+  useEffect(() => {
+    void api.projects().then((res) => setProjects(res.projects)).catch(() => setProjects([]))
+  }, [])
 
   const load = useCallback(async () => {
     setLoading(true); setError(null)
@@ -130,6 +131,19 @@ export default function SchedulerPage() {
     setBusySlotId(slotId)
     try {
       await api.updateSchedulerSlot(slotId, { scheduledTime })
+      await load()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'failed')
+    } finally {
+      setBusySlotId(null)
+    }
+  }
+
+  async function togglePosted(slotId: string, nextPosted: boolean) {
+    if (!isAdmin) return
+    setBusySlotId(slotId)
+    try {
+      await api.updateSchedulerSlot(slotId, { status: nextPosted ? 'posted' : 'planned' })
       await load()
     } catch (err) {
       setError(err instanceof Error ? err.message : 'failed')
@@ -222,6 +236,7 @@ export default function SchedulerPage() {
                   onAssign={assignSlot}
                   onClear={clearSlot}
                   onTimeChange={changeTime}
+                  onTogglePosted={togglePosted}
                 />
               ))}
             </div>
@@ -237,8 +252,18 @@ export default function SchedulerPage() {
           loading={loading}
           isAdmin={isAdmin}
           onUnpush={unpush}
+          onComposeOpen={() => setComposeOpen(true)}
         />
       </div>
+
+      {composeOpen && projects && (
+        <ComposeDialog
+          projects={projects}
+          defaultProjectId={showFilter !== 'all' ? showFilter : undefined}
+          onClose={() => setComposeOpen(false)}
+          onCreated={async () => { setComposeOpen(false); await load() }}
+        />
+      )}
     </div>
   )
 }
@@ -250,6 +275,7 @@ function DayColumn({
   onAssign,
   onClear,
   onTimeChange,
+  onTogglePosted,
 }: {
   day: ApiSchedulerDay
   isAdmin: boolean
@@ -257,6 +283,7 @@ function DayColumn({
   onAssign: (slotId: string, from: ApiSchedulerItem) => void
   onClear: (slotId: string) => void
   onTimeChange: (slotId: string, time: string) => void
+  onTogglePosted: (slotId: string, nextPosted: boolean) => void
 }) {
   const header = formatDayHeader(day.date)
   const buckets = KIND_ORDER.map((kind) => ({
@@ -274,8 +301,8 @@ function DayColumn({
       <div className="flex-1 p-1.5 space-y-3">
         {buckets.map(({ kind, slots }) => (
           <div key={kind}>
-            <div className="text-[9px] uppercase tracking-wider text-muted/70 font-bold px-1 mb-1">
-              {KIND_LABEL[kind]}
+            <div className={`text-[9px] uppercase tracking-wider font-bold px-1 mb-1 ${KIND_STYLES[kind].label_text}`}>
+              {KIND_STYLES[kind].emoji} {KIND_STYLES[kind].shortLabel}
             </div>
             <div className="space-y-1">
               {slots.map((slot) => (
@@ -287,6 +314,7 @@ function DayColumn({
                   onAssign={onAssign}
                   onClear={onClear}
                   onTimeChange={onTimeChange}
+                  onTogglePosted={onTogglePosted}
                 />
               ))}
             </div>
@@ -304,6 +332,7 @@ function Slot({
   onAssign,
   onClear,
   onTimeChange,
+  onTogglePosted,
 }: {
   slot: ApiSchedulerSlot
   isAdmin: boolean
@@ -311,7 +340,10 @@ function Slot({
   onAssign: (slotId: string, from: ApiSchedulerItem) => void
   onClear: (slotId: string) => void
   onTimeChange: (slotId: string, time: string) => void
+  onTogglePosted: (slotId: string, nextPosted: boolean) => void
 }) {
+  const kindStyle = KIND_STYLES[slot.kind]
+  const isPosted = slot.status === 'posted'
   const [over, setOver] = useState(false)
   const [editingTime, setEditingTime] = useState(false)
 
@@ -348,10 +380,12 @@ function Slot({
       onDrop={onDrop}
       className={[
         'rounded-md border text-[10px] transition relative group',
-        filled
-          ? 'border-line bg-ink/60 hover:border-stage-mastering/60'
-          : 'border-dashed border-line/40 bg-ink/20 hover:bg-ink/40',
-        over ? 'border-stage-mastering bg-stage-mastering/10 ring-1 ring-stage-mastering/40' : '',
+        isPosted
+          ? POSTED_STYLE
+          : filled
+            ? kindStyle.filled
+            : `border-dashed ${kindStyle.empty}`,
+        over ? `ring-1 ${kindStyle.ring}` : '',
         busy ? 'opacity-50' : '',
       ].join(' ')}
     >
@@ -369,20 +403,33 @@ function Slot({
           <button
             onClick={() => isAdmin && setEditingTime(true)}
             disabled={!isAdmin}
-            className="text-[10px] text-muted font-mono hover:text-stage-mastering cursor-pointer disabled:cursor-default"
+            className={`text-[10px] font-mono cursor-pointer disabled:cursor-default ${isPosted ? POSTED_LABEL_TEXT : 'text-muted hover:text-stage-mastering'}`}
             title={isAdmin ? 'Click to change time' : 'PT time (read-only)'}
           >
             {format12h(slot.scheduledTime)}
           </button>
         )}
         {filled && isAdmin && (
-          <button
-            onClick={() => onClear(slot.id)}
-            className="text-[10px] text-muted/50 hover:text-urgent opacity-0 group-hover:opacity-100"
-            title="Remove from this slot (sends back to backlog)"
-          >
-            ✕
-          </button>
+          <div className="flex items-center gap-1">
+            <button
+              onClick={() => onTogglePosted(slot.id, !isPosted)}
+              className={`text-[10px] transition ${
+                isPosted
+                  ? 'text-emerald-300 hover:text-emerald-200'
+                  : 'text-muted/40 hover:text-emerald-300 opacity-0 group-hover:opacity-100'
+              }`}
+              title={isPosted ? 'Marked posted — click to mark planned' : 'Mark this slot as posted'}
+            >
+              {isPosted ? '✓' : '○'}
+            </button>
+            <button
+              onClick={() => onClear(slot.id)}
+              className="text-[10px] text-muted/50 hover:text-urgent opacity-0 group-hover:opacity-100"
+              title="Remove from this slot (sends back to backlog)"
+            >
+              ✕
+            </button>
+          </div>
         )}
       </div>
       {slot.item ? (
@@ -420,6 +467,7 @@ function BacklogRail({
   loading,
   isAdmin,
   onUnpush,
+  onComposeOpen,
 }: {
   items: ApiSchedulerItem[]
   shows: Array<{ id: string; name: string }>
@@ -428,6 +476,7 @@ function BacklogRail({
   loading: boolean
   isAdmin: boolean
   onUnpush: (item: ApiSchedulerItem) => void
+  onComposeOpen: () => void
 }) {
   const grouped = useMemo(() => {
     const map: Record<SchedulerSlotKind, ApiSchedulerItem[]> = {
@@ -443,6 +492,12 @@ function BacklogRail({
         <h2 className="text-[11px] uppercase tracking-[0.2em] text-muted font-bold">📥 Backlog</h2>
         <span className="text-[10px] text-muted">{items.length} queued</span>
       </div>
+      <button
+        onClick={onComposeOpen}
+        className="w-full mb-3 rounded-lg bg-gradient-to-r from-stage-mastering to-stage-tracking text-white font-bold uppercase tracking-wider text-[10px] px-3 py-2"
+      >
+        ✏️ Compose new post
+      </button>
       {shows.length > 1 && (
         <select
           value={showFilter}
@@ -466,8 +521,8 @@ function BacklogRail({
             if (group.length === 0) return null
             return (
               <div key={kind}>
-                <div className="text-[10px] uppercase tracking-wider text-muted/70 font-bold mb-1.5">
-                  {KIND_LABEL[kind]} ({group.length})
+                <div className={`text-[10px] uppercase tracking-wider font-bold mb-1.5 ${KIND_STYLES[kind].label_text}`}>
+                  {KIND_STYLES[kind].label} ({group.length})
                 </div>
                 <div className="space-y-1.5">
                   {group.map((it) => (
@@ -498,6 +553,7 @@ function BacklogCard({
   onUnpush: (item: ApiSchedulerItem) => void
 }) {
   const ref = useRef<HTMLDivElement>(null)
+  const kindStyle = KIND_STYLES[item.item.kind as SchedulerSlotKind]
   function startDrag(e: React.DragEvent) {
     e.dataTransfer.setData('application/x-slate-item', JSON.stringify({
       planId: item.planId,
@@ -511,7 +567,7 @@ function BacklogCard({
       ref={ref}
       draggable={isAdmin}
       onDragStart={startDrag}
-      className={`rounded-lg border border-line bg-ink/40 p-2 text-[11px] ${isAdmin ? 'cursor-grab active:cursor-grabbing hover:border-stage-mastering/60' : ''} transition`}
+      className={`rounded-lg border p-2 text-[11px] ${kindStyle.filled} ${isAdmin ? 'cursor-grab active:cursor-grabbing hover:brightness-125' : ''} transition`}
       title={isAdmin ? 'Drag onto a day slot' : 'Read-only (admin can move)'}
     >
       <div className="flex items-center gap-2 mb-1">
@@ -532,7 +588,225 @@ function BacklogCard({
       <div className="text-[11px] text-text leading-snug line-clamp-4">
         {itemBlurb(item.item)}
       </div>
-      <div className="text-[9px] text-muted/60 mt-1 truncate">{item.songTitle}</div>
+      <div className="text-[9px] text-muted/60 mt-1 truncate">{item.songTitle ?? 'Freeform'}</div>
     </div>
+  )
+}
+
+// Compose a brand-new post (text / photo / reel / story) right from the
+// scheduler. It saves under the chosen show's freeform plan (no episode
+// required) and lands in the backlog so it can be dragged onto a slot.
+function ComposeDialog({
+  projects,
+  defaultProjectId,
+  onClose,
+  onCreated,
+}: {
+  projects: ApiProject[]
+  defaultProjectId?: string
+  onClose: () => void
+  onCreated: () => void | Promise<void>
+}) {
+  const [projectId, setProjectId] = useState<string>(defaultProjectId || projects[0]?.id || '')
+  const [kind, setKind] = useState<SchedulerSlotKind>('text_post')
+  const [text, setText] = useState('')
+  const [imageDirection, setImageDirection] = useState('')
+  const [caption, setCaption] = useState('')
+  const [vibe, setVibe] = useState('')
+  const [hook, setHook] = useState('')
+  const [talkingPoints, setTalkingPoints] = useState('')
+  const [suggestedClip, setSuggestedClip] = useState('')
+  const [description, setDescription] = useState('')
+  const [medium, setMedium] = useState<'video' | 'photo'>('video')
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  async function save() {
+    if (!projectId) { setError('Pick a show.'); return }
+    let fields: Record<string, unknown>
+    switch (kind) {
+      case 'text_post':
+        if (!text.trim()) { setError('Write the post copy first.'); return }
+        fields = { text }
+        break
+      case 'photo_concept':
+        fields = { image_direction: imageDirection, caption, vibe }
+        break
+      case 'reel_concept':
+        fields = {
+          hook,
+          talking_points: talkingPoints.split('\n').map((s) => s.trim()).filter(Boolean),
+          suggested_clip: suggestedClip,
+        }
+        break
+      case 'story_concept':
+        fields = { medium, description, caption, suggested_clip: suggestedClip, image_direction: imageDirection }
+        break
+    }
+    setBusy(true); setError(null)
+    try {
+      await api.createSchedulerItem({ projectId, kind, fields })
+      await onCreated()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'failed')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-40 bg-ink/80 backdrop-blur-sm grid place-items-center p-4" onClick={onClose}>
+      <div
+        onClick={(e) => e.stopPropagation()}
+        className="w-full max-w-lg rounded-2xl border border-line bg-panel/95 p-5 space-y-4 max-h-[90vh] overflow-y-auto"
+      >
+        <div className="flex items-center justify-between">
+          <h3 className="text-sm font-display text-rainbow uppercase tracking-widest">Compose post</h3>
+          <button onClick={onClose} className="text-muted hover:text-text text-lg leading-none">×</button>
+        </div>
+
+        <label className="block">
+          <div className="text-[10px] uppercase tracking-wider text-muted/70 font-bold mb-1">Show</div>
+          <select
+            value={projectId}
+            onChange={(e) => setProjectId(e.target.value)}
+            className="w-full rounded-lg bg-ink/40 border border-line text-text px-2 py-1.5 text-sm outline-none"
+          >
+            {projects.map((p) => (
+              <option key={p.id} value={p.id}>{p.name}</option>
+            ))}
+          </select>
+        </label>
+
+        <div>
+          <div className="text-[10px] uppercase tracking-wider text-muted/70 font-bold mb-1">Kind</div>
+          <div className="grid grid-cols-4 gap-1.5">
+            {(Object.keys(KIND_STYLES) as SchedulerSlotKind[]).map((k) => (
+              <button
+                key={k}
+                onClick={() => setKind(k)}
+                className={`text-[10px] uppercase tracking-wider font-bold rounded-lg border px-2 py-2 transition ${
+                  kind === k
+                    ? `${KIND_STYLES[k].filled} ring-1 ${KIND_STYLES[k].ring} ${KIND_STYLES[k].label_text}`
+                    : 'border-line text-muted hover:text-text'
+                }`}
+              >
+                {KIND_STYLES[k].emoji} {KIND_STYLES[k].shortLabel}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {kind === 'text_post' && (
+          <label className="block">
+            <div className="text-[10px] uppercase tracking-wider text-muted/70 font-bold mb-1">Caption</div>
+            <textarea
+              value={text}
+              onChange={(e) => setText(e.target.value)}
+              rows={6}
+              autoFocus
+              placeholder="Write the post copy as you want it to appear…"
+              className="w-full rounded-lg bg-ink/40 border border-line text-text px-2 py-1.5 text-sm outline-none focus:border-sky-400/60"
+            />
+          </label>
+        )}
+
+        {kind === 'photo_concept' && (
+          <>
+            <Field label="Image direction" value={imageDirection} onChange={setImageDirection} placeholder="What's in the photo? mood, framing…" multi />
+            <Field label="Caption" value={caption} onChange={setCaption} placeholder="The post caption" multi />
+            <Field label="Vibe" value={vibe} onChange={setVibe} placeholder="Tone words (warm, gritty, retro…)" />
+          </>
+        )}
+
+        {kind === 'reel_concept' && (
+          <>
+            <Field label="Hook" value={hook} onChange={setHook} placeholder="The opening line / on-screen text" multi />
+            <Field label="Talking points (one per line)" value={talkingPoints} onChange={setTalkingPoints} placeholder={'Point one\nPoint two\nPoint three'} multi rows={4} />
+            <Field label="Suggested clip" value={suggestedClip} onChange={setSuggestedClip} placeholder="What footage to cut from" multi />
+          </>
+        )}
+
+        {kind === 'story_concept' && (
+          <>
+            <div>
+              <div className="text-[10px] uppercase tracking-wider text-muted/70 font-bold mb-1">Medium</div>
+              <div className="inline-flex rounded-lg border border-line bg-ink/40 p-0.5">
+                {(['video', 'photo'] as const).map((m) => (
+                  <button
+                    key={m}
+                    onClick={() => setMedium(m)}
+                    className={`px-3 py-1 rounded-md text-[10px] uppercase tracking-wider font-bold ${
+                      medium === m ? 'bg-violet-400/20 text-violet-200' : 'text-muted'
+                    }`}
+                  >
+                    {m === 'video' ? '🎞 Video' : '📸 Photo'}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <Field label="Description" value={description} onChange={setDescription} placeholder="What's the story?" multi />
+            <Field label="Overlay caption" value={caption} onChange={setCaption} placeholder="Sticker / text overlay" />
+            {medium === 'video'
+              ? <Field label="Suggested clip" value={suggestedClip} onChange={setSuggestedClip} placeholder="What footage to use" multi />
+              : <Field label="Image direction" value={imageDirection} onChange={setImageDirection} placeholder="What the photo looks like" multi />}
+          </>
+        )}
+
+        {error && <p className="text-urgent text-xs">{error}</p>}
+
+        <div className="flex items-center justify-end gap-2 pt-2">
+          <button onClick={onClose} className="text-[11px] uppercase tracking-wider text-muted hover:text-text px-3 py-1.5">
+            Cancel
+          </button>
+          <button
+            onClick={() => void save()}
+            disabled={busy}
+            className="rounded-lg bg-gradient-to-r from-stage-mastering to-stage-tracking text-white font-bold uppercase tracking-wider text-[11px] px-4 py-2 disabled:opacity-50"
+          >
+            {busy ? 'Saving…' : '+ Add to backlog'}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function Field({
+  label,
+  value,
+  onChange,
+  placeholder,
+  multi,
+  rows,
+}: {
+  label: string
+  value: string
+  onChange: (next: string) => void
+  placeholder?: string
+  multi?: boolean
+  rows?: number
+}) {
+  return (
+    <label className="block">
+      <div className="text-[10px] uppercase tracking-wider text-muted/70 font-bold mb-1">{label}</div>
+      {multi ? (
+        <textarea
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          rows={rows ?? 2}
+          placeholder={placeholder}
+          className="w-full rounded-lg bg-ink/40 border border-line text-text px-2 py-1.5 text-sm outline-none focus:border-stage-mastering/60"
+        />
+      ) : (
+        <input
+          type="text"
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          placeholder={placeholder}
+          className="w-full rounded-lg bg-ink/40 border border-line text-text px-2 py-1.5 text-sm outline-none focus:border-stage-mastering/60"
+        />
+      )}
+    </label>
   )
 }
