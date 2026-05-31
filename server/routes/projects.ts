@@ -301,6 +301,11 @@ projectsRouter.patch('/:id', async (req, res) => {
     updates.push(`socials_brand_voice = $${i++}`)
     values.push(typeof v === 'string' && v.trim() ? v.trim().slice(0, 8000) : null)
   }
+  if ('socialsVocabulary' in (req.body ?? {})) {
+    const v = req.body.socialsVocabulary
+    updates.push(`socials_vocabulary = $${i++}`)
+    values.push(typeof v === 'string' && v.trim() ? v.trim().slice(0, 4000) : null)
+  }
   if (Array.isArray(req.body?.socialsExamplePosts)) {
     const cleaned = (req.body.socialsExamplePosts as unknown[])
       .filter((x): x is string => typeof x === 'string' && x.trim().length > 0)
@@ -368,7 +373,7 @@ projectsRouter.get('/:id', async (req, res) => {
   const projectId = req.params.id
   const projRes = await pool.query(
     `SELECT id, name, subtitle, kind, dropbox_folder, default_owners, stage_labels, channels_subfolder, film_phase,
-            socials_brand_voice, socials_example_posts, socials_default_assignees,
+            socials_brand_voice, socials_example_posts, socials_default_assignees, socials_vocabulary,
             rss_feed_url, cover_art_url,
             socials_brand_profile, socials_brand_profile_at
        FROM projects WHERE id = $1`,
@@ -468,6 +473,7 @@ projectsRouter.get('/:id', async (req, res) => {
       channelsSubfolder: project.channels_subfolder,
       filmPhase: project.film_phase || 'pre',
       socialsBrandVoice: project.socials_brand_voice ?? null,
+      socialsVocabulary: project.socials_vocabulary ?? null,
       socialsExamplePosts: Array.isArray(project.socials_example_posts) ? project.socials_example_posts : [],
       socialsDefaultAssignees: (project.socials_default_assignees && typeof project.socials_default_assignees === 'object')
         ? project.socials_default_assignees : {},

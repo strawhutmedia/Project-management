@@ -170,12 +170,14 @@ socialsRouter.post('/', async (req, res) => {
     brand_voice: string | null
     example_posts: string[] | null
     default_assignees: Record<string, string> | null
+    vocabulary: string | null
   }>(
     `SELECT s.project_id, s.title AS song_title, s.subtitle AS song_subtitle,
             p.name AS project_name, p.subtitle AS project_subtitle,
             p.socials_brand_voice AS brand_voice,
             p.socials_example_posts AS example_posts,
-            p.socials_default_assignees AS default_assignees
+            p.socials_default_assignees AS default_assignees,
+            p.socials_vocabulary AS vocabulary
        FROM songs s JOIN projects p ON p.id = s.project_id
       WHERE s.id = $1`,
     [songId],
@@ -231,6 +233,7 @@ socialsRouter.post('/', async (req, res) => {
         showSubtitle: ctx.project_subtitle,
         brandVoice: ctx.brand_voice ?? '',
         examplePosts,
+        vocabulary: ctx.vocabulary ?? '',
         episodeTitle: ctx.song_title,
         episodeSubtitle: ctx.song_subtitle,
         episodeTranscript: transcriptText,

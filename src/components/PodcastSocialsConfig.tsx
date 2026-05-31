@@ -26,6 +26,7 @@ export default function PodcastSocialsConfig({
   onSaved: () => void | Promise<void>
 }) {
   const [brandVoice, setBrandVoice] = useState(project.socialsBrandVoice ?? '')
+  const [vocabulary, setVocabulary] = useState(project.socialsVocabulary ?? '')
   const [examples, setExamples] = useState<string[]>(project.socialsExamplePosts ?? [])
   const [assignees, setAssignees] = useState<Partial<Record<typeof KIND_OPTIONS[number]['key'], string>>>(
     project.socialsDefaultAssignees ?? {},
@@ -39,6 +40,7 @@ export default function PodcastSocialsConfig({
     try {
       await api.updateProject(project.id, {
         socialsBrandVoice: brandVoice.trim() || null,
+        socialsVocabulary: vocabulary.trim() || null,
         socialsExamplePosts: examples.map((e) => e.trim()).filter((e) => e.length > 0),
         socialsDefaultAssignees: assignees,
       })
@@ -70,6 +72,30 @@ export default function PodcastSocialsConfig({
             rows={3}
             placeholder="e.g. Brandi is irreverent, gossipy, drops names. Short sentences. Self-deprecating humor. Never uses hashtags."
             className="w-full bg-ink/40 border border-line text-text rounded-lg px-3 py-2 text-sm outline-none focus:border-stage-mastering resize-y"
+          />
+        </label>
+      </div>
+
+      <div>
+        <label className="block">
+          <div className="text-[10px] uppercase tracking-wider text-muted/70 font-bold mb-1">
+            Names + spelling (must match exactly)
+          </div>
+          <p className="text-[11px] text-muted/70 mb-1.5">
+            One per line. Deepgram transcribes phonetically — guest names come out as gibberish
+            and Claude will copy that. List the exact spelling for hosts, recurring guests, show
+            names, brand terms. Example:
+            <br />
+            <code className="text-muted/60">Cheri Oteri</code>{' · '}
+            <code className="text-muted/60">Jay Kogen</code>{' · '}
+            <code className="text-muted/60">SNL</code>
+          </p>
+          <textarea
+            value={vocabulary}
+            onChange={(e) => setVocabulary(e.target.value)}
+            rows={3}
+            placeholder="One name or term per line"
+            className="w-full bg-ink/40 border border-line text-text rounded-lg px-3 py-2 text-sm font-mono outline-none focus:border-stage-mastering resize-y"
           />
         </label>
       </div>

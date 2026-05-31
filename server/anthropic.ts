@@ -169,6 +169,11 @@ export type GenerateInput = {
   showSubtitle?: string | null
   brandVoice: string
   examplePosts: string[]
+  // Per-show "must spell these correctly" list. Free-form text; the
+  // team types one name/term per line (e.g. "Cheri Oteri" not "Sherri
+  // O'Teri") so phonetic transcripts can't corrupt the spelling of
+  // recurring guests, show titles, brand terms, etc.
+  vocabulary?: string
   episodeTitle: string
   episodeSubtitle?: string | null
   episodeTranscript: string
@@ -200,6 +205,12 @@ function showMetadataBlock(input: GenerateInput): string {
     }
   } else {
     lines.push('EXAMPLE POSTS: (none provided)')
+  }
+  const vocab = (input.vocabulary ?? '').trim()
+  if (vocab) {
+    lines.push('')
+    lines.push('SPELLING REQUIREMENTS — these names and terms must appear EXACTLY as written below in every post, regardless of how the transcript spells them (transcripts are phonetic and often wrong on proper names):')
+    lines.push(vocab)
   }
   return lines.join('\n')
 }
