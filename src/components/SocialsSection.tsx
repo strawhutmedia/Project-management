@@ -13,7 +13,7 @@
 import { useEffect, useRef, useState } from 'react'
 import JSZip from 'jszip'
 import { api, type ApiMember, type ApiSocialItem, type ApiSocialPlan, type SocialItemStatus } from '../api'
-import { renderTextPostCanvas, canvasToBlob, safeFilename, extractAccentColor } from '../lib/textPostImage'
+import { renderTextPostCanvas, canvasToBlob, safeFilename, extractCoverPalette, type CoverPalette } from '../lib/textPostImage'
 import { KIND_STYLES } from '../lib/kindStyles'
 
 const STATUS_LABEL: Record<SocialItemStatus, string> = {
@@ -47,23 +47,23 @@ export default function SocialsSection({
   // Used to brand the rendered text-post images (top label).
   showName: string
   // Podcast cover art URL (from the project's RSS feed). Drives the
-  // accent color on every text-post image.
+  // palette color on every text-post image.
   coverArtUrl?: string | null
 }) {
   const [plans, setPlans] = useState<ApiSocialPlan[] | null>(null)
   const [hasDoneTranscript, setHasDoneTranscript] = useState<boolean | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [starting, setStarting] = useState(false)
-  const [accent, setAccent] = useState<string | null>(null)
+  const [palette, setPalette] = useState<CoverPalette | null>(null)
 
-  // Sample the cover art for a dominant color whenever the URL changes.
-  // Stays null on CORS-blocked covers — the renderer falls back to the
-  // default terracotta.
+  // Sample the cover art for a primary + secondary color so two-tone
+  // shows (yellow bg + blue title etc.) render with both colors. Stays
+  // null on CORS-blocked covers — the renderer falls back to a default.
   useEffect(() => {
-    if (!coverArtUrl) { setAccent(null); return }
+    if (!coverArtUrl) { setPalette(null); return }
     let cancelled = false
-    void extractAccentColor(coverArtUrl).then((c) => {
-      if (!cancelled) setAccent(c)
+    void extractCoverPalette(coverArtUrl).then((p) => {
+      if (!cancelled) setPalette(p)
     })
     return () => { cancelled = true }
   }, [coverArtUrl])
@@ -155,7 +155,7 @@ export default function SocialsSection({
       ) : (
         <div className="space-y-4">
           {plans.map((p) => (
-            <PlanCard key={p.id} plan={p} canWrite={canWrite} members={members} showName={showName} accent={accent} onChanged={load} onDelete={() => void remove(p.id)} />
+            <PlanCard key={p.id} plan={p} canWrite={canWrite} members={members} showName={showName} palette={palette} onChanged={load} onDelete={() => void remove(p.id)} />
           ))}
         </div>
       )}
@@ -168,7 +168,7 @@ function PlanCard({
   canWrite,
   members,
   showName,
-  accent,
+  palette,
   onChanged,
   onDelete,
 }: {
@@ -176,7 +176,7 @@ function PlanCard({
   canWrite: boolean
   members: ApiMember[]
   showName: string
-  accent: string | null
+  palette: CoverPalette | null
   onChanged: () => void | Promise<void>
   onDelete: () => void
 }) {
@@ -214,7 +214,7 @@ function PlanCard({
       {plan.status === 'generated' && (
         <div className="space-y-4">
           {buckets.text_post.length > 0 && (
-            <TextPostsBucket planId={plan.id} items={buckets.text_post} canWrite={canWrite} showName={showName} accent={accent} onChanged={onChanged} />
+            <TextPostsBucket planId={plan.id} items={buckets.text_post} canWrite={canWrite} showName={showName} palette={palette} onChanged={onChanged} />
           )}
           {buckets.story_concept.length > 0 && (
             <ConceptBucket kind="story_concept" items={buckets.story_concept} planId={plan.id}
@@ -244,14 +244,14 @@ function TextPostsBucket({
   items,
   canWrite,
   showName,
-  accent,
+  palette,
   onChanged,
 }: {
   planId: string
   items: ApiSocialItem[]
   canWrite: boolean
   showName: string
-  accent: string | null
+  palette: CoverPalette | null
   onChanged: () => void | Promise<void>
 }) {
   const selected = items.filter((i): i is Extract<ApiSocialItem, { kind: 'text_post' }> =>
@@ -279,7 +279,7 @@ function TextPostsBucket({
       const zip = new JSZip()
       for (let i = 0; i < toExport.length; i++) {
         const post = toExport[i]
-        const canvas = renderTextPostCanvas({ text: post.text, showName, accent }, { fullSize: true })
+        const canvas = renderTextPostCanvas({ text: post.text, showName, palette }, { fullSize: true })
         const blob = await canvasToBlob(canvas)
         const safe = safeFilename(post.text.slice(0, 40))
         const idx = String(i + 1).padStart(2, '0')
@@ -335,7 +335,7 @@ function TextPostsBucket({
               item={item}
               canWrite={canWrite}
               showName={showName}
-              accent={accent}
+              palette={palette}
               isSelected={isSelected}
               isRejected={isRejected}
               onStatus={(s) => void setStatus(item.id, s)}
@@ -354,7 +354,7 @@ function TextPostCard({
   item,
   canWrite,
   showName,
-  accent,
+  palette,
   isSelected,
   isRejected,
   onStatus,
@@ -365,7 +365,7 @@ function TextPostCard({
   item: Extract<ApiSocialItem, { kind: 'text_post' }>
   canWrite: boolean
   showName: string
-  accent: string | null
+  palette: CoverPalette | null
   isSelected: boolean
   isRejected: boolean
   onStatus: (next: SocialItemStatus) => void
@@ -374,20 +374,20 @@ function TextPostCard({
 }) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null)
 
-  // Re-render the canvas any time the text, show name, or accent changes
+  // Re-render the canvas any time the text, show name, or palette changes
   // so the preview always reflects the latest state.
   useEffect(() => {
     if (!canvasRef.current) return
-    const fresh = renderTextPostCanvas({ text: item.text, showName, accent }, { fullSize: false })
+    const fresh = renderTextPostCanvas({ text: item.text, showName, palette }, { fullSize: false })
     const ctx = canvasRef.current.getContext('2d')
     if (!ctx) return
     canvasRef.current.width = fresh.width
     canvasRef.current.height = fresh.height
     ctx.drawImage(fresh, 0, 0)
-  }, [item.text, showName, accent])
+  }, [item.text, showName, palette])
 
   async function downloadOne() {
-    const canvas = renderTextPostCanvas({ text: item.text, showName, accent }, { fullSize: true })
+    const canvas = renderTextPostCanvas({ text: item.text, showName, palette }, { fullSize: true })
     const blob = await canvasToBlob(canvas)
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
