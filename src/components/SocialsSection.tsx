@@ -373,26 +373,46 @@ function TextPostCard({
   onChanged: () => void | Promise<void>
 }) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null)
+  // Local draft so keystrokes don't fire a server call on every letter.
+  // The canvas renders from the draft (immediate preview); we save on
+  // blur. Re-sync when the server-side item.text changes (e.g. another
+  // user edited it, or the plan was regenerated).
+  const [draft, setDraft] = useState(item.text)
+  const [saving, setSaving] = useState(false)
+  const [savedAt, setSavedAt] = useState<number | null>(null)
+  useEffect(() => { setDraft(item.text) }, [item.text])
 
-  // Re-render the canvas any time the text, show name, or palette changes
-  // so the preview always reflects the latest state.
+  // Re-render the canvas any time the draft, show name, or palette changes
+  // so the preview always reflects what you're typing.
   useEffect(() => {
     if (!canvasRef.current) return
-    const fresh = renderTextPostCanvas({ text: item.text, showName, palette }, { fullSize: false })
+    const fresh = renderTextPostCanvas({ text: draft, showName, palette }, { fullSize: false })
     const ctx = canvasRef.current.getContext('2d')
     if (!ctx) return
     canvasRef.current.width = fresh.width
     canvasRef.current.height = fresh.height
     ctx.drawImage(fresh, 0, 0)
-  }, [item.text, showName, palette])
+  }, [draft, showName, palette])
+
+  async function commit() {
+    if (draft === item.text) return
+    setSaving(true)
+    try {
+      await onText(draft)
+      setSavedAt(Date.now())
+    } finally {
+      setSaving(false)
+    }
+  }
 
   async function downloadOne() {
-    const canvas = renderTextPostCanvas({ text: item.text, showName, palette }, { fullSize: true })
+    // Use the current draft so unsaved edits land in the file too.
+    const canvas = renderTextPostCanvas({ text: draft, showName, palette }, { fullSize: true })
     const blob = await canvasToBlob(canvas)
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
-    a.download = `${safeFilename(item.text.slice(0, 40))}.png`
+    a.download = `${safeFilename(draft.slice(0, 40))}.png`
     document.body.appendChild(a)
     a.click()
     document.body.removeChild(a)
@@ -436,15 +456,25 @@ function TextPostCard({
         <canvas ref={canvasRef} className="max-w-full h-auto rounded shadow-md" />
       </div>
 
-      {/* Edit copy + per-post PNG download */}
-      <textarea
-        value={item.text}
-        disabled={!canWrite}
-        onChange={(e) => onText(e.target.value)}
-        rows={3}
-        placeholder="Caption text"
-        className="w-full bg-transparent text-xs leading-snug outline-none border border-transparent focus:border-stage-mastering/40 rounded p-1 resize-y disabled:opacity-70"
-      />
+      {/* Edit copy + per-post PNG download. Draft updates the canvas
+          live; saves to the server on blur so focus isn't lost mid-typing. */}
+      <div className="space-y-1">
+        <textarea
+          value={draft}
+          disabled={!canWrite}
+          onChange={(e) => setDraft(e.target.value)}
+          onBlur={() => void commit()}
+          rows={3}
+          placeholder="Caption text — edits update the preview live; save happens when you click away."
+          className="w-full bg-ink/30 border border-line/40 focus:border-stage-mastering/60 text-xs leading-snug outline-none rounded p-2 resize-y disabled:opacity-70"
+        />
+        <div className="flex items-center justify-end gap-2 text-[10px] text-muted h-3">
+          {saving ? 'saving…' :
+           savedAt && Date.now() - savedAt < 2000 ? <span className="text-stage-stems">saved ✓</span> :
+           draft !== item.text ? <span className="text-stage-mastering">unsaved — click outside to save</span> :
+           null}
+        </div>
+      </div>
       <div className="flex items-center justify-end gap-1.5">
         <PushToSchedulerButton
           planId={planId}
