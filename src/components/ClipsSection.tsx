@@ -371,6 +371,24 @@ function ClipJobCard({
               { } raw
             </button>
           )}
+          {isAdmin && (
+            <button
+              onClick={async () => {
+                try {
+                  const r = raw ?? await api.clipJobRaw(job.id)
+                  if (!raw) setRaw(r)
+                  await navigator.clipboard.writeText(JSON.stringify(r, null, 2))
+                  alert('Raw OpusClip response copied to clipboard.')
+                } catch (err) {
+                  alert('Copy failed: ' + (err instanceof Error ? err.message : String(err)))
+                }
+              }}
+              className="text-[10px] uppercase tracking-wider text-muted hover:text-text border border-line rounded-full px-2 py-1"
+              title="Copy raw OpusClip JSON to clipboard"
+            >
+              📋 copy raw
+            </button>
+          )}
           {canWrite && (
             <button
               onClick={onDelete}

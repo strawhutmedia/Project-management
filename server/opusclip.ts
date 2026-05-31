@@ -235,14 +235,60 @@ function normalizeClip(c: Record<string, unknown>): OpusClip {
     }
     return null
   }
+  // First-pass: named fields we know about.
+  let previewUrl = get('previewUrl', 'previewURL', 'previewVideoUrl', 'streamUrl', 'videoUrl', 'mp4Url', 'url', 'mediaUrl', 'assetUrl', 'renderUrl')
+  let downloadUrl = get('downloadUrl', 'downloadURL', 'exportUrl', 'mp4Url', 'videoUrl', 'assetUrl', 'renderUrl')
+  let thumbnailUrl = get('thumbnailUrl', 'thumbnailURL', 'thumbUrl', 'coverUrl', 'imageUrl', 'thumbnail', 'cover', 'poster')
+
+  // Deep scan: walk the whole clip object looking for URL-shaped
+  // strings. Classify by extension. Lets us find URLs no matter
+  // where OpusClip nests them.
+  if (!previewUrl || !downloadUrl || !thumbnailUrl) {
+    const found = harvestMediaUrls(c)
+    if (!previewUrl) previewUrl = found.video
+    if (!downloadUrl) downloadUrl = found.video
+    if (!thumbnailUrl) thumbnailUrl = found.image
+  }
+
   return {
     id: String(c.id ?? c.clipId ?? c._id ?? ''),
     title: get('title', 'name', 'caption', 'headline'),
     durationSeconds: getNum('durationSeconds', 'duration', 'length'),
-    previewUrl: get('previewUrl', 'previewURL', 'previewVideoUrl', 'streamUrl'),
-    downloadUrl: get('downloadUrl', 'downloadURL', 'exportUrl', 'mp4Url'),
-    thumbnailUrl: get('thumbnailUrl', 'thumbnailURL', 'thumbUrl', 'coverUrl'),
+    previewUrl,
+    downloadUrl,
+    thumbnailUrl,
     score: getNum('score', 'viralityScore', 'virality'),
     raw: c,
   }
+}
+
+// Walk an arbitrary object looking for the most-promising video and
+// image URL strings. Pulls strings that look like https://… ending in
+// a known media extension. Used as a fallback when OpusClip's named
+// fields don't match anything we expect.
+function harvestMediaUrls(root: unknown): { video: string | null; image: string | null } {
+  const VIDEO_EXT = /\.(mp4|m3u8|mov|webm|m4v)(?:\?|#|$)/i
+  const IMAGE_EXT = /\.(jpe?g|png|webp|gif)(?:\?|#|$)/i
+  let video: string | null = null
+  let image: string | null = null
+  const seen = new WeakSet<object>()
+  const walk = (node: unknown): void => {
+    if (typeof node === 'string') {
+      if (!/^https?:\/\//i.test(node)) return
+      if (!video && VIDEO_EXT.test(node)) video = node
+      if (!image && IMAGE_EXT.test(node)) image = node
+      return
+    }
+    if (Array.isArray(node)) {
+      for (const v of node) walk(v)
+      return
+    }
+    if (node && typeof node === 'object') {
+      if (seen.has(node as object)) return
+      seen.add(node as object)
+      for (const v of Object.values(node as Record<string, unknown>)) walk(v)
+    }
+  }
+  walk(root)
+  return { video, image }
 }
