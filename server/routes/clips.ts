@@ -157,6 +157,27 @@ async function loadClips(jobId: string): Promise<ClipRow[]> {
 }
 
 // LIST jobs for a song
+// GET /api/clips/account — must come BEFORE /:id (otherwise the
+// dynamic-id route matches /account and tries to look up a clip job
+// with id "account", which fails).
+clipsRouter.get('/account', async (_req, res) => {
+  if (!hasOpusKey()) { res.status(503).json({ error: 'OPUSCLIP_API_KEY not configured' }); return }
+  const info = await fetchOpusAccountInfo()
+  if (!info) {
+    res.json({ available: false })
+    return
+  }
+  res.json({
+    available: true,
+    endpoint: info.endpoint,
+    planName: info.planName,
+    creditsRemaining: info.creditsRemaining,
+    creditsTotal: info.creditsTotal,
+    minutesRemaining: info.minutesRemaining,
+    minutesTotal: info.minutesTotal,
+  })
+})
+
 clipsRouter.get('/', async (req, res) => {
   const user = (req as typeof req & { user: SessionUser }).user
   const songId = String(req.query.songId || '')
@@ -270,28 +291,6 @@ clipsRouter.post('/', async (req, res) => {
       )
     }
   })()
-})
-
-// GET /api/clips/account — best-effort fetch of OpusClip plan/credits.
-// Probes a few common endpoint patterns since OpusClip's docs don't
-// pin one down. Returns null fields if their API doesn't expose them
-// via the patterns we try.
-clipsRouter.get('/account', async (_req, res) => {
-  if (!hasOpusKey()) { res.status(503).json({ error: 'OPUSCLIP_API_KEY not configured' }); return }
-  const info = await fetchOpusAccountInfo()
-  if (!info) {
-    res.json({ available: false })
-    return
-  }
-  res.json({
-    available: true,
-    endpoint: info.endpoint,
-    planName: info.planName,
-    creditsRemaining: info.creditsRemaining,
-    creditsTotal: info.creditsTotal,
-    minutesRemaining: info.minutesRemaining,
-    minutesTotal: info.minutesTotal,
-  })
 })
 
 // GET /api/clips/:id/raw — admin/writer only inspector. Returns the

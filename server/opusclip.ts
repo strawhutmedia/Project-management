@@ -152,26 +152,41 @@ const ACCOUNT_PATH_CANDIDATES = [
   '/organizations/me',
 ]
 
+// In-memory cache so every ClipsSection mount doesn't fan out 10
+// upstream requests. 5-minute TTL is plenty for a credit balance UI.
+type AccountCacheEntry = { at: number; value: OpusAccountInfo | null }
+let accountCache: AccountCacheEntry | null = null
+const ACCOUNT_CACHE_TTL_MS = 5 * 60 * 1000
+
 export async function fetchOpusAccountInfo(): Promise<OpusAccountInfo | null> {
+  if (accountCache && Date.now() - accountCache.at < ACCOUNT_CACHE_TTL_MS) {
+    return accountCache.value
+  }
   for (const path of ACCOUNT_PATH_CANDIDATES) {
     try {
       const res = await fetch(`${OPUS_API}${path}`, {
         headers: authHeaders(),
-        signal: AbortSignal.timeout(5_000),
+        // Aggressive timeout: 10 candidates * 5s = up to 50s of hang.
+        // 2s each keeps the worst case under 20s for the first call and
+        // the cache keeps every subsequent call instant.
+        signal: AbortSignal.timeout(2_000),
       })
       if (!res.ok) continue
       const data = (await res.json().catch(() => null)) as unknown
       if (!data) continue
       logInfo('opus: account endpoint hit', { path })
-      return {
+      const value: OpusAccountInfo = {
         endpoint: path,
         raw: data,
         ...parseAccountFields(data as Record<string, unknown>),
       }
+      accountCache = { at: Date.now(), value }
+      return value
     } catch {
       // Try the next candidate
     }
   }
+  accountCache = { at: Date.now(), value: null }
   return null
 }
 
