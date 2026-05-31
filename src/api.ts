@@ -223,6 +223,30 @@ export type ApiSchedulerResponse = {
   backlog: ApiSchedulerItem[]
 }
 
+export type ApiBrandProfile = {
+  brandVoice: string
+  examplePosts: string[]
+  postingTimes: {
+    text: string[]
+    photo: string[]
+    reel: string[]
+    story: string[]
+  }
+  weeklyCadence: {
+    text: number
+    photo: number
+    reel: number
+    story: number
+  }
+  defaultAssignees: {
+    story_video: string | null
+    story_photo: string | null
+    reel_concept: string | null
+    photo_concept: string | null
+  }
+  reasoning: string
+}
+
 export type ApiPodcastSearchResult = {
   itunesId: number | null
   title: string
@@ -349,6 +373,8 @@ export type ApiProject = {
   socialsDefaultAssignees?: Partial<Record<'story_video' | 'story_photo' | 'reel_concept' | 'photo_concept', string>>
   rssFeedUrl?: string | null
   coverArtUrl?: string | null
+  brandProfile?: ApiBrandProfile | null
+  brandProfileAt?: string | null
   songs: ApiSong[]
 }
 
@@ -625,6 +651,8 @@ export const api = {
     ),
   searchPodcasts: (q: string) =>
     request<{ results: ApiPodcastSearchResult[] }>(`/api/podcasts/search?q=${encodeURIComponent(q)}`),
+  generateBrandProfile: (projectId: string) =>
+    request<{ profile: ApiBrandProfile; generatedAt: string }>(`/api/projects/${projectId}/brand-profile`, { method: 'POST' }),
 
   // Social content scheduler
   scheduler: (from: string, to: string) =>

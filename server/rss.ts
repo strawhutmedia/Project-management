@@ -11,6 +11,7 @@ export type PodcastFeedMeta = {
   title: string | null
   description: string | null
   coverArtUrl: string | null
+  episodes: Array<{ title: string; description: string | null }>
 }
 
 export async function fetchPodcastFeed(url: string): Promise<PodcastFeedMeta> {
@@ -82,7 +83,25 @@ function parseChannelMeta(xml: string): PodcastFeedMeta {
     if (imageUrl) coverArtUrl = decodeXml(stripCdata(imageUrl[1])).trim()
   }
 
-  return { title, description, coverArtUrl }
+  // Episodes — pull up to 12 <item> blocks (most recent first) with
+  // title + description for downstream voice analysis. Channel block
+  // doesn't include <item>s, so scan the full XML for these.
+  const episodes: Array<{ title: string; description: string | null }> = []
+  const itemRegex = /<item[^>]*>([\s\S]*?)<\/item>/gi
+  let m: RegExpExecArray | null
+  while ((m = itemRegex.exec(xml)) !== null && episodes.length < 12) {
+    const body = m[1]
+    const t = body.match(/<title[^>]*>([\s\S]*?)<\/title>/i)
+    if (!t) continue
+    const d = body.match(/<itunes:summary[^>]*>([\s\S]*?)<\/itunes:summary>/i)
+      || body.match(/<description[^>]*>([\s\S]*?)<\/description>/i)
+    episodes.push({
+      title: decodeXml(stripCdata(t[1])).trim(),
+      description: d ? decodeXml(stripCdata(d[1])).trim().slice(0, 600) : null,
+    })
+  }
+
+  return { title, description, coverArtUrl, episodes }
 }
 
 function stripCdata(s: string): string {

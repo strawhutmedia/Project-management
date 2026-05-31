@@ -292,3 +292,225 @@ export async function generateSocialPlan(input: GenerateInput): Promise<Generate
     },
   }
 }
+
+// =============================================================
+// Brand profile generator — "Slate's read on this show"
+// =============================================================
+//
+// One call → an opinionated take on how the team should be running this
+// show's socials. Suggests brand voice, example post styles, posting
+// times, weekly cadence, and default assignees. The team adopts the
+// pieces they like via per-field Accept buttons; the rest stays as
+// suggestion-only.
+
+export type BrandProfileInput = {
+  showName: string
+  showSubtitle: string | null
+  kind: 'podcast' | 'album' | 'film'
+  // From the RSS feed if available
+  showDescription: string | null
+  recentEpisodes: Array<{ title: string; description?: string }>
+  // Up to ~6000 chars total — recent episode transcript snippets joined
+  // for voice/tone signal
+  transcriptSamples: string
+  // The pool of users the team can pick assignees from
+  availableUsers: Array<{ id: string; name: string }>
+}
+
+export type BrandProfile = {
+  brandVoice: string
+  examplePosts: string[]
+  postingTimes: {
+    text: string[]
+    photo: string[]
+    reel: string[]
+    story: string[]
+  }
+  weeklyCadence: {
+    text: number
+    photo: number
+    reel: number
+    story: number
+  }
+  defaultAssignees: {
+    story_video: string | null
+    story_photo: string | null
+    reel_concept: string | null
+    photo_concept: string | null
+  }
+  reasoning: string
+}
+
+export type BrandProfileResult = {
+  profile: BrandProfile
+  usage: GenerateResult['usage']
+}
+
+const BRAND_PROFILE_SYSTEM = `You are a senior social-media strategist for podcasts and shows.
+
+Given a show's metadata, cover art (described implicitly), and a few
+transcript samples, you produce an opinionated brand profile the team
+can adopt or tweak.
+
+The team's posting strategy: each week promotes the most recent
+episode — not the back catalog. Your suggestions should reflect that
+"this week = this week's episode" rhythm.
+
+You output strict JSON. No prose outside the JSON.`
+
+const BRAND_PROFILE_SCHEMA = {
+  type: 'object',
+  additionalProperties: false,
+  required: [
+    'brand_voice', 'example_posts', 'posting_times',
+    'weekly_cadence', 'default_assignees', 'reasoning',
+  ],
+  properties: {
+    brand_voice: {
+      type: 'string',
+      description: '2–3 sentence description of the show\'s voice for social posts. Concrete adjectives, not generic.',
+    },
+    example_posts: {
+      type: 'array',
+      minItems: 5,
+      maxItems: 5,
+      items: { type: 'string' },
+      description: '5 example IG-style text posts in the show\'s voice promoting this week\'s episode generically. Each 1–3 short sentences. No hashtags.',
+    },
+    posting_times: {
+      type: 'object',
+      additionalProperties: false,
+      required: ['text', 'photo', 'reel', 'story'],
+      properties: {
+        text:  { type: 'array', items: { type: 'string', pattern: '^[0-2][0-9]:[0-5][0-9]$' } },
+        photo: { type: 'array', items: { type: 'string', pattern: '^[0-2][0-9]:[0-5][0-9]$' } },
+        reel:  { type: 'array', items: { type: 'string', pattern: '^[0-2][0-9]:[0-5][0-9]$' } },
+        story: { type: 'array', items: { type: 'string', pattern: '^[0-2][0-9]:[0-5][0-9]$' } },
+      },
+      description: 'Best Pacific-time slots per kind for THIS show\'s audience. 24h HH:MM format.',
+    },
+    weekly_cadence: {
+      type: 'object',
+      additionalProperties: false,
+      required: ['text', 'photo', 'reel', 'story'],
+      properties: {
+        text:  { type: 'integer', minimum: 0, maximum: 50 },
+        photo: { type: 'integer', minimum: 0, maximum: 50 },
+        reel:  { type: 'integer', minimum: 0, maximum: 50 },
+        story: { type: 'integer', minimum: 0, maximum: 50 },
+      },
+      description: 'How many of each kind to post per week for this show. Be realistic given one episode/week.',
+    },
+    default_assignees: {
+      type: 'object',
+      additionalProperties: false,
+      required: ['story_video', 'story_photo', 'reel_concept', 'photo_concept'],
+      properties: {
+        story_video:   { type: ['string', 'null'], description: 'user_id from available_users or null' },
+        story_photo:   { type: ['string', 'null'] },
+        reel_concept:  { type: ['string', 'null'] },
+        photo_concept: { type: ['string', 'null'] },
+      },
+    },
+    reasoning: {
+      type: 'string',
+      description: 'Brief 2–4 sentence explanation of the choices, especially the posting times and cadence.',
+    },
+  },
+} as const
+
+export async function generateBrandProfile(input: BrandProfileInput): Promise<BrandProfileResult> {
+  logInfo('brand profile: generating', {
+    showName: input.showName,
+    episodeCount: input.recentEpisodes.length,
+    transcriptChars: input.transcriptSamples.length,
+  })
+  const usersBlock = input.availableUsers.length === 0
+    ? '(no users in the workspace)'
+    : input.availableUsers.map((u) => `- ${u.id}  ${u.name}`).join('\n')
+  const episodesBlock = input.recentEpisodes.length === 0
+    ? '(no episodes yet)'
+    : input.recentEpisodes
+        .slice(0, 8)
+        .map((e, i) => `${i + 1}. ${e.title}${e.description ? `\n   ${e.description.slice(0, 240)}` : ''}`)
+        .join('\n')
+  const userText = `SHOW
+Name: ${input.showName}
+${input.showSubtitle ? `Subtitle: ${input.showSubtitle}\n` : ''}Kind: ${input.kind}
+
+SHOW DESCRIPTION
+${input.showDescription || '(none provided)'}
+
+RECENT EPISODES
+${episodesBlock}
+
+TRANSCRIPT SAMPLES (for voice signal — may be partial)
+${input.transcriptSamples.slice(0, 6000) || '(no transcripts available)'}
+
+AVAILABLE TEAM MEMBERS (id  name)
+${usersBlock}
+
+Return your brand profile as JSON matching the schema. For default_assignees,
+use user_ids from the AVAILABLE TEAM MEMBERS list above, or null if you have
+no basis to pick one.`
+
+  let response
+  try {
+    response = await client.messages.create({
+      model: MODEL,
+      max_tokens: 4000,
+      system: BRAND_PROFILE_SYSTEM,
+      messages: [{ role: 'user', content: [{ type: 'text', text: userText }] }],
+      output_config: { format: { type: 'json_schema', schema: BRAND_PROFILE_SCHEMA } },
+    })
+  } catch (err) {
+    logError('brand profile: claude call failed', {
+      error: err instanceof Error ? err.message : String(err),
+    })
+    throw err
+  }
+
+  const textBlock = response.content.find((b) => b.type === 'text')
+  if (!textBlock || textBlock.type !== 'text') {
+    throw new Error('brand profile: claude returned no text block')
+  }
+
+  type RawProfile = {
+    brand_voice: string
+    example_posts: string[]
+    posting_times: { text: string[]; photo: string[]; reel: string[]; story: string[] }
+    weekly_cadence: { text: number; photo: number; reel: number; story: number }
+    default_assignees: {
+      story_video: string | null
+      story_photo: string | null
+      reel_concept: string | null
+      photo_concept: string | null
+    }
+    reasoning: string
+  }
+  const raw = JSON.parse(textBlock.text) as RawProfile
+
+  const profile: BrandProfile = {
+    brandVoice: raw.brand_voice,
+    examplePosts: raw.example_posts,
+    postingTimes: raw.posting_times,
+    weeklyCadence: raw.weekly_cadence,
+    defaultAssignees: raw.default_assignees,
+    reasoning: raw.reasoning,
+  }
+
+  logInfo('brand profile: generated', {
+    showName: input.showName,
+    cadenceTotal: profile.weeklyCadence.text + profile.weeklyCadence.photo + profile.weeklyCadence.reel + profile.weeklyCadence.story,
+  })
+
+  return {
+    profile,
+    usage: {
+      inputTokens: response.usage.input_tokens,
+      outputTokens: response.usage.output_tokens,
+      cacheCreationInputTokens: response.usage.cache_creation_input_tokens ?? 0,
+      cacheReadInputTokens: response.usage.cache_read_input_tokens ?? 0,
+    },
+  }
+}

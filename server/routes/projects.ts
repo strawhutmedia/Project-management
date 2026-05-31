@@ -3,6 +3,7 @@ import { pool } from '../db'
 import { requireUser, type SessionUser } from '../auth'
 import { getProjectRole, assertWriter, assertProjectAdmin } from '../permissions'
 import { fetchPodcastFeed } from '../rss'
+import { hasAnthropicKey, generateBrandProfile } from '../anthropic'
 import { logInfo, logError } from '../diag'
 
 // Look up the admin user (Ryan) by ADMIN_EMAIL so we can auto-assign
@@ -368,7 +369,8 @@ projectsRouter.get('/:id', async (req, res) => {
   const projRes = await pool.query(
     `SELECT id, name, subtitle, kind, dropbox_folder, default_owners, stage_labels, channels_subfolder, film_phase,
             socials_brand_voice, socials_example_posts, socials_default_assignees,
-            rss_feed_url, cover_art_url
+            rss_feed_url, cover_art_url,
+            socials_brand_profile, socials_brand_profile_at
        FROM projects WHERE id = $1`,
     [projectId],
   )
@@ -471,6 +473,8 @@ projectsRouter.get('/:id', async (req, res) => {
         ? project.socials_default_assignees : {},
       rssFeedUrl: project.rss_feed_url ?? null,
       coverArtUrl: project.cover_art_url ?? null,
+      brandProfile: project.socials_brand_profile ?? null,
+      brandProfileAt: project.socials_brand_profile_at ?? null,
       songs: songs.rows.map((s: { id: string; title: string; subtitle: string | null; stage: string }) => ({
         id: s.id,
         title: s.title,
@@ -570,4 +574,101 @@ projectsRouter.post('/:id/import-rss', async (req, res) => {
     [projectId, url, meta.coverArtUrl, meta.description],
   )
   res.json({ rssFeedUrl: url, coverArtUrl: meta.coverArtUrl, title: meta.title, description: meta.description })
+})
+
+// "Slate's read on this show" — calls Claude to propose a brand voice,
+// example posts, posting times, weekly cadence, and default assignees.
+// Caches the result on the project (overwriting any previous read) so
+// the project page can re-render without re-calling Claude.
+projectsRouter.post('/:id/brand-profile', async (req, res) => {
+  const user = (req as typeof req & { user: SessionUser }).user
+  const projectId = req.params.id
+  if (!await assertProjectAdmin(user, projectId, res)) return
+
+  const projRes = await pool.query<{
+    name: string
+    subtitle: string | null
+    kind: 'podcast' | 'album' | 'film'
+    rss_feed_url: string | null
+  }>(
+    `SELECT name, subtitle, kind, rss_feed_url FROM projects WHERE id = $1`,
+    [projectId],
+  )
+  if (projRes.rows.length === 0) { res.status(404).json({ error: 'not_found' }); return }
+  const p = projRes.rows[0]
+
+  if (!hasAnthropicKey()) {
+    res.status(503).json({ error: 'ANTHROPIC_API_KEY not configured' }); return
+  }
+
+  // Pull RSS feed (description + recent episodes) if available
+  let showDescription: string | null = null
+  let recentEpisodes: Array<{ title: string; description?: string }> = []
+  if (p.rss_feed_url) {
+    try {
+      const feed = await fetchPodcastFeed(p.rss_feed_url)
+      showDescription = feed.description
+      recentEpisodes = feed.episodes.map((e) => ({
+        title: e.title,
+        description: e.description ?? undefined,
+      }))
+    } catch (err) {
+      logError('brand profile: rss fetch failed', { url: p.rss_feed_url, error: err instanceof Error ? err.message : String(err) })
+      // Continue without RSS data
+    }
+  }
+
+  // Pull up to 3 most-recent done transcripts and join snippets together
+  // for voice signal. We cap each to ~2000 chars to keep prompt costs
+  // sane while still giving Claude enough to read tone.
+  const tRes = await pool.query<{ edited_blocks: Array<{ speaker: string; text: string }> | null }>(
+    `SELECT edited_blocks
+       FROM transcripts t
+      WHERE t.song_id IN (SELECT id FROM songs WHERE project_id = $1)
+        AND t.status = 'done'
+      ORDER BY t.created_at DESC LIMIT 3`,
+    [projectId],
+  )
+  const transcriptSamples = tRes.rows
+    .map((r) => (r.edited_blocks ?? []).map((b) => `${b.speaker}: ${b.text}`).join('\n').slice(0, 2000))
+    .filter((s) => s.length > 0)
+    .join('\n\n---\n\n')
+
+  // Available users for assignee suggestions: workspace admins + this
+  // project's members. Pass id + display name so Claude can pick from
+  // a real pool.
+  const uRes = await pool.query<{ id: string; name: string; display_name: string | null }>(
+    `SELECT DISTINCT u.id, u.name, u.display_name
+       FROM users u
+       LEFT JOIN project_members pm ON pm.user_id = u.id AND pm.project_id = $1
+      WHERE u.role = 'admin' OR pm.user_id IS NOT NULL`,
+    [projectId],
+  )
+  const availableUsers = uRes.rows.map((u) => ({ id: u.id, name: u.display_name || u.name }))
+
+  let result
+  try {
+    result = await generateBrandProfile({
+      showName: p.name,
+      showSubtitle: p.subtitle,
+      kind: p.kind,
+      showDescription,
+      recentEpisodes,
+      transcriptSamples,
+      availableUsers,
+    })
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err)
+    logError('brand profile: generation failed', { projectId, error: msg })
+    res.status(502).json({ error: `generation_failed: ${msg.slice(0, 200)}` }); return
+  }
+
+  await pool.query(
+    `UPDATE projects
+        SET socials_brand_profile = $2::jsonb,
+            socials_brand_profile_at = now()
+      WHERE id = $1`,
+    [projectId, JSON.stringify(result.profile)],
+  )
+  res.json({ profile: result.profile, generatedAt: new Date().toISOString() })
 })
