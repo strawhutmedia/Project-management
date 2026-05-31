@@ -425,7 +425,7 @@ function ClipJobCard({
       {job.clips.length > 0 && (
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
           {job.clips.map((c) => (
-            <ClipCard key={c.id} clip={c} />
+            <ClipCard key={c.id} clip={c} opusProjectId={job.opusProjectId ?? null} />
           ))}
         </div>
       )}
@@ -433,7 +433,15 @@ function ClipJobCard({
   )
 }
 
-function ClipCard({ clip }: { clip: { id: string; title: string | null; durationSeconds: number | null; previewUrl: string | null; downloadUrl: string | null; thumbnailUrl: string | null; score: number | null } }) {
+function ClipCard({ clip, opusProjectId }: {
+  clip: { id: string; title: string | null; durationSeconds: number | null; previewUrl: string | null; downloadUrl: string | null; thumbnailUrl: string | null; score: number | null }
+  opusProjectId: string | null
+}) {
+  const hasPlayable = !!clip.previewUrl || !!clip.thumbnailUrl
+  // Until OpusClip's per-clip export endpoint is wired, the only way to
+  // actually see/download a clip is in OpusClip's UI. Make every card
+  // a link there as the default behavior.
+  const opusUrl = opusProjectId ? `https://clip.opus.pro/projects/${opusProjectId}` : null
   return (
     <div className="rounded-lg border border-line/60 bg-panel/40 overflow-hidden flex flex-col">
       <div className="aspect-[9/16] bg-ink relative">
@@ -447,6 +455,17 @@ function ClipCard({ clip }: { clip: { id: string; title: string | null; duration
           />
         ) : clip.thumbnailUrl ? (
           <img src={clip.thumbnailUrl} alt={clip.title ?? ''} className="w-full h-full object-cover" />
+        ) : opusUrl ? (
+          <a
+            href={opusUrl}
+            target="_blank"
+            rel="noreferrer"
+            className="w-full h-full grid place-items-center text-muted text-xs hover:bg-ink/60 transition gap-1"
+            title="OpusClip hasn't returned a preview URL — open in OpusClip to view + download"
+          >
+            <span className="text-2xl">↗</span>
+            <span className="text-[10px] uppercase tracking-wider">Open in OpusClip</span>
+          </a>
         ) : (
           <div className="w-full h-full grid place-items-center text-muted text-xs">No preview</div>
         )}
@@ -462,7 +481,7 @@ function ClipCard({ clip }: { clip: { id: string; title: string | null; duration
         )}
         <div className="flex items-center justify-between gap-2 text-[10px] text-muted">
           {clip.durationSeconds != null && <span>{Math.round(clip.durationSeconds)}s</span>}
-          {clip.downloadUrl && (
+          {clip.downloadUrl ? (
             <a
               href={clip.downloadUrl}
               target="_blank"
@@ -471,7 +490,16 @@ function ClipCard({ clip }: { clip: { id: string; title: string | null; duration
             >
               ⬇ Download
             </a>
-          )}
+          ) : opusUrl && !hasPlayable ? (
+            <a
+              href={opusUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="uppercase tracking-wider font-bold text-stage-mastering hover:text-text"
+            >
+              ↗ OpusClip
+            </a>
+          ) : null}
         </div>
       </div>
     </div>
