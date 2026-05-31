@@ -307,11 +307,15 @@ export type BrandProfileInput = {
   showName: string
   showSubtitle: string | null
   kind: 'podcast' | 'album' | 'film'
-  // From the RSS feed if available
+  // From the RSS feed — show-level metadata only. Past episode titles
+  // from RSS are NOT passed; Slate is forward-looking and judgments
+  // should be anchored to the upcoming work, not the back catalog.
   showDescription: string | null
-  recentEpisodes: Array<{ title: string; description?: string }>
-  // Up to ~6000 chars total — recent episode transcript snippets joined
-  // for voice/tone signal
+  // Episodes currently being worked on inside Slate (the real project
+  // management surface). Sorted with upcoming first.
+  upcomingEpisodes: Array<{ title: string; subtitle: string | null; stage: string; releaseDate: string | null }>
+  // Up to ~6000 chars total — recent in-progress episode transcript
+  // snippets for voice/tone signal.
   transcriptSamples: string
   // The pool of users the team can pick assignees from
   availableUsers: Array<{ id: string; name: string }>
@@ -372,10 +376,8 @@ const BRAND_PROFILE_SCHEMA = {
     },
     example_posts: {
       type: 'array',
-      minItems: 5,
-      maxItems: 5,
       items: { type: 'string' },
-      description: '5 example IG-style text posts in the show\'s voice promoting this week\'s episode generically. Each 1–3 short sentences. No hashtags.',
+      description: 'Return exactly 5 example IG-style text posts in the show\'s voice promoting this week\'s episode generically. Each 1–3 short sentences. No hashtags.',
     },
     posting_times: {
       type: 'object',
@@ -422,17 +424,17 @@ const BRAND_PROFILE_SCHEMA = {
 export async function generateBrandProfile(input: BrandProfileInput): Promise<BrandProfileResult> {
   logInfo('brand profile: generating', {
     showName: input.showName,
-    episodeCount: input.recentEpisodes.length,
+    upcomingCount: input.upcomingEpisodes.length,
     transcriptChars: input.transcriptSamples.length,
   })
   const usersBlock = input.availableUsers.length === 0
     ? '(no users in the workspace)'
     : input.availableUsers.map((u) => `- ${u.id}  ${u.name}`).join('\n')
-  const episodesBlock = input.recentEpisodes.length === 0
-    ? '(no episodes yet)'
-    : input.recentEpisodes
+  const upcomingBlock = input.upcomingEpisodes.length === 0
+    ? '(no upcoming episodes in Slate yet)'
+    : input.upcomingEpisodes
         .slice(0, 8)
-        .map((e, i) => `${i + 1}. ${e.title}${e.description ? `\n   ${e.description.slice(0, 240)}` : ''}`)
+        .map((e, i) => `${i + 1}. ${e.title}${e.subtitle ? ` — ${e.subtitle}` : ''}\n   stage: ${e.stage}${e.releaseDate ? ` · releases ${e.releaseDate}` : ' · no release date set'}`)
         .join('\n')
   const userText = `SHOW
 Name: ${input.showName}
@@ -441,18 +443,22 @@ ${input.showSubtitle ? `Subtitle: ${input.showSubtitle}\n` : ''}Kind: ${input.ki
 SHOW DESCRIPTION
 ${input.showDescription || '(none provided)'}
 
-RECENT EPISODES
-${episodesBlock}
+UPCOMING + IN-PROGRESS EPISODES (Slate is forward-looking — these are
+the episodes the team is actually shipping, sorted with soonest first.
+Do NOT reference back-catalog episodes; they are not in scope.)
+${upcomingBlock}
 
-TRANSCRIPT SAMPLES (for voice signal — may be partial)
+TRANSCRIPT SAMPLES (for voice signal — may be partial, from recent
+in-progress episodes)
 ${input.transcriptSamples.slice(0, 6000) || '(no transcripts available)'}
 
 AVAILABLE TEAM MEMBERS (id  name)
 ${usersBlock}
 
-Return your brand profile as JSON matching the schema. For default_assignees,
-use user_ids from the AVAILABLE TEAM MEMBERS list above, or null if you have
-no basis to pick one.`
+Return your brand profile as JSON matching the schema. Requirements:
+- Provide exactly 5 example posts.
+- For default_assignees, use user_ids from the AVAILABLE TEAM MEMBERS list
+  above, or null if you have no basis to pick one.`
 
   let response
   try {

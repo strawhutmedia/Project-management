@@ -77,6 +77,11 @@ export default function SongPage() {
     await reload()
   }
 
+  async function saveReleaseDate(next: string) {
+    await api.updateSong(song!.id, { releaseDate: next || null })
+    await reload()
+  }
+
   return (
     <div className="space-y-10">
       <div>
@@ -106,6 +111,9 @@ export default function SongPage() {
                 emptyLabel="+ Add subtitle"
               />
             </div>
+            {song.projectKind === 'podcast' && (
+              <EpisodeReleaseDate value={song.releaseDate ?? null} onSave={saveReleaseDate} />
+            )}
           </div>
           <StagePill stage={song.stage} size="lg" glow />
         </div>
@@ -1008,4 +1016,79 @@ function formatBytes(n: number): string {
   if (n < 1024 * 1024) return `${(n / 1024).toFixed(0)} KB`
   if (n < 1024 * 1024 * 1024) return `${(n / 1024 / 1024).toFixed(1)} MB`
   return `${(n / 1024 / 1024 / 1024).toFixed(2)} GB`
+}
+
+// Episode release-date editor. Compact inline picker; shows "Releases
+// in N days" / "Released N days ago" so the timing is obvious at a
+// glance. Saves immediately on change.
+function EpisodeReleaseDate({
+  value,
+  onSave,
+}: {
+  value: string | null
+  onSave: (next: string) => void | Promise<void>
+}) {
+  const [editing, setEditing] = useState(false)
+  const [draft, setDraft] = useState(value ?? '')
+  useEffect(() => { setDraft(value ?? '') }, [value])
+
+  if (editing) {
+    return (
+      <div className="mt-1.5 flex items-center gap-2 text-[11px] text-muted">
+        <span className="uppercase tracking-wider font-bold">📅 Release</span>
+        <input
+          type="date"
+          value={draft}
+          autoFocus
+          onChange={(e) => setDraft(e.target.value)}
+          onBlur={async () => {
+            setEditing(false)
+            if (draft !== (value ?? '')) await onSave(draft)
+          }}
+          className="rounded bg-ink/40 border border-stage-mastering text-text px-2 py-0.5 text-[11px] outline-none"
+        />
+        {value && (
+          <button
+            type="button"
+            onMouseDown={(e) => e.preventDefault()}
+            onClick={async () => { setEditing(false); await onSave('') }}
+            className="text-[10px] text-muted hover:text-urgent"
+          >
+            Clear
+          </button>
+        )}
+      </div>
+    )
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={() => setEditing(true)}
+      className="mt-1.5 inline-flex items-center gap-2 text-[11px] text-muted hover:text-text"
+      title="Click to set the public release date"
+    >
+      <span className="uppercase tracking-wider font-bold">📅 Release</span>
+      {value ? (
+        <>
+          <span className="font-mono">{value}</span>
+          <span className="text-muted/60">· {relativeDaysLabel(value)}</span>
+        </>
+      ) : (
+        <span className="italic text-muted/60">+ Set release date</span>
+      )}
+    </button>
+  )
+}
+
+function relativeDaysLabel(yyyyMmDd: string): string {
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+  const [y, m, d] = yyyyMmDd.split('-').map(Number)
+  const target = new Date(y, m - 1, d)
+  const diff = Math.round((target.getTime() - today.getTime()) / 86_400_000)
+  if (diff === 0) return 'today'
+  if (diff > 0) return `in ${diff} day${diff === 1 ? '' : 's'}`
+  const ago = -diff
+  return `${ago} day${ago === 1 ? '' : 's'} ago`
 }

@@ -266,6 +266,18 @@ export default function ProjectPage() {
       <div className="space-y-8">
         {project.kind !== 'film' && STAGES.map((stage) => {
           const stageSongs = songs.filter((s) => s.stage === stage)
+          // For podcasts: sort by release date (upcoming first; undated last)
+          // so the project page reads as "what's next out the door."
+          if (project.kind === 'podcast') {
+            stageSongs.sort((a, b) => {
+              const ad = (a as unknown as { releaseDate?: string | null }).releaseDate
+              const bd = (b as unknown as { releaseDate?: string | null }).releaseDate
+              if (ad && bd) return ad.localeCompare(bd)
+              if (ad) return -1
+              if (bd) return 1
+              return 0
+            })
+          }
           if (stageSongs.length === 0) return null
           const c = STAGE_COLOR[stage]
           return (
@@ -301,6 +313,12 @@ export default function ProjectPage() {
                         {song.subtitle && (
                           <div className={`text-[11px] uppercase tracking-wider mt-0.5 ${c.text} font-semibold`}>
                             {song.subtitle}
+                          </div>
+                        )}
+                        {project.kind === 'podcast' && (song as unknown as { releaseDate?: string | null }).releaseDate && (
+                          <div className="text-[11px] text-muted mt-1 font-mono">
+                            📅 {(song as unknown as { releaseDate: string }).releaseDate}
+                            <span className="text-muted/60"> · {projectReleaseLabel((song as unknown as { releaseDate: string }).releaseDate)}</span>
                           </div>
                         )}
                       </div>
@@ -554,5 +572,16 @@ function ProjectRolesSection({
       </div>
     </section>
   )
+}
+
+function projectReleaseLabel(yyyyMmDd: string): string {
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+  const [y, m, d] = yyyyMmDd.split('-').map(Number)
+  const target = new Date(y, m - 1, d)
+  const diff = Math.round((target.getTime() - today.getTime()) / 86_400_000)
+  if (diff === 0) return 'today'
+  if (diff > 0) return `in ${diff}d`
+  return `${-diff}d ago`
 }
 

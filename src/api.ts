@@ -45,6 +45,8 @@ export type ApiSongDetail = {
   title: string
   subtitle?: string | null
   stage: Stage
+  // Public release date (YYYY-MM-DD). Surfaced for podcast episodes.
+  releaseDate?: string | null
   dropboxFolder: string | null
   stageOwners: Record<Stage, ApiStageOwner>
   stageOwnerFromDefault?: Partial<Record<Stage, boolean>>
@@ -353,6 +355,8 @@ export type ApiSong = {
   title: string
   subtitle?: string | null
   stage: Stage
+  // YYYY-MM-DD. Only surfaced in the podcast UI today; null for music/films.
+  releaseDate?: string | null
   tasks: ApiTask[]
   comments: unknown[]
   links: unknown[]
@@ -414,6 +418,7 @@ export const api = {
     title?: string
     subtitle?: string
     dropboxFolder?: string
+    releaseDate?: string | null
     writerId?: string | null
     trackerId?: string | null
     overdubId?: string | null

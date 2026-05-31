@@ -42,6 +42,7 @@ songsRouter.get('/:id', async (req, res) => {
   }
   const songRes = await pool.query(
     `SELECT s.id, s.project_id, s.title, s.subtitle, s.stage, s.dropbox_folder,
+            s.release_date,
             s.writer_id, s.tracker_id, s.overdub_id, s.producer_id, s.stems_id, s.mixer_id, s.master_id,
             wu.display_name AS writer_name, wu.name AS writer_full_name,
             tu.display_name AS tracker_name, tu.name AS tracker_full_name,
@@ -136,6 +137,8 @@ songsRouter.get('/:id', async (req, res) => {
       subtitle: song.subtitle,
       stage: song.stage,
       dropboxFolder: song.dropbox_folder,
+      // Shared with music's release date; only surfaced in podcast UIs today.
+      releaseDate: song.release_date ? String(song.release_date).slice(0, 10) : null,
       stageOwners: {
         writing: owners.writing.owner,
         tracking: owners.tracking.owner,
@@ -189,7 +192,7 @@ songsRouter.patch('/:id', async (req, res) => {
   const user = (req as typeof req & { user: SessionUser }).user
   const songId = req.params.id
   if (!await assertSongWriter(user, songId, res)) return
-  const { stage, title, subtitle, dropboxFolder, producerId, mixerId, writerId, trackerId, overdubId, stemsId, masterId } = req.body ?? {}
+  const { stage, title, subtitle, dropboxFolder, releaseDate, producerId, mixerId, writerId, trackerId, overdubId, stemsId, masterId } = req.body ?? {}
 
   // The Dropbox folder anchor is project-structural config, not an
   // operational edit — only Project Admins (and Super Admins) may
@@ -226,6 +229,13 @@ songsRouter.patch('/:id', async (req, res) => {
   if (typeof dropboxFolder === 'string') {
     updates.push(`dropbox_folder = $${i++}`)
     values.push(dropboxFolder.trim() || null)
+  }
+  // releaseDate: YYYY-MM-DD string, or null to clear.
+  if (releaseDate === null) {
+    updates.push(`release_date = NULL`)
+  } else if (typeof releaseDate === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(releaseDate)) {
+    updates.push(`release_date = $${i++}`)
+    values.push(releaseDate)
   }
   const ownerFields: Array<[unknown, string]> = [
     [writerId, 'writer_id'],

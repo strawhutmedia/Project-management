@@ -413,11 +413,11 @@ projectsRouter.get('/:id', async (req, res) => {
   const songs =
     accessLevel === 'full'
       ? await pool.query(
-          `SELECT id, title, subtitle, stage, position FROM songs WHERE project_id = $1 ORDER BY position ASC`,
+          `SELECT id, title, subtitle, stage, position, release_date FROM songs WHERE project_id = $1 ORDER BY position ASC`,
           [projectId],
         )
       : await pool.query(
-          `SELECT s.id, s.title, s.subtitle, s.stage, s.position
+          `SELECT s.id, s.title, s.subtitle, s.stage, s.position, s.release_date
            FROM songs s JOIN song_members sm ON sm.song_id = s.id
            WHERE s.project_id = $1 AND sm.user_id = $2
            ORDER BY s.position ASC`,
@@ -475,11 +475,12 @@ projectsRouter.get('/:id', async (req, res) => {
       coverArtUrl: project.cover_art_url ?? null,
       brandProfile: project.socials_brand_profile ?? null,
       brandProfileAt: project.socials_brand_profile_at ?? null,
-      songs: songs.rows.map((s: { id: string; title: string; subtitle: string | null; stage: string }) => ({
+      songs: songs.rows.map((s: { id: string; title: string; subtitle: string | null; stage: string; release_date: string | Date | null }) => ({
         id: s.id,
         title: s.title,
         subtitle: s.subtitle,
         stage: s.stage,
+        releaseDate: s.release_date ? String(s.release_date).slice(0, 10) : null,
         tasks: tasksBySong[s.id],
         comments: [],
         links: [],
@@ -601,22 +602,43 @@ projectsRouter.post('/:id/brand-profile', async (req, res) => {
     res.status(503).json({ error: 'ANTHROPIC_API_KEY not configured' }); return
   }
 
-  // Pull RSS feed (description + recent episodes) if available
+  // Pull RSS feed for SHOW-LEVEL description only. We deliberately do
+  // not pass back-catalog episodes — Slate is forward-looking and the
+  // AI should anchor judgments to upcoming work, not past releases.
   let showDescription: string | null = null
-  let recentEpisodes: Array<{ title: string; description?: string }> = []
   if (p.rss_feed_url) {
     try {
       const feed = await fetchPodcastFeed(p.rss_feed_url)
       showDescription = feed.description
-      recentEpisodes = feed.episodes.map((e) => ({
-        title: e.title,
-        description: e.description ?? undefined,
-      }))
     } catch (err) {
       logError('brand profile: rss fetch failed', { url: p.rss_feed_url, error: err instanceof Error ? err.message : String(err) })
-      // Continue without RSS data
     }
   }
+
+  // Pull upcoming + in-progress episodes from Slate itself. Songs with
+  // a release date come first (soonest first), then undated/in-progress
+  // episodes ordered by recency. Released-in-past episodes are filtered
+  // out — those are old news.
+  const sRes = await pool.query<{
+    title: string
+    subtitle: string | null
+    stage: string
+    release_date: string | Date | null
+  }>(
+    `SELECT title, subtitle, stage, release_date
+       FROM songs
+      WHERE project_id = $1
+        AND (release_date IS NULL OR release_date >= CURRENT_DATE)
+      ORDER BY (release_date IS NULL), release_date ASC, position ASC
+      LIMIT 12`,
+    [projectId],
+  )
+  const upcomingEpisodes = sRes.rows.map((s) => ({
+    title: s.title,
+    subtitle: s.subtitle,
+    stage: s.stage,
+    releaseDate: s.release_date ? String(s.release_date).slice(0, 10) : null,
+  }))
 
   // Pull up to 3 most-recent done transcripts and join snippets together
   // for voice signal. We cap each to ~2000 chars to keep prompt costs
@@ -653,7 +675,7 @@ projectsRouter.post('/:id/brand-profile', async (req, res) => {
       showSubtitle: p.subtitle,
       kind: p.kind,
       showDescription,
-      recentEpisodes,
+      upcomingEpisodes,
       transcriptSamples,
       availableUsers,
     })
