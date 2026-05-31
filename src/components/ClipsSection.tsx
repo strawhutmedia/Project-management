@@ -437,7 +437,33 @@ function ClipCard({ clip, opusProjectId }: {
   clip: { id: string; title: string | null; durationSeconds: number | null; previewUrl: string | null; downloadUrl: string | null; thumbnailUrl: string | null; score: number | null }
   opusProjectId: string | null
 }) {
-  const hasPlayable = !!clip.previewUrl || !!clip.thumbnailUrl
+  const [rendering, setRendering] = useState(false)
+  const [renderedPreview, setRenderedPreview] = useState<string | null>(null)
+  const [renderedDownload, setRenderedDownload] = useState<string | null>(null)
+  const [renderedThumb, setRenderedThumb] = useState<string | null>(null)
+  const [renderError, setRenderError] = useState<string | null>(null)
+  const previewUrl = clip.previewUrl ?? renderedPreview
+  const downloadUrl = clip.downloadUrl ?? renderedDownload
+  const thumbnailUrl = clip.thumbnailUrl ?? renderedThumb
+
+  async function render() {
+    setRendering(true); setRenderError(null)
+    try {
+      const r = await api.renderClip(clip.id)
+      setRenderedPreview(r.videoUrl)
+      setRenderedDownload(r.downloadUrl)
+      setRenderedThumb(r.thumbnailUrl)
+      if (!r.videoUrl && !r.thumbnailUrl) {
+        setRenderError('OpusClip responded but no playable URL came back. Try the raw inspector to see what they returned.')
+      }
+    } catch (err) {
+      setRenderError(err instanceof Error ? err.message : 'render failed')
+    } finally {
+      setRendering(false)
+    }
+  }
+
+  const hasPlayable = !!previewUrl || !!thumbnailUrl
   // Until OpusClip's per-clip export endpoint is wired, the only way to
   // actually see/download a clip is in OpusClip's UI. Make every card
   // a link there as the default behavior.
@@ -445,29 +471,31 @@ function ClipCard({ clip, opusProjectId }: {
   return (
     <div className="rounded-lg border border-line/60 bg-panel/40 overflow-hidden flex flex-col">
       <div className="aspect-[9/16] bg-ink relative">
-        {clip.previewUrl ? (
+        {previewUrl ? (
           <video
-            src={clip.previewUrl}
-            poster={clip.thumbnailUrl ?? undefined}
+            src={previewUrl}
+            poster={thumbnailUrl ?? undefined}
             controls
             preload="metadata"
             className="w-full h-full object-cover"
           />
-        ) : clip.thumbnailUrl ? (
-          <img src={clip.thumbnailUrl} alt={clip.title ?? ''} className="w-full h-full object-cover" />
-        ) : opusUrl ? (
-          <a
-            href={opusUrl}
-            target="_blank"
-            rel="noreferrer"
-            className="w-full h-full grid place-items-center text-muted text-xs hover:bg-ink/60 transition gap-1"
-            title="OpusClip hasn't returned a preview URL — open in OpusClip to view + download"
-          >
-            <span className="text-2xl">↗</span>
-            <span className="text-[10px] uppercase tracking-wider">Open in OpusClip</span>
-          </a>
+        ) : thumbnailUrl ? (
+          <img src={thumbnailUrl} alt={clip.title ?? ''} className="w-full h-full object-cover" />
         ) : (
-          <div className="w-full h-full grid place-items-center text-muted text-xs">No preview</div>
+          <button
+            onClick={() => void render()}
+            disabled={rendering}
+            className="w-full h-full grid place-items-center text-muted text-xs hover:bg-ink/60 transition gap-1 disabled:opacity-60"
+            title="Ask OpusClip to render this clip so we can play it in Slate"
+          >
+            <span className="text-2xl">{rendering ? '⏳' : '🎬'}</span>
+            <span className="text-[10px] uppercase tracking-wider px-2 text-center">
+              {rendering ? 'Rendering…' : 'Tap to render'}
+            </span>
+            {renderError && (
+              <span className="text-[9px] text-urgent px-2 text-center mt-1">{renderError.slice(0, 80)}</span>
+            )}
+          </button>
         )}
         {clip.score != null && (
           <span className="absolute top-1.5 right-1.5 text-[9px] font-mono font-bold uppercase tracking-wider bg-stage-mastering/80 text-white rounded-full px-1.5 py-0.5">
@@ -481,21 +509,22 @@ function ClipCard({ clip, opusProjectId }: {
         )}
         <div className="flex items-center justify-between gap-2 text-[10px] text-muted">
           {clip.durationSeconds != null && <span>{Math.round(clip.durationSeconds)}s</span>}
-          {clip.downloadUrl ? (
+          {downloadUrl ? (
             <a
-              href={clip.downloadUrl}
+              href={downloadUrl}
               target="_blank"
               rel="noreferrer"
               className="uppercase tracking-wider font-bold text-stage-mastering hover:text-text"
             >
               ⬇ Download
             </a>
-          ) : opusUrl && !hasPlayable ? (
+          ) : opusUrl && !hasPlayable && !rendering ? (
             <a
               href={opusUrl}
               target="_blank"
               rel="noreferrer"
-              className="uppercase tracking-wider font-bold text-stage-mastering hover:text-text"
+              className="uppercase tracking-wider font-bold text-muted/60 hover:text-text"
+              title="Fallback: open in OpusClip's UI"
             >
               ↗ OpusClip
             </a>

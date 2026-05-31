@@ -14,7 +14,7 @@ import { pool } from '../db'
 import { requireUser, type SessionUser } from '../auth'
 import { assertWriter } from '../permissions'
 import { getFileMetadata, getTemporaryLink } from '../dropbox'
-import { hasOpusKey, createOpusProject, fetchOpusClips, fetchOpusAccountInfo, type OpusClip, type OpusCreateOptions } from '../opusclip'
+import { hasOpusKey, createOpusProject, fetchOpusClips, fetchOpusAccountInfo, exportOpusClip, type OpusClip, type OpusCreateOptions } from '../opusclip'
 import { logError, logInfo } from '../diag'
 
 export const clipsRouter = Router()
@@ -312,6 +312,69 @@ clipsRouter.get('/:id/raw', async (req, res) => {
     createResponse: rows[0].raw_create_response,
     pollResponse: rows[0].raw_poll_response,
   })
+})
+
+// POST /api/clips/clips/:clipId/render — asks OpusClip to actually
+// render the MP4 for a single clip (their /exportable-clips endpoint
+// returns metadata only; the playable URL requires a separate render
+// call). Probes a handful of candidate endpoints in opusclip.ts since
+// their API isn't publicly documented for this; first 2xx wins.
+//
+// On success: persists the harvested URLs onto the clip row and
+// returns them; UI re-renders with a playable video.
+clipsRouter.post('/clips/:clipId/render', async (req, res) => {
+  const user = (req as typeof req & { user: SessionUser }).user
+  const clipRes = await pool.query<{
+    id: string
+    job_id: string
+    opus_clip_id: string | null
+    project_id: string
+    opus_project_id: string | null
+    opus_org_id: string | null
+  }>(
+    `SELECT c.id, c.job_id, c.opus_clip_id,
+            j.project_id, j.opus_project_id, j.opus_org_id
+       FROM clips c JOIN clip_jobs j ON j.id = c.job_id
+      WHERE c.id = $1`,
+    [req.params.clipId],
+  )
+  if (clipRes.rows.length === 0) { res.status(404).json({ error: 'clip_not_found' }); return }
+  const c = clipRes.rows[0]
+  if (!await assertWriter(user, c.project_id, res)) return
+  if (!hasOpusKey()) { res.status(503).json({ error: 'OPUSCLIP_API_KEY not configured' }); return }
+  if (!c.opus_clip_id || !c.opus_project_id) {
+    res.status(400).json({ error: 'clip_missing_opus_ids' }); return
+  }
+
+  try {
+    const result = await exportOpusClip({
+      clipId: c.opus_clip_id,
+      projectId: c.opus_project_id,
+      orgId: c.opus_org_id,
+    })
+    if (result.videoUrl || result.thumbnailUrl) {
+      await pool.query(
+        `UPDATE clips
+            SET preview_url = COALESCE(preview_url, $2),
+                download_url = COALESCE(download_url, $3),
+                thumbnail_url = COALESCE(thumbnail_url, $4)
+          WHERE id = $1`,
+        [c.id, result.videoUrl, result.downloadUrl, result.thumbnailUrl],
+      )
+    }
+    res.json({
+      ok: true,
+      endpoint: result.endpoint,
+      videoUrl: result.videoUrl,
+      downloadUrl: result.downloadUrl,
+      thumbnailUrl: result.thumbnailUrl,
+      raw: result.raw,
+    })
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err)
+    logError('clip render failed', { clipId: c.id, error: msg })
+    res.status(502).json({ error: msg.slice(0, 600) })
+  }
 })
 
 // DELETE

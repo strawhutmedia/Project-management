@@ -218,6 +218,77 @@ function pickDeep(d: Record<string, unknown>, key: string): unknown {
   return undefined
 }
 
+// Triggers OpusClip to actually render an MP4 for a clip so we can get
+// playable URLs back. OpusClip's public docs don't pin down the export
+// endpoint, so we probe several reasonable patterns. Returns the first
+// 2xx response and the path that worked. Raw is surfaced so the UI can
+// show what came back.
+export type OpusExportResult = {
+  endpoint: string
+  raw: unknown
+  videoUrl: string | null
+  downloadUrl: string | null
+  thumbnailUrl: string | null
+}
+
+export async function exportOpusClip(args: {
+  clipId: string
+  projectId: string
+  orgId: string | null
+}): Promise<OpusExportResult> {
+  const headers: Record<string, string> = { ...authHeaders() }
+  if (args.orgId) headers['x-opus-org-id'] = args.orgId
+
+  // Each candidate: (method, path, body). Ordered by best guess based
+  // on OpusClip's existing /clip-projects + /exportable-clips surface.
+  const candidates: Array<{ method: 'POST' | 'GET'; path: string; body?: unknown }> = [
+    { method: 'POST', path: `/exportable-clips/${args.clipId}/export` },
+    { method: 'POST', path: `/exportable-clips/${args.clipId}/render` },
+    { method: 'POST', path: `/exportable-clips/${args.clipId}`, body: { action: 'export' } },
+    { method: 'POST', path: `/exports`, body: { clipId: args.clipId, projectId: args.projectId } },
+    { method: 'POST', path: `/clip-exports`, body: { clipId: args.clipId, projectId: args.projectId } },
+    { method: 'POST', path: `/clip-projects/${args.projectId}/exports`, body: { clipId: args.clipId } },
+    { method: 'POST', path: `/render-clip`, body: { clipId: args.clipId, projectId: args.projectId } },
+    { method: 'GET',  path: `/exportable-clips/${args.clipId}` },
+  ]
+
+  const attempts: Array<{ endpoint: string; status: number; body: string }> = []
+  for (const c of candidates) {
+    try {
+      const init: RequestInit = {
+        method: c.method,
+        headers,
+        signal: AbortSignal.timeout(20_000),
+      }
+      if (c.body) init.body = JSON.stringify(c.body)
+      const res = await fetch(`${OPUS_API}${c.path}`, init)
+      const bodyText = await res.text()
+      attempts.push({ endpoint: `${c.method} ${c.path}`, status: res.status, body: bodyText.slice(0, 600) })
+      if (!res.ok) continue
+      let parsed: unknown = bodyText
+      try { parsed = JSON.parse(bodyText) } catch {}
+      // Harvest URLs from the response wherever they live.
+      const found = harvestMediaUrls(parsed)
+      logInfo('opus.export: succeeded', { endpoint: `${c.method} ${c.path}`, clipId: args.clipId })
+      return {
+        endpoint: `${c.method} ${c.path}`,
+        raw: parsed,
+        videoUrl: found.video,
+        downloadUrl: found.video,
+        thumbnailUrl: found.image,
+      }
+    } catch (err) {
+      attempts.push({
+        endpoint: `${c.method} ${c.path}`,
+        status: 0,
+        body: err instanceof Error ? err.message.slice(0, 200) : String(err).slice(0, 200),
+      })
+    }
+  }
+  logError('opus.export: all candidates failed', { clipId: args.clipId, attempts })
+  throw new Error(`opus_export_failed: tried ${candidates.length} endpoints, see logs for raw responses`)
+}
+
 function normalizeClip(c: Record<string, unknown>): OpusClip {
   // OpusClip's response is still beta-shifting; pull whichever field
   // names we recognize and stash the raw blob for later.

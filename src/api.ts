@@ -735,6 +735,15 @@ export const api = {
   opusAccount: () => request<ApiOpusAccount>('/api/clips/account'),
   clipJobRaw: (id: string) =>
     request<{ createResponse: unknown; pollResponse: unknown }>(`/api/clips/${id}/raw`),
+  renderClip: (clipId: string) =>
+    request<{
+      ok: true
+      endpoint: string
+      videoUrl: string | null
+      downloadUrl: string | null
+      thumbnailUrl: string | null
+      raw: unknown
+    }>(`/api/clips/clips/${clipId}/render`, { method: 'POST' }),
 
   transcriptSrtUrl: (id: string) => `/api/transcripts/${id}/srt`,
   transcriptVttUrl: (id: string) => `/api/transcripts/${id}/vtt`,
