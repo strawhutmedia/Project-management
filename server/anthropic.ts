@@ -533,3 +533,212 @@ Return your brand profile as JSON matching the schema. Requirements:
     },
   }
 }
+
+// =============================================================
+// Transcript correction pass
+// =============================================================
+//
+// Deepgram is phonetic — "Cheri Oteri" comes out "Sherri O'Teri",
+// speakers are anonymous "Speaker 0/1". One Claude pass:
+//
+//   1. Hard-applies every spelling in the show's vocabulary list.
+//   2. Suggests other proper-noun fixes it spots from context
+//      (these come back as suggestions, not auto-applied, so a real
+//      "Sherri Brown" guest doesn't get auto-corrected to a celeb).
+//   3. Identifies how many distinct speakers there are and names
+//      each one when it can tell from context (host introductions,
+//      guest call-outs, the episode title, etc.).
+
+export type TranscriptCorrectionInput = {
+  showName: string
+  episodeTitle: string
+  vocabulary: string
+  blocks: Array<{ speaker: string; text: string; start: number; end: number }>
+}
+
+export type SpeakerIdentification = {
+  original: string
+  name: string
+  confidence: 'high' | 'medium' | 'low'
+}
+
+export type TranscriptCorrectionResult = {
+  speakerCount: number
+  speakers: SpeakerIdentification[]
+  correctedBlocks: Array<{ speaker: string; text: string; start: number; end: number }>
+  vocabularyChangesApplied: number
+  suggestedChanges: Array<{ from: string; to: string; reason: string }>
+  summary: string
+  usage: GenerateResult['usage']
+}
+
+const TRANSCRIPT_FIX_SYSTEM = `You are a transcript-correction assistant.
+
+You correct phonetic transcription errors (Deepgram output) and identify
+speakers — but you NEVER paraphrase, summarize, restructure, fix
+grammar, or change meaning. Word-for-word fidelity is paramount.
+
+You will receive:
+- A SPELLING LIST: names and terms that MUST appear exactly as written,
+  regardless of how the transcript spells them. Hard rule.
+- A transcript as a list of blocks. Each has a speaker tag ("Speaker 0",
+  etc.) and text.
+
+You do three things, in one pass:
+1. Apply every spelling from the SPELLING LIST literally — find phonetic
+   variants in the text and replace with the canonical spelling.
+2. Suggest other proper-noun corrections you spot from context that are
+   NOT in the SPELLING LIST (e.g. a famous person whose name is clearly
+   mis-spelled phonetically and is unambiguous from context). These come
+   back as suggestions, NOT applied. Be conservative — when in doubt,
+   leave the spelling alone.
+3. Identify each unique speaker tag. Use context (intros, direct
+   address, the episode title) to give each one a real name when you
+   can. If you genuinely can't identify a speaker, keep the original
+   tag like "Speaker 0".
+
+Output strict JSON matching the schema. Every input block must appear
+in corrected_blocks at the same index, with the same start/end times,
+the speaker field updated to the real name (or kept as "Speaker N"),
+and the text field with vocabulary corrections applied. NEVER edit
+text beyond the corrections described above.`
+
+const TRANSCRIPT_FIX_SCHEMA = {
+  type: 'object',
+  additionalProperties: false,
+  required: ['speakers', 'corrected_blocks', 'vocabulary_changes_applied', 'suggested_changes', 'summary'],
+  properties: {
+    speakers: {
+      type: 'array',
+      items: {
+        type: 'object',
+        additionalProperties: false,
+        required: ['original', 'name', 'confidence'],
+        properties: {
+          original: { type: 'string', description: 'The original tag, e.g. "Speaker 0"' },
+          name: { type: 'string', description: 'Real name if identifiable, otherwise repeat the original tag.' },
+          confidence: { type: 'string', enum: ['high', 'medium', 'low'] },
+        },
+      },
+    },
+    corrected_blocks: {
+      type: 'array',
+      items: {
+        type: 'object',
+        additionalProperties: false,
+        required: ['speaker', 'text', 'start', 'end'],
+        properties: {
+          speaker: { type: 'string' },
+          text: { type: 'string' },
+          start: { type: 'number' },
+          end: { type: 'number' },
+        },
+      },
+    },
+    vocabulary_changes_applied: { type: 'integer' },
+    suggested_changes: {
+      type: 'array',
+      items: {
+        type: 'object',
+        additionalProperties: false,
+        required: ['from', 'to', 'reason'],
+        properties: {
+          from: { type: 'string' },
+          to: { type: 'string' },
+          reason: { type: 'string' },
+        },
+      },
+    },
+    summary: { type: 'string', description: '1–2 sentence human-readable summary of what changed.' },
+  },
+} as const
+
+export async function correctTranscript(input: TranscriptCorrectionInput): Promise<TranscriptCorrectionResult> {
+  logInfo('transcript correction: starting', {
+    show: input.showName,
+    episode: input.episodeTitle,
+    blockCount: input.blocks.length,
+    vocabSize: input.vocabulary.length,
+  })
+
+  const blocksJson = input.blocks.map((b, i) => ({
+    index: i,
+    speaker: b.speaker,
+    text: b.text,
+    start: b.start,
+    end: b.end,
+  }))
+
+  const userText = `SHOW: ${input.showName}
+EPISODE: ${input.episodeTitle}
+
+SPELLING LIST (these terms MUST appear exactly as written; replace any
+phonetic variant in the transcript):
+${input.vocabulary.trim() || '(none provided)'}
+
+TRANSCRIPT BLOCKS (JSON; preserve same length and same start/end times
+in corrected_blocks):
+${JSON.stringify(blocksJson)}
+
+Return the JSON per the schema. Reminders:
+- Apply EVERY spelling from the SPELLING LIST.
+- Suggest other corrections you can infer from context, but be
+  conservative — don't auto-apply uncertain corrections.
+- Identify speakers when you can; keep original "Speaker N" tag when
+  you can't tell.
+- DO NOT rephrase, summarize, fix grammar, or change meaning. Word
+  fidelity beyond spelling corrections is mandatory.`
+
+  let response
+  try {
+    response = await client.messages.create({
+      model: MODEL,
+      max_tokens: 16000,
+      system: TRANSCRIPT_FIX_SYSTEM,
+      messages: [{ role: 'user', content: [{ type: 'text', text: userText }] }],
+      output_config: { format: { type: 'json_schema', schema: TRANSCRIPT_FIX_SCHEMA } },
+    })
+  } catch (err) {
+    logError('transcript correction: claude call failed', {
+      error: err instanceof Error ? err.message : String(err),
+    })
+    throw err
+  }
+
+  const textBlock = response.content.find((b) => b.type === 'text')
+  if (!textBlock || textBlock.type !== 'text') {
+    throw new Error('transcript correction: claude returned no text block')
+  }
+
+  type RawResult = {
+    speakers: SpeakerIdentification[]
+    corrected_blocks: Array<{ speaker: string; text: string; start: number; end: number }>
+    vocabulary_changes_applied: number
+    suggested_changes: Array<{ from: string; to: string; reason: string }>
+    summary: string
+  }
+  const raw = JSON.parse(textBlock.text) as RawResult
+
+  if (raw.corrected_blocks.length !== input.blocks.length) {
+    logError('transcript correction: block count mismatch', {
+      input: input.blocks.length,
+      output: raw.corrected_blocks.length,
+    })
+    throw new Error(`block_count_mismatch: input ${input.blocks.length} != output ${raw.corrected_blocks.length}`)
+  }
+
+  return {
+    speakerCount: raw.speakers.length,
+    speakers: raw.speakers,
+    correctedBlocks: raw.corrected_blocks,
+    vocabularyChangesApplied: raw.vocabulary_changes_applied,
+    suggestedChanges: raw.suggested_changes,
+    summary: raw.summary,
+    usage: {
+      inputTokens: response.usage.input_tokens,
+      outputTokens: response.usage.output_tokens,
+      cacheCreationInputTokens: response.usage.cache_creation_input_tokens ?? 0,
+      cacheReadInputTokens: response.usage.cache_read_input_tokens ?? 0,
+    },
+  }
+}

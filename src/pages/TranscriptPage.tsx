@@ -201,6 +201,13 @@ export default function TranscriptPage() {
         </div>
       </header>
 
+      <ClaudePassSection
+        transcriptId={transcript.id}
+        onApply={(correctedBlocks) => {
+          scheduleSave({ ...transcript, editedBlocks: correctedBlocks })
+        }}
+      />
+
       {/* Speakers panel */}
       {speakers.length > 0 && (
         <section className="rounded-2xl border border-line bg-panel/60 p-4 space-y-2">
@@ -415,4 +422,204 @@ function timeSince(d: Date): string {
   if (sec < 60) return `${sec}s`
   if (sec < 3600) return `${Math.round(sec / 60)}m`
   return `${Math.round(sec / 3600)}h`
+}
+
+// One-click Claude pass: fixes spellings (hard-applies the show's
+// vocabulary, suggests other corrections from context), identifies and
+// names speakers. Shows a review modal before overwriting the transcript.
+function ClaudePassSection({
+  transcriptId,
+  onApply,
+}: {
+  transcriptId: string
+  onApply: (correctedBlocks: ApiTranscriptBlock[]) => void
+}) {
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [result, setResult] = useState<Awaited<ReturnType<typeof api.transcriptClaudePass>> | null>(null)
+
+  async function run() {
+    setBusy(true); setError(null); setResult(null)
+    try {
+      const r = await api.transcriptClaudePass(transcriptId)
+      setResult(r)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'failed')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <section className="rounded-2xl border border-line bg-panel/60 p-4 space-y-3">
+      <div className="flex items-start justify-between gap-3 flex-wrap">
+        <div>
+          <div className="text-[11px] uppercase tracking-[0.2em] text-muted font-bold">🎯 Claude pass</div>
+          <p className="text-[11px] text-muted/80 mt-1 max-w-xl">
+            One Claude call to (1) apply the show's spelling list, (2) suggest other obvious
+            proper-noun fixes from context, and (3) identify each speaker by name. Reviews the
+            proposal before overwriting — never paraphrases or changes meaning.
+          </p>
+        </div>
+        <button
+          onClick={() => void run()}
+          disabled={busy}
+          className="rounded-xl bg-gradient-to-r from-stage-mastering to-stage-tracking text-white font-bold uppercase tracking-wider text-xs px-3 py-2 disabled:opacity-50"
+        >
+          {busy ? 'Running…' : '🎯 Run Claude pass'}
+        </button>
+      </div>
+
+      {error && <p className="text-urgent text-sm">{error}</p>}
+
+      {result && (
+        <ClaudePassReview
+          result={result}
+          onClose={() => setResult(null)}
+          onApply={(blocks) => { onApply(blocks); setResult(null) }}
+        />
+      )}
+    </section>
+  )
+}
+
+function ClaudePassReview({
+  result,
+  onClose,
+  onApply,
+}: {
+  result: Awaited<ReturnType<typeof api.transcriptClaudePass>>
+  onClose: () => void
+  onApply: (correctedBlocks: ApiTranscriptBlock[]) => void
+}) {
+  const [acceptedSuggestions, setAcceptedSuggestions] = useState<Set<number>>(new Set())
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [onClose])
+
+  function toggleSuggestion(i: number) {
+    setAcceptedSuggestions((prev) => {
+      const next = new Set(prev)
+      if (next.has(i)) next.delete(i)
+      else next.add(i)
+      return next
+    })
+  }
+
+  function apply() {
+    let blocks = result.correctedBlocks
+    // Apply accepted suggestions as global string replacements.
+    if (acceptedSuggestions.size > 0) {
+      blocks = blocks.map((b) => {
+        let text = b.text
+        for (const i of acceptedSuggestions) {
+          const s = result.suggestedChanges[i]
+          if (!s) continue
+          text = text.split(s.from).join(s.to)
+        }
+        return { ...b, text }
+      })
+    }
+    onApply(blocks)
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 bg-ink/80 backdrop-blur-sm grid place-items-center p-4" onClick={onClose}>
+      <div
+        onClick={(e) => e.stopPropagation()}
+        className="w-full max-w-2xl rounded-2xl border border-line bg-panel/95 max-h-[90vh] overflow-y-auto"
+      >
+        <div className="p-5 space-y-4">
+          <div className="flex items-start justify-between">
+            <div>
+              <h3 className="text-sm font-display text-rainbow uppercase tracking-widest">🎯 Claude pass — review</h3>
+              <p className="text-[11px] text-muted mt-1 max-w-md">{result.summary}</p>
+            </div>
+            <button onClick={onClose} className="text-muted hover:text-text text-xl leading-none">×</button>
+          </div>
+
+          {/* Speakers */}
+          <div>
+            <div className="text-[10px] uppercase tracking-wider text-muted/70 font-bold mb-1.5">
+              Speakers detected · {result.speakerCount}
+            </div>
+            <ul className="space-y-1.5">
+              {result.speakers.map((s) => {
+                const renamed = s.name !== s.original
+                return (
+                  <li key={s.original} className="flex items-center gap-2 text-sm">
+                    <span className="font-mono text-muted">{s.original}</span>
+                    <span className="text-muted/60">→</span>
+                    <span className={renamed ? 'font-bold text-stage-stems' : 'text-muted italic'}>
+                      {s.name}
+                    </span>
+                    <span className={`text-[10px] uppercase tracking-wider rounded-full px-1.5 py-0.5 border ${
+                      s.confidence === 'high' ? 'border-emerald-400/40 text-emerald-300' :
+                      s.confidence === 'medium' ? 'border-amber-400/40 text-amber-300' :
+                      'border-line text-muted'
+                    }`}>
+                      {s.confidence}
+                    </span>
+                  </li>
+                )
+              })}
+            </ul>
+          </div>
+
+          {/* Vocabulary corrections */}
+          <div className="rounded-lg border border-line/40 bg-ink/30 p-3">
+            <div className="text-sm">
+              <span className="font-bold text-stage-stems">{result.vocabularyChangesApplied}</span>{' '}
+              vocabulary corrections applied across the transcript
+              <span className="text-muted/70"> · already baked into the preview below</span>
+            </div>
+          </div>
+
+          {/* Suggested corrections (opt-in) */}
+          {result.suggestedChanges.length > 0 && (
+            <div>
+              <div className="text-[10px] uppercase tracking-wider text-muted/70 font-bold mb-1.5">
+                Other suggestions ({result.suggestedChanges.length}) — opt in
+              </div>
+              <ul className="space-y-1.5">
+                {result.suggestedChanges.map((s, i) => (
+                  <li key={i} className="flex items-start gap-2 text-[11px]">
+                    <input
+                      type="checkbox"
+                      checked={acceptedSuggestions.has(i)}
+                      onChange={() => toggleSuggestion(i)}
+                      className="mt-0.5"
+                    />
+                    <div className="flex-1">
+                      <div>
+                        <span className="line-through text-urgent">{s.from}</span>
+                        <span className="text-muted/60"> → </span>
+                        <span className="text-stage-stems font-bold">{s.to}</span>
+                      </div>
+                      <div className="text-[10px] text-muted/70">{s.reason}</div>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          <div className="flex items-center justify-end gap-2 pt-2">
+            <button onClick={onClose} className="text-[11px] uppercase tracking-wider text-muted hover:text-text px-3 py-1.5">
+              Cancel
+            </button>
+            <button
+              onClick={apply}
+              className="rounded-lg bg-gradient-to-r from-stage-mastering to-stage-tracking text-white font-bold uppercase tracking-wider text-[11px] px-4 py-2"
+            >
+              Apply {acceptedSuggestions.size > 0 ? `+ ${acceptedSuggestions.size} suggestions` : ''} → transcript
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
 }

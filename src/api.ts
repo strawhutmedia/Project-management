@@ -632,6 +632,15 @@ export const api = {
     }),
   deleteTranscript: (id: string) =>
     request<{ ok: true }>(`/api/transcripts/${id}`, { method: 'DELETE' }),
+  transcriptClaudePass: (id: string) =>
+    request<{
+      summary: string
+      speakerCount: number
+      speakers: Array<{ original: string; name: string; confidence: 'high' | 'medium' | 'low' }>
+      vocabularyChangesApplied: number
+      suggestedChanges: Array<{ from: string; to: string; reason: string }>
+      correctedBlocks: ApiTranscriptBlock[]
+    }>(`/api/transcripts/${id}/claude-pass`, { method: 'POST' }),
   // Socials (Claude-generated daily content plans)
   socialPlans: (songId: string) =>
     request<{ plans: ApiSocialPlan[] }>(`/api/socials?songId=${songId}`),

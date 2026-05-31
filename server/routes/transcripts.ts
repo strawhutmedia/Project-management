@@ -18,6 +18,7 @@ import { requireUser, type SessionUser } from '../auth'
 import { assertWriter } from '../permissions'
 import { getFileMetadata, getTemporaryLink } from '../dropbox'
 import { hasDeepgramKey, paragraphsToBlocks, transcribeUrl, type EditedBlock } from '../deepgram'
+import { hasAnthropicKey, correctTranscript } from '../anthropic'
 import { logError, logInfo } from '../diag'
 
 export const transcriptsRouter = Router()
@@ -213,6 +214,79 @@ transcriptsRouter.patch('/:id', async (req, res) => {
     vals,
   )
   res.json({ transcript: rowToApi(rows[0], true) })
+})
+
+// CLAUDE PASS — runs the correction + speaker-ID pass against the
+// current edited_blocks and returns the proposal (does NOT save). The
+// frontend shows the diff; on accept it PATCHes editedBlocks via the
+// existing endpoint above.
+transcriptsRouter.post('/:id/claude-pass', async (req, res) => {
+  const user = (req as typeof req & { user: SessionUser }).user
+  const { rows } = await pool.query<TranscriptRow & {
+    project_name: string
+    project_vocabulary: string | null
+    song_title: string | null
+  }>(
+    `SELECT t.*, p.name AS project_name, p.socials_vocabulary AS project_vocabulary,
+            s.title AS song_title
+       FROM transcripts t
+       JOIN projects p ON p.id = t.project_id
+       LEFT JOIN songs s ON s.id = t.song_id
+      WHERE t.id = $1`,
+    [req.params.id],
+  )
+  if (rows.length === 0) { res.status(404).json({ error: 'not_found' }); return }
+  const t = rows[0]
+  if (!await assertWriter(user, t.project_id, res)) return
+  if (!hasAnthropicKey()) {
+    res.status(503).json({ error: 'ANTHROPIC_API_KEY not configured' }); return
+  }
+  if (t.status !== 'done') {
+    res.status(400).json({ error: 'transcript_not_ready' }); return
+  }
+  const blocks = (t.edited_blocks ?? []) as EditedBlock[]
+  if (blocks.length === 0) {
+    res.status(400).json({ error: 'no_blocks_to_correct' }); return
+  }
+
+  try {
+    const result = await correctTranscript({
+      showName: t.project_name,
+      episodeTitle: t.song_title ?? '(unknown episode)',
+      vocabulary: t.project_vocabulary ?? '',
+      blocks: blocks.map((b) => ({ speaker: b.speaker, text: b.text, start: b.start, end: b.end })),
+    })
+
+    logInfo('transcript correction: done', {
+      transcriptId: t.id,
+      speakerCount: result.speakerCount,
+      vocabApplied: result.vocabularyChangesApplied,
+      suggestions: result.suggestedChanges.length,
+      inputTokens: result.usage.inputTokens,
+      outputTokens: result.usage.outputTokens,
+    })
+
+    // Stitch corrected speaker/text back onto the original blocks so the
+    // word-level `words` field is preserved. The frontend uses block ids
+    // to apply the patch.
+    const corrected = blocks.map((b, i) => {
+      const c = result.correctedBlocks[i]
+      return c ? { ...b, speaker: c.speaker, text: c.text } : b
+    })
+
+    res.json({
+      summary: result.summary,
+      speakerCount: result.speakerCount,
+      speakers: result.speakers,
+      vocabularyChangesApplied: result.vocabularyChangesApplied,
+      suggestedChanges: result.suggestedChanges,
+      correctedBlocks: corrected,
+    })
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err)
+    logError('transcript correction: failed', { transcriptId: t.id, error: msg })
+    res.status(502).json({ error: msg.slice(0, 400) })
+  }
 })
 
 // DELETE
