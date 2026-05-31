@@ -150,6 +150,7 @@ export default function ClipsSection({
       {pendingFile && (
         <ClipOptionsDialog
           fileName={pendingFile.name}
+          songId={songId}
           submitting={starting}
           onCancel={() => setPendingFile(null)}
           onSubmit={submitWithOptions}
@@ -191,11 +192,13 @@ function OpusBalanceChip({ account }: { account: ApiOpusAccount | null }) {
 
 function ClipOptionsDialog({
   fileName,
+  songId,
   submitting,
   onCancel,
   onSubmit,
 }: {
   fileName: string
+  songId: string
   submitting: boolean
   onCancel: () => void
   onSubmit: (options: ClipJobOptions) => void
@@ -204,6 +207,42 @@ function ClipOptionsDialog({
   const [clipCount, setClipCount] = useState<number | ''>(10)
   const [minDuration, setMinDuration] = useState<number | ''>(15)
   const [maxDuration, setMaxDuration] = useState<number | ''>(60)
+  const [loadingClaude, setLoadingClaude] = useState(false)
+  const [claudeError, setClaudeError] = useState<string | null>(null)
+
+  // Pull every suggested_clip field with a timecode out of the most-
+  // recent generated social plan for this episode, format it into a
+  // line-by-line directive list, and pre-fill the prompt textarea.
+  // This is the strongest hint we can give OpusClip's AI without their
+  // (undocumented) per-cut API: a list of specific moments to focus on.
+  async function useClaudeSuggestions() {
+    setLoadingClaude(true); setClaudeError(null)
+    try {
+      const { plans } = await api.socialPlans(songId)
+      const latest = plans.find((p) => p.status === 'generated')
+      if (!latest) { setClaudeError('No generated social plan yet. Generate one on the episode first.'); return }
+      const lines: string[] = []
+      for (const item of latest.items) {
+        if (item.kind === 'story_concept' && item.medium === 'video' && item.suggested_clip) {
+          lines.push(`- ${item.suggested_clip}`)
+        }
+        if (item.kind === 'reel_concept' && item.suggested_clip) {
+          lines.push(`- ${item.suggested_clip}`)
+        }
+      }
+      if (lines.length === 0) {
+        setClaudeError('Latest plan has no suggested clips. Try generating a fresh one.')
+        return
+      }
+      const directive = `Focus on these specific moments (timecodes from our transcript):\n\n${lines.join('\n')}`
+      setPrompt((prev) => prev.trim() ? `${prev}\n\n${directive}` : directive)
+      setClipCount(lines.length)
+    } catch (err) {
+      setClaudeError(err instanceof Error ? err.message : 'failed to load plan')
+    } finally {
+      setLoadingClaude(false)
+    }
+  }
   return (
     <div className="fixed inset-0 z-40 grid place-items-center bg-ink/80 backdrop-blur-sm p-4" onClick={onCancel}>
       <div
@@ -219,8 +258,19 @@ function ClipOptionsDialog({
         </div>
 
         <label className="block">
-          <div className="text-[10px] uppercase tracking-wider text-muted/70 font-bold mb-1">
-            What kind of clips do you want?
+          <div className="flex items-center justify-between mb-1">
+            <div className="text-[10px] uppercase tracking-wider text-muted/70 font-bold">
+              What kind of clips do you want?
+            </div>
+            <button
+              type="button"
+              onClick={() => void useClaudeSuggestions()}
+              disabled={loadingClaude}
+              className="text-[10px] uppercase tracking-wider font-bold text-stage-mastering border border-stage-mastering/40 rounded-full px-2.5 py-0.5 hover:bg-stage-mastering/10 disabled:opacity-50"
+              title="Pull the timecoded suggested clips from this episode's latest social plan"
+            >
+              {loadingClaude ? '…' : '✨ Use Claude\'s clip suggestions'}
+            </button>
           </div>
           <textarea
             value={prompt}
@@ -229,6 +279,7 @@ function ClipOptionsDialog({
             placeholder={'e.g. Focus on the funniest moments where Cheri talks about her early SNL days. Skip ad breaks and the intro music.'}
             className="w-full rounded-lg bg-ink/40 border border-line text-text px-3 py-2 text-sm outline-none focus:border-stage-mastering resize-y"
           />
+          {claudeError && <p className="text-[10px] text-urgent mt-1">{claudeError}</p>}
           <p className="text-[10px] text-muted/60 mt-1">
             Plain English. Used as a hint to OpusClip's AI when picking moments. Leave blank to let
             it choose freely.

@@ -14,7 +14,7 @@ import crypto from 'crypto'
 import { pool } from '../db'
 import { requireUser, type SessionUser } from '../auth'
 import { assertWriter } from '../permissions'
-import { hasAnthropicKey, generateSocialPlan, type RawSocialPlan } from '../anthropic'
+import { hasAnthropicKey, generateSocialPlan, regenerateSocialItem, type RawSocialPlan } from '../anthropic'
 import { logError, logInfo } from '../diag'
 
 export const socialsRouter = Router()
@@ -205,8 +205,11 @@ socialsRouter.post('/', async (req, res) => {
     res.status(400).json({ error: 'no_done_transcript_for_episode' }); return
   }
   const transcript = tRes.rows[0]
+  // Prefix every block with its timecode so Claude can reference real
+  // moments by [HH:MM:SS] in the suggested_clip fields. The editor/
+  // OpusClip then knows exactly where each suggested moment lives.
   const transcriptText = (transcript.edited_blocks ?? [])
-    .map((b) => `${b.speaker}: ${b.text}`)
+    .map((b) => `[${fmtTimecode(b.start)}] ${b.speaker}: ${b.text}`)
     .join('\n\n')
     .slice(0, MAX_TRANSCRIPT_CHARS)
   if (transcriptText.length < 100) {
@@ -344,3 +347,129 @@ socialsRouter.delete('/:id', async (req, res) => {
   await pool.query(`DELETE FROM social_plans WHERE id = $1`, [req.params.id])
   res.json({ ok: true })
 })
+
+// POST /:planId/regenerate-item — single-item replacement. One Claude
+// call, one fresh alternative for the given itemId, swapped in-place
+// so the rest of the plan stays.
+socialsRouter.post('/:planId/regenerate-item', async (req, res) => {
+  const user = (req as typeof req & { user: SessionUser }).user
+  const { itemId } = req.body as { itemId?: string }
+  if (!itemId) { res.status(400).json({ error: 'itemId required' }); return }
+
+  const planRes = await pool.query<PlanRow & {
+    project_name: string
+    project_subtitle: string | null
+    song_title: string
+    brand_voice: string | null
+    example_posts: string[] | null
+    vocabulary: string | null
+  }>(
+    `SELECT sp.*, p.name AS project_name, p.subtitle AS project_subtitle,
+            s.title AS song_title,
+            p.socials_brand_voice AS brand_voice,
+            p.socials_example_posts AS example_posts,
+            p.socials_vocabulary AS vocabulary
+       FROM social_plans sp
+       JOIN projects p ON p.id = sp.project_id
+       JOIN songs s ON s.id = sp.song_id
+      WHERE sp.id = $1`,
+    [req.params.planId],
+  )
+  if (planRes.rows.length === 0) { res.status(404).json({ error: 'plan_not_found' }); return }
+  const plan = planRes.rows[0]
+  if (!await assertWriter(user, plan.project_id, res)) return
+  if (!hasAnthropicKey()) {
+    res.status(503).json({ error: 'ANTHROPIC_API_KEY not configured' }); return
+  }
+
+  const items = plan.items
+  const idx = items.findIndex((i) => i.id === itemId)
+  if (idx < 0) { res.status(404).json({ error: 'item_not_found' }); return }
+  const existing = items[idx]
+
+  // Pull the latest done transcript for context. Same flow as the full
+  // plan generator so the regen has identical signal.
+  const tRes = await pool.query<{
+    edited_blocks: Array<{ speaker: string; text: string; start: number; end: number }> | null
+  }>(
+    `SELECT edited_blocks FROM transcripts
+      WHERE song_id = $1 AND status = 'done'
+      ORDER BY created_at DESC LIMIT 1`,
+    [plan.song_id],
+  )
+  const transcriptText = (tRes.rows[0]?.edited_blocks ?? [])
+    .map((b) => `[${fmtTimecode(b.start)}] ${b.speaker}: ${b.text}`)
+    .join('\n\n')
+    .slice(0, MAX_TRANSCRIPT_CHARS)
+
+  // Build a verbatim string representation of the existing item so
+  // Claude knows exactly what to NOT repeat.
+  const existingStr = (() => {
+    switch (existing.kind) {
+      case 'text_post':     return existing.text || existing.ai_text
+      case 'story_concept': return `medium: ${existing.medium}\ndescription: ${existing.description}\ncaption: ${existing.caption}\nsuggested_clip: ${existing.suggested_clip}\nimage_direction: ${existing.image_direction}`
+      case 'reel_concept':  return `hook: ${existing.hook}\ntalking_points: ${existing.talking_points.join(' | ')}\nsuggested_clip: ${existing.suggested_clip}`
+      case 'photo_concept': return `image_direction: ${existing.image_direction}\ncaption: ${existing.caption}\nvibe: ${existing.vibe}`
+    }
+  })()
+
+  let result
+  try {
+    result = await regenerateSocialItem({
+      kind: existing.kind,
+      showName: plan.project_name,
+      showSubtitle: plan.project_subtitle,
+      brandVoice: plan.brand_voice ?? '',
+      examplePosts: Array.isArray(plan.example_posts) ? plan.example_posts.filter((e): e is string => typeof e === 'string') : [],
+      vocabulary: plan.vocabulary ?? '',
+      episodeTitle: plan.song_title,
+      episodeTranscript: transcriptText,
+      existing: existingStr,
+    })
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err)
+    logError('socials: regen failed', { planId: plan.id, itemId, error: msg })
+    res.status(502).json({ error: msg.slice(0, 400) }); return
+  }
+
+  // Splice the new content into the existing item, preserving id,
+  // status, pushed_to_scheduler_at, assignee, etc.
+  const fresh: SocialItem = (() => {
+    switch (existing.kind) {
+      case 'text_post': {
+        const i = result.item as { text: string }
+        return { ...existing, ai_text: i.text, text: i.text }
+      }
+      case 'story_concept': {
+        const i = result.item as { medium: 'video' | 'photo'; description: string; caption: string; suggested_clip: string; image_direction: string }
+        return { ...existing, ...i }
+      }
+      case 'reel_concept': {
+        const i = result.item as { hook: string; talking_points: string[]; suggested_clip: string }
+        return { ...existing, ...i }
+      }
+      case 'photo_concept': {
+        const i = result.item as { image_direction: string; caption: string; vibe: string }
+        return { ...existing, ...i }
+      }
+    }
+  })()
+  items[idx] = fresh
+
+  await pool.query(
+    `UPDATE social_plans SET items = $2::jsonb, updated_at = now() WHERE id = $1`,
+    [plan.id, JSON.stringify(items)],
+  )
+  res.json({ ok: true, item: fresh })
+})
+
+// HH:MM:SS — used to anchor every Claude clip suggestion to a real
+// timecode the editor or OpusClip prompt can act on.
+function fmtTimecode(seconds: number): string {
+  if (!Number.isFinite(seconds) || seconds < 0) return '00:00:00'
+  const s = Math.floor(seconds)
+  const h = Math.floor(s / 3600)
+  const m = Math.floor((s % 3600) / 60)
+  const ss = s % 60
+  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(ss).padStart(2, '0')}`
+}

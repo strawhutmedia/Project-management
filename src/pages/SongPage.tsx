@@ -170,7 +170,12 @@ export default function SongPage() {
 
       <div className="grid lg:grid-cols-3 gap-5">
         <div className="lg:col-span-2 space-y-5">
-          <PeoplePanel song={song} members={members} onChange={reload} />
+          {/* Per-episode People panel is hidden for podcasts — those
+              assignments live on the show page so each episode page
+              stays focused on the actual production work. */}
+          {song.projectKind !== 'podcast' && (
+            <PeoplePanel song={song} members={members} onChange={reload} />
+          )}
           <TasksPanel song={song} members={members} onChange={reload} />
           {song.projectKind === 'podcast' && (() => {
             const me = members.find((m) => m.id === user?.id)

@@ -90,6 +90,17 @@ For every concept (story / reel / photo): be specific. Reference real
 names, real quotes, real moments from the transcript. Avoid generic ideas
 ("clip a funny moment").
 
+TIMECODES: every transcript block is prefixed with [HH:MM:SS] showing
+when in the recording it occurs. Every suggested_clip field MUST begin
+with the timecode range of the moment it references, in the format
+"[HH:MM:SS – HH:MM:SS] " followed by the description. Use the actual
+timecodes from the transcript. Example:
+  "[00:14:23 – 00:15:02] Sherri's bit about the Kool-Aid vase and
+   the 'I trust your visit with Adele was pleasant' line."
+
+This lets the editor jump straight to the moment and lets us hand
+OpusClip an exact cut directive.
+
 Output: ONLY valid JSON matching the supplied schema. No preamble. No
 explanation. No markdown fences.`
 
@@ -734,6 +745,147 @@ Return the JSON per the schema. Reminders:
     vocabularyChangesApplied: raw.vocabulary_changes_applied,
     suggestedChanges: raw.suggested_changes,
     summary: raw.summary,
+    usage: {
+      inputTokens: response.usage.input_tokens,
+      outputTokens: response.usage.output_tokens,
+      cacheCreationInputTokens: response.usage.cache_creation_input_tokens ?? 0,
+      cacheReadInputTokens: response.usage.cache_read_input_tokens ?? 0,
+    },
+  }
+}
+
+// =============================================================
+// Single-item regenerator
+// =============================================================
+//
+// Per-item "give me a fresh alternative" — one Claude call, one item
+// of the requested kind, generated to be distinct from the existing
+// item. Cheaper than rerunning the whole plan and lets the producer
+// trade individual ideas without losing the rest of the plan.
+
+export type RegenItemKind = 'text_post' | 'story_concept' | 'reel_concept' | 'photo_concept'
+
+export type RegenInput = {
+  kind: RegenItemKind
+  showName: string
+  showSubtitle?: string | null
+  brandVoice: string
+  examplePosts: string[]
+  vocabulary?: string
+  episodeTitle: string
+  episodeTranscript: string
+  // The current copy/text/concept the user wants to replace, verbatim.
+  existing: string
+}
+
+export type RegenResult = {
+  // The shape mirrors a single item from RawSocialPlan, minus the kind
+  // tag. Callers project this into a SocialItem after they fill in id /
+  // status / assignee_user_id.
+  item:
+    | { text: string }
+    | { medium: 'video' | 'photo'; description: string; caption: string; suggested_clip: string; image_direction: string }
+    | { hook: string; talking_points: string[]; suggested_clip: string }
+    | { image_direction: string; caption: string; vibe: string }
+  usage: GenerateResult['usage']
+}
+
+const REGEN_SCHEMAS: Record<RegenItemKind, Record<string, unknown>> = {
+  text_post: {
+    type: 'object',
+    additionalProperties: false,
+    required: ['text'],
+    properties: { text: { type: 'string' } },
+  },
+  story_concept: {
+    type: 'object',
+    additionalProperties: false,
+    required: ['medium', 'description', 'caption', 'suggested_clip', 'image_direction'],
+    properties: {
+      medium: { type: 'string', enum: ['video', 'photo'] },
+      description: { type: 'string' },
+      caption: { type: 'string' },
+      suggested_clip: { type: 'string' },
+      image_direction: { type: 'string' },
+    },
+  },
+  reel_concept: {
+    type: 'object',
+    additionalProperties: false,
+    required: ['hook', 'talking_points', 'suggested_clip'],
+    properties: {
+      hook: { type: 'string' },
+      talking_points: { type: 'array', items: { type: 'string' } },
+      suggested_clip: { type: 'string' },
+    },
+  },
+  photo_concept: {
+    type: 'object',
+    additionalProperties: false,
+    required: ['image_direction', 'caption', 'vibe'],
+    properties: {
+      image_direction: { type: 'string' },
+      caption: { type: 'string' },
+      vibe: { type: 'string' },
+    },
+  },
+}
+
+const REGEN_KIND_INSTRUCTIONS: Record<RegenItemKind, string> = {
+  text_post: 'one Instagram caption following the show\'s voice and the established IG-text-post rules from the system prompt',
+  story_concept: 'one story concept with medium (video or photo), description, overlay caption (<100 chars), suggested_clip (with [HH:MM:SS – HH:MM:SS] timecode prefix), and image_direction. Pick the format that fits the idea best',
+  reel_concept: 'one reel concept with hook, 3–5 talking_points, and suggested_clip (with [HH:MM:SS – HH:MM:SS] timecode prefix)',
+  photo_concept: 'one photo concept with image_direction, caption, and a 2–4 word vibe',
+}
+
+export async function regenerateSocialItem(input: RegenInput): Promise<RegenResult> {
+  logInfo('socials: regenerating single item', {
+    kind: input.kind, show: input.showName, episode: input.episodeTitle,
+  })
+
+  const userText = `SHOW: ${input.showName}
+${input.showSubtitle ? `SHOW DESCRIPTION: ${input.showSubtitle}\n` : ''}EPISODE: ${input.episodeTitle}
+
+BRAND VOICE:
+${input.brandVoice.trim() || '(none specified — infer from show name)'}
+
+${input.examplePosts.length > 0 ? `EXAMPLE POSTS (match this voice):\n${input.examplePosts.map((e) => `  - ${e.trim()}`).join('\n')}\n` : ''}${input.vocabulary?.trim() ? `SPELLING REQUIREMENTS (use exactly):\n${input.vocabulary.trim()}\n` : ''}
+TRANSCRIPT (timecoded — each block prefixed with [HH:MM:SS]):
+${input.episodeTranscript.slice(0, 80_000)}
+
+EXISTING ITEM the team wants replaced:
+${input.existing}
+
+Generate ${REGEN_KIND_INSTRUCTIONS[input.kind]}. It must be MEANINGFULLY
+DIFFERENT from the existing item — different angle, different moment,
+different hook. Don't just rephrase.
+
+Return strict JSON per the schema.`
+
+  let response
+  try {
+    response = await client.messages.create({
+      model: MODEL,
+      max_tokens: 2000,
+      system: SYSTEM_PROMPT,
+      messages: [{ role: 'user', content: [{ type: 'text', text: userText }] }],
+      output_config: { format: { type: 'json_schema', schema: REGEN_SCHEMAS[input.kind] } },
+    })
+  } catch (err) {
+    logError('socials: regen claude call failed', {
+      kind: input.kind,
+      error: err instanceof Error ? err.message : String(err),
+    })
+    throw err
+  }
+
+  const textBlock = response.content.find((b) => b.type === 'text')
+  if (!textBlock || textBlock.type !== 'text') {
+    throw new Error('socials regen: claude returned no text block')
+  }
+  const item = JSON.parse(textBlock.text) as RegenResult['item']
+  return {
+    item,
     usage: {
       inputTokens: response.usage.input_tokens,
       outputTokens: response.usage.output_tokens,

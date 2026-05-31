@@ -677,6 +677,11 @@ export const api = {
     }),
   deleteSocialPlan: (id: string) =>
     request<{ ok: true }>(`/api/socials/${id}`, { method: 'DELETE' }),
+  regenerateSocialItem: (planId: string, itemId: string) =>
+    request<{ ok: true; item: ApiSocialItem }>(`/api/socials/${planId}/regenerate-item`, {
+      method: 'POST',
+      body: JSON.stringify({ itemId }),
+    }),
   socialTextPostsTxtUrl: (planId: string) => `/api/socials/${planId}/text-posts.txt`,
   importPodcastRss: (projectId: string, rssFeedUrl: string) =>
     request<{ rssFeedUrl: string; coverArtUrl: string | null; title: string | null; description: string | null }>(

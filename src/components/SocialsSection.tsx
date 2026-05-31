@@ -219,17 +219,17 @@ function PlanCard({
           {buckets.story_concept.length > 0 && (
             <ConceptBucket kind="story_concept" items={buckets.story_concept} planId={plan.id}
               canWrite={canWrite} members={members} onChanged={onChanged}
-              renderItem={(item) => item.kind === 'story_concept' ? <StoryBody item={item} /> : null} />
+              renderItem={(item, save) => item.kind === 'story_concept' ? <StoryBody item={item} canWrite={canWrite} onSave={save} /> : null} />
           )}
           {buckets.reel_concept.length > 0 && (
             <ConceptBucket kind="reel_concept" items={buckets.reel_concept} planId={plan.id}
               canWrite={canWrite} members={members} onChanged={onChanged}
-              renderItem={(item) => item.kind === 'reel_concept' ? <ReelBody item={item} /> : null} />
+              renderItem={(item, save) => item.kind === 'reel_concept' ? <ReelBody item={item} canWrite={canWrite} onSave={save} /> : null} />
           )}
           {buckets.photo_concept.length > 0 && (
             <ConceptBucket kind="photo_concept" items={buckets.photo_concept} planId={plan.id}
               canWrite={canWrite} members={members} onChanged={onChanged}
-              renderItem={(item) => item.kind === 'photo_concept' ? <PhotoBody item={item} /> : null} />
+              renderItem={(item, save) => item.kind === 'photo_concept' ? <PhotoBody item={item} canWrite={canWrite} onSave={save} /> : null} />
           )}
         </div>
       )}
@@ -476,6 +476,7 @@ function TextPostCard({
         </div>
       </div>
       <div className="flex items-center justify-end gap-1.5">
+        <RegenerateButton planId={planId} itemId={item.id} canWrite={canWrite} onChanged={onChanged} />
         <PushToSchedulerButton
           planId={planId}
           itemId={item.id}
@@ -511,7 +512,7 @@ function ConceptBucket({
   canWrite: boolean
   members: ApiMember[]
   onChanged: () => void | Promise<void>
-  renderItem: (item: ApiSocialItem) => React.ReactNode
+  renderItem: (item: ApiSocialItem, onSave: (patch: Record<string, unknown>) => void | Promise<void>) => React.ReactNode
 }) {
   const style = KIND_STYLES[kind]
   async function save(itemId: string, patch: Record<string, unknown>) {
@@ -539,15 +540,18 @@ function ConceptBucket({
                     onChange={(v) => void save(item.id, { assignee_user_id: v })}
                   />
                 </div>
-                <PushToSchedulerButton
-                  planId={planId}
-                  itemId={item.id}
-                  isPushed={!!item.pushed_to_scheduler_at}
-                  canWrite={canWrite}
-                  onChanged={onChanged}
-                />
+                <div className="flex items-center gap-1.5">
+                  <RegenerateButton planId={planId} itemId={item.id} canWrite={canWrite} onChanged={onChanged} />
+                  <PushToSchedulerButton
+                    planId={planId}
+                    itemId={item.id}
+                    isPushed={!!item.pushed_to_scheduler_at}
+                    canWrite={canWrite}
+                    onChanged={onChanged}
+                  />
+                </div>
               </div>
-              {renderItem(item)}
+              {renderItem(item, (patch) => save(item.id, patch))}
             </div>
           )
         })}
@@ -556,68 +560,172 @@ function ConceptBucket({
   )
 }
 
-function StoryBody({ item }: { item: Extract<ApiSocialItem, { kind: 'story_concept' }> }) {
+// Asks Claude for a single fresh alternative for this one item. Cheaper
+// than regenerating the whole plan; preserves the rest.
+function RegenerateButton({
+  planId,
+  itemId,
+  canWrite,
+  onChanged,
+}: {
+  planId: string
+  itemId: string
+  canWrite: boolean
+  onChanged: () => void | Promise<void>
+}) {
+  const [busy, setBusy] = useState(false)
+  if (!canWrite) return null
+  async function regen() {
+    setBusy(true)
+    try {
+      await api.regenerateSocialItem(planId, itemId)
+      await onChanged()
+    } catch (err) {
+      alert(`Regenerate failed: ${err instanceof Error ? err.message : String(err)}`)
+    } finally {
+      setBusy(false)
+    }
+  }
   return (
-    <div className="space-y-1.5">
-      <div>
-        <div className="text-[10px] uppercase tracking-wider text-muted/70">Concept</div>
-        <div className="text-sm">{item.description}</div>
-      </div>
-      <div>
-        <div className="text-[10px] uppercase tracking-wider text-muted/70">Overlay caption</div>
-        <div className="text-sm italic">{item.caption}</div>
-      </div>
-      {item.medium === 'video' && item.suggested_clip && (
-        <div>
-          <div className="text-[10px] uppercase tracking-wider text-muted/70">Suggested clip</div>
-          <div className="text-xs italic">{item.suggested_clip}</div>
-        </div>
+    <button
+      onClick={() => void regen()}
+      disabled={busy}
+      title="Ask Claude for a fresh alternative for this one item"
+      className="text-[10px] uppercase tracking-wider font-bold rounded-full px-2.5 py-0.5 border border-line text-muted hover:text-stage-mastering hover:border-stage-mastering/40 disabled:opacity-50"
+    >
+      {busy ? '…' : '↻ Regenerate'}
+    </button>
+  )
+}
+
+function StoryBody({ item, canWrite, onSave }: {
+  item: Extract<ApiSocialItem, { kind: 'story_concept' }>
+  canWrite: boolean
+  onSave: (patch: Record<string, unknown>) => void | Promise<void>
+}) {
+  return (
+    <div className="space-y-2">
+      <EditableLine label="Concept" value={item.description} canWrite={canWrite} onSave={(v) => onSave({ description: v })} multi />
+      <EditableLine label="Overlay caption" value={item.caption} canWrite={canWrite} onSave={(v) => onSave({ caption: v })} />
+      {item.medium === 'video' && (
+        <EditableLine label="Suggested clip" value={item.suggested_clip} canWrite={canWrite} onSave={(v) => onSave({ suggested_clip: v })} multi mono />
       )}
-      {item.medium === 'photo' && item.image_direction && (
-        <div>
-          <div className="text-[10px] uppercase tracking-wider text-muted/70">Image direction</div>
-          <div className="text-xs italic">{item.image_direction}</div>
-        </div>
+      {item.medium === 'photo' && (
+        <EditableLine label="Image direction" value={item.image_direction} canWrite={canWrite} onSave={(v) => onSave({ image_direction: v })} multi />
       )}
     </div>
   )
 }
 
-function ReelBody({ item }: { item: Extract<ApiSocialItem, { kind: 'reel_concept' }> }) {
+function ReelBody({ item, canWrite, onSave }: {
+  item: Extract<ApiSocialItem, { kind: 'reel_concept' }>
+  canWrite: boolean
+  onSave: (patch: Record<string, unknown>) => void | Promise<void>
+}) {
   return (
-    <div className="space-y-1.5">
-      <div>
-        <div className="text-[10px] uppercase tracking-wider text-muted/70">Hook</div>
-        <div className="text-sm font-bold">{item.hook}</div>
-      </div>
-      <div>
-        <div className="text-[10px] uppercase tracking-wider text-muted/70">Talking points</div>
-        <ul className="text-xs list-disc pl-4 space-y-0.5">
-          {item.talking_points.map((tp, i) => <li key={i}>{tp}</li>)}
-        </ul>
-      </div>
-      <div>
-        <div className="text-[10px] uppercase tracking-wider text-muted/70">Suggested clip</div>
-        <div className="text-xs italic">{item.suggested_clip}</div>
-      </div>
+    <div className="space-y-2">
+      <EditableLine label="Hook" value={item.hook} canWrite={canWrite} onSave={(v) => onSave({ hook: v })} bold />
+      <EditableLine
+        label="Talking points (one per line)"
+        value={item.talking_points.join('\n')}
+        canWrite={canWrite}
+        onSave={(v) => onSave({ talking_points: v.split('\n').map((s) => s.trim()).filter(Boolean) })}
+        multi
+        rows={4}
+      />
+      <EditableLine label="Suggested clip" value={item.suggested_clip} canWrite={canWrite} onSave={(v) => onSave({ suggested_clip: v })} multi mono />
     </div>
   )
 }
 
-function PhotoBody({ item }: { item: Extract<ApiSocialItem, { kind: 'photo_concept' }> }) {
+function PhotoBody({ item, canWrite, onSave }: {
+  item: Extract<ApiSocialItem, { kind: 'photo_concept' }>
+  canWrite: boolean
+  onSave: (patch: Record<string, unknown>) => void | Promise<void>
+}) {
   return (
-    <div className="space-y-1.5">
+    <div className="space-y-2">
+      <EditableLine label="Image direction" value={item.image_direction} canWrite={canWrite} onSave={(v) => onSave({ image_direction: v })} multi />
+      <EditableLine label="Caption" value={item.caption} canWrite={canWrite} onSave={(v) => onSave({ caption: v })} multi />
+      <EditableLine label="Vibe" value={item.vibe} canWrite={canWrite} onSave={(v) => onSave({ vibe: v })} bold />
+    </div>
+  )
+}
+
+// Inline editable field — local draft + save on blur. Identical shape
+// to the scheduler modal's EditableField but inlined here so the
+// episode page's concept cards edit in place without focus loss.
+function EditableLine({
+  label,
+  value,
+  canWrite,
+  onSave,
+  multi,
+  bold,
+  mono,
+  rows,
+}: {
+  label: string
+  value: string
+  canWrite: boolean
+  onSave: (next: string) => void | Promise<void>
+  multi?: boolean
+  bold?: boolean
+  mono?: boolean
+  rows?: number
+}) {
+  const [draft, setDraft] = useState(value)
+  const [saving, setSaving] = useState(false)
+  const [savedAt, setSavedAt] = useState<number | null>(null)
+  useEffect(() => { setDraft(value) }, [value])
+
+  async function commit() {
+    if (draft === value) return
+    setSaving(true)
+    try {
+      await onSave(draft)
+      setSavedAt(Date.now())
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const cls = `w-full bg-ink/30 border border-line/40 focus:border-stage-mastering/60 text-text rounded p-1.5 text-xs leading-snug outline-none ${mono ? 'font-mono' : ''} ${bold ? 'font-bold' : ''}`
+
+  if (!canWrite) {
+    return (
       <div>
-        <div className="text-[10px] uppercase tracking-wider text-muted/70">Image direction</div>
-        <div className="text-sm">{item.image_direction}</div>
+        <div className="text-[10px] uppercase tracking-wider text-muted/70">{label}</div>
+        <div className={`text-sm whitespace-pre-wrap ${bold ? 'font-bold' : ''} ${mono ? 'font-mono text-xs' : ''}`}>{value}</div>
       </div>
-      <div>
-        <div className="text-[10px] uppercase tracking-wider text-muted/70">Caption</div>
-        <div className="text-sm italic">{item.caption}</div>
+    )
+  }
+
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-0.5">
+        <div className="text-[10px] uppercase tracking-wider text-muted/70">{label}</div>
+        {saving ? <span className="text-[10px] text-muted italic">saving…</span>
+          : savedAt && Date.now() - savedAt < 2000 ? <span className="text-[10px] text-stage-stems">saved ✓</span>
+          : null}
       </div>
-      <div className="text-[10px] uppercase tracking-wider text-muted/70">
-        Vibe: <span className="text-text font-bold">{item.vibe}</span>
-      </div>
+      {multi ? (
+        <textarea
+          value={draft}
+          onChange={(e) => setDraft(e.target.value)}
+          onBlur={() => void commit()}
+          rows={rows ?? 2}
+          className={`${cls} resize-y`}
+        />
+      ) : (
+        <input
+          type="text"
+          value={draft}
+          onChange={(e) => setDraft(e.target.value)}
+          onBlur={() => void commit()}
+          className={cls}
+        />
+      )}
     </div>
   )
 }
