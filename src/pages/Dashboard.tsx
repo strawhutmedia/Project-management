@@ -11,10 +11,30 @@ const KIND_GRADIENT: Record<string, string> = {
   film: 'from-stage-stems/30 via-stage-producing/20 to-stage-done/30',
 }
 
+type KindTab = 'podcast' | 'album' | 'film'
+
+const TABS: Array<{ value: KindTab; label: string; emoji: string }> = [
+  { value: 'podcast', label: 'Podcasts', emoji: '🎙️' },
+  { value: 'album', label: 'Music', emoji: '🎵' },
+  { value: 'film', label: 'Films', emoji: '🎬' },
+]
+
+const TAB_STORAGE_KEY = 'slate.dashboard.kindTab'
+
 export default function Dashboard() {
   const [projects, setProjects] = useState<ApiProject[] | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [showCreate, setShowCreate] = useState(false)
+  // Persist the last-viewed tab so the user lands back where they were.
+  const [tab, setTab] = useState<KindTab>(() => {
+    if (typeof window === 'undefined') return 'podcast'
+    const stored = window.localStorage.getItem(TAB_STORAGE_KEY)
+    return stored === 'album' || stored === 'film' || stored === 'podcast' ? stored : 'podcast'
+  })
+
+  useEffect(() => {
+    window.localStorage.setItem(TAB_STORAGE_KEY, tab)
+  }, [tab])
 
   async function load() {
     try {
@@ -29,8 +49,17 @@ export default function Dashboard() {
     void load()
   }, [])
 
+  const counts: Record<KindTab, number> = { podcast: 0, album: 0, film: 0 }
+  if (projects) {
+    for (const p of projects) {
+      if (p.kind === 'podcast' || p.kind === 'album' || p.kind === 'film') counts[p.kind]++
+    }
+  }
+  const visibleProjects = projects?.filter((p) => p.kind === tab) ?? []
+  const activeMeta = TABS.find((t) => t.value === tab)!
+
   return (
-    <div className="space-y-10">
+    <div className="space-y-8">
       <section>
         <h1 className="font-display text-6xl mb-2 text-rainbow">Projects</h1>
         <p className="text-muted text-sm max-w-xl">
@@ -38,6 +67,31 @@ export default function Dashboard() {
           where each track stands.
         </p>
       </section>
+
+      {/* Kind tabs — one focused workspace per medium so podcasts don't
+          get tangled with music or films. */}
+      <div className="flex flex-wrap gap-2 border-b border-line/60 pb-3">
+        {TABS.map((t) => {
+          const active = tab === t.value
+          return (
+            <button
+              key={t.value}
+              onClick={() => setTab(t.value)}
+              className={`inline-flex items-center gap-2 rounded-full px-4 py-2 text-xs uppercase tracking-wider font-bold transition ${
+                active
+                  ? 'bg-gradient-to-r from-stage-mastering to-stage-tracking text-white shadow-[0_0_20px_-6px_rgba(244,114,182,0.55)]'
+                  : 'border border-line text-muted hover:text-text'
+              }`}
+            >
+              <span>{t.emoji}</span>
+              <span>{t.label}</span>
+              <span className={`text-[10px] rounded-full px-1.5 py-0.5 ${active ? 'bg-white/20' : 'bg-ink/40'}`}>
+                {counts[t.value]}
+              </span>
+            </button>
+          )
+        })}
+      </div>
 
       {error && (
         <div className="rounded-xl border border-urgent/40 bg-urgent/10 p-4 text-sm text-urgent">
@@ -47,9 +101,15 @@ export default function Dashboard() {
 
       {!projects && !error && <p className="text-muted text-sm">Loading…</p>}
 
+      {projects && visibleProjects.length === 0 && (
+        <p className="text-muted text-sm italic py-8 text-center border border-dashed border-line/60 rounded-2xl">
+          No {activeMeta.label.toLowerCase()} yet. Use “+ New project” below to add one.
+        </p>
+      )}
+
       {projects && (
         <section className="grid gap-5">
-          {projects.map((p) => (
+          {visibleProjects.map((p) => (
             <Link
               key={p.id}
               to={`/projects/${p.id}`}
@@ -83,27 +143,29 @@ export default function Dashboard() {
             onClick={() => setShowCreate(true)}
             className="rounded-3xl border-2 border-dashed border-line/70 bg-panel/20 p-6 text-left text-muted hover:text-text hover:border-stage-mastering/50 transition"
           >
-            <div className="text-[10px] uppercase tracking-[0.3em] mb-1 font-bold">+ New project</div>
-            <div className="text-sm">Album, podcast, or film.</div>
+            <div className="text-[10px] uppercase tracking-[0.3em] mb-1 font-bold">+ New {activeMeta.label.toLowerCase().replace(/s$/, '')}</div>
+            <div className="text-sm">Starts on the {activeMeta.label} tab.</div>
           </button>
         </section>
       )}
-      {showCreate && <CreateProjectModal onClose={() => setShowCreate(false)} onCreated={load} />}
+      {showCreate && <CreateProjectModal defaultKind={tab} onClose={() => setShowCreate(false)} onCreated={load} />}
     </div>
   )
 }
 
 function CreateProjectModal({
+  defaultKind,
   onClose,
   onCreated,
 }: {
+  defaultKind?: 'album' | 'podcast' | 'film'
   onClose: () => void
   onCreated: () => void | Promise<void>
 }) {
   const navigate = useNavigate()
   const [name, setName] = useState('')
   const [subtitle, setSubtitle] = useState('')
-  const [kind, setKind] = useState<'album' | 'podcast' | 'film'>('album')
+  const [kind, setKind] = useState<'album' | 'podcast' | 'film'>(defaultKind ?? 'album')
   const [dropboxFolder, setDropboxFolder] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
