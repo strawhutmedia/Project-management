@@ -1,9 +1,9 @@
 {
   "version": "0.2.2",
-  "now": "2026-06-01T17:29:19.551Z",
+  "now": "2026-06-01T21:55:32.652Z",
   "boot": {
-    "startedAt": "2026-06-01T17:29:19.458Z",
-    "completedAt": "2026-06-01T17:29:19.548Z",
+    "startedAt": "2026-06-01T21:55:32.103Z",
+    "completedAt": "2026-06-01T21:55:32.620Z",
     "error": null
   },
   "env": {
@@ -70,12 +70,12 @@
       "034_promote_caroline.sql"
     ],
     "userCount": 9,
-    "projectCount": 5
+    "projectCount": 9
   },
   "recentLog": [
     {
       "level": "info",
-      "ts": "2026-06-01T17:29:19.456Z",
+      "ts": "2026-06-01T21:55:32.100Z",
       "msg": "serving client from",
       "data": {
         "clientDir": "/app/dist"
@@ -83,7 +83,7 @@
     },
     {
       "level": "info",
-      "ts": "2026-06-01T17:29:19.458Z",
+      "ts": "2026-06-01T21:55:32.103Z",
       "msg": "boot starting",
       "data": {
         "cwd": "/app",
@@ -94,12 +94,12 @@
     },
     {
       "level": "info",
-      "ts": "2026-06-01T17:29:19.499Z",
+      "ts": "2026-06-01T21:55:32.383Z",
       "msg": "migrations complete"
     },
     {
       "level": "info",
-      "ts": "2026-06-01T17:29:19.544Z",
+      "ts": "2026-06-01T21:55:32.604Z",
       "msg": "BIYA seed: project already exists, ensured shoot days",
       "data": {
         "projectId": "12f53ed1-c6c7-4c11-8d7b-06d91744c9af"
@@ -107,12 +107,12 @@
     },
     {
       "level": "info",
-      "ts": "2026-06-01T17:29:19.548Z",
+      "ts": "2026-06-01T21:55:32.620Z",
       "msg": "listening on :8080"
     },
     {
       "level": "info",
-      "ts": "2026-06-01T17:29:19.548Z",
+      "ts": "2026-06-01T21:55:32.621Z",
       "msg": "scheduler started (every 5 min)"
     }
   ]
