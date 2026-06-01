@@ -6,4 +6,4 @@
 # enough to land ffmpeg in PATH on the runtime container (we hit
 # "spawn ffmpeg ENOENT" on the first batch).
 [phases.setup]
-nixPkgs = ["...", "ffmpeg"]
+nixPkgs = ["nodejs_20", "ffmpeg"]
