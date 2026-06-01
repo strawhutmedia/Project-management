@@ -36,6 +36,23 @@ export type OpusCreateOptions = {
   maxDuration?: number | null
 }
 
+// Caption-style directive baked into every clip job's prompt so
+// OpusClip's AI knows the team wants a single visual style across
+// every show: clean burned-in captions, white sans-serif on a
+// translucent black pill, no animations, no emoji, one or two words
+// per beat. This is sent on top of whatever moment-focused prompt
+// the user provides.
+const DEFAULT_CAPTION_STYLE = `
+CAPTION STYLE — apply to EVERY clip:
+- Single-line burned-in captions, white sans-serif text on a small,
+  rounded, semi-transparent black background ("pill" style).
+- Centered, slightly above the bottom of the frame.
+- One or two words at a time, switching with the speaker's cadence.
+- NO emoji, NO bouncing/zoom animations, NO color-changing letters,
+  NO highlighted active words. Keep it clean and editorial — looks
+  the same on every clip across every show in our network.
+- Standard sentence case. No all-caps. No emoji.`
+
 // POST /clip-projects — kicks off clip generation. Accepts public URLs
 // (YouTube, Google Drive, Vimeo, S3, Dropbox temp links, etc.) so we
 // hand it a Dropbox temporary link with no upload.
@@ -46,7 +63,14 @@ export type OpusCreateOptions = {
 // actually came back.
 export async function createOpusProject(videoUrl: string, opts?: OpusCreateOptions): Promise<OpusCreateResult> {
   const body: Record<string, unknown> = { videoUrl }
-  if (opts?.prompt && opts.prompt.trim()) body.prompt = opts.prompt.trim().slice(0, 1000)
+  // Always prepend the caption style so the look is consistent across
+  // every clip OpusClip produces for us, regardless of what the user
+  // typed in the prompt field.
+  const userPrompt = opts?.prompt && opts.prompt.trim() ? opts.prompt.trim().slice(0, 1000) : ''
+  const fullPrompt = userPrompt
+    ? `${userPrompt}\n${DEFAULT_CAPTION_STYLE}`
+    : DEFAULT_CAPTION_STYLE.trim()
+  body.prompt = fullPrompt
   if (opts?.clipCount != null) body.clipCount = opts.clipCount
   if (opts?.minDuration != null) body.minDuration = opts.minDuration
   if (opts?.maxDuration != null) body.maxDuration = opts.maxDuration
