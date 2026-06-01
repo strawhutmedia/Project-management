@@ -85,3 +85,4 @@
 {"level":"error","ts":"2026-05-31T16:17:21.129Z","msg":"brand profile: generation failed","data":{"projectId":"5de249c0-f326-45cc-be23-d52a7d77ef1d","error":"400 {\"type\":\"error\",\"error\":{\"type\":\"invalid_request_error\",\"message\":\"output_config.format.schema: For 'integer' type, properties maximum, minimum are not supported\"},\"request_id\":\"req_011CbawvBRCNNdPxiTaHo4WZ\"}"}}
 {"level":"error","ts":"2026-06-01T15:25:08.586Z","msg":"stills: ffmpeg frame failed","data":{"itemId":"2753f18f-75d7-4ef4-8733-a7db870b1d9e","t":1389,"error":"spawn ffmpeg ENOENT"}}
 {"level":"error","ts":"2026-06-01T15:25:09.933Z","msg":"stills: ffmpeg frame failed","data":{"itemId":"b14a98e6-74b4-481f-a3eb-5dde9dbb735e","t":3091,"error":"spawn ffmpeg ENOENT"}}
+{"level":"error","ts":"2026-06-01T19:16:19.319Z","msg":"stills: ffmpeg not in PATH — stills extraction will be skipped","data":{}}
