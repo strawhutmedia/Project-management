@@ -86,3 +86,4 @@
 {"level":"error","ts":"2026-06-01T15:25:08.586Z","msg":"stills: ffmpeg frame failed","data":{"itemId":"2753f18f-75d7-4ef4-8733-a7db870b1d9e","t":1389,"error":"spawn ffmpeg ENOENT"}}
 {"level":"error","ts":"2026-06-01T15:25:09.933Z","msg":"stills: ffmpeg frame failed","data":{"itemId":"b14a98e6-74b4-481f-a3eb-5dde9dbb735e","t":3091,"error":"spawn ffmpeg ENOENT"}}
 {"level":"error","ts":"2026-06-01T19:16:19.319Z","msg":"stills: ffmpeg not in PATH — stills extraction will be skipped","data":{}}
+{"level":"error","ts":"2026-06-01T19:34:40.701Z","msg":"transcript: failed","data":{"id":"b387fe25-dd64-42d5-8733-ed4c4014d85e","error":"fetch failed"}}
