@@ -24,6 +24,7 @@ export default function ProjectPage() {
   const [error, setError] = useState<string | null>(null)
   const [showRootPicker, setShowRootPicker] = useState(false)
   const [showUploadEpisode, setShowUploadEpisode] = useState(false)
+  const [showQuickTranscript, setShowQuickTranscript] = useState(false)
 
   async function reload() {
     if (!projectId) return
@@ -176,13 +177,22 @@ export default function ProjectPage() {
             </div>
           </div>
           {project.kind === 'podcast' ? (
-            <button
-              onClick={() => setShowUploadEpisode(true)}
-              className="rounded-xl bg-gradient-to-r from-stage-producing to-stage-mastering text-white font-bold uppercase tracking-wider text-xs px-3 py-2 whitespace-nowrap"
-              title="Upload a near-final video — Slate transcribes, writes the social plan, and cuts clips automatically"
-            >
-              📤 Upload episode
-            </button>
+            <div className="flex items-center gap-2 flex-wrap">
+              <button
+                onClick={() => setShowQuickTranscript(true)}
+                className="rounded-xl border border-line text-muted hover:text-text hover:border-line/80 font-bold uppercase tracking-wider text-xs px-3 py-2 whitespace-nowrap"
+                title="Just a transcript — no social plan, no clips. Audio or video, fast and cheap."
+              >
+                🎙 Quick transcript
+              </button>
+              <button
+                onClick={() => setShowUploadEpisode(true)}
+                className="rounded-xl bg-gradient-to-r from-stage-producing to-stage-mastering text-white font-bold uppercase tracking-wider text-xs px-3 py-2 whitespace-nowrap"
+                title="Upload a near-final video — Slate transcribes, writes the social plan, and cuts clips automatically"
+              >
+                📤 Upload episode
+              </button>
+            </div>
           ) : project.kind !== 'film' && (
             <button
               onClick={() => void addChannel()}
@@ -282,6 +292,14 @@ export default function ProjectPage() {
             setShowUploadEpisode(false)
             await reload()
           }}
+        />
+      )}
+
+      {showQuickTranscript && (
+        <QuickTranscriptDialog
+          projectId={project.id}
+          projectRoot={project.dropboxFolder ?? null}
+          onClose={() => setShowQuickTranscript(false)}
         />
       )}
 
@@ -713,6 +731,97 @@ function UploadEpisodeDialog({
             {submitting ? 'Starting…' : 'Start upload-and-go'}
           </button>
         </div>
+      </div>
+    </div>
+  )
+}
+
+// Lightweight "I just need a transcript" flow. Accepts audio OR video,
+// runs Deepgram only — no episode row, no social plan, no clip job.
+// Lands in the show's Transcripts library unattached.
+function QuickTranscriptDialog({
+  projectId,
+  projectRoot,
+  onClose,
+}: {
+  projectId: string
+  projectRoot: string | null
+  onClose: () => void
+}) {
+  const [picking, setPicking] = useState(true)
+  const [submitting, setSubmitting] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [started, setStarted] = useState<{ transcriptId: string; name: string } | null>(null)
+
+  async function onFilePicked(path: string, name: string) {
+    setPicking(false)
+    setSubmitting(true)
+    setError(null)
+    try {
+      const { transcript } = await api.startTranscript({
+        projectId,
+        dropboxPath: path,
+        songId: null,
+      })
+      setStarted({ transcriptId: transcript.id, name })
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'failed to start transcript')
+      setPicking(true)
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  if (picking) {
+    return (
+      <DropboxFilePicker
+        title="Pick a file to transcribe (audio or video)"
+        acceptExtensions={['.mp3', '.m4a', '.wav', '.mp4', '.mov', '.m4v']}
+        initialPath={projectRoot ?? undefined}
+        restrictAbove={projectRoot ?? undefined}
+        scopeProjectId={projectId}
+        onSelect={onFilePicked}
+        onCancel={onClose}
+      />
+    )
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 grid place-items-center bg-ink/80 backdrop-blur-sm p-4" onClick={onClose}>
+      <div onClick={(e) => e.stopPropagation()} className="w-full max-w-md rounded-2xl border border-line bg-panel/95 p-5 space-y-4">
+        <div className="flex items-start justify-between">
+          <h3 className="text-sm font-display text-rainbow uppercase tracking-widest">🎙 Quick transcript</h3>
+          <button onClick={onClose} className="text-muted hover:text-text text-xl leading-none">×</button>
+        </div>
+
+        {submitting && <p className="text-muted text-sm">Starting transcription…</p>}
+
+        {error && <p className="text-urgent text-sm">{error}</p>}
+
+        {started && (
+          <div className="space-y-3">
+            <p className="text-sm">
+              <span className="text-stage-stems font-bold">✓ Transcription started</span> for{' '}
+              <span className="truncate inline-block max-w-[280px] align-bottom" title={started.name}>{started.name}</span>.
+            </p>
+            <p className="text-[11px] text-muted">
+              Deepgram usually takes 5–15 minutes for an hour of audio. No social plan, no clips
+              — just the transcript.
+            </p>
+            <div className="flex items-center justify-end gap-2 pt-1">
+              <button onClick={onClose} className="text-[11px] uppercase tracking-wider text-muted hover:text-text px-3 py-1.5">
+                Done
+              </button>
+              <Link
+                to={`/projects/${projectId}/transcripts/${started.transcriptId}`}
+                onClick={onClose}
+                className="rounded-lg bg-gradient-to-r from-stage-mastering to-stage-tracking text-white font-bold uppercase tracking-wider text-[11px] px-4 py-2"
+              >
+                Open transcript →
+              </Link>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   )
