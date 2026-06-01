@@ -43,6 +43,11 @@ songsRouter.get('/:id', async (req, res) => {
   const songRes = await pool.query(
     `SELECT s.id, s.project_id, s.title, s.subtitle, s.stage, s.dropbox_folder,
             s.release_date,
+            s.processing_state,
+            s.source_file_path,
+            s.autopipeline_started_at,
+            s.autopipeline_ready_at,
+            s.autopipeline_error,
             s.writer_id, s.tracker_id, s.overdub_id, s.producer_id, s.stems_id, s.mixer_id, s.master_id,
             wu.display_name AS writer_name, wu.name AS writer_full_name,
             tu.display_name AS tracker_name, tu.name AS tracker_full_name,
@@ -139,6 +144,11 @@ songsRouter.get('/:id', async (req, res) => {
       dropboxFolder: song.dropbox_folder,
       // Shared with music's release date; only surfaced in podcast UIs today.
       releaseDate: song.release_date ? String(song.release_date).slice(0, 10) : null,
+      processingState: song.processing_state ?? null,
+      sourceFilePath: song.source_file_path ?? null,
+      autopipelineStartedAt: song.autopipeline_started_at ?? null,
+      autopipelineReadyAt: song.autopipeline_ready_at ?? null,
+      autopipelineError: song.autopipeline_error ?? null,
       stageOwners: {
         writing: owners.writing.owner,
         tracking: owners.tracking.owner,

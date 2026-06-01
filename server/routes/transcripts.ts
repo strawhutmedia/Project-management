@@ -112,53 +112,42 @@ transcriptsRouter.get('/:id', async (req, res) => {
   res.json({ transcript: rowToApi(rows[0], true) })
 })
 
-// CREATE — kicks off transcription. Body: { projectId, dropboxPath, songId?, language? }
-transcriptsRouter.post('/', async (req, res) => {
-  const user = (req as typeof req & { user: SessionUser }).user
-  const { projectId, dropboxPath, songId, language } = req.body as {
-    projectId?: string
-    dropboxPath?: string
-    songId?: string | null
-    language?: string
-  }
-  if (!projectId || !dropboxPath) {
-    res.status(400).json({ error: 'projectId and dropboxPath required' }); return
-  }
-  if (!await assertWriter(user, projectId, res)) return
-  if (!hasDeepgramKey()) {
-    res.status(503).json({ error: 'transcription_unavailable: DEEPGRAM_API_KEY not configured' }); return
-  }
-
-  // Size-check via Dropbox metadata first
-  const meta = await getFileMetadata(dropboxPath)
-  if (!meta.ok) {
-    res.status(400).json({ error: meta.error || 'dropbox_metadata_failed' }); return
-  }
+// Shared core: creates a transcript row, kicks off Deepgram, and on
+// success / failure updates the row. Returns the inserted id. Used by
+// both the public POST endpoint and the podcast upload-and-go pipeline
+// in projects.ts.
+//
+// chainAutopipeline=true wires the post-transcript chain that flips
+// the parent song through processing → ready, triggers the social
+// plan, and (for video) starts a clip job.
+export async function createInternalTranscriptJob(args: {
+  projectId: string
+  songId: string | null
+  dropboxPath: string
+  createdBy: string
+  language?: string
+  chainAutopipeline?: boolean
+}): Promise<string> {
+  if (!hasDeepgramKey()) throw new Error('transcription_unavailable: DEEPGRAM_API_KEY not configured')
+  const meta = await getFileMetadata(args.dropboxPath)
+  if (!meta.ok) throw new Error(meta.error || 'dropbox_metadata_failed')
   if (meta.size && meta.size > MAX_FILE_BYTES) {
-    res.status(413).json({
-      error: `file_too_large: ${(meta.size / 1024 / 1024 / 1024).toFixed(2)}GB exceeds 10GB cap`,
-    }); return
+    throw new Error(`file_too_large: ${(meta.size / 1024 / 1024 / 1024).toFixed(2)}GB exceeds 10GB cap`)
   }
-
-  // Insert as queued, then attempt transcription. If transcription fails
-  // the row stays so the user can see the error and retry.
   const inserted = await pool.query<TranscriptRow>(
     `INSERT INTO transcripts (project_id, song_id, dropbox_path, file_name, file_size_bytes, language, status, created_by)
      VALUES ($1, $2, $3, $4, $5, $6, 'transcribing', $7)
      RETURNING *`,
-    [projectId, songId ?? null, dropboxPath, meta.name ?? dropboxPath, meta.size ?? null, language ?? 'en', user.id],
+    [args.projectId, args.songId, args.dropboxPath, meta.name ?? args.dropboxPath, meta.size ?? null, args.language ?? 'en', args.createdBy],
   )
   const id = inserted.rows[0].id
 
-  // Respond right away; do the actual Deepgram work in the background.
-  res.json({ transcript: rowToApi(inserted.rows[0]) })
-
-  // Fire-and-forget background work. Errors are written back to the row.
+  // Fire-and-forget background work.
   ;(async () => {
     try {
-      const link = await getTemporaryLink(dropboxPath)
+      const link = await getTemporaryLink(args.dropboxPath)
       if (!link.ok || !link.url) throw new Error(link.error || 'temporary_link_failed')
-      const result = await transcribeUrl(link.url, language ?? 'en')
+      const result = await transcribeUrl(link.url, args.language ?? 'en')
       const blocks = paragraphsToBlocks(result)
       await pool.query(
         `UPDATE transcripts
@@ -172,6 +161,15 @@ transcriptsRouter.post('/', async (req, res) => {
         [id, JSON.stringify(result), JSON.stringify(blocks), result.request_id ?? null, result.duration_seconds ?? null],
       )
       logInfo('transcript: done', { id, duration: result.duration_seconds, blocks: blocks.length })
+
+      if (args.chainAutopipeline && args.songId) {
+        await runPostTranscriptAutopipeline({
+          projectId: args.projectId,
+          songId: args.songId,
+          dropboxPath: args.dropboxPath,
+          createdBy: args.createdBy,
+        })
+      }
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err)
       logError('transcript: failed', { id, error: msg })
@@ -179,8 +177,96 @@ transcriptsRouter.post('/', async (req, res) => {
         `UPDATE transcripts SET status = 'failed', error = $2, updated_at = now() WHERE id = $1`,
         [id, msg],
       )
+      if (args.chainAutopipeline && args.songId) {
+        await pool.query(
+          `UPDATE songs SET autopipeline_error = $2 WHERE id = $1`,
+          [args.songId, msg.slice(0, 500)],
+        )
+      }
     }
   })()
+  return id
+}
+
+// After Deepgram succeeds on an autopipeline transcript, chain into:
+//   1. Social plan generation (via existing /api/socials handler logic)
+//   2. Clip job creation (OpusClip)
+//   3. Flip song.processing_state to 'ready' once everything's queued.
+//
+// We don't wait for the social plan or clip job to FINISH — both run
+// async themselves. "Ready" here means the autopipeline has fired off
+// every job it intended to.
+async function runPostTranscriptAutopipeline(args: {
+  projectId: string
+  songId: string
+  dropboxPath: string
+  createdBy: string
+}): Promise<void> {
+  try {
+    // Social plan: same shape as the existing socialsRouter.post('/')
+    // handler but called directly so no HTTP round-trip is needed.
+    const { triggerSocialPlanGeneration } = await import('./socials')
+    await triggerSocialPlanGeneration({
+      songId: args.songId,
+      createdBy: args.createdBy,
+    })
+  } catch (err) {
+    logError('autopipeline: social plan trigger failed', {
+      songId: args.songId, error: err instanceof Error ? err.message : String(err),
+    })
+  }
+
+  // Clip job (OpusClip) — fire if we have an OpusClip key.
+  try {
+    if (process.env.OPUSCLIP_API_KEY) {
+      const { triggerClipJob } = await import('./clips')
+      await triggerClipJob({
+        projectId: args.projectId,
+        songId: args.songId,
+        dropboxPath: args.dropboxPath,
+        createdBy: args.createdBy,
+      })
+    }
+  } catch (err) {
+    logError('autopipeline: clip job trigger failed', {
+      songId: args.songId, error: err instanceof Error ? err.message : String(err),
+    })
+  }
+
+  await pool.query(
+    `UPDATE songs
+        SET processing_state = 'ready',
+            autopipeline_ready_at = now()
+      WHERE id = $1`,
+    [args.songId],
+  )
+  logInfo('autopipeline: episode ready', { songId: args.songId })
+}
+
+// CREATE — kicks off transcription. Body: { projectId, dropboxPath, songId?, language? }
+transcriptsRouter.post('/', async (req, res) => {
+  const user = (req as typeof req & { user: SessionUser }).user
+  const { projectId, dropboxPath, songId, language } = req.body as {
+    projectId?: string
+    dropboxPath?: string
+    songId?: string | null
+    language?: string
+  }
+  if (!projectId || !dropboxPath) {
+    res.status(400).json({ error: 'projectId and dropboxPath required' }); return
+  }
+  if (!await assertWriter(user, projectId, res)) return
+  try {
+    const id = await createInternalTranscriptJob({
+      projectId, songId: songId ?? null, dropboxPath,
+      createdBy: user.id, language,
+    })
+    const { rows } = await pool.query<TranscriptRow>(`SELECT * FROM transcripts WHERE id = $1`, [id])
+    res.json({ transcript: rowToApi(rows[0]) })
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err)
+    res.status(msg.startsWith('file_too_large') ? 413 : msg.includes('unavailable') ? 503 : 400).json({ error: msg })
+  }
 })
 
 // UPDATE — patch edited_blocks and/or settings.

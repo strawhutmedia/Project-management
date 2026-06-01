@@ -223,53 +223,39 @@ clipsRouter.get('/:id', async (req, res) => {
   res.json({ job: jobToApi(refreshed, clips) })
 })
 
-// CREATE
-clipsRouter.post('/', async (req, res) => {
-  const user = (req as typeof req & { user: SessionUser }).user
-  const { projectId, songId, dropboxPath, options } = req.body as {
-    projectId?: string
-    songId?: string | null
-    dropboxPath?: string
-    options?: OpusCreateOptions
-  }
-  if (!projectId || !dropboxPath) {
-    res.status(400).json({ error: 'projectId and dropboxPath required' }); return
-  }
-  if (!await assertWriter(user, projectId, res)) return
-  if (!hasOpusKey()) {
-    res.status(503).json({ error: 'clips_unavailable: OPUSCLIP_API_KEY not configured' }); return
-  }
-
-  // Dropbox size check (30GB hard cap per OpusClip)
-  const meta = await getFileMetadata(dropboxPath)
-  if (!meta.ok) { res.status(400).json({ error: meta.error || 'dropbox_metadata_failed' }); return }
+// Internal-callable: same core as the public POST handler. Used by
+// the podcast upload-and-go auto-pipeline.
+export async function triggerClipJob(args: {
+  projectId: string
+  songId: string | null
+  dropboxPath: string
+  createdBy: string
+  options?: OpusCreateOptions | null
+}): Promise<string> {
+  if (!hasOpusKey()) throw new Error('clips_unavailable: OPUSCLIP_API_KEY not configured')
+  const meta = await getFileMetadata(args.dropboxPath)
+  if (!meta.ok) throw new Error(meta.error || 'dropbox_metadata_failed')
   if (meta.size && meta.size > MAX_FILE_BYTES) {
-    res.status(413).json({
-      error: `file_too_large: ${(meta.size / 1024 / 1024 / 1024).toFixed(2)}GB exceeds 30GB OpusClip cap`,
-    }); return
+    throw new Error(`file_too_large: ${(meta.size / 1024 / 1024 / 1024).toFixed(2)}GB exceeds 30GB`)
   }
-
-  // Sanitize options once so the same shape lands in DB + OpusClip body.
-  const cleanOpts: OpusCreateOptions | null = options ? {
-    prompt: typeof options.prompt === 'string' && options.prompt.trim() ? options.prompt.trim().slice(0, 1000) : null,
-    clipCount: typeof options.clipCount === 'number' && options.clipCount > 0 && options.clipCount <= 50 ? Math.round(options.clipCount) : null,
-    minDuration: typeof options.minDuration === 'number' && options.minDuration > 0 ? Math.round(options.minDuration) : null,
-    maxDuration: typeof options.maxDuration === 'number' && options.maxDuration > 0 ? Math.round(options.maxDuration) : null,
+  const cleanOpts: OpusCreateOptions | null = args.options ? {
+    prompt: typeof args.options.prompt === 'string' && args.options.prompt.trim() ? args.options.prompt.trim().slice(0, 1000) : null,
+    clipCount: typeof args.options.clipCount === 'number' && args.options.clipCount > 0 && args.options.clipCount <= 50 ? Math.round(args.options.clipCount) : null,
+    minDuration: typeof args.options.minDuration === 'number' && args.options.minDuration > 0 ? Math.round(args.options.minDuration) : null,
+    maxDuration: typeof args.options.maxDuration === 'number' && args.options.maxDuration > 0 ? Math.round(args.options.maxDuration) : null,
   } : null
 
   const inserted = await pool.query<ClipJobRow>(
     `INSERT INTO clip_jobs (project_id, song_id, dropbox_path, file_name, status, options, created_by)
      VALUES ($1, $2, $3, $4, 'queued', $5::jsonb, $6)
      RETURNING *`,
-    [projectId, songId ?? null, dropboxPath, meta.name ?? dropboxPath, cleanOpts ? JSON.stringify(cleanOpts) : null, user.id],
+    [args.projectId, args.songId, args.dropboxPath, meta.name ?? args.dropboxPath, cleanOpts ? JSON.stringify(cleanOpts) : null, args.createdBy],
   )
   const jobId = inserted.rows[0].id
-  res.json({ job: jobToApi(inserted.rows[0]) })
 
-  // Fire-and-forget: get temp link, kick off OpusClip, flip status.
   ;(async () => {
     try {
-      const link = await getTemporaryLink(dropboxPath)
+      const link = await getTemporaryLink(args.dropboxPath)
       if (!link.ok || !link.url) throw new Error(link.error || 'temporary_link_failed')
       const opus = await createOpusProject(link.url, cleanOpts ?? undefined)
       await pool.query(
@@ -291,6 +277,38 @@ clipsRouter.post('/', async (req, res) => {
       )
     }
   })()
+  return jobId
+}
+
+// CREATE
+clipsRouter.post('/', async (req, res) => {
+  const user = (req as typeof req & { user: SessionUser }).user
+  const { projectId, songId, dropboxPath, options } = req.body as {
+    projectId?: string
+    songId?: string | null
+    dropboxPath?: string
+    options?: OpusCreateOptions
+  }
+  if (!projectId || !dropboxPath) {
+    res.status(400).json({ error: 'projectId and dropboxPath required' }); return
+  }
+  if (!await assertWriter(user, projectId, res)) return
+  try {
+    const jobId = await triggerClipJob({
+      projectId,
+      songId: songId ?? null,
+      dropboxPath,
+      createdBy: user.id,
+      options,
+    })
+    const { rows } = await pool.query<ClipJobRow>(`SELECT * FROM clip_jobs WHERE id = $1`, [jobId])
+    res.json({ job: jobToApi(rows[0]) })
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err)
+    const status = msg.startsWith('file_too_large') ? 413 : msg.includes('unavailable') ? 503 : 400
+    res.status(status).json({ error: msg })
+    return
+  }
 })
 
 // GET /api/clips/:id/raw — admin/writer only inspector. Returns the

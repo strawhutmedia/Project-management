@@ -47,6 +47,12 @@ export type ApiSongDetail = {
   stage: Stage
   // Public release date (YYYY-MM-DD). Surfaced for podcast episodes.
   releaseDate?: string | null
+  // Upload-and-go pipeline state for podcasts.
+  processingState?: 'processing' | 'ready' | 'posted' | null
+  sourceFilePath?: string | null
+  autopipelineStartedAt?: string | null
+  autopipelineReadyAt?: string | null
+  autopipelineError?: string | null
   dropboxFolder: string | null
   stageOwners: Record<Stage, ApiStageOwner>
   stageOwnerFromDefault?: Partial<Record<Stage, boolean>>
@@ -376,6 +382,9 @@ export type ApiSong = {
   stage: Stage
   // YYYY-MM-DD. Only surfaced in the podcast UI today; null for music/films.
   releaseDate?: string | null
+  // Upload-and-go status for podcast episodes. Null for music/films.
+  processingState?: 'processing' | 'ready' | 'posted' | null
+  autopipelineError?: string | null
   tasks: ApiTask[]
   comments: unknown[]
   links: unknown[]
@@ -518,6 +527,11 @@ export const api = {
   // Project edit
   updateProject: (id: string, patch: { name?: string; subtitle?: string; dropboxFolder?: string; channelsSubfolder?: string | null; defaultOwners?: Record<string, string>; filmPhase?: 'pre' | 'production' | 'post' | 'wrapped'; socialsBrandVoice?: string | null; socialsVocabulary?: string | null; socialsExamplePosts?: string[]; socialsDefaultAssignees?: Partial<Record<'story_video' | 'story_photo' | 'reel_concept' | 'photo_concept', string>>; rssFeedUrl?: string | null; coverArtUrl?: string | null }) =>
     request<{ ok: true }>(`/api/projects/${id}`, { method: 'PATCH', body: JSON.stringify(patch) }),
+  uploadPodcastEpisode: (projectId: string, body: { dropboxPath: string; title?: string; releaseDate?: string | null }) =>
+    request<{ episode: { id: string; title: string; processingState: 'processing' | 'ready' | 'posted' } }>(
+      `/api/projects/${projectId}/episodes/from-file`,
+      { method: 'POST', body: JSON.stringify(body) },
+    ),
   addSong: (projectId: string, body: { title: string; subtitle?: string }) =>
     request<{ song: { id: string; title: string } }>(`/api/projects/${projectId}/songs`, { method: 'POST', body: JSON.stringify(body) }),
   createProject: (body: { name: string; subtitle?: string; kind?: 'album' | 'podcast' | 'film'; dropboxFolder?: string }) =>

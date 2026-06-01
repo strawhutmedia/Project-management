@@ -212,6 +212,100 @@ projectsRouter.post('/:id/songs', async (req, res) => {
   res.json({ song: rows[0] })
 })
 
+// Upload-and-go: podcast episode creation from a near-final video file.
+// Takes a Dropbox path + optional release date, creates the episode
+// row in state='processing', kicks off the auto-pipeline (transcript
+// then social plan then clip job) in the background, and returns
+// immediately so the UI can poll.
+//
+// Hard-restricted to mp4 / mov / m4v so we don't burn Deepgram credit
+// on audio-only files the team will end up replacing with video later.
+projectsRouter.post('/:id/episodes/from-file', async (req, res) => {
+  const user = (req as typeof req & { user: SessionUser }).user
+  const projectId = req.params.id
+  if (!await assertWriter(user, projectId, res)) return
+
+  const { dropboxPath, title: titleRaw, releaseDate } = req.body as {
+    dropboxPath?: string
+    title?: string
+    releaseDate?: string | null
+  }
+  if (!dropboxPath || typeof dropboxPath !== 'string') {
+    res.status(400).json({ error: 'dropboxPath required' }); return
+  }
+  if (!/\.(mp4|mov|m4v)$/i.test(dropboxPath)) {
+    res.status(400).json({ error: 'Only .mp4 / .mov / .m4v files are accepted. Audio-only podcasts must be converted to video first.' }); return
+  }
+  if (releaseDate != null && releaseDate !== '' && !/^\d{4}-\d{2}-\d{2}$/.test(releaseDate)) {
+    res.status(400).json({ error: 'releaseDate must be YYYY-MM-DD' }); return
+  }
+
+  // Verify it's a podcast project. Music/films keep their own flows.
+  const projRes = await pool.query<{ kind: string }>(
+    `SELECT kind FROM projects WHERE id = $1`, [projectId],
+  )
+  if (projRes.rows.length === 0) { res.status(404).json({ error: 'project_not_found' }); return }
+  if (projRes.rows[0].kind !== 'podcast') {
+    res.status(400).json({ error: 'upload_flow_is_podcast_only' }); return
+  }
+
+  // Derive a reasonable episode title from the filename when one isn't
+  // provided. Strip extension, swap underscores/dashes for spaces.
+  const filenameTitle = (titleRaw && titleRaw.trim()) ||
+    dropboxPath.split('/').pop()!
+      .replace(/\.(mp4|mov|m4v)$/i, '')
+      .replace(/[_\-]+/g, ' ')
+      .trim()
+      .slice(0, 200)
+
+  const positionRes = await pool.query<{ next: number }>(
+    `SELECT COALESCE(MAX(position), 0) + 1 AS next FROM songs WHERE project_id = $1`,
+    [projectId],
+  )
+  const position = positionRes.rows[0].next
+
+  const inserted = await pool.query<{ id: string }>(
+    `INSERT INTO songs (project_id, title, stage, position, source_file_path,
+                        processing_state, autopipeline_started_at, release_date)
+     VALUES ($1, $2, 'writing', $3, $4, 'processing', now(),
+             ${releaseDate ? '$5::date' : 'NULL'})
+     RETURNING id`,
+    releaseDate
+      ? [projectId, filenameTitle, position, dropboxPath, releaseDate]
+      : [projectId, filenameTitle, position, dropboxPath],
+  )
+  const songId = inserted.rows[0].id
+
+  logInfo('podcast upload-and-go: episode created', {
+    projectId, songId, dropboxPath, title: filenameTitle,
+  })
+
+  res.json({ episode: { id: songId, title: filenameTitle, processingState: 'processing' } })
+
+  // Fire-and-forget: start the transcript. The transcript-completion
+  // hook (in transcripts.ts) chains into social-plan generation and
+  // the clip job from there.
+  ;(async () => {
+    try {
+      const { createInternalTranscriptJob } = await import('./transcripts')
+      await createInternalTranscriptJob({
+        projectId,
+        songId,
+        dropboxPath,
+        createdBy: user.id,
+        chainAutopipeline: true,
+      })
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err)
+      logError('podcast upload-and-go: transcript start failed', { songId, error: msg })
+      await pool.query(
+        `UPDATE songs SET autopipeline_error = $2 WHERE id = $1`,
+        [songId, msg.slice(0, 500)],
+      )
+    }
+  })()
+})
+
 // Project members for autocomplete (@mentions, assignee pickers).
 // Returns: project members + admins + the project creator. All distinct.
 projectsRouter.get('/:id/members', async (req, res) => {
@@ -418,11 +512,14 @@ projectsRouter.get('/:id', async (req, res) => {
   const songs =
     accessLevel === 'full'
       ? await pool.query(
-          `SELECT id, title, subtitle, stage, position, release_date FROM songs WHERE project_id = $1 ORDER BY position ASC`,
+          `SELECT id, title, subtitle, stage, position, release_date,
+                  processing_state, autopipeline_error
+             FROM songs WHERE project_id = $1 ORDER BY position ASC`,
           [projectId],
         )
       : await pool.query(
-          `SELECT s.id, s.title, s.subtitle, s.stage, s.position, s.release_date
+          `SELECT s.id, s.title, s.subtitle, s.stage, s.position, s.release_date,
+                  s.processing_state, s.autopipeline_error
            FROM songs s JOIN song_members sm ON sm.song_id = s.id
            WHERE s.project_id = $1 AND sm.user_id = $2
            ORDER BY s.position ASC`,
@@ -481,12 +578,14 @@ projectsRouter.get('/:id', async (req, res) => {
       coverArtUrl: project.cover_art_url ?? null,
       brandProfile: project.socials_brand_profile ?? null,
       brandProfileAt: project.socials_brand_profile_at ?? null,
-      songs: songs.rows.map((s: { id: string; title: string; subtitle: string | null; stage: string; release_date: string | Date | null }) => ({
+      songs: songs.rows.map((s: { id: string; title: string; subtitle: string | null; stage: string; release_date: string | Date | null; processing_state: string | null; autopipeline_error: string | null }) => ({
         id: s.id,
         title: s.title,
         subtitle: s.subtitle,
         stage: s.stage,
         releaseDate: s.release_date ? String(s.release_date).slice(0, 10) : null,
+        processingState: s.processing_state ?? null,
+        autopipelineError: s.autopipeline_error ?? null,
         tasks: tasksBySong[s.id],
         comments: [],
         links: [],

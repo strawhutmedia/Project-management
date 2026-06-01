@@ -153,14 +153,12 @@ socialsRouter.get('/:id', async (req, res) => {
   res.json({ plan: rowToApi(rows[0]) })
 })
 
-// CREATE — kicks off generation for one episode based on its latest done
-// transcript. Body: { songId }
-socialsRouter.post('/', async (req, res) => {
-  const user = (req as typeof req & { user: SessionUser }).user
-  const songId = String(req.body?.songId || '')
-  if (!songId) { res.status(400).json({ error: 'songId required' }); return }
-
-  // Pull song + project + brand voice config
+// Internal-callable: same logic as the public POST handler, minus the
+// Express layer. Returns the new plan id; throws on validation errors.
+export async function triggerSocialPlanGeneration(args: {
+  songId: string
+  createdBy: string
+}): Promise<string> {
   const sRes = await pool.query<{
     project_id: string
     song_title: string
@@ -180,50 +178,35 @@ socialsRouter.post('/', async (req, res) => {
             p.socials_vocabulary AS vocabulary
        FROM songs s JOIN projects p ON p.id = s.project_id
       WHERE s.id = $1`,
-    [songId],
+    [args.songId],
   )
-  if (sRes.rows.length === 0) { res.status(404).json({ error: 'song_not_found' }); return }
+  if (sRes.rows.length === 0) throw new Error('song_not_found')
   const ctx = sRes.rows[0]
+  if (!hasAnthropicKey()) throw new Error('socials_unavailable: ANTHROPIC_API_KEY not configured')
 
-  if (!await assertWriter(user, ctx.project_id, res)) return
-  if (!hasAnthropicKey()) {
-    res.status(503).json({ error: 'socials_unavailable: ANTHROPIC_API_KEY not configured' }); return
-  }
-
-  // Pull the latest done transcript for this song
   const tRes = await pool.query<{
     id: string
     edited_blocks: Array<{ speaker: string; text: string; start: number; end: number }> | null
   }>(
-    `SELECT id, edited_blocks
-       FROM transcripts
+    `SELECT id, edited_blocks FROM transcripts
       WHERE song_id = $1 AND status = 'done'
       ORDER BY created_at DESC LIMIT 1`,
-    [songId],
+    [args.songId],
   )
-  if (tRes.rows.length === 0) {
-    res.status(400).json({ error: 'no_done_transcript_for_episode' }); return
-  }
+  if (tRes.rows.length === 0) throw new Error('no_done_transcript_for_episode')
   const transcript = tRes.rows[0]
-  // Prefix every block with its timecode so Claude can reference real
-  // moments by [HH:MM:SS] in the suggested_clip fields. The editor/
-  // OpusClip then knows exactly where each suggested moment lives.
   const transcriptText = (transcript.edited_blocks ?? [])
     .map((b) => `[${fmtTimecode(b.start)}] ${b.speaker}: ${b.text}`)
     .join('\n\n')
     .slice(0, MAX_TRANSCRIPT_CHARS)
-  if (transcriptText.length < 100) {
-    res.status(400).json({ error: 'transcript_too_short' }); return
-  }
+  if (transcriptText.length < 100) throw new Error('transcript_too_short')
 
-  // Insert generating row, respond immediately
   const inserted = await pool.query<PlanRow>(
     `INSERT INTO social_plans (project_id, song_id, transcript_id, status, created_by)
      VALUES ($1, $2, $3, 'generating', $4) RETURNING *`,
-    [ctx.project_id, songId, transcript.id, user.id],
+    [ctx.project_id, args.songId, transcript.id, args.createdBy],
   )
   const planId = inserted.rows[0].id
-  res.json({ plan: rowToApi(inserted.rows[0]) })
 
   // Fire-and-forget Claude call
   ;(async () => {
@@ -254,20 +237,11 @@ socialsRouter.post('/', async (req, res) => {
                 cache_create_tokens = $6,
                 updated_at = now()
           WHERE id = $1`,
-        [
-          planId,
-          JSON.stringify(items),
-          result.usage.inputTokens,
-          result.usage.outputTokens,
-          result.usage.cacheReadInputTokens,
-          result.usage.cacheCreationInputTokens,
-        ],
+        [planId, JSON.stringify(items),
+         result.usage.inputTokens, result.usage.outputTokens,
+         result.usage.cacheReadInputTokens, result.usage.cacheCreationInputTokens],
       )
-      logInfo('socials: plan done', {
-        planId,
-        items: items.length,
-        cacheRead: result.usage.cacheReadInputTokens,
-      })
+      logInfo('socials: plan done', { planId, items: items.length })
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err)
       logError('socials: generation failed', { planId, error: msg })
@@ -277,6 +251,32 @@ socialsRouter.post('/', async (req, res) => {
       )
     }
   })()
+  return planId
+}
+
+// CREATE — kicks off generation for one episode based on its latest done
+// transcript. Body: { songId }
+socialsRouter.post('/', async (req, res) => {
+  const user = (req as typeof req & { user: SessionUser }).user
+  const songId = String(req.body?.songId || '')
+  if (!songId) { res.status(400).json({ error: 'songId required' }); return }
+  // Auth pre-check — pull the project id so assertWriter can run.
+  const pCheck = await pool.query<{ project_id: string }>(
+    `SELECT project_id FROM songs WHERE id = $1`, [songId],
+  )
+  if (pCheck.rows.length === 0) { res.status(404).json({ error: 'song_not_found' }); return }
+  if (!await assertWriter(user, pCheck.rows[0].project_id, res)) return
+  try {
+    const planId = await triggerSocialPlanGeneration({ songId, createdBy: user.id })
+    const { rows } = await pool.query<PlanRow>(`SELECT * FROM social_plans WHERE id = $1`, [planId])
+    res.json({ plan: rowToApi(rows[0]) })
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err)
+    const status = msg.includes('unavailable') ? 503 :
+                   msg === 'song_not_found' ? 404 :
+                   400
+    res.status(status).json({ error: msg })
+  }
 })
 
 // PATCH — update one item (status, text, etc.) inside a plan.

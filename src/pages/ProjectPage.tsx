@@ -6,6 +6,7 @@ import StagePill from '../components/StagePill'
 import StageDistribution from '../components/StageDistribution'
 import InlineEdit from '../components/InlineEdit'
 import DropboxFolderPicker from '../components/DropboxFolderPicker'
+import DropboxFilePicker from '../components/DropboxFilePicker'
 import BudgetSection from '../components/BudgetSection'
 import ProjectMembersSection from '../components/ProjectMembersSection'
 import PodcastSocialsConfig from '../components/PodcastSocialsConfig'
@@ -22,6 +23,7 @@ export default function ProjectPage() {
   const [members, setMembers] = useState<ApiMember[]>([])
   const [error, setError] = useState<string | null>(null)
   const [showRootPicker, setShowRootPicker] = useState(false)
+  const [showUploadEpisode, setShowUploadEpisode] = useState(false)
 
   async function reload() {
     if (!projectId) return
@@ -173,7 +175,15 @@ export default function ProjectPage() {
             )}
             </div>
           </div>
-          {project.kind !== 'film' && (
+          {project.kind === 'podcast' ? (
+            <button
+              onClick={() => setShowUploadEpisode(true)}
+              className="rounded-xl bg-gradient-to-r from-stage-producing to-stage-mastering text-white font-bold uppercase tracking-wider text-xs px-3 py-2 whitespace-nowrap"
+              title="Upload a near-final video — Slate transcribes, writes the social plan, and cuts clips automatically"
+            >
+              📤 Upload episode
+            </button>
+          ) : project.kind !== 'film' && (
             <button
               onClick={() => void addChannel()}
               className="rounded-xl bg-gradient-to-r from-stage-producing to-stage-mastering text-white font-bold uppercase tracking-wider text-xs px-3 py-2 whitespace-nowrap"
@@ -263,6 +273,18 @@ export default function ProjectPage() {
         />
       )}
 
+      {showUploadEpisode && (
+        <UploadEpisodeDialog
+          projectId={project.id}
+          projectRoot={project.dropboxFolder ?? null}
+          onClose={() => setShowUploadEpisode(false)}
+          onCreated={async () => {
+            setShowUploadEpisode(false)
+            await reload()
+          }}
+        />
+      )}
+
       <div className="space-y-8">
         {project.kind !== 'film' && STAGES.map((stage) => {
           const stageSongs = songs.filter((s) => s.stage === stage)
@@ -321,8 +343,17 @@ export default function ProjectPage() {
                             <span className="text-muted/60"> · {projectReleaseLabel((song as unknown as { releaseDate: string }).releaseDate)}</span>
                           </div>
                         )}
+                        {project.kind === 'podcast' && (song as unknown as { processingState?: string | null }).processingState && (
+                          <div className="mt-2">
+                            <ProcessingPill state={(song as unknown as { processingState: 'processing' | 'ready' | 'posted' }).processingState} />
+                          </div>
+                        )}
                       </div>
-                      <StagePill stage={song.stage} size="xs" labels={project.stageLabels} />
+                      {/* Stage pill hidden on podcasts — the processing
+                          state above replaces the 8-stage pipeline. */}
+                      {project.kind !== 'podcast' && (
+                        <StagePill stage={song.stage} size="xs" labels={project.stageLabels} />
+                      )}
                     </div>
                     <div className="pl-3 mt-4 text-[11px] text-muted flex items-center gap-3">
                       <span className="inline-flex items-center gap-1">
@@ -571,6 +602,133 @@ function ProjectRolesSection({
         })}
       </div>
     </section>
+  )
+}
+
+// Podcast upload-and-go dialog. Step 1: pick the near-final video.
+// Step 2: optional release date. Submit fires the auto-pipeline server-
+// side; user lands back on the project page and the new episode card
+// shows the "Processing…" state immediately.
+function UploadEpisodeDialog({
+  projectId,
+  projectRoot,
+  onClose,
+  onCreated,
+}: {
+  projectId: string
+  projectRoot: string | null
+  onClose: () => void
+  onCreated: () => void | Promise<void>
+}) {
+  const [picking, setPicking] = useState(true)
+  const [picked, setPicked] = useState<{ path: string; name: string; size?: number } | null>(null)
+  const [releaseDate, setReleaseDate] = useState('')
+  const [submitting, setSubmitting] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  function onFilePicked(path: string, name: string, size?: number) {
+    setPicking(false)
+    if (!/\.(mp4|mov|m4v)$/i.test(name)) {
+      setError('Slate only accepts video — pick an .mp4, .mov, or .m4v.')
+      return
+    }
+    setPicked({ path, name, size })
+    setError(null)
+  }
+
+  async function submit() {
+    if (!picked) return
+    setSubmitting(true); setError(null)
+    try {
+      await api.uploadPodcastEpisode(projectId, {
+        dropboxPath: picked.path,
+        title: picked.name.replace(/\.(mp4|mov|m4v)$/i, '').replace(/[_\-]+/g, ' ').trim(),
+        releaseDate: releaseDate || null,
+      })
+      await onCreated()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'failed')
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  if (picking) {
+    return (
+      <DropboxFilePicker
+        title="Upload a near-final episode video"
+        acceptExtensions={['.mp4', '.mov', '.m4v']}
+        initialPath={projectRoot ?? undefined}
+        restrictAbove={projectRoot ?? undefined}
+        scopeProjectId={projectId}
+        onSelect={onFilePicked}
+        onCancel={onClose}
+      />
+    )
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 grid place-items-center bg-ink/80 backdrop-blur-sm p-4" onClick={onClose}>
+      <div onClick={(e) => e.stopPropagation()} className="w-full max-w-md rounded-2xl border border-line bg-panel/95 p-5 space-y-4">
+        <div className="flex items-start justify-between">
+          <div>
+            <h3 className="text-sm font-display text-rainbow uppercase tracking-widest">📤 Upload episode</h3>
+            <p className="text-[11px] text-muted mt-1 truncate" title={picked?.name}>{picked?.name}</p>
+          </div>
+          <button onClick={onClose} className="text-muted hover:text-text text-xl leading-none">×</button>
+        </div>
+
+        <label className="block">
+          <div className="text-[10px] uppercase tracking-wider text-muted/70 font-bold mb-1">Release date (optional)</div>
+          <input
+            type="date"
+            value={releaseDate}
+            onChange={(e) => setReleaseDate(e.target.value)}
+            className="w-full rounded-lg bg-ink/40 border border-line text-text px-3 py-2 text-sm outline-none focus:border-stage-mastering"
+          />
+          <p className="text-[10px] text-muted/60 mt-1">
+            When this episode goes public. Drives the scheduler's "this week's episode" rule.
+          </p>
+        </label>
+
+        <div className="rounded-lg border border-line/40 bg-ink/30 p-3 text-[11px] text-muted space-y-1">
+          <div><span className="text-stage-stems font-bold">What happens next:</span></div>
+          <div>1. Slate transcribes via Deepgram (~5–15 min for an hour episode)</div>
+          <div>2. Claude writes the daily social plan from the transcript</div>
+          <div>3. OpusClip generates short clips from the video</div>
+          <div className="pt-1 text-muted/70">The episode appears in this list as "Processing…" and flips to "Ready" when done.</div>
+        </div>
+
+        {error && <p className="text-urgent text-sm">{error}</p>}
+
+        <div className="flex items-center justify-end gap-2">
+          <button onClick={() => setPicking(true)} disabled={submitting} className="text-[11px] uppercase tracking-wider text-muted hover:text-text px-3 py-1.5">
+            ← Pick different file
+          </button>
+          <button
+            onClick={() => void submit()}
+            disabled={submitting || !picked}
+            className="rounded-lg bg-gradient-to-r from-stage-mastering to-stage-tracking text-white font-bold uppercase tracking-wider text-[11px] px-4 py-2 disabled:opacity-50"
+          >
+            {submitting ? 'Starting…' : 'Start upload-and-go'}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function ProcessingPill({ state }: { state: 'processing' | 'ready' | 'posted' }) {
+  const styles: Record<typeof state, { label: string; cls: string }> = {
+    processing: { label: '⏳ Processing…', cls: 'text-stage-mastering border-stage-mastering/40 bg-stage-mastering/10' },
+    ready:      { label: '✓ Ready',         cls: 'text-stage-stems border-stage-stems/40 bg-stage-stems/10' },
+    posted:     { label: '🚀 Posted',       cls: 'text-emerald-300 border-emerald-400/40 bg-emerald-400/10' },
+  }
+  const s = styles[state]
+  return (
+    <span className={`inline-flex items-center text-[10px] uppercase tracking-wider font-bold rounded-full px-2 py-0.5 border ${s.cls}`}>
+      {s.label}
+    </span>
   )
 }
 
