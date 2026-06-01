@@ -72,11 +72,18 @@ export async function transcribeUrl(
   const params = { ...DEFAULT_PARAMS, language }
   const endpoint = `${DEEPGRAM_API}/listen?${paramsToQuery(params)}`
   logInfo('deepgram: transcribe start', { language })
-  const res = await fetch(endpoint, {
-    method: 'POST',
-    headers: authHeader(),
-    body: JSON.stringify({ url }),
-  })
+  let res: Response
+  try {
+    res = await fetch(endpoint, {
+      method: 'POST',
+      headers: authHeader(),
+      body: JSON.stringify({ url }),
+    })
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err)
+    logError('deepgram: fetch error', { endpoint, error: msg })
+    throw new Error(`deepgram_fetch_failed: ${msg}`)
+  }
   if (!res.ok) {
     const text = await res.text()
     logError('deepgram: transcribe failed', { status: res.status, body: text.slice(0, 500) })
