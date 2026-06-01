@@ -219,17 +219,17 @@ function PlanCard({
           {buckets.story_concept.length > 0 && (
             <ConceptBucket kind="story_concept" items={buckets.story_concept} planId={plan.id}
               canWrite={canWrite} members={members} onChanged={onChanged}
-              renderItem={(item, save) => item.kind === 'story_concept' ? <StoryBody item={item} canWrite={canWrite} onSave={save} /> : null} />
+              renderItem={(item, save) => item.kind === 'story_concept' ? <StoryBody item={item} canWrite={canWrite} onSave={save} planId={plan.id} onChanged={onChanged} /> : null} />
           )}
           {buckets.reel_concept.length > 0 && (
             <ConceptBucket kind="reel_concept" items={buckets.reel_concept} planId={plan.id}
               canWrite={canWrite} members={members} onChanged={onChanged}
-              renderItem={(item, save) => item.kind === 'reel_concept' ? <ReelBody item={item} canWrite={canWrite} onSave={save} /> : null} />
+              renderItem={(item, save) => item.kind === 'reel_concept' ? <ReelBody item={item} canWrite={canWrite} onSave={save} planId={plan.id} onChanged={onChanged} /> : null} />
           )}
           {buckets.photo_concept.length > 0 && (
             <ConceptBucket kind="photo_concept" items={buckets.photo_concept} planId={plan.id}
               canWrite={canWrite} members={members} onChanged={onChanged}
-              renderItem={(item, save) => item.kind === 'photo_concept' ? <PhotoBody item={item} canWrite={canWrite} onSave={save} /> : null} />
+              renderItem={(item, save) => item.kind === 'photo_concept' ? <PhotoBody item={item} canWrite={canWrite} onSave={save} planId={plan.id} onChanged={onChanged} /> : null} />
           )}
         </div>
       )}
@@ -598,13 +598,16 @@ function RegenerateButton({
   )
 }
 
-function StoryBody({ item, canWrite, onSave }: {
+function StoryBody({ item, canWrite, onSave, planId, onChanged }: {
   item: Extract<ApiSocialItem, { kind: 'story_concept' }>
   canWrite: boolean
   onSave: (patch: Record<string, unknown>) => void | Promise<void>
+  planId: string
+  onChanged: () => void | Promise<void>
 }) {
   return (
     <div className="space-y-2">
+      <StillsStrip item={item} planId={planId} canWrite={canWrite} onChanged={onChanged} />
       <EditableLine label="Concept" value={item.description} canWrite={canWrite} onSave={(v) => onSave({ description: v })} multi />
       <EditableLine label="Overlay caption" value={item.caption} canWrite={canWrite} onSave={(v) => onSave({ caption: v })} />
       {item.medium === 'video' && (
@@ -617,13 +620,16 @@ function StoryBody({ item, canWrite, onSave }: {
   )
 }
 
-function ReelBody({ item, canWrite, onSave }: {
+function ReelBody({ item, canWrite, onSave, planId, onChanged }: {
   item: Extract<ApiSocialItem, { kind: 'reel_concept' }>
   canWrite: boolean
   onSave: (patch: Record<string, unknown>) => void | Promise<void>
+  planId: string
+  onChanged: () => void | Promise<void>
 }) {
   return (
     <div className="space-y-2">
+      <StillsStrip item={item} planId={planId} canWrite={canWrite} onChanged={onChanged} />
       <EditableLine label="Hook" value={item.hook} canWrite={canWrite} onSave={(v) => onSave({ hook: v })} bold />
       <EditableLine
         label="Talking points (one per line)"
@@ -638,13 +644,16 @@ function ReelBody({ item, canWrite, onSave }: {
   )
 }
 
-function PhotoBody({ item, canWrite, onSave }: {
+function PhotoBody({ item, canWrite, onSave, planId, onChanged }: {
   item: Extract<ApiSocialItem, { kind: 'photo_concept' }>
   canWrite: boolean
   onSave: (patch: Record<string, unknown>) => void | Promise<void>
+  planId: string
+  onChanged: () => void | Promise<void>
 }) {
   return (
     <div className="space-y-2">
+      <StillsStrip item={item} planId={planId} canWrite={canWrite} onChanged={onChanged} />
       <EditableLine label="Image direction" value={item.image_direction} canWrite={canWrite} onSave={(v) => onSave({ image_direction: v })} multi />
       <EditableLine label="Caption" value={item.caption} canWrite={canWrite} onSave={(v) => onSave({ caption: v })} multi />
       <EditableLine label="Vibe" value={item.vibe} canWrite={canWrite} onSave={(v) => onSave({ vibe: v })} bold />
@@ -880,5 +889,92 @@ function PushToSchedulerButton({
     >
       {busy ? '…' : (isPushed ? '✓ Queued' : '📅 Queue')}
     </button>
+  )
+}
+
+// Per-item still-frame strip. Shows up to 5 thumbnails sampled from
+// the source MP4 around the item's Claude-proposed timecode. Click a
+// thumb to view full-size; tap ↻ -5s / ↻ +5s to shift the window and
+// pull a fresh batch (useful when the first batch caught a blink).
+function StillsStrip({
+  item,
+  planId,
+  canWrite,
+  onChanged,
+}: {
+  item: ApiSocialItem
+  planId: string
+  canWrite: boolean
+  onChanged: () => void | Promise<void>
+}) {
+  const paths = (item as unknown as { still_paths?: string[] }).still_paths
+  const [busy, setBusy] = useState(false)
+  const [zoomed, setZoomed] = useState<string | null>(null)
+  const [error, setError] = useState<string | null>(null)
+
+  async function regen(direction: 1 | -1) {
+    setBusy(true); setError(null)
+    try {
+      await api.regenerateStills(planId, item.id, direction * 5)
+      await onChanged()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'regenerate failed')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  if (!paths || paths.length === 0) return null
+
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-1">
+        <div className="text-[10px] uppercase tracking-wider text-muted/70 font-bold">
+          📸 Frames pulled from the episode
+        </div>
+        {canWrite && (
+          <div className="flex items-center gap-1">
+            <button
+              onClick={() => void regen(-1)}
+              disabled={busy}
+              title="Pull 5 fresh frames from ~5s earlier"
+              className="text-[10px] uppercase tracking-wider text-muted hover:text-text border border-line rounded-full px-2 py-0.5 disabled:opacity-50"
+            >
+              ↻ -5s
+            </button>
+            <button
+              onClick={() => void regen(1)}
+              disabled={busy}
+              title="Pull 5 fresh frames from ~5s later"
+              className="text-[10px] uppercase tracking-wider text-muted hover:text-text border border-line rounded-full px-2 py-0.5 disabled:opacity-50"
+            >
+              ↻ +5s
+            </button>
+          </div>
+        )}
+      </div>
+      <div className="grid grid-cols-5 gap-1">
+        {paths.map((p, i) => (
+          <button
+            key={i}
+            onClick={() => setZoomed(p)}
+            className="aspect-square rounded overflow-hidden bg-ink/60 border border-line/40 hover:border-stage-mastering/60 transition"
+          >
+            <img
+              src={api.dropboxFileUrl(p)}
+              alt={`Still ${i + 1}`}
+              className="w-full h-full object-cover"
+              loading="lazy"
+            />
+          </button>
+        ))}
+      </div>
+      {error && <p className="text-urgent text-[10px] mt-1">{error}</p>}
+      {zoomed && (
+        <div className="fixed inset-0 z-50 bg-ink/90 backdrop-blur-sm grid place-items-center p-4" onClick={() => setZoomed(null)}>
+          <img src={api.dropboxFileUrl(zoomed)} alt="Still" className="max-w-full max-h-full rounded-xl" />
+        </div>
+      )}
+    </div>
   )
 }

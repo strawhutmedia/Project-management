@@ -257,3 +257,24 @@ integrationsRouter.post('/dropbox/share-link', requireUser, async (req, res) => 
   }
   res.json({ url: result.url })
 })
+
+// GET /api/integrations/dropbox/file?path=…
+// Resolves a Dropbox path to a fresh temp link and 302-redirects the
+// browser straight to it. Used as the <img src> for stills extracted
+// by the social-plan auto-pipeline (Dropbox temp links last 4hr; we
+// resolve per-request so they don't go stale in the DB / API payload).
+integrationsRouter.get('/dropbox/file', requireUser, async (req, res) => {
+  const filePath = String(req.query.path || '')
+  if (!filePath) { res.status(400).send('path required'); return }
+  // Only stills under our known prefix get the unscoped fetch — anything
+  // else has to go through the scoped Dropbox helpers above.
+  if (!filePath.startsWith('/slate-stills/')) {
+    res.status(403).send('forbidden'); return
+  }
+  const { getTemporaryLink } = await import('../dropbox')
+  const link = await getTemporaryLink(filePath)
+  if (!link.ok || !link.url) {
+    res.status(502).send(link.error || 'temp_link_failed'); return
+  }
+  res.redirect(302, link.url)
+})

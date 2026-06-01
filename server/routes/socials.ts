@@ -163,6 +163,7 @@ export async function triggerSocialPlanGeneration(args: {
     project_id: string
     song_title: string
     song_subtitle: string | null
+    source_file_path: string | null
     project_name: string
     project_subtitle: string | null
     brand_voice: string | null
@@ -171,6 +172,7 @@ export async function triggerSocialPlanGeneration(args: {
     vocabulary: string | null
   }>(
     `SELECT s.project_id, s.title AS song_title, s.subtitle AS song_subtitle,
+            s.source_file_path,
             p.name AS project_name, p.subtitle AS project_subtitle,
             p.socials_brand_voice AS brand_voice,
             p.socials_example_posts AS example_posts,
@@ -226,7 +228,11 @@ export async function triggerSocialPlanGeneration(args: {
         date: new Date().toISOString().slice(0, 10),
       })
       const defaults = (ctx.default_assignees ?? {}) as Record<string, string>
-      const items = rawPlanToItems(result.plan, defaults)
+      let items = rawPlanToItems(result.plan, defaults)
+
+      // Save items first so the plan appears in the UI even if stills
+      // extraction is slow / fails. We then attempt to attach stills,
+      // and re-save items if any landed.
       await pool.query(
         `UPDATE social_plans
             SET status = 'generated',
@@ -242,6 +248,60 @@ export async function triggerSocialPlanGeneration(args: {
          result.usage.cacheReadInputTokens, result.usage.cacheCreationInputTokens],
       )
       logInfo('socials: plan done', { planId, items: items.length })
+
+      // ----- Still extraction -----
+      // Pull frames from the source MP4 for every item with a
+      // [HH:MM:SS] timecode in its suggested_clip / image_direction.
+      // Fire-and-forget: failures are logged but never block plan use.
+      if (ctx.source_file_path) {
+        ;(async () => {
+          try {
+            const { extractStillsForItem, parseTimecode } = await import('../stills')
+            let touched = false
+            for (let i = 0; i < items.length; i++) {
+              const it = items[i]
+              const tc =
+                it.kind === 'story_concept' || it.kind === 'reel_concept'
+                  ? parseTimecode((it as { suggested_clip?: string }).suggested_clip)
+                  : it.kind === 'photo_concept'
+                    ? parseTimecode((it as { image_direction?: string }).image_direction)
+                    : null
+              if (tc == null) continue
+              try {
+                const stills = await extractStillsForItem({
+                  videoDropboxPath: ctx.source_file_path!,
+                  centerSeconds: tc,
+                  songId: args.songId,
+                  itemId: it.id,
+                  version: 0,
+                })
+                if (stills.paths.length > 0) {
+                  ;(items[i] as unknown as Record<string, unknown>).still_paths = stills.paths
+                  ;(items[i] as unknown as Record<string, unknown>).still_center_s = stills.centerSeconds
+                  ;(items[i] as unknown as Record<string, unknown>).still_window_s = stills.windowSeconds
+                  ;(items[i] as unknown as Record<string, unknown>).still_version = stills.version
+                  touched = true
+                }
+              } catch (err) {
+                logError('socials: stills for item failed', {
+                  planId, itemId: it.id, error: err instanceof Error ? err.message : String(err),
+                })
+              }
+            }
+            if (touched) {
+              await pool.query(
+                `UPDATE social_plans SET items = $2::jsonb, updated_at = now() WHERE id = $1`,
+                [planId, JSON.stringify(items)],
+              )
+              logInfo('socials: stills attached', { planId, items: items.length })
+            }
+          } catch (err) {
+            logError('socials: stills batch failed', {
+              planId, error: err instanceof Error ? err.message : String(err),
+            })
+          }
+        })()
+      }
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err)
       logError('socials: generation failed', { planId, error: msg })
@@ -351,6 +411,75 @@ socialsRouter.delete('/:id', async (req, res) => {
 // POST /:planId/regenerate-item — single-item replacement. One Claude
 // call, one fresh alternative for the given itemId, swapped in-place
 // so the rest of the plan stays.
+// POST /:planId/regenerate-stills — pulls a fresh batch of 5 frames
+// around the item's timecode, with the center shifted by shiftSeconds
+// (so the user can nudge forward or back if Claude's pick was an
+// awkward moment). Existing still_paths get overwritten.
+socialsRouter.post('/:planId/regenerate-stills', async (req, res) => {
+  const user = (req as typeof req & { user: SessionUser }).user
+  const { itemId, shiftSeconds } = req.body as { itemId?: string; shiftSeconds?: number }
+  if (!itemId) { res.status(400).json({ error: 'itemId required' }); return }
+
+  const planRes = await pool.query<PlanRow & { source_file_path: string | null; song_id_actual: string }>(
+    `SELECT sp.*, s.source_file_path, s.id AS song_id_actual
+       FROM social_plans sp JOIN songs s ON s.id = sp.song_id
+      WHERE sp.id = $1`,
+    [req.params.planId],
+  )
+  if (planRes.rows.length === 0) { res.status(404).json({ error: 'plan_not_found' }); return }
+  const plan = planRes.rows[0]
+  if (!await assertWriter(user, plan.project_id, res)) return
+  if (!plan.source_file_path) { res.status(400).json({ error: 'no_source_video' }); return }
+
+  const items = plan.items
+  const idx = items.findIndex((i) => i.id === itemId)
+  if (idx < 0) { res.status(404).json({ error: 'item_not_found' }); return }
+  const it = items[idx]
+
+  // Pull existing center (set on first extraction) or re-parse from
+  // the timecode string if this item never had stills before.
+  const { extractStillsForItem, parseTimecode } = await import('../stills')
+  const existing = it as unknown as { still_center_s?: number; still_version?: number }
+  const baseCenter = typeof existing.still_center_s === 'number'
+    ? existing.still_center_s
+    : parseTimecode(
+        it.kind === 'story_concept' || it.kind === 'reel_concept'
+          ? (it as { suggested_clip?: string }).suggested_clip
+          : it.kind === 'photo_concept'
+            ? (it as { image_direction?: string }).image_direction
+            : undefined,
+      )
+  if (baseCenter == null) {
+    res.status(400).json({ error: 'no_timecode_to_anchor_stills' }); return
+  }
+  const shift = typeof shiftSeconds === 'number' ? shiftSeconds : 5
+  const nextVersion = (existing.still_version ?? 0) + 1
+  const nextCenter = Math.max(0, baseCenter + shift)
+
+  try {
+    const stills = await extractStillsForItem({
+      videoDropboxPath: plan.source_file_path,
+      centerSeconds: nextCenter,
+      songId: plan.song_id_actual,
+      itemId: it.id,
+      version: nextVersion,
+    })
+    ;(items[idx] as unknown as Record<string, unknown>).still_paths = stills.paths
+    ;(items[idx] as unknown as Record<string, unknown>).still_center_s = stills.centerSeconds
+    ;(items[idx] as unknown as Record<string, unknown>).still_window_s = stills.windowSeconds
+    ;(items[idx] as unknown as Record<string, unknown>).still_version = stills.version
+    await pool.query(
+      `UPDATE social_plans SET items = $2::jsonb, updated_at = now() WHERE id = $1`,
+      [plan.id, JSON.stringify(items)],
+    )
+    res.json({ ok: true, item: items[idx] })
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err)
+    logError('socials: regenerate-stills failed', { planId: plan.id, itemId, error: msg })
+    res.status(502).json({ error: msg.slice(0, 400) })
+  }
+})
+
 socialsRouter.post('/:planId/regenerate-item', async (req, res) => {
   const user = (req as typeof req & { user: SessionUser }).user
   const { itemId } = req.body as { itemId?: string }

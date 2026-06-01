@@ -174,11 +174,21 @@ export type ApiBudget = {
 
 export type SocialItemStatus = 'idea' | 'drafted' | 'selected' | 'rejected' | 'scheduled' | 'posted'
 
+// Optional still-frame fields populated by the auto-pipeline after
+// Claude returns timecoded suggestions. Five Dropbox paths sampled
+// around the moment; the UI proxies them via /api/integrations/dropbox/file.
+export type StillFields = {
+  still_paths?: string[]
+  still_center_s?: number
+  still_window_s?: number
+  still_version?: number
+}
+
 export type ApiSocialItem =
   | { id: string; kind: 'text_post'; status: SocialItemStatus; ai_text: string; text: string; pushed_to_scheduler_at?: string | null }
-  | { id: string; kind: 'story_concept'; status: SocialItemStatus; assignee_user_id: string | null; medium: 'video' | 'photo'; description: string; caption: string; suggested_clip: string; image_direction: string; pushed_to_scheduler_at?: string | null }
-  | { id: string; kind: 'reel_concept'; status: SocialItemStatus; assignee_user_id: string | null; hook: string; talking_points: string[]; suggested_clip: string; pushed_to_scheduler_at?: string | null }
-  | { id: string; kind: 'photo_concept'; status: SocialItemStatus; assignee_user_id: string | null; image_direction: string; caption: string; vibe: string; pushed_to_scheduler_at?: string | null }
+  | ({ id: string; kind: 'story_concept'; status: SocialItemStatus; assignee_user_id: string | null; medium: 'video' | 'photo'; description: string; caption: string; suggested_clip: string; image_direction: string; pushed_to_scheduler_at?: string | null } & StillFields)
+  | ({ id: string; kind: 'reel_concept'; status: SocialItemStatus; assignee_user_id: string | null; hook: string; talking_points: string[]; suggested_clip: string; pushed_to_scheduler_at?: string | null } & StillFields)
+  | ({ id: string; kind: 'photo_concept'; status: SocialItemStatus; assignee_user_id: string | null; image_direction: string; caption: string; vibe: string; pushed_to_scheduler_at?: string | null } & StillFields)
 
 export type ApiSocialPlan = {
   id: string
@@ -696,6 +706,14 @@ export const api = {
       method: 'POST',
       body: JSON.stringify({ itemId }),
     }),
+  regenerateStills: (planId: string, itemId: string, shiftSeconds = 5) =>
+    request<{ ok: true; item: ApiSocialItem }>(`/api/socials/${planId}/regenerate-stills`, {
+      method: 'POST',
+      body: JSON.stringify({ itemId, shiftSeconds }),
+    }),
+  // The /api/integrations/dropbox/file proxy 302-redirects to a fresh
+  // 4hr temp link. <img src> works directly with this.
+  dropboxFileUrl: (path: string) => `/api/integrations/dropbox/file?path=${encodeURIComponent(path)}`,
   socialTextPostsTxtUrl: (planId: string) => `/api/socials/${planId}/text-posts.txt`,
   importPodcastRss: (projectId: string, rssFeedUrl: string) =>
     request<{ rssFeedUrl: string; coverArtUrl: string | null; title: string | null; description: string | null }>(
