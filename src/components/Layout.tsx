@@ -1,12 +1,20 @@
-import { Link, NavLink, Outlet } from 'react-router-dom'
+import { Link, NavLink, Outlet, useNavigate } from 'react-router-dom'
 import { useState } from 'react'
 import { useAuth } from '../auth'
 import NotificationsBell from './NotificationsBell'
+
+const PICKED_SESSION_KEY = 'slate.dashboard.workspacePicked'
 
 export default function Layout() {
   const { user, logout } = useAuth()
   const initial = (user?.display_name || user?.name || '?').charAt(0).toUpperCase()
   const [menuOpen, setMenuOpen] = useState(false)
+  const navigate = useNavigate()
+
+  function switchWorkspace() {
+    try { window.sessionStorage.removeItem(PICKED_SESSION_KEY) } catch {}
+    navigate('/')
+  }
 
   return (
     <div className="min-h-screen flex flex-col">
@@ -21,6 +29,13 @@ export default function Layout() {
           </Link>
 
           <div className="flex items-center gap-2">
+            <button
+              onClick={switchWorkspace}
+              className="hidden sm:inline-flex items-center gap-1 text-[11px] uppercase tracking-wider font-bold px-2.5 py-1 rounded-full border border-line text-muted hover:text-text transition"
+              title="Switch between Podcasts / Music / Films"
+            >
+              ↻ Switch
+            </button>
             <NavLink
               to="/scheduler"
               className={({ isActive }) =>

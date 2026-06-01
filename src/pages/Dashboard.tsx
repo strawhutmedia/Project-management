@@ -20,6 +20,10 @@ const TABS: Array<{ value: KindTab; label: string; emoji: string }> = [
 ]
 
 const TAB_STORAGE_KEY = 'slate.dashboard.kindTab'
+// Session-scoped flag: once you pick a workspace this session, we
+// don't pop the picker again on refresh. Clearing it (via the
+// header's "Switch workspace" link) sends you back to the picker.
+const PICKED_SESSION_KEY = 'slate.dashboard.workspacePicked'
 
 export default function Dashboard() {
   const [projects, setProjects] = useState<ApiProject[] | null>(null)
@@ -30,6 +34,10 @@ export default function Dashboard() {
     if (typeof window === 'undefined') return 'podcast'
     const stored = window.localStorage.getItem(TAB_STORAGE_KEY)
     return stored === 'album' || stored === 'film' || stored === 'podcast' ? stored : 'podcast'
+  })
+  const [pickerDismissed, setPickerDismissed] = useState<boolean>(() => {
+    if (typeof window === 'undefined') return false
+    return window.sessionStorage.getItem(PICKED_SESSION_KEY) === '1'
   })
 
   useEffect(() => {
@@ -55,8 +63,40 @@ export default function Dashboard() {
       if (p.kind === 'podcast' || p.kind === 'album' || p.kind === 'film') counts[p.kind]++
     }
   }
+  // Available kinds = kinds where the user can see at least one project.
+  // Super admins see everything; regular users only see what they're a
+  // member of. We hide the picker entirely when they have access to
+  // just one kind — no choice to make.
+  const availableKinds = TABS.filter((t) => counts[t.value] > 0).map((t) => t.value)
+  const showPicker = projects !== null && availableKinds.length > 1 && !pickerDismissed
+
+  function chooseKind(k: KindTab) {
+    setTab(k)
+    setPickerDismissed(true)
+    if (typeof window !== 'undefined') window.sessionStorage.setItem(PICKED_SESSION_KEY, '1')
+  }
+
+  // If they only have access to one kind, snap the tab to it and
+  // never bother them with the picker.
+  useEffect(() => {
+    if (projects && availableKinds.length === 1 && tab !== availableKinds[0]) {
+      setTab(availableKinds[0])
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [projects, availableKinds.length])
+
   const visibleProjects = projects?.filter((p) => p.kind === tab) ?? []
   const activeMeta = TABS.find((t) => t.value === tab)!
+
+  if (showPicker) {
+    return (
+      <WorkspacePicker
+        available={availableKinds}
+        counts={counts}
+        onPick={chooseKind}
+      />
+    )
+  }
 
   return (
     <div className="space-y-8">
@@ -323,6 +363,70 @@ function CreateProjectModal({
             {submitting ? 'Creating…' : 'Create project'}
           </button>
         </div>
+      </div>
+    </div>
+  )
+}
+
+// First-thing-after-login picker. Three big buttons, only rendered for
+// users who actually have access to multiple kinds. Pick one and you
+// land in that workspace; the choice sticks until you switch.
+function WorkspacePicker({
+  available,
+  counts,
+  onPick,
+}: {
+  available: KindTab[]
+  counts: Record<KindTab, number>
+  onPick: (k: KindTab) => void
+}) {
+  const cardGradients: Record<KindTab, string> = {
+    podcast: 'from-stage-tracking via-stage-overdubs to-stage-mastering',
+    album: 'from-stage-mastering via-stage-producing to-stage-mixing',
+    film: 'from-stage-stems via-stage-producing to-stage-done',
+  }
+  const tagline: Record<KindTab, string> = {
+    podcast: 'Episodes · transcripts · daily socials · the scheduler.',
+    album: 'Songs · sessions · mixers · the album pipeline.',
+    film: 'Scenes · stripboard · budgets · phase tracking.',
+  }
+  return (
+    <div className="space-y-10">
+      <section>
+        <h1 className="font-display text-6xl mb-2 text-rainbow">Where to?</h1>
+        <p className="text-muted text-sm max-w-xl">
+          Slate runs three studios. Pick one — you'll land in the workspace for it
+          and stay there until you switch.
+        </p>
+      </section>
+
+      <div className={`grid gap-5 ${available.length === 2 ? 'sm:grid-cols-2' : 'sm:grid-cols-3'}`}>
+        {available.map((k) => {
+          const meta = TABS.find((t) => t.value === k)!
+          return (
+            <button
+              key={k}
+              onClick={() => onPick(k)}
+              className="group relative aspect-[4/5] overflow-hidden rounded-3xl border border-line/70 bg-panel/40 transition hover:-translate-y-1 hover:shadow-[0_30px_80px_-30px_rgba(167,139,250,0.6)]"
+            >
+              <div className={`pointer-events-none absolute inset-0 bg-gradient-to-br ${cardGradients[k]} opacity-30 group-hover:opacity-50 transition`} />
+              <div className="absolute inset-0 bg-ink/40" />
+              <div className="relative h-full flex flex-col justify-between p-7 text-left">
+                <div className="text-5xl">{meta.emoji}</div>
+                <div className="space-y-2">
+                  <div className="font-display text-4xl text-rainbow">{meta.label}</div>
+                  <div className="text-[11px] text-muted">{tagline[k]}</div>
+                  <div className="text-[10px] uppercase tracking-[0.2em] text-muted/70 font-bold pt-2">
+                    {counts[k]} {counts[k] === 1 ? 'project' : 'projects'}
+                  </div>
+                </div>
+                <div className="text-[10px] uppercase tracking-wider text-muted opacity-0 group-hover:opacity-100 transition">
+                  Enter →
+                </div>
+              </div>
+            </button>
+          )
+        })}
       </div>
     </div>
   )
