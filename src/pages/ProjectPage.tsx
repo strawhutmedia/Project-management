@@ -672,12 +672,29 @@ function UploadEpisodeDialog({
   }
 
   if (picking) {
+    // Hard refusal when the show doesn't have a Dropbox root set —
+    // without it the picker would otherwise show the entire workspace.
+    if (!projectRoot || !projectRoot.trim()) {
+      return (
+        <div className="fixed inset-0 z-50 grid place-items-center bg-ink/80 backdrop-blur-sm p-4" onClick={onClose}>
+          <div onClick={(e) => e.stopPropagation()} className="w-full max-w-md rounded-2xl border border-urgent/40 bg-panel/95 p-5 space-y-3">
+            <h3 className="text-sm font-display text-urgent uppercase tracking-widest">Set a Dropbox root first</h3>
+            <p className="text-sm text-muted">
+              This show doesn't have a Dropbox root configured yet. Pick one on the show page (📦 Dropbox root → Pick) so episode uploads stay inside that folder.
+            </p>
+            <div className="flex justify-end">
+              <button onClick={onClose} className="text-[11px] uppercase tracking-wider text-muted hover:text-text px-3 py-1.5">Close</button>
+            </div>
+          </div>
+        </div>
+      )
+    }
     return (
       <DropboxFilePicker
         title="Upload a near-final episode video"
         acceptExtensions={['.mp4', '.mov', '.m4v']}
-        initialPath={projectRoot ?? undefined}
-        restrictAbove={projectRoot ?? undefined}
+        initialPath={projectRoot}
+        restrictAbove={projectRoot}
         scopeProjectId={projectId}
         onSelect={onFilePicked}
         onCancel={onClose}
@@ -773,12 +790,27 @@ function QuickTranscriptDialog({
   }
 
   if (picking) {
+    if (!projectRoot || !projectRoot.trim()) {
+      return (
+        <div className="fixed inset-0 z-50 grid place-items-center bg-ink/80 backdrop-blur-sm p-4" onClick={onClose}>
+          <div onClick={(e) => e.stopPropagation()} className="w-full max-w-md rounded-2xl border border-urgent/40 bg-panel/95 p-5 space-y-3">
+            <h3 className="text-sm font-display text-urgent uppercase tracking-widest">Set a Dropbox root first</h3>
+            <p className="text-sm text-muted">
+              This show doesn't have a Dropbox root configured yet. Pick one on the show page so transcripts stay inside that folder.
+            </p>
+            <div className="flex justify-end">
+              <button onClick={onClose} className="text-[11px] uppercase tracking-wider text-muted hover:text-text px-3 py-1.5">Close</button>
+            </div>
+          </div>
+        </div>
+      )
+    }
     return (
       <DropboxFilePicker
         title="Pick a file to transcribe (audio or video)"
         acceptExtensions={['.mp3', '.m4a', '.wav', '.mp4', '.mov', '.m4v']}
-        initialPath={projectRoot ?? undefined}
-        restrictAbove={projectRoot ?? undefined}
+        initialPath={projectRoot}
+        restrictAbove={projectRoot}
         scopeProjectId={projectId}
         onSelect={onFilePicked}
         onCancel={onClose}

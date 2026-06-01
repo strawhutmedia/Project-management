@@ -75,9 +75,22 @@ export default function DropboxFilePicker({
       }
       // Auto-walk up to nearest valid ancestor when the saved path doesn't
       // exist anymore, instead of leaving the user staring at a dead end.
+      // Honors restrictAbove — if the configured project root is the
+      // problem, we surface the error rather than escaping the scope.
       if (msg.startsWith('not_found') || msg.startsWith('dropbox_4')) {
+        if (restrictAbove && path === restrictAbove) {
+          setError(`Show's configured Dropbox root (${restrictAbove}) doesn't exist or isn't readable. Fix the show's Dropbox root in its settings.`)
+          setEntries([])
+          return
+        }
         if (path !== '' && path !== '/') {
           const parent = path.replace(/\/[^/]+\/?$/, '') || ''
+          // Never walk above the restrict boundary.
+          if (restrictAbove && !parent.startsWith(restrictAbove)) {
+            setError(`Show's configured Dropbox root (${restrictAbove}) doesn't exist or isn't readable. Fix the show's Dropbox root in its settings.`)
+            setEntries([])
+            return
+          }
           setCurrentPath(parent)
           return
         }
