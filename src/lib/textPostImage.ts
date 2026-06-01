@@ -1,8 +1,18 @@
 // Renders an Instagram-portrait (1080×1350) text-post image branded to
-// the show. The cover art's dominant color fills the background; a
-// second vivid color (or a luminance-derived contrast) handles the show
-// name and rules. The post copy uses a high-contrast color picked from
-// the bg luminance so it's always legible.
+// the show. Picks one of five distinct layout templates based on the
+// post's shape so every card in a plan reads differently — not just
+// "same template, different color."
+//
+// Templates:
+//   QUOTE     — centered serif with big quotation marks; for quoted lines
+//   HEADLINE  — top-anchored left-aligned sans with a colored bar; for
+//               named claims / news-style headlines with a "—"
+//   STATEMENT — single huge condensed-sans phrase filling the frame;
+//               for short punchy posts (< 70 chars)
+//   STACK     — paragraphs stacked with thin rules between them; for
+//               multi-paragraph posts
+//   CALLOUT   — asymmetric: small show label top-left, body centered
+//               on a half-toned color block; default fallback
 //
 // Palette extraction happens asynchronously via extractCoverPalette
 // below — the caller passes the result in, so rendering stays
@@ -10,21 +20,40 @@
 
 const DISPLAY_RATIO = 0.45 // ~486×608 preview in the UI
 
-// Warm-terracotta palette used when the cover can't be read (CORS, etc.)
 const DEFAULT_PALETTE: CoverPalette = { primary: '#D9B382', secondary: '#3A2C1F' }
 
 export type CoverPalette = {
-  primary: string   // dominant color — used as background
-  secondary: string // contrasting accent — used for show name + rule
+  primary: string
+  secondary: string
 }
 
 export type PostImageInput = {
   text: string
   showName: string
   palette?: CoverPalette | null
-  // Back-compat: a single accent color, applied as primary if palette
-  // isn't supplied. The renderer will derive a secondary from luminance.
   accent?: string | null
+}
+
+type Template = 'quote' | 'headline' | 'statement' | 'stack' | 'callout'
+
+// Decides which template fits this post. Deterministic so the same
+// text always renders the same way (no flicker between previews and
+// downloads).
+function pickTemplate(text: string): Template {
+  const t = text.trim()
+  if (!t) return 'callout'
+  // Quoted: starts with " and has a closing " in the first 200 chars
+  const startsWithQuote = /^["'“‘]/.test(t)
+  const hasMatchingClose = startsWithQuote && /["'”’]/.test(t.slice(1, 220))
+  if (startsWithQuote && hasMatchingClose) return 'quote'
+  // Short and punchy
+  if (t.length <= 70) return 'statement'
+  // Multiple paragraphs → STACK
+  const paraCount = t.split(/\n\s*\n/).filter((p) => p.trim()).length
+  if (paraCount >= 3) return 'stack'
+  // Em-dash attribution (e.g. "X just changed Y — Person, Role at Place")
+  if (/—|--/.test(t.slice(0, 200))) return 'headline'
+  return 'callout'
 }
 
 export function renderTextPostCanvas(input: PostImageInput, opts: { fullSize: boolean } = { fullSize: false }): HTMLCanvasElement {
@@ -38,92 +67,282 @@ export function renderTextPostCanvas(input: PostImageInput, opts: { fullSize: bo
   if (!ctx) return canvas
 
   const palette = resolvePalette(input)
-  const bg = palette.primary
-  const bgRGB = hexToRgb(bg)
-  const bgLuma = luminance(bgRGB)
-  // Pick text color for legibility on the bg. Dark bg → cream; light
-  // bg → deep ink. We anchor to fixed extremes (rather than a derived
-  // shade of the bg) so contrast stays strong even on muddy covers.
-  const isLightBg = bgLuma > 0.55
-  const ink = isLightBg ? '#1A140C' : '#FAF7EF'
-  const inkRGB = hexToRgb(ink)
-  const accent = palette.secondary
-  const accentRGB = hexToRgb(accent)
+  const text = (input.text || '').trim()
+  const showName = (input.showName || 'Untitled show').toUpperCase()
+  const template = pickTemplate(text)
 
-  // Background fill — the whole canvas takes the show's dominant color.
+  switch (template) {
+    case 'quote':     drawQuote(ctx, W, H, scale, text, showName, palette); break
+    case 'headline':  drawHeadline(ctx, W, H, scale, text, showName, palette); break
+    case 'statement': drawStatement(ctx, W, H, scale, text, showName, palette); break
+    case 'stack':     drawStack(ctx, W, H, scale, text, showName, palette); break
+    case 'callout':   drawCallout(ctx, W, H, scale, text, showName, palette); break
+  }
+  return canvas
+}
+
+// ============================================================
+// Template renderers
+// ============================================================
+
+// QUOTE — classic editorial: solid color bg, big serif quote text
+// centered, small attribution dot below.
+function drawQuote(
+  ctx: CanvasRenderingContext2D, W: number, H: number, scale: number,
+  text: string, showName: string, palette: CoverPalette,
+) {
+  const bg = palette.primary
+  const accent = palette.secondary
+  const bgRGB = hexToRgb(bg)
+  const isLightBg = luminance(bgRGB) > 0.55
+  const ink = isLightBg ? '#1A140C' : '#FAF7EF'
+
   ctx.fillStyle = bg
   ctx.fillRect(0, 0, W, H)
 
-  // Soft inner card to keep long copy readable on saturated backgrounds.
-  // The card is a tinted version of the bg — slightly lighter or darker
-  // than the bg depending on luminance — so the post still reads
-  // "yellow show" or "blue show" at a glance.
-  const cardPad = 70 * scale
-  const cardX = cardPad
-  const cardY = cardPad
-  const cardW = W - cardPad * 2
-  const cardH = H - cardPad * 2
-  const cardFill = isLightBg
-    ? mixWithWhite(bgRGB, 0.65)   // 65% toward white on light bgs
-    : mixWithBlack(bgRGB, 0.55)   // 55% toward black on dark bgs
-  ctx.fillStyle = `rgb(${cardFill.r}, ${cardFill.g}, ${cardFill.b})`
-  roundedRect(ctx, cardX, cardY, cardW, cardH, 28 * scale)
-  ctx.fill()
-
-  // Decide ink for inside the card based on its own luminance, not the
-  // outer bg's — the card may be much paler than the bg.
-  const cardLuma = luminance(cardFill)
-  const cardIsLight = cardLuma > 0.55
-  const cardInk = cardIsLight ? '#1A140C' : '#FAF7EF'
-  const cardInkRGB = hexToRgb(cardInk)
-
-  // Thin accent border around the card
-  ctx.strokeStyle = `rgba(${accentRGB.r}, ${accentRGB.g}, ${accentRGB.b}, 0.6)`
-  ctx.lineWidth = 2 * scale
-  roundedRect(ctx, cardX + 12 * scale, cardY + 12 * scale, cardW - 24 * scale, cardH - 24 * scale, 22 * scale)
-  ctx.stroke()
-
-  // Show name (small caps, kerned) — secondary/accent on the card
+  // Show label top
   ctx.fillStyle = accent
   ctx.font = `700 ${Math.round(22 * scale)}px Georgia, serif`
   ctx.textAlign = 'center'
   ctx.textBaseline = 'middle'
-  const showLabel = (input.showName || 'Untitled show').toUpperCase()
-  ctx.fillText(spaceForKerning(showLabel), W / 2, cardY + 80 * scale)
+  ctx.fillText(spaceForKerning(showName), W / 2, 120 * scale)
 
-  // Rule under show name
-  ctx.strokeStyle = `rgba(${accentRGB.r}, ${accentRGB.g}, ${accentRGB.b}, 0.75)`
-  ctx.lineWidth = 1.5 * scale
-  ctx.beginPath()
-  ctx.moveTo(W / 2 - 50 * scale, cardY + 120 * scale)
-  ctx.lineTo(W / 2 + 50 * scale, cardY + 120 * scale)
-  ctx.stroke()
+  // Big opening quotation mark behind text (decorative)
+  ctx.fillStyle = `rgba(${hexToRgb(accent).r}, ${hexToRgb(accent).g}, ${hexToRgb(accent).b}, 0.18)`
+  ctx.font = `700 ${Math.round(400 * scale)}px Georgia, serif`
+  ctx.textBaseline = 'top'
+  ctx.fillText('“', W / 2 - 200 * scale, 180 * scale)
 
-  // Post text — high-contrast against the card.
-  ctx.fillStyle = cardInk
-  const text = (input.text || '').trim()
+  // Quote text
+  ctx.fillStyle = ink
+  ctx.textBaseline = 'middle'
   drawWrappedAutoFit(ctx, text, {
-    x: W / 2,
-    y: H / 2,
-    maxWidth: W - 240 * scale,
-    maxHeight: H * 0.55,
-    maxFontPx: Math.round(58 * scale),
-    minFontPx: Math.round(28 * scale),
+    x: W / 2, y: H / 2 + 40 * scale,
+    maxWidth: W - 180 * scale, maxHeight: H * 0.55,
+    maxFontPx: Math.round(64 * scale), minFontPx: Math.round(30 * scale),
     fontFamily: 'Georgia, "Playfair Display", serif',
-    fontWeight: '500',
-    lineHeightRatio: 1.32,
+    fontWeight: '500', lineHeightRatio: 1.3,
   })
 
-  // Footer mark — small accent
+  // Bottom attribution rule + show name
+  ctx.strokeStyle = accent
+  ctx.lineWidth = 2 * scale
+  ctx.beginPath()
+  ctx.moveTo(W / 2 - 40 * scale, H - 130 * scale)
+  ctx.lineTo(W / 2 + 40 * scale, H - 130 * scale)
+  ctx.stroke()
   ctx.fillStyle = accent
-  ctx.font = `700 ${Math.round(16 * scale)}px Georgia, serif`
-  ctx.fillText('·  ·  ·', W / 2, H - cardPad - 50 * scale)
-
-  // Silence unused warning for older flow that referenced ink/inkRGB.
-  void ink; void inkRGB; void cardInkRGB
-
-  return canvas
+  ctx.font = `600 ${Math.round(18 * scale)}px Georgia, serif`
+  ctx.textBaseline = 'middle'
+  ctx.fillText(showName, W / 2, H - 90 * scale)
 }
+
+// HEADLINE — magazine-style: thick color bar across the top, big bold
+// sans headline left-aligned beneath it, show name in the bar.
+function drawHeadline(
+  ctx: CanvasRenderingContext2D, W: number, H: number, scale: number,
+  text: string, showName: string, palette: CoverPalette,
+) {
+  const bg = palette.primary
+  const accent = palette.secondary
+  const bgRGB = hexToRgb(bg)
+  const isLightBg = luminance(bgRGB) > 0.55
+  // Use a near-white card area below the colored bar.
+  const cardFill = isLightBg ? mixWithWhite(bgRGB, 0.8) : mixWithWhite(bgRGB, 0.92)
+  const cardInk = '#161210'
+
+  // Full bg
+  ctx.fillStyle = `rgb(${cardFill.r}, ${cardFill.g}, ${cardFill.b})`
+  ctx.fillRect(0, 0, W, H)
+
+  // Top color band
+  const bandH = 200 * scale
+  ctx.fillStyle = accent
+  ctx.fillRect(0, 0, W, bandH)
+  // Show name in band
+  ctx.fillStyle = '#FAF7EF'
+  ctx.font = `800 ${Math.round(28 * scale)}px Inter, "Helvetica Neue", sans-serif`
+  ctx.textAlign = 'left'
+  ctx.textBaseline = 'middle'
+  ctx.fillText(showName, 70 * scale, bandH / 2)
+
+  // Big sans headline, left-aligned
+  ctx.fillStyle = cardInk
+  ctx.textAlign = 'left'
+  drawWrappedAutoFit(ctx, text, {
+    x: 70 * scale + ((W - 140 * scale) / 2), // center within left-aligned bounds
+    y: bandH + (H - bandH) / 2,
+    maxWidth: W - 140 * scale, maxHeight: H - bandH - 200 * scale,
+    maxFontPx: Math.round(78 * scale), minFontPx: Math.round(32 * scale),
+    fontFamily: 'Inter, "Helvetica Neue", sans-serif',
+    fontWeight: '800', lineHeightRatio: 1.15,
+    alignLeft: true,
+  })
+
+  // Thin colored rule near bottom + small "swipe / link in bio" style mark
+  ctx.strokeStyle = accent
+  ctx.lineWidth = 3 * scale
+  ctx.beginPath()
+  ctx.moveTo(70 * scale, H - 90 * scale)
+  ctx.lineTo(170 * scale, H - 90 * scale)
+  ctx.stroke()
+}
+
+// STATEMENT — huge bold condensed sans, centered, fills most of the
+// frame. Bg is the show's primary color (no card). For short punchy posts.
+function drawStatement(
+  ctx: CanvasRenderingContext2D, W: number, H: number, scale: number,
+  text: string, showName: string, palette: CoverPalette,
+) {
+  const bg = palette.primary
+  const accent = palette.secondary
+  const bgRGB = hexToRgb(bg)
+  const isLightBg = luminance(bgRGB) > 0.55
+  const ink = isLightBg ? '#1A140C' : '#FAF7EF'
+
+  ctx.fillStyle = bg
+  ctx.fillRect(0, 0, W, H)
+
+  // Top show label, small
+  ctx.fillStyle = accent
+  ctx.font = `800 ${Math.round(20 * scale)}px Inter, "Helvetica Neue", sans-serif`
+  ctx.textAlign = 'left'
+  ctx.textBaseline = 'top'
+  ctx.fillText(showName, 80 * scale, 80 * scale)
+  ctx.strokeStyle = accent
+  ctx.lineWidth = 4 * scale
+  ctx.beginPath()
+  ctx.moveTo(80 * scale, 122 * scale)
+  ctx.lineTo(80 * scale + 60 * scale, 122 * scale)
+  ctx.stroke()
+
+  // Huge body — fills as much vertical space as possible
+  ctx.fillStyle = ink
+  ctx.textAlign = 'left'
+  drawWrappedAutoFit(ctx, text, {
+    x: 80 * scale + ((W - 160 * scale) / 2),
+    y: H / 2 + 40 * scale,
+    maxWidth: W - 160 * scale, maxHeight: H * 0.7,
+    maxFontPx: Math.round(160 * scale), minFontPx: Math.round(60 * scale),
+    fontFamily: '"Bebas Neue", "Oswald", Impact, sans-serif',
+    fontWeight: '900', lineHeightRatio: 1.02,
+    alignLeft: true,
+  })
+}
+
+// STACK — multi-paragraph posts. Each paragraph in its own band with
+// a thin colored rule. Varies font size by paragraph so it reads more
+// like an article than a wall of text.
+function drawStack(
+  ctx: CanvasRenderingContext2D, W: number, H: number, scale: number,
+  text: string, showName: string, palette: CoverPalette,
+) {
+  const bg = palette.primary
+  const accent = palette.secondary
+  const bgRGB = hexToRgb(bg)
+  const isLightBg = luminance(bgRGB) > 0.55
+  const cardFill = isLightBg ? mixWithWhite(bgRGB, 0.7) : mixWithBlack(bgRGB, 0.6)
+  const cardInk = isLightBg ? '#1A140C' : '#FAF7EF'
+
+  ctx.fillStyle = `rgb(${cardFill.r}, ${cardFill.g}, ${cardFill.b})`
+  ctx.fillRect(0, 0, W, H)
+
+  // Side stripe in accent color
+  ctx.fillStyle = accent
+  ctx.fillRect(0, 0, 30 * scale, H)
+
+  // Show name top
+  ctx.fillStyle = accent
+  ctx.font = `700 ${Math.round(20 * scale)}px Georgia, serif`
+  ctx.textAlign = 'left'
+  ctx.textBaseline = 'middle'
+  ctx.fillText(spaceForKerning(showName), 80 * scale, 90 * scale)
+
+  const paras = text.split(/\n\s*\n/).map((p) => p.trim()).filter(Boolean)
+  const top = 160 * scale
+  const bottom = H - 100 * scale
+  const totalH = bottom - top
+  const gap = 28 * scale
+  const slotH = (totalH - gap * (paras.length - 1)) / paras.length
+
+  ctx.fillStyle = cardInk
+  ctx.textAlign = 'left'
+  for (let i = 0; i < paras.length; i++) {
+    const y = top + i * (slotH + gap) + slotH / 2
+    // First paragraph slightly larger / bolder than the rest.
+    const big = i === 0
+    drawWrappedAutoFit(ctx, paras[i], {
+      x: 80 * scale + ((W - 160 * scale) / 2),
+      y,
+      maxWidth: W - 160 * scale, maxHeight: slotH,
+      maxFontPx: Math.round((big ? 56 : 40) * scale),
+      minFontPx: Math.round(22 * scale),
+      fontFamily: big ? 'Georgia, "Playfair Display", serif' : 'Inter, "Helvetica Neue", sans-serif',
+      fontWeight: big ? '700' : '500',
+      lineHeightRatio: 1.25,
+      alignLeft: true,
+    })
+    // Thin separator below each para except the last
+    if (i < paras.length - 1) {
+      ctx.strokeStyle = `rgba(${hexToRgb(accent).r}, ${hexToRgb(accent).g}, ${hexToRgb(accent).b}, 0.4)`
+      ctx.lineWidth = 1.5 * scale
+      ctx.beginPath()
+      ctx.moveTo(80 * scale, top + i * (slotH + gap) + slotH + gap / 2)
+      ctx.lineTo(W - 80 * scale, top + i * (slotH + gap) + slotH + gap / 2)
+      ctx.stroke()
+    }
+  }
+}
+
+// CALLOUT — asymmetric: a vertical accent column on the left holding
+// the show name (rotated 90°), big serif body filling the right.
+// Default fallback for medium-length posts that don't fit other shapes.
+function drawCallout(
+  ctx: CanvasRenderingContext2D, W: number, H: number, scale: number,
+  text: string, showName: string, palette: CoverPalette,
+) {
+  const bg = palette.primary
+  const accent = palette.secondary
+  const bgRGB = hexToRgb(bg)
+  const isLightBg = luminance(bgRGB) > 0.55
+  const cardFill = isLightBg ? mixWithWhite(bgRGB, 0.85) : mixWithWhite(bgRGB, 0.92)
+  const cardInk = '#1A140C'
+
+  // Right portion = card
+  ctx.fillStyle = `rgb(${cardFill.r}, ${cardFill.g}, ${cardFill.b})`
+  ctx.fillRect(0, 0, W, H)
+  // Left band in accent — narrow column with rotated show name
+  const bandW = 180 * scale
+  ctx.fillStyle = accent
+  ctx.fillRect(0, 0, bandW, H)
+  // Rotated show name on band
+  ctx.save()
+  ctx.translate(bandW / 2, H / 2)
+  ctx.rotate(-Math.PI / 2)
+  ctx.fillStyle = '#FAF7EF'
+  ctx.font = `800 ${Math.round(34 * scale)}px Inter, "Helvetica Neue", sans-serif`
+  ctx.textAlign = 'center'
+  ctx.textBaseline = 'middle'
+  ctx.fillText(spaceForKerning(showName), 0, 0)
+  ctx.restore()
+
+  // Body text — big serif filling right side
+  ctx.fillStyle = cardInk
+  ctx.textAlign = 'left'
+  drawWrappedAutoFit(ctx, text, {
+    x: bandW + 60 * scale + (W - bandW - 120 * scale) / 2,
+    y: H / 2,
+    maxWidth: W - bandW - 120 * scale, maxHeight: H * 0.75,
+    maxFontPx: Math.round(58 * scale), minFontPx: Math.round(26 * scale),
+    fontFamily: 'Georgia, "Playfair Display", serif',
+    fontWeight: '500', lineHeightRatio: 1.3,
+    alignLeft: true,
+  })
+}
+
+// ============================================================
+// Shared helpers
+// ============================================================
 
 function resolvePalette(input: PostImageInput): CoverPalette {
   if (input.palette) {
@@ -138,12 +357,6 @@ function resolvePalette(input: PostImageInput): CoverPalette {
   return DEFAULT_PALETTE
 }
 
-// Pulls a primary + secondary color out of the cover art. Anonymous CORS
-// so pixels are readable. Downscales to 64×64, builds a saturated-color
-// histogram, picks the most-prominent vivid bucket as the primary, then
-// picks the next vivid bucket that's hue-distant from the primary so
-// two-tone shows (yellow background + blue title, etc.) render with
-// both colors instead of just one.
 export async function extractCoverPalette(coverArtUrl: string): Promise<CoverPalette | null> {
   return new Promise((resolve) => {
     const img = new Image()
@@ -166,8 +379,8 @@ export async function extractCoverPalette(coverArtUrl: string): Promise<CoverPal
           const r = data[i], g = data[i + 1], b = data[i + 2], a = data[i + 3]
           if (a < 200) continue
           const max = Math.max(r, g, b), min = Math.min(r, g, b)
-          if (max < 30 || min > 230) continue // skip near-black / near-white
-          if (max - min < 24) continue        // skip greys
+          if (max < 30 || min > 230) continue
+          if (max - min < 24) continue
           const qr = (r >> 5) << 5
           const qg = (g >> 5) << 5
           const qb = (b >> 5) << 5
@@ -184,9 +397,6 @@ export async function extractCoverPalette(coverArtUrl: string): Promise<CoverPal
         const sorted = [...buckets.values()].sort((a, b) => b.score - a.score)
         const primary = sorted[0]
         if (!primary) return done(null)
-        // Find a secondary that's at least 60° away in hue and still has
-        // meaningful score (top 8). Falls back to a luminance-derived
-        // contrast if the cover is monochromatic.
         let secondary: Bucket | null = null
         for (const cand of sorted.slice(1, 9)) {
           const d = hueDistance(primary.hue, cand.hue)
@@ -206,7 +416,6 @@ export async function extractCoverPalette(coverArtUrl: string): Promise<CoverPal
   })
 }
 
-// Back-compat: callers that just want a single color.
 export async function extractAccentColor(coverArtUrl: string): Promise<string | null> {
   const palette = await extractCoverPalette(coverArtUrl)
   return palette?.primary ?? null
@@ -231,7 +440,6 @@ function rgbToHex(r: number, g: number, b: number): string {
   return `#${h(r)}${h(g)}${h(b)}`
 }
 
-// Standard relative luminance (0–1). Used to decide light vs. dark ink.
 function luminance({ r, g, b }: { r: number; g: number; b: number }): number {
   const lin = (c: number) => {
     const s = c / 255
@@ -248,7 +456,6 @@ function mixWithBlack({ r, g, b }: { r: number; g: number; b: number }, t: numbe
   return { r: r * (1 - t), g: g * (1 - t), b: b * (1 - t) }
 }
 
-// HSL-style hue in degrees [0, 360). For palette diversity.
 function hueOf(r: number, g: number, b: number): number {
   const rn = r / 255, gn = g / 255, bn = b / 255
   const max = Math.max(rn, gn, bn), min = Math.min(rn, gn, bn)
@@ -268,26 +475,12 @@ function hueDistance(a: number, b: number): number {
   return d > 180 ? 360 - d : d
 }
 
-// When the cover is monochromatic, build a tonal secondary by darkening
-// or lightening the primary so the show-name label still reads on the
-// inner card.
 function deriveContrast(rgb: { r: number; g: number; b: number }): string {
   const lum = luminance(rgb)
   const shifted = lum > 0.55 ? mixWithBlack(rgb, 0.7) : mixWithWhite(rgb, 0.7)
   return rgbToHex(shifted.r, shifted.g, shifted.b)
 }
 
-function roundedRect(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number) {
-  ctx.beginPath()
-  ctx.moveTo(x + r, y)
-  ctx.arcTo(x + w, y, x + w, y + h, r)
-  ctx.arcTo(x + w, y + h, x, y + h, r)
-  ctx.arcTo(x, y + h, x, y, r)
-  ctx.arcTo(x, y, x + w, y, r)
-  ctx.closePath()
-}
-
-// Try sequentially smaller font sizes until the wrapped text fits the box.
 function drawWrappedAutoFit(
   ctx: CanvasRenderingContext2D,
   text: string,
@@ -301,8 +494,11 @@ function drawWrappedAutoFit(
     fontFamily: string
     fontWeight: string
     lineHeightRatio: number
+    alignLeft?: boolean
   },
 ) {
+  const prevAlign = ctx.textAlign
+  if (opts.alignLeft) ctx.textAlign = 'left'
   for (let size = opts.maxFontPx; size >= opts.minFontPx; size -= 2) {
     ctx.font = `${opts.fontWeight} ${size}px ${opts.fontFamily}`
     const lines = wrapLines(ctx, text, opts.maxWidth)
@@ -310,9 +506,11 @@ function drawWrappedAutoFit(
     const totalH = lines.length * lineH
     if (totalH <= opts.maxHeight) {
       const startY = opts.y - totalH / 2 + lineH / 2
+      const startX = opts.alignLeft ? opts.x - opts.maxWidth / 2 : opts.x
       lines.forEach((line, i) => {
-        ctx.fillText(line, opts.x, startY + i * lineH)
+        ctx.fillText(line, startX, startY + i * lineH)
       })
+      ctx.textAlign = prevAlign
       return
     }
   }
@@ -321,9 +519,11 @@ function drawWrappedAutoFit(
   const lines = wrapLines(ctx, text, opts.maxWidth)
   const lineH = size * opts.lineHeightRatio
   const startY = opts.y - (lines.length * lineH) / 2 + lineH / 2
+  const startX = opts.alignLeft ? opts.x - opts.maxWidth / 2 : opts.x
   lines.forEach((line, i) => {
-    ctx.fillText(line, opts.x, startY + i * lineH)
+    ctx.fillText(line, startX, startY + i * lineH)
   })
+  ctx.textAlign = prevAlign
 }
 
 function wrapLines(ctx: CanvasRenderingContext2D, text: string, maxWidth: number): string[] {
@@ -351,6 +551,17 @@ function wrapLines(ctx: CanvasRenderingContext2D, text: string, maxWidth: number
 function spaceForKerning(s: string): string {
   return s.split('').join(' ')
 }
+
+function roundedRect(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number) {
+  ctx.beginPath()
+  ctx.moveTo(x + r, y)
+  ctx.arcTo(x + w, y, x + w, y + h, r)
+  ctx.arcTo(x + w, y + h, x, y + h, r)
+  ctx.arcTo(x, y + h, x, y, r)
+  ctx.arcTo(x, y, x + w, y, r)
+  ctx.closePath()
+}
+void roundedRect
 
 export function canvasToBlob(canvas: HTMLCanvasElement, type: string = 'image/png'): Promise<Blob> {
   return new Promise((resolve, reject) => {
