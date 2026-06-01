@@ -912,69 +912,99 @@ function StillsStrip({
   const [zoomed, setZoomed] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
 
-  async function regen(direction: 1 | -1) {
+  // Parse a [HH:MM:SS] anchor out of the relevant field so we can
+  // tell whether an item is even extractable (some older photo
+  // concepts may not have one).
+  const timecodeSource =
+    item.kind === 'story_concept' || item.kind === 'reel_concept'
+      ? (item as { suggested_clip?: string }).suggested_clip
+      : item.kind === 'photo_concept'
+        ? (item as { image_direction?: string }).image_direction
+        : undefined
+  const hasTimecode = !!timecodeSource && /\[\d{1,2}:\d{2}:\d{2}/.test(timecodeSource)
+
+  async function pull(direction: -1 | 0 | 1) {
     setBusy(true); setError(null)
     try {
       await api.regenerateStills(planId, item.id, direction * 5)
       await onChanged()
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'regenerate failed')
+      setError(err instanceof Error ? err.message : 'failed')
     } finally {
       setBusy(false)
     }
   }
 
-  if (!paths || paths.length === 0) return null
-
-  return (
-    <div>
-      <div className="flex items-center justify-between mb-1">
-        <div className="text-[10px] uppercase tracking-wider text-muted/70 font-bold">
-          📸 Frames pulled from the episode
+  // Has-frames view.
+  if (paths && paths.length > 0) {
+    return (
+      <div>
+        <div className="flex items-center justify-between mb-1">
+          <div className="text-[10px] uppercase tracking-wider text-muted/70 font-bold">
+            📸 Frames pulled from the episode
+          </div>
+          {canWrite && (
+            <div className="flex items-center gap-1">
+              <button
+                onClick={() => void pull(-1)}
+                disabled={busy}
+                title="Pull 5 fresh frames from ~5s earlier"
+                className="text-[10px] uppercase tracking-wider text-muted hover:text-text border border-line rounded-full px-2 py-0.5 disabled:opacity-50"
+              >
+                ↻ -5s
+              </button>
+              <button
+                onClick={() => void pull(1)}
+                disabled={busy}
+                title="Pull 5 fresh frames from ~5s later"
+                className="text-[10px] uppercase tracking-wider text-muted hover:text-text border border-line rounded-full px-2 py-0.5 disabled:opacity-50"
+              >
+                ↻ +5s
+              </button>
+            </div>
+          )}
         </div>
-        {canWrite && (
-          <div className="flex items-center gap-1">
+        <div className="grid grid-cols-5 gap-1">
+          {paths.map((p, i) => (
             <button
-              onClick={() => void regen(-1)}
-              disabled={busy}
-              title="Pull 5 fresh frames from ~5s earlier"
-              className="text-[10px] uppercase tracking-wider text-muted hover:text-text border border-line rounded-full px-2 py-0.5 disabled:opacity-50"
+              key={i}
+              onClick={() => setZoomed(p)}
+              className="aspect-square rounded overflow-hidden bg-ink/60 border border-line/40 hover:border-stage-mastering/60 transition"
             >
-              ↻ -5s
+              <img
+                src={api.dropboxFileUrl(p)}
+                alt={`Still ${i + 1}`}
+                className="w-full h-full object-cover"
+                loading="lazy"
+              />
             </button>
-            <button
-              onClick={() => void regen(1)}
-              disabled={busy}
-              title="Pull 5 fresh frames from ~5s later"
-              className="text-[10px] uppercase tracking-wider text-muted hover:text-text border border-line rounded-full px-2 py-0.5 disabled:opacity-50"
-            >
-              ↻ +5s
-            </button>
+          ))}
+        </div>
+        {error && <p className="text-urgent text-[10px] mt-1">{error}</p>}
+        {zoomed && (
+          <div className="fixed inset-0 z-50 bg-ink/90 backdrop-blur-sm grid place-items-center p-4" onClick={() => setZoomed(null)}>
+            <img src={api.dropboxFileUrl(zoomed)} alt="Still" className="max-w-full max-h-full rounded-xl" />
           </div>
         )}
       </div>
-      <div className="grid grid-cols-5 gap-1">
-        {paths.map((p, i) => (
-          <button
-            key={i}
-            onClick={() => setZoomed(p)}
-            className="aspect-square rounded overflow-hidden bg-ink/60 border border-line/40 hover:border-stage-mastering/60 transition"
-          >
-            <img
-              src={api.dropboxFileUrl(p)}
-              alt={`Still ${i + 1}`}
-              className="w-full h-full object-cover"
-              loading="lazy"
-            />
-          </button>
-        ))}
-      </div>
+    )
+  }
+
+  // No-frames view. If the item carries a timecode, offer a single
+  // "Pull frames" button. Otherwise stay invisible (older items that
+  // don't have an anchor can't be extracted at all).
+  if (!hasTimecode || !canWrite) return null
+  return (
+    <div>
+      <button
+        onClick={() => void pull(0)}
+        disabled={busy}
+        className="w-full rounded-lg border border-dashed border-line/60 hover:border-stage-mastering/60 px-3 py-2 text-[11px] uppercase tracking-wider text-muted hover:text-text transition disabled:opacity-50"
+        title="Pull 5 still frames from the episode at this moment's timecode"
+      >
+        {busy ? 'Pulling frames…' : '📸 Pull frames from the episode'}
+      </button>
       {error && <p className="text-urgent text-[10px] mt-1">{error}</p>}
-      {zoomed && (
-        <div className="fixed inset-0 z-50 bg-ink/90 backdrop-blur-sm grid place-items-center p-4" onClick={() => setZoomed(null)}>
-          <img src={api.dropboxFileUrl(zoomed)} alt="Still" className="max-w-full max-h-full rounded-xl" />
-        </div>
-      )}
     </div>
   )
 }
