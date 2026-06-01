@@ -104,5 +104,26 @@
     "attemptedAt": "2026-06-01T18:37:14.561Z",
     "error": "Anthropic 429: {\"type\":\"error\",\"error\":{\"type\":\"rate_limit_error\",\"message\":\"This request would exceed your organization's rate limit of 30,000 input tokens per minute (org: 2a077add-3af6-43c7-9e33-c2426f97c5c3, model: claude-sonnet-4-5-20250929). For details, refer to: https://docs.claude.com/en/api/rate-limits. You can see the response headers for current usage. Reduce the prompt length or the maximum tokens requested, or try again later. View your current limits at https://console.anthropic.com/settings/lim",
     "iterations": 0
+  },
+  "stills: ffmpeg not in PATH — stills extraction will be skipped::{}": {
+    "attemptedAt": "2026-06-01T21:54:19.146Z",
+    "outcome": "fixed",
+    "summary": "Fixed ffmpeg not in PATH error by replacing invalid \"...\" placeholder with explicit \"nodejs_20\" package in nixpacks.toml nixPkgs array.",
+    "iterations": 11
+  },
+  "transcript: failed::{\"id\":\"b387fe25-dd64-42d5-8733-ed4c4014d85e\",\"error\":\"fetch failed\"}": {
+    "attemptedAt": "2026-06-01T21:54:48.184Z",
+    "error": "Anthropic 429: {\"type\":\"error\",\"error\":{\"type\":\"rate_limit_error\",\"message\":\"This request would exceed your organization's rate limit of 30,000 input tokens per minute (org: 2a077add-3af6-43c7-9e33-c2426f97c5c3, model: claude-sonnet-4-5-20250929). For details, refer to: https://docs.claude.com/en/api/rate-limits. You can see the response headers for current usage. Reduce the prompt length or the maximum tokens requested, or try again later. View your current limits at https://console.anthropic.com/settings/lim",
+    "iterations": 0
+  },
+  "socials: regenerate-stills failed::{\"planId\":\"7449a338-a369-4000-bc62-7c1eecbc0a33\",\"itemId\":\"5cc40a4c-73a6-4a00-a3": {
+    "attemptedAt": "2026-06-01T21:54:52.040Z",
+    "error": "Anthropic 429: {\"type\":\"error\",\"error\":{\"type\":\"rate_limit_error\",\"message\":\"This request would exceed your organization's rate limit of 30,000 input tokens per minute (org: 2a077add-3af6-43c7-9e33-c2426f97c5c3, model: claude-sonnet-4-5-20250929). For details, refer to: https://docs.claude.com/en/api/rate-limits. You can see the response headers for current usage. Reduce the prompt length or the maximum tokens requested, or try again later. View your current limits at https://console.anthropic.com/settings/lim",
+    "iterations": 0
+  },
+  "socials: regenerate-stills failed::{\"planId\":\"7449a338-a369-4000-bc62-7c1eecbc0a33\",\"itemId\":\"851db937-aa0e-42cd-95": {
+    "attemptedAt": "2026-06-01T21:54:52.246Z",
+    "error": "Anthropic 429: {\"type\":\"error\",\"error\":{\"type\":\"rate_limit_error\",\"message\":\"This request would exceed your organization's rate limit of 30,000 input tokens per minute (org: 2a077add-3af6-43c7-9e33-c2426f97c5c3, model: claude-sonnet-4-5-20250929). For details, refer to: https://docs.claude.com/en/api/rate-limits. You can see the response headers for current usage. Reduce the prompt length or the maximum tokens requested, or try again later. View your current limits at https://console.anthropic.com/settings/lim",
+    "iterations": 0
   }
 }
