@@ -2,7 +2,8 @@
 # and builds it fine — we add ffmpeg here so the server can extract
 # still frames from podcast episode MP4s for the social plan UI.
 #
-# providers stays auto so Node detection still runs; aptPkgs is the
-# only hook we need.
+# nixPkgs is the canonical Nixpacks hook; aptPkgs alone wasn't
+# enough to land ffmpeg in PATH on the runtime container (we hit
+# "spawn ffmpeg ENOENT" on the first batch).
 [phases.setup]
-aptPkgs = ["ffmpeg"]
+nixPkgs = ["...", "ffmpeg"]

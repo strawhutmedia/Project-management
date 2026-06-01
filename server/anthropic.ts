@@ -75,35 +75,38 @@ The plan has the following structure and counts:
                                 suggested_clip }. Suggested_clip references
                                 an actual moment from the transcript.
   - 3 photo_concepts: each is { image_direction, caption, vibe }.
-                       image_direction describes an ACTUAL PHOTOGRAPH
-                       — the kinds the team has on hand from the
-                       recording session, not staged graphic assets.
-                       Pull from this menu:
-                         (a) Headshot / portrait of the GUEST (alone,
-                             in the studio, looking at camera or 3/4).
-                         (b) Host + guest together — at the desk,
-                             mid-laugh, candid moment.
-                         (c) BTS — producer at the board, mic setup,
-                             cables, behind-the-glass wide shot, etc.
-                         (d) A specific MOMENT FROM THE INTERVIEW:
-                             reference a real beat from the transcript
-                             ("Guest reacting to the question about
-                              their dad — eyes wide, hand on chest"),
-                             so the photographer/editor can pull that
-                             frame from the recording or restage it.
-                       Specify subject + setting + light/framing.
+                       Slate auto-extracts 5 still frames from the
+                       episode video at the timecode you provide, so
+                       EVERY photo_concept must reference a real
+                       moment from the transcript. image_direction
+                       must START with a "[HH:MM:SS] " timecode that
+                       points to where in the recording the desired
+                       shot composition exists in-frame, followed by
+                       a one-sentence description of what we want to
+                       see at that beat. Examples:
+                         "[00:08:14] Guest reacting to the dad
+                          question — eyes wide, hand on chest."
+                         "[00:24:02] Host + guest leaning in mid-
+                          laugh during the lobster bit."
+                         "[00:37:50] Wide behind-the-glass while the
+                          guest is mid-anecdote, producer visible at
+                          the board."
+                         "[00:51:31] Guest portrait — 3/4 angle,
+                          looking up thoughtfully."
+                       Pick variety across the 3 — mix portrait,
+                       host+guest two-shot, and BTS-style wides if
+                       the recording supports it.
                        NEVER a typographic graphic, NEVER text on a
                        colored background, NEVER a poll sticker, NEVER
                        a Canva-style template — those are design
                        assets, not photos.
-                       Aim for variety across the 3 (don't propose
-                       three headshots — mix the categories above).
                        caption is the IG caption text.
                        vibe is a 2-4 word mood.
 
 For story_concepts with medium='photo': same rule — image_direction
-must describe a real photograph (subject, setting, light), not a
-graphic-design asset.
+must START with a [HH:MM:SS] timecode pointing to a moment in the
+recording, followed by the shot description. Slate will pull frames
+from that timecode.
 
 Voice:
   - Match the show's brand voice exactly. The provided EXAMPLES are

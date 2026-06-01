@@ -256,7 +256,14 @@ export async function triggerSocialPlanGeneration(args: {
       if (ctx.source_file_path) {
         ;(async () => {
           try {
-            const { extractStillsForItem, parseTimecode } = await import('../stills')
+            const { extractStillsForItem, parseTimecode, isFfmpegAvailable } = await import('../stills')
+            // Probe once up front — if ffmpeg isn't installed, skip the
+            // whole batch with a single info log instead of generating
+            // an email-alert per item × per frame.
+            if (!(await isFfmpegAvailable())) {
+              logInfo('socials: skipping stills (ffmpeg not available)', { planId })
+              return
+            }
             let touched = false
             for (let i = 0; i < items.length; i++) {
               const it = items[i]

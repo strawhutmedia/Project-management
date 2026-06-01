@@ -19,6 +19,31 @@ import path from 'path'
 import { logError, logInfo } from './diag'
 import { getTemporaryLink, uploadFile } from './dropbox'
 
+// Cache the ffmpeg-on-PATH check so we don't probe (or log) on every
+// frame call. Set to false if the first probe ENOENTs; subsequent
+// extractions short-circuit instead of generating one alert email per
+// failed frame × every item in the plan.
+let ffmpegAvailable: boolean | null = null
+
+async function probeFfmpeg(): Promise<boolean> {
+  if (ffmpegAvailable !== null) return ffmpegAvailable
+  ffmpegAvailable = await new Promise<boolean>((resolve) => {
+    const proc = spawn('ffmpeg', ['-version'], { stdio: 'ignore' })
+    proc.on('error', () => resolve(false))
+    proc.on('close', (code) => resolve(code === 0))
+  })
+  if (ffmpegAvailable) {
+    logInfo('stills: ffmpeg available')
+  } else {
+    logError('stills: ffmpeg not in PATH — stills extraction will be skipped', {})
+  }
+  return ffmpegAvailable
+}
+
+export function isFfmpegAvailable(): Promise<boolean> {
+  return probeFfmpeg()
+}
+
 export type StillExtractInput = {
   // Dropbox path to the source MP4. We grab a temp link from this.
   videoDropboxPath: string
@@ -49,6 +74,9 @@ const DEFAULT_WINDOW_S = 2
 const DEFAULT_FRAME_COUNT = 5
 
 export async function extractStillsForItem(input: StillExtractInput): Promise<StillExtractResult> {
+  if (!(await probeFfmpeg())) {
+    throw new Error('stills_ffmpeg_unavailable')
+  }
   const windowS = input.windowSeconds ?? DEFAULT_WINDOW_S
   const frames = input.frameCount ?? DEFAULT_FRAME_COUNT
   const version = input.version ?? 0
