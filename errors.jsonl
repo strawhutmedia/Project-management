@@ -89,3 +89,4 @@
 {"level":"error","ts":"2026-06-01T19:34:40.701Z","msg":"transcript: failed","data":{"id":"b387fe25-dd64-42d5-8733-ed4c4014d85e","error":"fetch failed"}}
 {"level":"error","ts":"2026-06-01T19:58:42.968Z","msg":"socials: regenerate-stills failed","data":{"planId":"7449a338-a369-4000-bc62-7c1eecbc0a33","itemId":"5cc40a4c-73a6-4a00-a324-66b953142041","error":"stills_ffmpeg_unavailable"}}
 {"level":"error","ts":"2026-06-01T19:58:47.518Z","msg":"socials: regenerate-stills failed","data":{"planId":"7449a338-a369-4000-bc62-7c1eecbc0a33","itemId":"5cc40a4c-73a6-4a00-a324-66b953142041","error":"stills_ffmpeg_unavailable"}}
+{"level":"error","ts":"2026-06-01T19:58:55.328Z","msg":"socials: regenerate-stills failed","data":{"planId":"7449a338-a369-4000-bc62-7c1eecbc0a33","itemId":"851db937-aa0e-42cd-95c0-e3b1c063ec16","error":"stills_ffmpeg_unavailable"}}
