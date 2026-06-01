@@ -234,7 +234,16 @@ function ClipOptionsDialog({
         setClaudeError('Latest plan has no suggested clips. Try generating a fresh one.')
         return
       }
-      const directive = `Focus on these specific moments (timecodes from our transcript):\n\n${lines.join('\n')}`
+      // Be as directive as possible — OpusClip's AI may or may not
+      // honor a soft suggestion. Frame this as an explicit instruction
+      // so the chance of getting back exactly these moments goes up.
+      const directive = [
+        `Generate exactly ${lines.length} clips, one per moment listed below. Do not pick your own moments; use ONLY these:`,
+        '',
+        ...lines,
+        '',
+        'Each output clip must correspond to one moment above, keeping its timecode range. Do not invent new clips outside this list.',
+      ].join('\n')
       setPrompt((prev) => prev.trim() ? `${prev}\n\n${directive}` : directive)
       setClipCount(lines.length)
     } catch (err) {
