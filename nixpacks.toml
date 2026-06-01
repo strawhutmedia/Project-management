@@ -1,0 +1,8 @@
+# Railway build override. Nixpacks normally auto-detects a Node app
+# and builds it fine — we add ffmpeg here so the server can extract
+# still frames from podcast episode MP4s for the social plan UI.
+#
+# providers stays auto so Node detection still runs; aptPkgs is the
+# only hook we need.
+[phases.setup]
+aptPkgs = ["ffmpeg"]
