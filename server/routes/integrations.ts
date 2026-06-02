@@ -266,9 +266,9 @@ integrationsRouter.post('/dropbox/share-link', requireUser, async (req, res) => 
 integrationsRouter.get('/dropbox/file', requireUser, async (req, res) => {
   const filePath = String(req.query.path || '')
   if (!filePath) { res.status(400).send('path required'); return }
-  // Only stills under our known prefix get the unscoped fetch — anything
-  // else has to go through the scoped Dropbox helpers above.
-  if (!filePath.startsWith('/slate-stills/')) {
+  // Only Slate-managed asset prefixes get the unscoped fetch —
+  // anything else has to go through the scoped Dropbox helpers above.
+  if (!filePath.startsWith('/slate-stills/') && !filePath.startsWith('/slate-clips/')) {
     res.status(403).send('forbidden'); return
   }
   const { getTemporaryLink } = await import('../dropbox')

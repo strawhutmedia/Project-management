@@ -607,6 +607,7 @@ function StoryBody({ item, canWrite, onSave, planId, onChanged }: {
 }) {
   return (
     <div className="space-y-2">
+      <ClipPlayer item={item} />
       <StillsStrip item={item} planId={planId} canWrite={canWrite} onChanged={onChanged} />
       <EditableLine label="Concept" value={item.description} canWrite={canWrite} onSave={(v) => onSave({ description: v })} multi />
       <EditableLine label="Overlay caption" value={item.caption} canWrite={canWrite} onSave={(v) => onSave({ caption: v })} />
@@ -629,6 +630,7 @@ function ReelBody({ item, canWrite, onSave, planId, onChanged }: {
 }) {
   return (
     <div className="space-y-2">
+      <ClipPlayer item={item} />
       <StillsStrip item={item} planId={planId} canWrite={canWrite} onChanged={onChanged} />
       <EditableLine label="Hook" value={item.hook} canWrite={canWrite} onSave={(v) => onSave({ hook: v })} bold />
       <EditableLine
@@ -1005,6 +1007,39 @@ function StillsStrip({
         {busy ? 'Pulling frames…' : '📸 Pull frames from the episode'}
       </button>
       {error && <p className="text-urgent text-[10px] mt-1">{error}</p>}
+    </div>
+  )
+}
+
+// Inline video player for story/reel items whose suggested_clip range
+// has been auto-extracted from the episode MP4 by the ffmpeg pipeline.
+// Falls back to nothing when the clip_dropbox_path hasn't been written
+// yet (still rendering, or the item has no timecode range).
+function ClipPlayer({ item }: { item: ApiSocialItem }) {
+  const clipPath = (item as unknown as { clip_dropbox_path?: string | null }).clip_dropbox_path
+  const dur = (item as unknown as { clip_duration_s?: number | null }).clip_duration_s
+  if (!clipPath) return null
+  return (
+    <div>
+      <div className="text-[10px] uppercase tracking-wider text-muted/70 font-bold mb-1">
+        🎬 Clip from the episode{dur ? ` · ${Math.round(dur)}s` : ''}
+      </div>
+      <video
+        src={api.dropboxFileUrl(clipPath)}
+        controls
+        preload="metadata"
+        playsInline
+        className="w-full rounded-lg bg-ink/60 border border-line/40"
+      />
+      <div className="flex items-center justify-end mt-1">
+        <a
+          href={api.dropboxFileUrl(clipPath)}
+          download
+          className="text-[10px] uppercase tracking-wider font-bold text-stage-mastering hover:text-text"
+        >
+          ⬇ Download mp4
+        </a>
+      </div>
     </div>
   )
 }

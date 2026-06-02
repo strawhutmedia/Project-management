@@ -192,3 +192,100 @@ export function parseTimecode(s: string | undefined | null): number | null {
   if (!Number.isFinite(h) || !Number.isFinite(mn) || !Number.isFinite(sc)) return null
   return h * 3600 + mn * 60 + sc
 }
+
+// Helper: parse a [HH:MM:SS - HH:MM:SS] range — Claude is required to
+// produce these on every suggested_clip. Returns start + end in
+// seconds, or null if the string doesn't have a range.
+export function parseTimecodeRange(s: string | undefined | null): { startSeconds: number; endSeconds: number } | null {
+  if (!s) return null
+  // Accepts plain dash, en-dash, em-dash, "to", optional spaces.
+  const m = s.match(/\[(\d{1,2}):(\d{2}):(\d{2})\s*[-–—to]+\s*(\d{1,2}):(\d{2}):(\d{2})/i)
+  if (!m) return null
+  const h1 = Number(m[1]), m1 = Number(m[2]), s1 = Number(m[3])
+  const h2 = Number(m[4]), m2 = Number(m[5]), s2 = Number(m[6])
+  const start = h1 * 3600 + m1 * 60 + s1
+  const end = h2 * 3600 + m2 * 60 + s2
+  if (!Number.isFinite(start) || !Number.isFinite(end) || end <= start) return null
+  // Cap at 90s — anything longer is almost certainly a Claude
+  // hallucination of an end timecode. Reel/story clips top out
+  // around 60s in practice.
+  if (end - start > 90) return null
+  return { startSeconds: start, endSeconds: end }
+}
+
+// ============================================================
+// Video clip extraction
+// ============================================================
+//
+// Same idea as still extraction but the output is an mp4 segment cut
+// from the source episode at the [start - end] range. Used to turn
+// Claude's "[00:14:23 – 00:15:02] Sherri's bit about Kool-Aid" into
+// a real ready-to-post clip, no OpusClip required for moments Claude
+// has already picked.
+
+export type ClipExtractInput = {
+  videoDropboxPath: string
+  startSeconds: number
+  endSeconds: number
+  songId: string
+  itemId: string
+  version?: number
+}
+
+export type ClipExtractResult = {
+  dropboxPath: string
+  durationSeconds: number
+  version: number
+}
+
+export async function extractClipForItem(input: ClipExtractInput): Promise<ClipExtractResult> {
+  if (!(await probeFfmpeg())) throw new Error('clips_ffmpeg_unavailable')
+  const version = input.version ?? 0
+  const duration = input.endSeconds - input.startSeconds
+  const workDir = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'slate-clip-'))
+  try {
+    const link = await getTemporaryLink(input.videoDropboxPath)
+    if (!link.ok || !link.url) {
+      throw new Error(`dropbox_temp_link_failed: ${link.error || 'unknown'}`)
+    }
+    const outPath = path.join(workDir, 'clip.mp4')
+    // Use -ss BEFORE -i for fast seeking, then -t for duration. Use
+    // -c copy to avoid re-encoding (fast, lossless). If the keyframes
+    // don't line up exactly, the cut may start a fraction of a second
+    // late — acceptable for a 30-60s social clip preview.
+    await runFfmpeg([
+      '-ss', input.startSeconds.toFixed(3),
+      '-i', link.url,
+      '-t', duration.toFixed(3),
+      '-c', 'copy',
+      '-movflags', '+faststart',
+      '-y',
+      outPath,
+    ])
+    if (!fs.existsSync(outPath) || fs.statSync(outPath).size === 0) {
+      throw new Error('clip_no_output')
+    }
+    const buf = await fs.promises.readFile(outPath)
+    const dropboxFolder = `/slate-clips/${input.songId}/${input.itemId}`
+    const fileName = `v${version}.mp4`
+    const res = await uploadFile(dropboxFolder, fileName, buf)
+    if (!res.ok || !res.path) {
+      throw new Error(`dropbox_upload_failed: ${res.error || 'unknown'}`)
+    }
+    logInfo('clips: extracted', {
+      itemId: input.itemId,
+      startSeconds: input.startSeconds,
+      endSeconds: input.endSeconds,
+      durationSeconds: duration,
+      version,
+      bytes: buf.length,
+    })
+    return {
+      dropboxPath: res.path,
+      durationSeconds: duration,
+      version,
+    }
+  } finally {
+    fs.promises.rm(workDir, { recursive: true, force: true }).catch(() => {})
+  }
+}

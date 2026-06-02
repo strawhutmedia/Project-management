@@ -256,43 +256,73 @@ export async function triggerSocialPlanGeneration(args: {
       if (ctx.source_file_path) {
         ;(async () => {
           try {
-            const { extractStillsForItem, parseTimecode, isFfmpegAvailable } = await import('../stills')
-            // Probe once up front — if ffmpeg isn't installed, skip the
-            // whole batch with a single info log instead of generating
-            // an email-alert per item × per frame.
+            const { extractStillsForItem, extractClipForItem, parseTimecode, parseTimecodeRange, isFfmpegAvailable } = await import('../stills')
             if (!(await isFfmpegAvailable())) {
-              logInfo('socials: skipping stills (ffmpeg not available)', { planId })
+              logInfo('socials: skipping ffmpeg work (ffmpeg not available)', { planId })
               return
             }
             let touched = false
             for (let i = 0; i < items.length; i++) {
               const it = items[i]
+              // Stills anchor — center timecode from suggested_clip
+              // (story/reel) or image_direction (photo).
               const tc =
                 it.kind === 'story_concept' || it.kind === 'reel_concept'
                   ? parseTimecode((it as { suggested_clip?: string }).suggested_clip)
                   : it.kind === 'photo_concept'
                     ? parseTimecode((it as { image_direction?: string }).image_direction)
                     : null
-              if (tc == null) continue
-              try {
-                const stills = await extractStillsForItem({
-                  videoDropboxPath: ctx.source_file_path!,
-                  centerSeconds: tc,
-                  songId: args.songId,
-                  itemId: it.id,
-                  version: 0,
-                })
-                if (stills.paths.length > 0) {
-                  ;(items[i] as unknown as Record<string, unknown>).still_paths = stills.paths
-                  ;(items[i] as unknown as Record<string, unknown>).still_center_s = stills.centerSeconds
-                  ;(items[i] as unknown as Record<string, unknown>).still_window_s = stills.windowSeconds
-                  ;(items[i] as unknown as Record<string, unknown>).still_version = stills.version
-                  touched = true
+              if (tc != null) {
+                try {
+                  const stills = await extractStillsForItem({
+                    videoDropboxPath: ctx.source_file_path!,
+                    centerSeconds: tc,
+                    songId: args.songId,
+                    itemId: it.id,
+                    version: 0,
+                  })
+                  if (stills.paths.length > 0) {
+                    ;(items[i] as unknown as Record<string, unknown>).still_paths = stills.paths
+                    ;(items[i] as unknown as Record<string, unknown>).still_center_s = stills.centerSeconds
+                    ;(items[i] as unknown as Record<string, unknown>).still_window_s = stills.windowSeconds
+                    ;(items[i] as unknown as Record<string, unknown>).still_version = stills.version
+                    touched = true
+                  }
+                } catch (err) {
+                  logError('socials: stills for item failed', {
+                    planId, itemId: it.id, error: err instanceof Error ? err.message : String(err),
+                  })
                 }
-              } catch (err) {
-                logError('socials: stills for item failed', {
-                  planId, itemId: it.id, error: err instanceof Error ? err.message : String(err),
-                })
+              }
+              // Video clip extraction — story (video medium) + reel
+              // items get the actual mp4 cut at their [start - end] range.
+              const isVideo =
+                (it.kind === 'story_concept' && (it as { medium?: string }).medium === 'video') ||
+                it.kind === 'reel_concept'
+              if (isVideo) {
+                const range = parseTimecodeRange((it as { suggested_clip?: string }).suggested_clip)
+                if (range) {
+                  try {
+                    const clip = await extractClipForItem({
+                      videoDropboxPath: ctx.source_file_path!,
+                      startSeconds: range.startSeconds,
+                      endSeconds: range.endSeconds,
+                      songId: args.songId,
+                      itemId: it.id,
+                      version: 0,
+                    })
+                    ;(items[i] as unknown as Record<string, unknown>).clip_dropbox_path = clip.dropboxPath
+                    ;(items[i] as unknown as Record<string, unknown>).clip_duration_s = clip.durationSeconds
+                    ;(items[i] as unknown as Record<string, unknown>).clip_start_s = range.startSeconds
+                    ;(items[i] as unknown as Record<string, unknown>).clip_end_s = range.endSeconds
+                    ;(items[i] as unknown as Record<string, unknown>).clip_version = clip.version
+                    touched = true
+                  } catch (err) {
+                    logError('socials: clip for item failed', {
+                      planId, itemId: it.id, error: err instanceof Error ? err.message : String(err),
+                    })
+                  }
+                }
               }
             }
             if (touched) {
@@ -300,10 +330,10 @@ export async function triggerSocialPlanGeneration(args: {
                 `UPDATE social_plans SET items = $2::jsonb, updated_at = now() WHERE id = $1`,
                 [planId, JSON.stringify(items)],
               )
-              logInfo('socials: stills attached', { planId, items: items.length })
+              logInfo('socials: ffmpeg assets attached', { planId, items: items.length })
             }
           } catch (err) {
-            logError('socials: stills batch failed', {
+            logError('socials: ffmpeg batch failed', {
               planId, error: err instanceof Error ? err.message : String(err),
             })
           }

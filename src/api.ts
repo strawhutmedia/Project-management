@@ -174,14 +174,21 @@ export type ApiBudget = {
 
 export type SocialItemStatus = 'idea' | 'drafted' | 'selected' | 'rejected' | 'scheduled' | 'posted'
 
-// Optional still-frame fields populated by the auto-pipeline after
-// Claude returns timecoded suggestions. Five Dropbox paths sampled
-// around the moment; the UI proxies them via /api/integrations/dropbox/file.
+// Optional still-frame + video-clip fields populated by the
+// auto-pipeline after Claude returns timecoded suggestions. Stills
+// are 5 thumbnails sampled around the moment; clip is the actual mp4
+// cut at the [start - end] range. UI proxies via the Dropbox file
+// route.
 export type StillFields = {
   still_paths?: string[]
   still_center_s?: number
   still_window_s?: number
   still_version?: number
+  clip_dropbox_path?: string | null
+  clip_start_s?: number
+  clip_end_s?: number
+  clip_duration_s?: number
+  clip_version?: number
 }
 
 export type ApiSocialItem =
