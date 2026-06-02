@@ -93,3 +93,4 @@
 {"level":"error","ts":"2026-06-01T21:34:10.617Z","msg":"transcript: failed","data":{"id":"ee7d9efb-fa55-4557-8dd3-99b1e68594ec","error":"fetch failed"}}
 {"level":"error","ts":"2026-06-02T17:39:16.671Z","msg":"stills: ffmpeg not in PATH — stills extraction will be skipped","data":{}}
 {"level":"error","ts":"2026-06-02T21:27:34.795Z","msg":"agent: workdir sync failed","data":{"error":"git_clone_failed: spawn_error"}}
+{"level":"error","ts":"2026-06-02T21:28:09.655Z","msg":"agent: workdir sync failed","data":{"error":"git_clone_failed: spawn_error"}}
