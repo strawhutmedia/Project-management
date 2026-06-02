@@ -15,6 +15,7 @@ import { transcriptsRouter } from './routes/transcripts'
 import { clipsRouter } from './routes/clips'
 import { socialsRouter } from './routes/socials'
 import { podcastsRouter } from './routes/podcasts'
+import { agentRouter } from './routes/agent'
 import { schedulerRouter as socialSchedulerRouter } from './routes/scheduler'
 import { seedBackInYourArms } from './seeds/back_in_your_arms'
 import { ensureRyanIsPodcastEp } from './routes/projects'
@@ -54,6 +55,7 @@ app.use('/api/transcripts', transcriptsRouter)
 app.use('/api/clips', clipsRouter)
 app.use('/api/socials', socialsRouter)
 app.use('/api/podcasts', podcastsRouter)
+app.use('/api/agent', agentRouter)
 app.use('/api/scheduler', socialSchedulerRouter)
 
 const clientDir = path.resolve(process.cwd(), 'dist')
