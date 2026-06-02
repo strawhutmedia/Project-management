@@ -20,6 +20,8 @@ import Anthropic from '@anthropic-ai/sdk'
 import { spawn } from 'child_process'
 import fs from 'fs'
 import path from 'path'
+import git from 'isomorphic-git'
+import http from 'isomorphic-git/http/node'
 import { pool } from '../db'
 import { requireUser, type SessionUser } from '../auth'
 import { logError, logInfo } from '../diag'
@@ -43,36 +45,42 @@ const RUNTIME_APP_DIR = '/app'
 // Ensures the agent's working tree exists, is on origin/main, and has
 // a usable node_modules. Returns the path to the workdir. Safe to call
 // before every tool that needs it.
+//
+// Uses isomorphic-git (pure JS) so we don't depend on a system git
+// binary being available in the Railway runtime container.
 let workdirReadyPromise: Promise<string> | null = null
 async function ensureWorkdir(): Promise<string> {
   if (workdirReadyPromise) return workdirReadyPromise
   workdirReadyPromise = (async () => {
     const token = process.env.GITHUB_TOKEN
     if (!token) throw new Error('GITHUB_TOKEN env var not set on Railway')
-    const repoUrl = `https://x-access-token:${token}@github.com/strawhutmedia/Project-management.git`
+    const url = 'https://github.com/strawhutmedia/Project-management.git'
+    const auth = () => ({ username: 'x-access-token', password: token })
 
     const hasCheckout = fs.existsSync(path.join(AGENT_WORKDIR, '.git'))
     if (!hasCheckout) {
       logInfo('agent: cloning workdir', { dir: AGENT_WORKDIR })
       await fs.promises.mkdir(path.dirname(AGENT_WORKDIR), { recursive: true })
-      // If a stale non-git dir exists, blow it away.
       if (fs.existsSync(AGENT_WORKDIR)) await fs.promises.rm(AGENT_WORKDIR, { recursive: true, force: true })
-      const clone = await rawSpawn('git', ['clone', '--depth', '50', repoUrl, AGENT_WORKDIR], 180_000)
-      if (clone.code !== 0) throw new Error(`git_clone_failed: ${clone.output.slice(-400)}`)
+      await fs.promises.mkdir(AGENT_WORKDIR, { recursive: true })
+      await git.clone({
+        fs, http, dir: AGENT_WORKDIR, url,
+        ref: 'main', singleBranch: true, depth: 50,
+        onAuth: auth,
+      })
     }
 
-    // Identify the bot for any commits this workdir produces.
-    await rawSpawn('git', ['-C', AGENT_WORKDIR, 'config', 'user.email', 'slate-bot@strawhutmedia.com'], 5_000)
-    await rawSpawn('git', ['-C', AGENT_WORKDIR, 'config', 'user.name', 'Slate Bot'], 5_000)
-    // Make sure origin points at the tokened URL so push works.
-    await rawSpawn('git', ['-C', AGENT_WORKDIR, 'remote', 'set-url', 'origin', repoUrl], 5_000)
-
     // Pull latest origin/main so the agent always starts on current prod.
-    const fetch = await rawSpawn('git', ['-C', AGENT_WORKDIR, 'fetch', 'origin', 'main'], 60_000)
-    if (fetch.code !== 0) throw new Error(`git_fetch_failed: ${fetch.output.slice(-400)}`)
-    const reset = await rawSpawn('git', ['-C', AGENT_WORKDIR, 'reset', '--hard', 'origin/main'], 30_000)
-    if (reset.code !== 0) throw new Error(`git_reset_failed: ${reset.output.slice(-400)}`)
-    await rawSpawn('git', ['-C', AGENT_WORKDIR, 'clean', '-fd'], 30_000)
+    await git.fetch({
+      fs, http, dir: AGENT_WORKDIR, ref: 'main',
+      singleBranch: true, depth: 50, onAuth: auth,
+    })
+    await git.checkout({ fs, dir: AGENT_WORKDIR, ref: 'main', force: true })
+    // Reset to the freshly-fetched origin/main tip in case local edits
+    // from a prior agent run are still sitting around.
+    const remoteSha = await git.resolveRef({ fs, dir: AGENT_WORKDIR, ref: 'refs/remotes/origin/main' })
+    await fs.promises.writeFile(path.join(AGENT_WORKDIR, '.git', 'refs', 'heads', 'main'), remoteSha + '\n')
+    await git.checkout({ fs, dir: AGENT_WORKDIR, ref: 'main', force: true })
 
     // Symlink the runtime container's node_modules into the workdir
     // (same package.json, same install) so `npm run build` doesn't
@@ -80,8 +88,8 @@ async function ensureWorkdir(): Promise<string> {
     const wdNodeModules = path.join(AGENT_WORKDIR, 'node_modules')
     const appNodeModules = path.join(RUNTIME_APP_DIR, 'node_modules')
     try {
-      const stat = fs.existsSync(wdNodeModules) ? await fs.promises.lstat(wdNodeModules) : null
-      if (!stat && fs.existsSync(appNodeModules)) {
+      const exists = fs.existsSync(wdNodeModules)
+      if (!exists && fs.existsSync(appNodeModules)) {
         await fs.promises.symlink(appNodeModules, wdNodeModules, 'dir')
         logInfo('agent: symlinked node_modules into workdir')
       }
@@ -101,34 +109,18 @@ async function ensureWorkdir(): Promise<string> {
   }
 }
 
-// Sync the workdir against origin/main before every agent turn so
-// changes made via other paths (a manual push from a real terminal)
-// land in the agent's checkout too. Cheap.
 async function syncWorkdir(): Promise<void> {
-  await ensureWorkdir() // initial setup if needed
-  await rawSpawn('git', ['-C', AGENT_WORKDIR, 'fetch', 'origin', 'main'], 60_000)
-  await rawSpawn('git', ['-C', AGENT_WORKDIR, 'reset', '--hard', 'origin/main'], 30_000)
-  await rawSpawn('git', ['-C', AGENT_WORKDIR, 'clean', '-fd'], 30_000)
-}
-
-type RawSpawnResult = { code: number | null; output: string }
-function rawSpawn(cmd: string, args: string[], timeoutMs: number): Promise<RawSpawnResult> {
-  return new Promise((resolve) => {
-    const proc = spawn(cmd, args, { stdio: ['ignore', 'pipe', 'pipe'] })
-    let stdout = ''
-    let stderr = ''
-    const t = setTimeout(() => { try { proc.kill('SIGKILL') } catch {} }, timeoutMs)
-    proc.stdout?.on('data', (d) => { stdout += String(d) })
-    proc.stderr?.on('data', (d) => { stderr += String(d) })
-    proc.on('error', () => {
-      clearTimeout(t)
-      resolve({ code: -1, output: stdout + stderr || 'spawn_error' })
-    })
-    proc.on('close', (code) => {
-      clearTimeout(t)
-      resolve({ code, output: stdout + (stderr ? `\n[stderr]\n${stderr}` : '') })
-    })
+  await ensureWorkdir()
+  const token = process.env.GITHUB_TOKEN
+  if (!token) return
+  const auth = () => ({ username: 'x-access-token', password: token })
+  await git.fetch({
+    fs, http, dir: AGENT_WORKDIR, ref: 'main',
+    singleBranch: true, depth: 50, onAuth: auth,
   })
+  const remoteSha = await git.resolveRef({ fs, dir: AGENT_WORKDIR, ref: 'refs/remotes/origin/main' })
+  await fs.promises.writeFile(path.join(AGENT_WORKDIR, '.git', 'refs', 'heads', 'main'), remoteSha + '\n')
+  await git.checkout({ fs, dir: AGENT_WORKDIR, ref: 'main', force: true })
 }
 
 // Hard allowlist — the chat is only available to Ryan and Caroline.
@@ -290,23 +282,57 @@ async function runTool(name: string, input: Record<string, unknown>): Promise<To
         return await runSpawn('npm', ['run', 'build'], 360_000)
       }
       case 'git_status': {
-        return await runSpawn('git', ['-C', AGENT_WORKDIR, 'status', '--porcelain=v1'], 30_000)
+        // Use isomorphic-git statusMatrix and summarize changes.
+        const matrix = await git.statusMatrix({ fs, dir: AGENT_WORKDIR })
+        const changed: string[] = []
+        for (const [filepath, head, workdir, stage] of matrix) {
+          // [0,0,0] no change; anything else means a difference.
+          if (head !== 1 || workdir !== 1 || stage !== 1) {
+            const tag = head === 0 ? 'A' : workdir === 0 ? 'D' : 'M'
+            changed.push(`${tag}  ${filepath}`)
+          }
+        }
+        return { content: changed.length === 0 ? '(clean working tree)' : changed.join('\n') }
       }
       case 'git_commit_push': {
         const msg = String(input.commit_message || '').trim()
         if (!msg) return { content: 'commit_message required', is_error: true }
-        // ensureWorkdir() already set git user + tokened remote. Just
-        // stage, commit, push.
-        const addRes = await runSpawn('git', ['-C', AGENT_WORKDIR, 'add', '-A'], 30_000)
-        if (addRes.is_error) return addRes
-        const commitRes = await runSpawn('git', ['-C', AGENT_WORKDIR, 'commit', '-m', msg], 30_000)
-        // git commit returns non-zero if there's nothing to commit; treat as success-no-op.
-        if (commitRes.is_error && !/nothing to commit|no changes added/i.test(commitRes.content)) {
-          return commitRes
+        const token = process.env.GITHUB_TOKEN
+        if (!token) return { content: 'GITHUB_TOKEN env var not set on Railway', is_error: true }
+        // Stage every change in the working tree.
+        const matrix = await git.statusMatrix({ fs, dir: AGENT_WORKDIR })
+        let stagedCount = 0
+        for (const [filepath, head, workdir] of matrix) {
+          if (workdir === 0 && head === 1) {
+            // File deleted from working tree — remove from index.
+            await git.remove({ fs, dir: AGENT_WORKDIR, filepath })
+            stagedCount++
+          } else if (head !== 1 || workdir !== 1) {
+            await git.add({ fs, dir: AGENT_WORKDIR, filepath })
+            stagedCount++
+          }
         }
-        const pushRes = await runSpawn('git', ['-C', AGENT_WORKDIR, 'push', 'origin', 'HEAD:main'], 120_000)
-        if (pushRes.is_error) return pushRes
-        return { content: `Committed and pushed. Railway will redeploy in ~60s.\n\n${pushRes.content}` }
+        if (stagedCount === 0) {
+          return { content: 'Nothing to commit — the working tree is clean.', is_error: true }
+        }
+        const sha = await git.commit({
+          fs, dir: AGENT_WORKDIR, message: msg,
+          author: { name: 'Slate Bot', email: 'slate-bot@strawhutmedia.com' },
+        })
+        const pushResult = await git.push({
+          fs, http, dir: AGENT_WORKDIR,
+          remote: 'origin', ref: 'main', force: false,
+          onAuth: () => ({ username: 'x-access-token', password: token }),
+        })
+        if (pushResult.ok === false || pushResult.error) {
+          return {
+            content: `push_rejected: ${pushResult.error || 'unknown'}`,
+            is_error: true,
+          }
+        }
+        return {
+          content: `Committed ${stagedCount} file change(s) as ${sha.slice(0, 8)} and pushed to main. Railway will redeploy in ~60s.`,
+        }
       }
       default:
         return { content: `unknown_tool: ${name}`, is_error: true }
@@ -318,7 +344,11 @@ async function runTool(name: string, input: Record<string, unknown>): Promise<To
 
 function runSpawn(cmd: string, args: string[], timeoutMs: number): Promise<ToolResult> {
   return new Promise((resolve) => {
-    const proc = spawn(cmd, args, { stdio: ['ignore', 'pipe', 'pipe'] })
+    // Run from the agent workdir so npm picks up the cloned tree,
+    // not /app. Falls back to process.cwd() if workdir doesn't exist
+    // yet (shouldn't happen since ensureWorkdir runs first).
+    const cwd = fs.existsSync(AGENT_WORKDIR) ? AGENT_WORKDIR : process.cwd()
+    const proc = spawn(cmd, args, { stdio: ['ignore', 'pipe', 'pipe'], cwd })
     let stdout = ''
     let stderr = ''
     const t = setTimeout(() => { try { proc.kill('SIGKILL') } catch {} }, timeoutMs)
