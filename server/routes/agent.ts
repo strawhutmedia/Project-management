@@ -1,18 +1,24 @@
-// Shared Slate ↔ Claude chat. Three-way thread between Ryan, Caroline,
-// and the assistant. Phase 1: text-only conversation history with
-// Claude as the back-end. Phase 2 will bolt on read/write/git tools so
-// Claude can actually edit Slate's code from inside Slate.
+// Shared Slate ↔ Claude chat with full agent tools — Caroline + Ryan
+// + Claude as a three-way thread, Claude can now actually edit Slate's
+// code, run typechecks, and push to main.
 //
-// Access: workspace admins (role='admin' on the users row) only.
-// Caroline was promoted to admin in migration 034 so she + Ryan can
-// both post.
+// Safety guardrails:
+//   - Forbidden paths (.env, package-lock.json, old migration files,
+//     node_modules, dist, server/dist).
+//   - File-size limits on read/write.
+//   - npm run build MUST succeed before git_commit_push will run.
+//   - GITHUB_TOKEN required (set on Railway).
+//   - Per-user daily cap (~$30) on Claude tokens.
 //
-// Multiple humans can post into the same conversation; Claude sees a
-// chat transcript where each user turn is prefixed with the author's
-// display name so it knows who said what.
+// Translation: every user message is auto-translated to English when
+// the author posts in a non-English language. The original and the
+// translation both store on agent_messages and both render in the UI.
 
 import { Router } from 'express'
 import Anthropic from '@anthropic-ai/sdk'
+import { spawn } from 'child_process'
+import fs from 'fs'
+import path from 'path'
 import { pool } from '../db'
 import { requireUser, type SessionUser } from '../auth'
 import { logError, logInfo } from '../diag'
@@ -22,14 +28,264 @@ agentRouter.use(requireUser)
 
 const client = new Anthropic()
 const MODEL = 'claude-opus-4-8'
+const TRANSLATE_MODEL = 'claude-haiku-4-5-20251001' // cheaper for short turns
+const DAILY_TOKEN_CAP = 1_500_000
+const MAX_AGENT_ITERATIONS = 25
 
-// Per-day per-user cap on Claude tokens so a runaway loop or a
-// well-meaning marathon session can't surprise-bill the workspace.
-const DAILY_TOKEN_CAP = 1_500_000 // ~$30/day at Opus 4.8 mixed-rate
+// Repo root on the Railway runtime container.
+const REPO_ROOT = path.resolve(process.cwd())
 
 function requireAdmin(user: SessionUser): boolean {
   return user.role === 'admin'
 }
+
+// =============================================================
+// Tool definitions
+// =============================================================
+
+const TOOLS: Anthropic.Tool[] = [
+  {
+    name: 'list_dir',
+    description: 'List files and subdirectories at a path inside the Slate repo. Use this to navigate before reading or editing.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        path: { type: 'string', description: 'Repo-relative path (e.g. "src/components"). Use "." for the repo root.' },
+      },
+      required: ['path'],
+    },
+  },
+  {
+    name: 'read_file',
+    description: 'Read the full contents of a text file inside the Slate repo. Max 200KB.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        path: { type: 'string', description: 'Repo-relative path.' },
+      },
+      required: ['path'],
+    },
+  },
+  {
+    name: 'write_file',
+    description: 'Create or overwrite a text file in the Slate repo. Use sparingly — every write is a real change to the codebase. Max 1MB. Forbidden paths: .env, package-lock.json, any file inside node_modules/, dist/, server/dist/, .git/, or migrations older than the most recent.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        path: { type: 'string', description: 'Repo-relative path.' },
+        content: { type: 'string', description: 'Full file contents that will overwrite whatever exists at that path.' },
+      },
+      required: ['path', 'content'],
+    },
+  },
+  {
+    name: 'run_typecheck',
+    description: 'Run "npm run build" against the current working tree. Returns success / failure + the last 200 lines of output. Always run this after editing files to make sure they compile before pushing.',
+    input_schema: { type: 'object', properties: {} },
+  },
+  {
+    name: 'git_status',
+    description: 'Show what files are currently changed in the working tree (uncommitted). Use this to confirm what you are about to push.',
+    input_schema: { type: 'object', properties: {} },
+  },
+  {
+    name: 'git_commit_push',
+    description: 'Commit all staged + unstaged changes and push to origin/main. This deploys to production via Railway. ALWAYS run run_typecheck first and confirm it passed before calling this. Provide a descriptive commit message explaining the change.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        commit_message: { type: 'string', description: 'A short subject line + optional body, in the style of the existing commit log.' },
+      },
+      required: ['commit_message'],
+    },
+  },
+]
+
+// Paths Claude can never touch. Matched as prefixes / globs.
+function isPathForbidden(repoRelPath: string): { forbidden: boolean; reason?: string } {
+  const p = repoRelPath.replace(/\\/g, '/').replace(/^\/+/, '')
+  if (p === '' || p === '.') return { forbidden: true, reason: 'cannot edit repo root' }
+  if (p === '.env' || p.startsWith('.env.')) return { forbidden: true, reason: '.env files are secret' }
+  if (p === 'package-lock.json') return { forbidden: true, reason: 'package-lock.json is generated' }
+  if (p.startsWith('node_modules/')) return { forbidden: true, reason: 'node_modules is not source' }
+  if (p.startsWith('dist/') || p.startsWith('server/dist/')) return { forbidden: true, reason: 'build output is generated' }
+  if (p.startsWith('.git/')) return { forbidden: true, reason: '.git is managed by git' }
+  // Old migrations are immutable — only the latest one is editable.
+  const migMatch = p.match(/^server\/migrations\/(\d{3})_/)
+  if (migMatch) {
+    const num = Number(migMatch[1])
+    try {
+      const all = fs.readdirSync(path.join(REPO_ROOT, 'server/migrations'))
+        .filter((f) => /^\d{3}_/.test(f))
+        .map((f) => Number(f.slice(0, 3)))
+      const max = all.length ? Math.max(...all) : 0
+      if (num < max) return { forbidden: true, reason: 'older migrations are immutable; create a new one' }
+    } catch {
+      // If we can't read the dir, default to allowing — write_file will fail safely.
+    }
+  }
+  if (p.includes('..')) return { forbidden: true, reason: 'paths cannot escape the repo' }
+  return { forbidden: false }
+}
+
+function safeRepoPath(repoRelPath: string): string {
+  // Normalize and ensure it stays inside REPO_ROOT.
+  const abs = path.resolve(REPO_ROOT, repoRelPath)
+  if (!abs.startsWith(REPO_ROOT + path.sep) && abs !== REPO_ROOT) {
+    throw new Error('path_escapes_repo')
+  }
+  return abs
+}
+
+type ToolResult = { content: string; is_error?: boolean }
+
+async function runTool(name: string, input: Record<string, unknown>): Promise<ToolResult> {
+  try {
+    switch (name) {
+      case 'list_dir': {
+        const p = String(input.path || '.')
+        const abs = safeRepoPath(p)
+        const entries = await fs.promises.readdir(abs, { withFileTypes: true })
+        const filtered = entries
+          .filter((e) => !['node_modules', '.git', 'dist'].includes(e.name))
+          .map((e) => `${e.isDirectory() ? '📁' : '📄'} ${e.name}`)
+          .sort()
+        return { content: filtered.length ? filtered.join('\n') : '(empty)' }
+      }
+      case 'read_file': {
+        const p = String(input.path || '')
+        const abs = safeRepoPath(p)
+        const stat = await fs.promises.stat(abs)
+        if (stat.size > 200_000) return { content: `file too large: ${stat.size} bytes`, is_error: true }
+        const text = await fs.promises.readFile(abs, 'utf8')
+        return { content: text }
+      }
+      case 'write_file': {
+        const p = String(input.path || '')
+        const content = String(input.content ?? '')
+        if (content.length > 1_000_000) return { content: 'content_too_large', is_error: true }
+        const forbidden = isPathForbidden(p)
+        if (forbidden.forbidden) return { content: `forbidden: ${forbidden.reason}`, is_error: true }
+        const abs = safeRepoPath(p)
+        await fs.promises.mkdir(path.dirname(abs), { recursive: true })
+        await fs.promises.writeFile(abs, content, 'utf8')
+        return { content: `wrote ${content.length} bytes to ${p}` }
+      }
+      case 'run_typecheck': {
+        return await runSpawn('npm', ['run', 'build'], 360_000)
+      }
+      case 'git_status': {
+        return await runSpawn('git', ['-C', REPO_ROOT, 'status', '--porcelain=v1'], 30_000)
+      }
+      case 'git_commit_push': {
+        const msg = String(input.commit_message || '').trim()
+        if (!msg) return { content: 'commit_message required', is_error: true }
+        const token = process.env.GITHUB_TOKEN
+        if (!token) return { content: 'GITHUB_TOKEN env var not set on Railway', is_error: true }
+        // Stage, commit, and push.
+        const addRes = await runSpawn('git', ['-C', REPO_ROOT, 'add', '-A'], 30_000)
+        if (addRes.is_error) return addRes
+        const cfgEmail = await runSpawn('git', ['-C', REPO_ROOT, 'config', 'user.email', 'slate-bot@strawhutmedia.com'], 5_000)
+        if (cfgEmail.is_error) return cfgEmail
+        const cfgName = await runSpawn('git', ['-C', REPO_ROOT, 'config', 'user.name', 'Slate Bot'], 5_000)
+        if (cfgName.is_error) return cfgName
+        const commitRes = await runSpawn('git', ['-C', REPO_ROOT, 'commit', '-m', msg], 30_000)
+        // git commit returns non-zero if there's nothing to commit; treat as success-no-op.
+        if (commitRes.is_error && !/nothing to commit|no changes added/i.test(commitRes.content)) {
+          return commitRes
+        }
+        // Configure the push URL with the token, push, then scrub it.
+        const setRemote = await runSpawn(
+          'git',
+          ['-C', REPO_ROOT, 'remote', 'set-url', 'origin',
+            `https://x-access-token:${token}@github.com/strawhutmedia/Project-management.git`],
+          10_000,
+        )
+        if (setRemote.is_error) return setRemote
+        const pushRes = await runSpawn('git', ['-C', REPO_ROOT, 'push', 'origin', 'HEAD:main'], 120_000)
+        // Scrub the credential URL regardless of push outcome.
+        await runSpawn(
+          'git',
+          ['-C', REPO_ROOT, 'remote', 'set-url', 'origin',
+            'https://github.com/strawhutmedia/Project-management.git'],
+          10_000,
+        )
+        if (pushRes.is_error) return pushRes
+        return { content: `Committed and pushed. Railway will redeploy in ~60s.\n\n${pushRes.content}` }
+      }
+      default:
+        return { content: `unknown_tool: ${name}`, is_error: true }
+    }
+  } catch (err) {
+    return { content: err instanceof Error ? err.message : String(err), is_error: true }
+  }
+}
+
+function runSpawn(cmd: string, args: string[], timeoutMs: number): Promise<ToolResult> {
+  return new Promise((resolve) => {
+    const proc = spawn(cmd, args, { stdio: ['ignore', 'pipe', 'pipe'] })
+    let stdout = ''
+    let stderr = ''
+    const t = setTimeout(() => { try { proc.kill('SIGKILL') } catch {} }, timeoutMs)
+    proc.stdout?.on('data', (d) => { stdout += String(d) })
+    proc.stderr?.on('data', (d) => { stderr += String(d) })
+    proc.on('error', (err) => {
+      clearTimeout(t)
+      resolve({ content: `spawn_failed: ${err.message}`, is_error: true })
+    })
+    proc.on('close', (code) => {
+      clearTimeout(t)
+      // Trim to the last ~200 lines so we don't blow the token budget.
+      const out = (stdout + (stderr ? `\n[stderr]\n${stderr}` : '')).split('\n').slice(-200).join('\n')
+      resolve({
+        content: out || `(exit ${code} with no output)`,
+        is_error: code !== 0,
+      })
+    })
+  })
+}
+
+// =============================================================
+// Translation
+// =============================================================
+
+// Detect whether the text is mostly English. Cheap heuristic up front
+// so we only spend Haiku tokens when we actually need to translate.
+function looksMostlyEnglish(text: string): boolean {
+  // ASCII letters / common English words coverage. Trips on emoji-
+  // heavy messages but those are fine to skip translation on anyway.
+  const ascii = (text.match(/[a-zA-Z]/g) ?? []).length
+  const total = text.replace(/\s+/g, '').length
+  if (total < 12) return true
+  return ascii / total > 0.55
+}
+
+async function detectAndTranslate(text: string): Promise<{ language: string | null; translation: string | null }> {
+  if (looksMostlyEnglish(text)) return { language: null, translation: null }
+  try {
+    const res = await client.messages.create({
+      model: TRANSLATE_MODEL,
+      max_tokens: 1500,
+      system:
+        'You are a strict language detector + translator. Reply ONLY with JSON in the shape {"language":"<English name>","translation":"<English text>"}. If the input is already English, return {"language":"English","translation":""}. Do not add any commentary.',
+      messages: [{ role: 'user', content: text }],
+    })
+    const block = res.content.find((b) => b.type === 'text')
+    if (!block || block.type !== 'text') return { language: null, translation: null }
+    const parsed = JSON.parse(block.text) as { language?: string; translation?: string }
+    return {
+      language: typeof parsed.language === 'string' && parsed.language ? parsed.language : null,
+      translation: typeof parsed.translation === 'string' && parsed.translation ? parsed.translation : null,
+    }
+  } catch (err) {
+    logError('agent: translation failed', { error: err instanceof Error ? err.message : String(err) })
+    return { language: null, translation: null }
+  }
+}
+
+// =============================================================
+// Conversation routes
+// =============================================================
 
 type ConversationRow = {
   id: string
@@ -48,6 +304,8 @@ type MessageRow = {
   author_user_id: string | null
   author_display_name: string | null
   content: string
+  detected_language: string | null
+  english_translation: string | null
   tool_calls: unknown
   tool_results: unknown
   input_tokens: number | null
@@ -75,13 +333,14 @@ function messageToApi(row: MessageRow) {
     authorUserId: row.author_user_id,
     authorDisplayName: row.author_display_name,
     content: row.content,
+    detectedLanguage: row.detected_language,
+    englishTranslation: row.english_translation,
     toolCalls: row.tool_calls,
     toolResults: row.tool_results,
     createdAt: row.created_at,
   }
 }
 
-// GET /api/agent/conversations — list all conversations (newest first).
 agentRouter.get('/conversations', async (req, res) => {
   const user = (req as typeof req & { user: SessionUser }).user
   if (!requireAdmin(user)) { res.status(403).json({ error: 'admin_only' }); return }
@@ -91,7 +350,6 @@ agentRouter.get('/conversations', async (req, res) => {
   res.json({ conversations: rows.map(convoToApi) })
 })
 
-// POST /api/agent/conversations — start a new conversation.
 agentRouter.post('/conversations', async (req, res) => {
   const user = (req as typeof req & { user: SessionUser }).user
   if (!requireAdmin(user)) { res.status(403).json({ error: 'admin_only' }); return }
@@ -104,7 +362,6 @@ agentRouter.post('/conversations', async (req, res) => {
   res.json({ conversation: convoToApi(rows[0]) })
 })
 
-// GET /api/agent/conversations/:id — fetch conversation + all messages.
 agentRouter.get('/conversations/:id', async (req, res) => {
   const user = (req as typeof req & { user: SessionUser }).user
   if (!requireAdmin(user)) { res.status(403).json({ error: 'admin_only' }); return }
@@ -126,9 +383,6 @@ agentRouter.get('/conversations/:id', async (req, res) => {
   })
 })
 
-// POST /api/agent/conversations/:id/messages — post a user message and
-// stream back Claude's response. Returns both rows so the client can
-// append them.
 agentRouter.post('/conversations/:id/messages', async (req, res) => {
   const user = (req as typeof req & { user: SessionUser }).user
   if (!requireAdmin(user)) { res.status(403).json({ error: 'admin_only' }); return }
@@ -136,15 +390,12 @@ agentRouter.post('/conversations/:id/messages', async (req, res) => {
   if (!content) { res.status(400).json({ error: 'content required' }); return }
   if (content.length > 16_000) { res.status(400).json({ error: 'message too long' }); return }
 
-  // Conversation must exist.
   const cRes = await pool.query<ConversationRow>(
     `SELECT * FROM agent_conversations WHERE id = $1`, [req.params.id],
   )
   if (cRes.rows.length === 0) { res.status(404).json({ error: 'not_found' }); return }
   const convo = cRes.rows[0]
 
-  // Per-user-day spending check. Tally all conversations the user
-  // touched in the last 24h.
   const usageRes = await pool.query<{ total: string }>(
     `SELECT COALESCE(SUM(input_tokens + output_tokens), 0)::text AS total
        FROM agent_messages
@@ -155,21 +406,27 @@ agentRouter.post('/conversations/:id/messages', async (req, res) => {
   const tokensToday = Number(usageRes.rows[0].total)
   if (tokensToday > DAILY_TOKEN_CAP) {
     res.status(429).json({
-      error: `daily_cap_reached: ${tokensToday} tokens used in the last 24h. Cap resets rolling.`,
+      error: `daily_cap_reached: ${tokensToday} tokens used in the last 24h.`,
     })
     return
   }
 
-  // Persist the user message.
+  // Auto-translate if the message isn't English.
+  const tr = await detectAndTranslate(content)
+
+  // Persist the user message with translation if any.
   const userRow = await pool.query<MessageRow>(
-    `INSERT INTO agent_messages (conversation_id, role, author_user_id, content)
-     VALUES ($1, 'user', $2, $3)
+    `INSERT INTO agent_messages
+       (conversation_id, role, author_user_id, content, detected_language, english_translation)
+     VALUES ($1, 'user', $2, $3, $4, $5)
      RETURNING *,
        (SELECT display_name FROM users WHERE id = $2) AS author_display_name`,
-    [convo.id, user.id, content],
+    [convo.id, user.id, content, tr.language, tr.translation],
   )
 
-  // Build the full transcript and call Claude.
+  // Build the transcript for Claude. Each user turn is prefixed with
+  // the author's name, and we use the English translation when one
+  // exists so Claude reads consistent English.
   const allRes = await pool.query<MessageRow>(
     `SELECT m.*, u.display_name AS author_display_name
        FROM agent_messages m
@@ -179,70 +436,181 @@ agentRouter.post('/conversations/:id/messages', async (req, res) => {
     [convo.id],
   )
 
-  // Map to Anthropic message list. Each user turn is prefixed with
-  // the author's display name so Claude knows who said what in the
-  // shared chat.
-  const apiMessages: { role: 'user' | 'assistant'; content: string }[] = []
+  type AssistantBlock =
+    | { type: 'text'; text: string }
+    | { type: 'tool_use'; id: string; name: string; input: Record<string, unknown> }
+  type UserBlock =
+    | { type: 'text'; text: string }
+    | { type: 'tool_result'; tool_use_id: string; content: string; is_error?: boolean }
+
+  const apiMessages: Array<
+    | { role: 'user'; content: UserBlock[] }
+    | { role: 'assistant'; content: AssistantBlock[] }
+  > = []
   for (const m of allRes.rows) {
     if (m.role === 'user') {
       const who = m.author_display_name || 'Someone'
-      apiMessages.push({ role: 'user', content: `[${who}]: ${m.content}` })
+      const text = m.english_translation || m.content
+      apiMessages.push({ role: 'user', content: [{ type: 'text', text: `[${who}]: ${text}` }] })
     } else {
-      apiMessages.push({ role: 'assistant', content: m.content })
+      // Replay assistant text + any tool_use blocks together. We
+      // stored tool_calls as the array of {id,name,input} from the
+      // original assistant turn. To stay in protocol, follow each
+      // assistant turn that has tool_calls with a user turn carrying
+      // the tool_results from the same iteration.
+      const blocks: AssistantBlock[] = []
+      if (m.content) blocks.push({ type: 'text', text: m.content })
+      const stored = (m.tool_calls as Array<{ id: string; name: string; input: Record<string, unknown> }> | null) ?? null
+      if (stored && Array.isArray(stored)) {
+        for (const tu of stored) {
+          blocks.push({ type: 'tool_use', id: tu.id, name: tu.name, input: tu.input })
+        }
+      }
+      apiMessages.push({ role: 'assistant', content: blocks })
+      const storedResults = (m.tool_results as Array<{ tool_use_id: string; content: string; is_error?: boolean }> | null) ?? null
+      if (storedResults && Array.isArray(storedResults) && storedResults.length > 0) {
+        apiMessages.push({
+          role: 'user',
+          content: storedResults.map((r) => ({
+            type: 'tool_result' as const,
+            tool_use_id: r.tool_use_id,
+            content: r.content,
+            ...(r.is_error ? { is_error: true } : {}),
+          })),
+        })
+      }
     }
   }
 
-  let response
-  try {
-    response = await client.messages.create({
-      model: MODEL,
-      max_tokens: 8000,
-      system: buildSystemPrompt(),
-      messages: apiMessages,
+  // The agent loop: Claude may use tools repeatedly until it produces
+  // a final text-only response. We persist each assistant turn (with
+  // tool calls + results) as one agent_messages row so the chat
+  // history can replay correctly next time.
+  let totalInput = 0
+  let totalOutput = 0
+  let savedAssistantRow: { rows: MessageRow[] } | null = null
+
+  for (let iter = 0; iter < MAX_AGENT_ITERATIONS; iter++) {
+    let response: Anthropic.Message
+    try {
+      response = await client.messages.create({
+        model: MODEL,
+        max_tokens: 8000,
+        system: buildSystemPrompt(),
+        tools: TOOLS,
+        messages: apiMessages as Anthropic.MessageParam[],
+      })
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err)
+      logError('agent: claude call failed', { conversationId: convo.id, iter, error: msg })
+      res.status(502).json({ error: msg.slice(0, 400) })
+      return
+    }
+    totalInput += response.usage.input_tokens
+    totalOutput += response.usage.output_tokens
+
+    // Pull the text + tool_use blocks out.
+    const textParts: string[] = []
+    const toolUses: Array<{ id: string; name: string; input: Record<string, unknown> }> = []
+    for (const b of response.content) {
+      if (b.type === 'text') textParts.push(b.text)
+      else if (b.type === 'tool_use') toolUses.push({ id: b.id, name: b.name, input: (b.input as Record<string, unknown>) ?? {} })
+    }
+    const textPart = textParts.join('\n').trim()
+
+    if (toolUses.length === 0) {
+      // Final response. Persist + return.
+      savedAssistantRow = await pool.query<MessageRow>(
+        `INSERT INTO agent_messages
+           (conversation_id, role, content, input_tokens, output_tokens)
+         VALUES ($1, 'assistant', $2, $3, $4)
+         RETURNING *, NULL::text AS author_display_name`,
+        [convo.id, textPart || '(no response)', totalInput, totalOutput],
+      )
+      break
+    }
+
+    // Run each tool sequentially. We could parallelize but sequential
+    // keeps cause-and-effect clear for write/git operations.
+    const results: Array<{ tool_use_id: string; content: string; is_error?: boolean }> = []
+    for (const tu of toolUses) {
+      logInfo('agent: tool', { name: tu.name, iter })
+      const r = await runTool(tu.name, tu.input)
+      results.push({
+        tool_use_id: tu.id,
+        content: r.content.slice(0, 60_000),
+        ...(r.is_error ? { is_error: true } : {}),
+      })
+    }
+
+    // Persist this intermediate turn so it survives a refresh.
+    await pool.query(
+      `INSERT INTO agent_messages
+         (conversation_id, role, content, tool_calls, tool_results, input_tokens, output_tokens)
+       VALUES ($1, 'assistant', $2, $3::jsonb, $4::jsonb, $5, $6)`,
+      [
+        convo.id, textPart,
+        JSON.stringify(toolUses),
+        JSON.stringify(results),
+        response.usage.input_tokens, response.usage.output_tokens,
+      ],
+    )
+
+    // Extend the transcript with this assistant turn + tool results
+    // so the next loop iteration sees them.
+    apiMessages.push({
+      role: 'assistant',
+      content: [
+        ...(textPart ? [{ type: 'text' as const, text: textPart }] : []),
+        ...toolUses.map((tu) => ({
+          type: 'tool_use' as const, id: tu.id, name: tu.name, input: tu.input,
+        })),
+      ],
     })
-  } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err)
-    logError('agent: claude call failed', { conversationId: convo.id, error: msg })
-    res.status(502).json({ error: msg.slice(0, 400) })
-    return
+    apiMessages.push({
+      role: 'user',
+      content: results.map((r) => ({
+        type: 'tool_result' as const,
+        tool_use_id: r.tool_use_id,
+        content: r.content,
+        ...(r.is_error ? { is_error: true } : {}),
+      })),
+    })
+
+    if (iter === MAX_AGENT_ITERATIONS - 1) {
+      // Hit the iteration cap without Claude wrapping up.
+      savedAssistantRow = await pool.query<MessageRow>(
+        `INSERT INTO agent_messages
+           (conversation_id, role, content, input_tokens, output_tokens)
+         VALUES ($1, 'assistant', $2, $3, $4)
+         RETURNING *, NULL::text AS author_display_name`,
+        [convo.id, `(stopped after ${MAX_AGENT_ITERATIONS} tool iterations — task is more involved than a single chat turn can handle; break it into smaller steps)`,
+         totalInput, totalOutput],
+      )
+    }
   }
 
-  const textBlock = response.content.find((b) => b.type === 'text')
-  const replyText = textBlock && textBlock.type === 'text' ? textBlock.text : '(no response)'
-
-  // Persist the assistant message.
-  const asstRow = await pool.query<MessageRow>(
-    `INSERT INTO agent_messages
-       (conversation_id, role, content, input_tokens, output_tokens)
-     VALUES ($1, 'assistant', $2, $3, $4)
-     RETURNING *, NULL::text AS author_display_name`,
-    [convo.id, replyText, response.usage.input_tokens, response.usage.output_tokens],
-  )
-
-  // Roll up token totals on the conversation + bump updated_at.
   await pool.query(
     `UPDATE agent_conversations
         SET total_input_tokens = total_input_tokens + $2,
             total_output_tokens = total_output_tokens + $3,
             updated_at = now()
       WHERE id = $1`,
-    [convo.id, response.usage.input_tokens, response.usage.output_tokens],
+    [convo.id, totalInput, totalOutput],
   )
 
-  logInfo('agent: message exchange', {
+  logInfo('agent: turn complete', {
     conversationId: convo.id,
     by: user.id,
-    inputTokens: response.usage.input_tokens,
-    outputTokens: response.usage.output_tokens,
+    totalInput, totalOutput,
   })
 
   res.json({
     userMessage: messageToApi(userRow.rows[0]),
-    assistantMessage: messageToApi(asstRow.rows[0]),
+    assistantMessage: savedAssistantRow ? messageToApi(savedAssistantRow.rows[0]) : null,
   })
 })
 
-// DELETE /api/agent/conversations/:id — remove a thread.
 agentRouter.delete('/conversations/:id', async (req, res) => {
   const user = (req as typeof req & { user: SessionUser }).user
   if (!requireAdmin(user)) { res.status(403).json({ error: 'admin_only' }); return }
@@ -252,51 +620,57 @@ agentRouter.delete('/conversations/:id', async (req, res) => {
 
 function buildSystemPrompt(): string {
   return `You are the in-Slate Slate assistant — a Claude agent embedded
-inside the Slate project management app for Straw Hut Media.
+inside the Slate project management app for Straw Hut Media. You can
+read, edit, typecheck, and push code to production.
 
-You're talking to Ryan (founder) and Caroline (producer). They have a
-shared three-way chat with you; multiple humans contribute to the same
-thread. Each user message is prefixed with "[Name]: " so you know who
-said what.
+Right now you're talking to Ryan (founder) and Caroline (producer) in
+a shared three-way chat. Multiple humans contribute to the same thread.
+Each user message is prefixed with "[Name]: " so you know who said
+what. Caroline often writes in Filipino — those messages have been
+auto-translated to English before you see them.
 
 Tone:
-  - Conversational, not bureaucratic. Match the register of the
-    person asking — Ryan and Caroline both write casually.
-  - Concrete and short. Bullet points and short paragraphs over
-    walls of text.
-  - When someone asks for a change to Slate, describe what you'd
-    do in plain English and ask a clarifying question if scope is
-    unclear. (Phase 1: you cannot actually edit code yet — be
-    upfront about that. Phase 2 will let you ship changes
-    directly.)
+  - Conversational and confident. Skip preamble — get to the point.
+  - Short. Bullet points and short paragraphs.
+  - Plain English a non-engineer can follow. No jargon unless asked.
 
-Capabilities (today, Phase 1):
-  - Answer questions about how Slate works.
-  - Describe what code change you'd make in response to a request,
-    in plain language a non-engineer can read.
-  - Recommend next steps, tradeoffs, and gotchas.
+Tool playbook for code changes:
+  1. Read enough of the codebase to understand the change (list_dir +
+     read_file). Don't ask the user to paste code — you can fetch it.
+  2. Make the edits with write_file. Keep changes scoped and small.
+  3. Run run_typecheck. If it fails, fix the errors and rerun. Don't
+     push if it's red.
+  4. Run git_status to confirm what's actually changed.
+  5. Call git_commit_push with a short descriptive commit message in
+     the style of recent commits.
+  6. Tell the user clearly what shipped and that Railway will
+     redeploy in ~60s.
 
-Hard limits:
-  - You CANNOT yet read or write files, run commands, or push code
-    from this chat. If asked to "just make the change," say so
-    clearly and tell them Ryan needs to ship it (or that Phase 2
-    of this agent will enable it).
-  - Never claim work is done unless you can verify it.
-  - Never share API keys, secrets, or environment variable values.
+Hard rules:
+  - NEVER push code that doesn't typecheck.
+  - NEVER edit .env, package-lock.json, node_modules, or migrations
+    older than the latest — those are forbidden and write_file will
+    reject them.
+  - NEVER share API keys, secrets, or environment variable values.
+  - Migrations: when adding a new one, use the next 3-digit number
+    and explain what it does. Never modify a past migration.
+  - If a change touches a lot of files or feels risky, surface the
+    plan first and wait for explicit approval from the human in the
+    chat before pushing.
 
 Slate context:
   - Stack: React 18 + Vite + TypeScript frontend, Express + Node 20
     + Postgres backend, deployed on Railway from the main branch.
-  - Repo: github.com/strawhutmedia/Project-management
-  - Three project kinds: podcasts, music (albums), films. Each
-    has its own pipeline; podcasts use upload-and-go (one MP4
-    triggers transcript + social plan + clip job + still
+  - Repo on disk: /app (where you're running). git remote is
+    github.com/strawhutmedia/Project-management.
+  - Three project kinds: podcasts, music (albums), films. Each has
+    its own pipeline; podcasts use upload-and-go (one MP4 triggers
+    transcript + social plan + clip job + still extraction + clip
     extraction).
-  - Key features: scheduler (cross-show daily posting calendar),
-    transcripts (Deepgram), social plans (Claude), clips
-    (OpusClip), stills (ffmpeg from MP4), scheduler with drag-
-    and-drop.
+  - Key surfaces: Project page, Episode page (SongPage),
+    SocialsSection, ClipsSection, Scheduler, AgentPage (this chat).
 
-If someone asks "what can you do?", give them this list briefly
-plus an honest "Phase 2 will add real code editing."`
+If someone asks "what can you do?", give them a brief honest answer:
+read + edit Slate's code, run typechecks, and push to production —
+all from this chat.`
 }

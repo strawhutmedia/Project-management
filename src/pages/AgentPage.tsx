@@ -233,6 +233,11 @@ function MessageBubble({
   const isMine = !isAssistant && message.authorUserId === currentUserId
   const name = isAssistant ? 'Claude' : (message.authorDisplayName || 'Someone')
   const initial = name.charAt(0).toUpperCase()
+  const translation = message.englishTranslation || null
+  const lang = message.detectedLanguage || null
+  const toolCalls = Array.isArray(message.toolCalls)
+    ? (message.toolCalls as Array<{ id: string; name: string; input: Record<string, unknown> }>)
+    : null
   return (
     <div className={`flex gap-3 ${isMine ? 'flex-row-reverse' : ''}`}>
       <div className={`w-8 h-8 rounded-full grid place-items-center text-xs font-bold shrink-0 ${
@@ -255,6 +260,29 @@ function MessageBubble({
         }`}>
           {message.content}
         </div>
+        {translation && (
+          <div className={`mt-1 inline-block rounded-xl px-3 py-2 text-[12px] text-muted border border-line/60 bg-ink/30 text-left whitespace-pre-wrap ${isMine ? 'text-right' : ''}`}>
+            <div className="text-[9px] uppercase tracking-wider text-muted/70 font-bold mb-0.5">
+              English{lang ? ` (from ${lang})` : ''}
+            </div>
+            {translation}
+          </div>
+        )}
+        {toolCalls && toolCalls.length > 0 && (
+          <div className="mt-1.5 space-y-1">
+            {toolCalls.map((tc) => (
+              <div key={tc.id} className="text-[11px] inline-block rounded-lg border border-line/60 bg-ink/40 px-2 py-1 text-left">
+                <span className="font-mono text-stage-mastering">🔧 {tc.name}</span>
+                {typeof tc.input?.path === 'string' && (
+                  <span className="text-muted/80 ml-1.5 font-mono">{tc.input.path}</span>
+                )}
+                {typeof tc.input?.commit_message === 'string' && (
+                  <span className="text-muted/80 ml-1.5 italic">{(tc.input.commit_message as string).split('\n')[0]}</span>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   )

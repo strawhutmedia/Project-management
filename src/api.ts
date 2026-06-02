@@ -289,6 +289,8 @@ export type ApiAgentMessage = {
   authorUserId: string | null
   authorDisplayName: string | null
   content: string
+  detectedLanguage?: string | null
+  englishTranslation?: string | null
   toolCalls: unknown
   toolResults: unknown
   createdAt: string
