@@ -1,9 +1,10 @@
 # Railway build override. Nixpacks normally auto-detects a Node app
-# and builds it fine — we add ffmpeg here so the server can extract
-# still frames from podcast episode MP4s for the social plan UI.
+# and builds it fine — we add system binaries the runtime container
+# needs:
+#   - ffmpeg: stills + clip extraction from podcast MP4s
+#   - git: the in-Slate Claude agent clones the repo and pushes
+#     code changes from the running container
 #
-# nixPkgs is the canonical Nixpacks hook; aptPkgs alone wasn't
-# enough to land ffmpeg in PATH on the runtime container (we hit
-# "spawn ffmpeg ENOENT" on the first batch).
+# nixPkgs is the canonical Nixpacks hook for system binaries.
 [phases.setup]
-nixPkgs = ["nodejs_20", "ffmpeg"]
+nixPkgs = ["nodejs_20", "ffmpeg", "git"]

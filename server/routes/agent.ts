@@ -1,18 +1,19 @@
 // Shared Slate ↔ Claude chat with full agent tools — Caroline + Ryan
-// + Claude as a three-way thread, Claude can now actually edit Slate's
-// code, run typechecks, and push to main.
+// + Claude as a three-way thread. Claude can read, edit, typecheck,
+// and push to main from inside Slate. Functions like a Claude Code
+// session, just running on the production container.
 //
 // Safety guardrails:
 //   - Forbidden paths (.env, package-lock.json, old migration files,
-//     node_modules, dist, server/dist).
+//     node_modules, dist, server/dist, .git).
 //   - File-size limits on read/write.
-//   - npm run build MUST succeed before git_commit_push will run.
 //   - GITHUB_TOKEN required (set on Railway).
-//   - Per-user daily cap (~$30) on Claude tokens.
+//   - 25-iteration hard cap on the agent loop to prevent runaways.
 //
-// Translation: every user message is auto-translated to English when
-// the author posts in a non-English language. The original and the
-// translation both store on agent_messages and both render in the UI.
+// Working dir: the agent maintains a freshly-cloned working tree at
+// /tmp/slate-agent. We don't rely on Railway leaving .git in /app —
+// we clone from origin on first use and pull origin/main before every
+// turn so the agent always operates against current production code.
 
 import { Router } from 'express'
 import Anthropic from '@anthropic-ai/sdk'
@@ -29,11 +30,106 @@ agentRouter.use(requireUser)
 const client = new Anthropic()
 const MODEL = 'claude-opus-4-8'
 const TRANSLATE_MODEL = 'claude-haiku-4-5-20251001' // cheaper for short turns
-const DAILY_TOKEN_CAP = 1_500_000
 const MAX_AGENT_ITERATIONS = 25
 
-// Repo root on the Railway runtime container.
-const REPO_ROOT = path.resolve(process.cwd())
+// Where the agent does its work. We clone the repo here on first use
+// and `git reset --hard origin/main` before each turn so we're always
+// editing against current production code, never a stale checkout.
+const AGENT_WORKDIR = '/tmp/slate-agent'
+// The container's own /app — used to symlink node_modules into the
+// workdir so npm run build doesn't have to reinstall on every turn.
+const RUNTIME_APP_DIR = '/app'
+
+// Ensures the agent's working tree exists, is on origin/main, and has
+// a usable node_modules. Returns the path to the workdir. Safe to call
+// before every tool that needs it.
+let workdirReadyPromise: Promise<string> | null = null
+async function ensureWorkdir(): Promise<string> {
+  if (workdirReadyPromise) return workdirReadyPromise
+  workdirReadyPromise = (async () => {
+    const token = process.env.GITHUB_TOKEN
+    if (!token) throw new Error('GITHUB_TOKEN env var not set on Railway')
+    const repoUrl = `https://x-access-token:${token}@github.com/strawhutmedia/Project-management.git`
+
+    const hasCheckout = fs.existsSync(path.join(AGENT_WORKDIR, '.git'))
+    if (!hasCheckout) {
+      logInfo('agent: cloning workdir', { dir: AGENT_WORKDIR })
+      await fs.promises.mkdir(path.dirname(AGENT_WORKDIR), { recursive: true })
+      // If a stale non-git dir exists, blow it away.
+      if (fs.existsSync(AGENT_WORKDIR)) await fs.promises.rm(AGENT_WORKDIR, { recursive: true, force: true })
+      const clone = await rawSpawn('git', ['clone', '--depth', '50', repoUrl, AGENT_WORKDIR], 180_000)
+      if (clone.code !== 0) throw new Error(`git_clone_failed: ${clone.output.slice(-400)}`)
+    }
+
+    // Identify the bot for any commits this workdir produces.
+    await rawSpawn('git', ['-C', AGENT_WORKDIR, 'config', 'user.email', 'slate-bot@strawhutmedia.com'], 5_000)
+    await rawSpawn('git', ['-C', AGENT_WORKDIR, 'config', 'user.name', 'Slate Bot'], 5_000)
+    // Make sure origin points at the tokened URL so push works.
+    await rawSpawn('git', ['-C', AGENT_WORKDIR, 'remote', 'set-url', 'origin', repoUrl], 5_000)
+
+    // Pull latest origin/main so the agent always starts on current prod.
+    const fetch = await rawSpawn('git', ['-C', AGENT_WORKDIR, 'fetch', 'origin', 'main'], 60_000)
+    if (fetch.code !== 0) throw new Error(`git_fetch_failed: ${fetch.output.slice(-400)}`)
+    const reset = await rawSpawn('git', ['-C', AGENT_WORKDIR, 'reset', '--hard', 'origin/main'], 30_000)
+    if (reset.code !== 0) throw new Error(`git_reset_failed: ${reset.output.slice(-400)}`)
+    await rawSpawn('git', ['-C', AGENT_WORKDIR, 'clean', '-fd'], 30_000)
+
+    // Symlink the runtime container's node_modules into the workdir
+    // (same package.json, same install) so `npm run build` doesn't
+    // need to reinstall deps on every turn.
+    const wdNodeModules = path.join(AGENT_WORKDIR, 'node_modules')
+    const appNodeModules = path.join(RUNTIME_APP_DIR, 'node_modules')
+    try {
+      const stat = fs.existsSync(wdNodeModules) ? await fs.promises.lstat(wdNodeModules) : null
+      if (!stat && fs.existsSync(appNodeModules)) {
+        await fs.promises.symlink(appNodeModules, wdNodeModules, 'dir')
+        logInfo('agent: symlinked node_modules into workdir')
+      }
+    } catch (err) {
+      logError('agent: node_modules symlink failed (typecheck may be slow)', {
+        error: err instanceof Error ? err.message : String(err),
+      })
+    }
+
+    return AGENT_WORKDIR
+  })()
+  try {
+    return await workdirReadyPromise
+  } catch (err) {
+    workdirReadyPromise = null // allow retry on next request
+    throw err
+  }
+}
+
+// Sync the workdir against origin/main before every agent turn so
+// changes made via other paths (a manual push from a real terminal)
+// land in the agent's checkout too. Cheap.
+async function syncWorkdir(): Promise<void> {
+  await ensureWorkdir() // initial setup if needed
+  await rawSpawn('git', ['-C', AGENT_WORKDIR, 'fetch', 'origin', 'main'], 60_000)
+  await rawSpawn('git', ['-C', AGENT_WORKDIR, 'reset', '--hard', 'origin/main'], 30_000)
+  await rawSpawn('git', ['-C', AGENT_WORKDIR, 'clean', '-fd'], 30_000)
+}
+
+type RawSpawnResult = { code: number | null; output: string }
+function rawSpawn(cmd: string, args: string[], timeoutMs: number): Promise<RawSpawnResult> {
+  return new Promise((resolve) => {
+    const proc = spawn(cmd, args, { stdio: ['ignore', 'pipe', 'pipe'] })
+    let stdout = ''
+    let stderr = ''
+    const t = setTimeout(() => { try { proc.kill('SIGKILL') } catch {} }, timeoutMs)
+    proc.stdout?.on('data', (d) => { stdout += String(d) })
+    proc.stderr?.on('data', (d) => { stderr += String(d) })
+    proc.on('error', () => {
+      clearTimeout(t)
+      resolve({ code: -1, output: stdout + stderr || 'spawn_error' })
+    })
+    proc.on('close', (code) => {
+      clearTimeout(t)
+      resolve({ code, output: stdout + (stderr ? `\n[stderr]\n${stderr}` : '') })
+    })
+  })
+}
 
 function requireAdmin(user: SessionUser): boolean {
   return user.role === 'admin'
@@ -115,7 +211,7 @@ function isPathForbidden(repoRelPath: string): { forbidden: boolean; reason?: st
   if (migMatch) {
     const num = Number(migMatch[1])
     try {
-      const all = fs.readdirSync(path.join(REPO_ROOT, 'server/migrations'))
+      const all = fs.readdirSync(path.join(AGENT_WORKDIR, 'server/migrations'))
         .filter((f) => /^\d{3}_/.test(f))
         .map((f) => Number(f.slice(0, 3)))
       const max = all.length ? Math.max(...all) : 0
@@ -129,9 +225,9 @@ function isPathForbidden(repoRelPath: string): { forbidden: boolean; reason?: st
 }
 
 function safeRepoPath(repoRelPath: string): string {
-  // Normalize and ensure it stays inside REPO_ROOT.
-  const abs = path.resolve(REPO_ROOT, repoRelPath)
-  if (!abs.startsWith(REPO_ROOT + path.sep) && abs !== REPO_ROOT) {
+  // Normalize and ensure it stays inside AGENT_WORKDIR.
+  const abs = path.resolve(AGENT_WORKDIR, repoRelPath)
+  if (!abs.startsWith(AGENT_WORKDIR + path.sep) && abs !== AGENT_WORKDIR) {
     throw new Error('path_escapes_repo')
   }
   return abs
@@ -141,6 +237,9 @@ type ToolResult = { content: string; is_error?: boolean }
 
 async function runTool(name: string, input: Record<string, unknown>): Promise<ToolResult> {
   try {
+    // Make sure the workdir exists + is on origin/main before any tool
+    // touches it. Cheap when already-ready.
+    await ensureWorkdir()
     switch (name) {
       case 'list_dir': {
         const p = String(input.path || '.')
@@ -175,41 +274,21 @@ async function runTool(name: string, input: Record<string, unknown>): Promise<To
         return await runSpawn('npm', ['run', 'build'], 360_000)
       }
       case 'git_status': {
-        return await runSpawn('git', ['-C', REPO_ROOT, 'status', '--porcelain=v1'], 30_000)
+        return await runSpawn('git', ['-C', AGENT_WORKDIR, 'status', '--porcelain=v1'], 30_000)
       }
       case 'git_commit_push': {
         const msg = String(input.commit_message || '').trim()
         if (!msg) return { content: 'commit_message required', is_error: true }
-        const token = process.env.GITHUB_TOKEN
-        if (!token) return { content: 'GITHUB_TOKEN env var not set on Railway', is_error: true }
-        // Stage, commit, and push.
-        const addRes = await runSpawn('git', ['-C', REPO_ROOT, 'add', '-A'], 30_000)
+        // ensureWorkdir() already set git user + tokened remote. Just
+        // stage, commit, push.
+        const addRes = await runSpawn('git', ['-C', AGENT_WORKDIR, 'add', '-A'], 30_000)
         if (addRes.is_error) return addRes
-        const cfgEmail = await runSpawn('git', ['-C', REPO_ROOT, 'config', 'user.email', 'slate-bot@strawhutmedia.com'], 5_000)
-        if (cfgEmail.is_error) return cfgEmail
-        const cfgName = await runSpawn('git', ['-C', REPO_ROOT, 'config', 'user.name', 'Slate Bot'], 5_000)
-        if (cfgName.is_error) return cfgName
-        const commitRes = await runSpawn('git', ['-C', REPO_ROOT, 'commit', '-m', msg], 30_000)
+        const commitRes = await runSpawn('git', ['-C', AGENT_WORKDIR, 'commit', '-m', msg], 30_000)
         // git commit returns non-zero if there's nothing to commit; treat as success-no-op.
         if (commitRes.is_error && !/nothing to commit|no changes added/i.test(commitRes.content)) {
           return commitRes
         }
-        // Configure the push URL with the token, push, then scrub it.
-        const setRemote = await runSpawn(
-          'git',
-          ['-C', REPO_ROOT, 'remote', 'set-url', 'origin',
-            `https://x-access-token:${token}@github.com/strawhutmedia/Project-management.git`],
-          10_000,
-        )
-        if (setRemote.is_error) return setRemote
-        const pushRes = await runSpawn('git', ['-C', REPO_ROOT, 'push', 'origin', 'HEAD:main'], 120_000)
-        // Scrub the credential URL regardless of push outcome.
-        await runSpawn(
-          'git',
-          ['-C', REPO_ROOT, 'remote', 'set-url', 'origin',
-            'https://github.com/strawhutmedia/Project-management.git'],
-          10_000,
-        )
+        const pushRes = await runSpawn('git', ['-C', AGENT_WORKDIR, 'push', 'origin', 'HEAD:main'], 120_000)
         if (pushRes.is_error) return pushRes
         return { content: `Committed and pushed. Railway will redeploy in ~60s.\n\n${pushRes.content}` }
       }
@@ -396,19 +475,16 @@ agentRouter.post('/conversations/:id/messages', async (req, res) => {
   if (cRes.rows.length === 0) { res.status(404).json({ error: 'not_found' }); return }
   const convo = cRes.rows[0]
 
-  const usageRes = await pool.query<{ total: string }>(
-    `SELECT COALESCE(SUM(input_tokens + output_tokens), 0)::text AS total
-       FROM agent_messages
-      WHERE author_user_id = $1
-        AND created_at > now() - interval '1 day'`,
-    [user.id],
-  )
-  const tokensToday = Number(usageRes.rows[0].total)
-  if (tokensToday > DAILY_TOKEN_CAP) {
-    res.status(429).json({
-      error: `daily_cap_reached: ${tokensToday} tokens used in the last 24h.`,
+  // Always sync the workdir against origin/main before the turn so
+  // the agent sees current production code, not a stale checkout.
+  // Fire-and-watch — if it fails, tools will surface the failure
+  // clearly when called.
+  try {
+    await syncWorkdir()
+  } catch (err) {
+    logError('agent: workdir sync failed', {
+      error: err instanceof Error ? err.message : String(err),
     })
-    return
   }
 
   // Auto-translate if the message isn't English.
