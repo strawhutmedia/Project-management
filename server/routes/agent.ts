@@ -131,8 +131,24 @@ function rawSpawn(cmd: string, args: string[], timeoutMs: number): Promise<RawSp
   })
 }
 
-function requireAdmin(user: SessionUser): boolean {
-  return user.role === 'admin'
+// Hard allowlist — the chat is only available to Ryan and Caroline.
+// Workspace role='admin' alone is NOT enough; the user must also
+// match one of the entries here. Future people get added explicitly.
+//
+// Email is the canonical match; display_name fallback covers Caroline
+// since her email isn't pinned in source. Both are case-insensitive.
+const AGENT_ALLOWED_EMAILS = new Set<string>([
+  'ryan@strawhutmedia.com',
+])
+const AGENT_ALLOWED_NAME_PATTERNS = [
+  /caroline/i, // Caroline (Filipino producer, promoted in migration 034)
+]
+
+function isAgentAllowed(user: SessionUser): boolean {
+  if (user.email && AGENT_ALLOWED_EMAILS.has(user.email.toLowerCase())) return true
+  const name = (user.display_name || user.name || '').trim()
+  if (name && AGENT_ALLOWED_NAME_PATTERNS.some((rx) => rx.test(name))) return true
+  return false
 }
 
 // =============================================================
@@ -422,7 +438,7 @@ function messageToApi(row: MessageRow) {
 
 agentRouter.get('/conversations', async (req, res) => {
   const user = (req as typeof req & { user: SessionUser }).user
-  if (!requireAdmin(user)) { res.status(403).json({ error: 'admin_only' }); return }
+  if (!isAgentAllowed(user)) { res.status(403).json({ error: 'chat_locked_to_ryan_and_caroline' }); return }
   const { rows } = await pool.query<ConversationRow>(
     `SELECT * FROM agent_conversations ORDER BY updated_at DESC LIMIT 100`,
   )
@@ -431,7 +447,7 @@ agentRouter.get('/conversations', async (req, res) => {
 
 agentRouter.post('/conversations', async (req, res) => {
   const user = (req as typeof req & { user: SessionUser }).user
-  if (!requireAdmin(user)) { res.status(403).json({ error: 'admin_only' }); return }
+  if (!isAgentAllowed(user)) { res.status(403).json({ error: 'chat_locked_to_ryan_and_caroline' }); return }
   const title = String((req.body?.title || 'New conversation')).slice(0, 200)
   const { rows } = await pool.query<ConversationRow>(
     `INSERT INTO agent_conversations (title, created_by)
@@ -443,7 +459,7 @@ agentRouter.post('/conversations', async (req, res) => {
 
 agentRouter.get('/conversations/:id', async (req, res) => {
   const user = (req as typeof req & { user: SessionUser }).user
-  if (!requireAdmin(user)) { res.status(403).json({ error: 'admin_only' }); return }
+  if (!isAgentAllowed(user)) { res.status(403).json({ error: 'chat_locked_to_ryan_and_caroline' }); return }
   const cRes = await pool.query<ConversationRow>(
     `SELECT * FROM agent_conversations WHERE id = $1`, [req.params.id],
   )
@@ -464,7 +480,7 @@ agentRouter.get('/conversations/:id', async (req, res) => {
 
 agentRouter.post('/conversations/:id/messages', async (req, res) => {
   const user = (req as typeof req & { user: SessionUser }).user
-  if (!requireAdmin(user)) { res.status(403).json({ error: 'admin_only' }); return }
+  if (!isAgentAllowed(user)) { res.status(403).json({ error: 'chat_locked_to_ryan_and_caroline' }); return }
   const content = String(req.body?.content || '').trim()
   if (!content) { res.status(400).json({ error: 'content required' }); return }
   if (content.length > 16_000) { res.status(400).json({ error: 'message too long' }); return }
@@ -689,7 +705,7 @@ agentRouter.post('/conversations/:id/messages', async (req, res) => {
 
 agentRouter.delete('/conversations/:id', async (req, res) => {
   const user = (req as typeof req & { user: SessionUser }).user
-  if (!requireAdmin(user)) { res.status(403).json({ error: 'admin_only' }); return }
+  if (!isAgentAllowed(user)) { res.status(403).json({ error: 'chat_locked_to_ryan_and_caroline' }); return }
   await pool.query(`DELETE FROM agent_conversations WHERE id = $1`, [req.params.id])
   res.json({ ok: true })
 })

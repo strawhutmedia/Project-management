@@ -6,9 +6,18 @@ import { Link } from 'react-router-dom'
 import { api, type ApiAgentConversation, type ApiAgentMessage } from '../api'
 import { useAuth } from '../auth'
 
+// Mirrors server/routes/agent.ts allowlist. The server enforces this
+// via 403 — the page-level check just renders a clearer message.
+const AGENT_ALLOWED_EMAILS = new Set<string>(['ryan@strawhutmedia.com'])
+const AGENT_ALLOWED_NAME_PATTERNS = [/caroline/i]
+
 export default function AgentPage() {
   const { user } = useAuth()
-  const isAdmin = user?.role === 'admin'
+  const email = (user?.email || '').toLowerCase()
+  const name = (user?.display_name || user?.name || '').trim()
+  const isAdmin =
+    AGENT_ALLOWED_EMAILS.has(email) ||
+    AGENT_ALLOWED_NAME_PATTERNS.some((rx) => rx.test(name))
   const [conversations, setConversations] = useState<ApiAgentConversation[] | null>(null)
   const [activeId, setActiveId] = useState<string | null>(null)
   const [messages, setMessages] = useState<ApiAgentMessage[]>([])
@@ -86,7 +95,7 @@ export default function AgentPage() {
   if (!isAdmin) {
     return (
       <div className="text-muted text-sm">
-        Slate ↔ Claude chat is workspace-admin only.{' '}
+        Slate ↔ Claude chat is locked to Ryan and Caroline only.{' '}
         <Link to="/" className="underline">Back to projects</Link>
       </div>
     )
