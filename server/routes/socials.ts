@@ -170,6 +170,7 @@ export async function triggerSocialPlanGeneration(args: {
     example_posts: string[] | null
     default_assignees: Record<string, string> | null
     vocabulary: string | null
+    brand_assets_folder: string | null
   }>(
     `SELECT s.project_id, s.title AS song_title, s.subtitle AS song_subtitle,
             s.source_file_path,
@@ -177,7 +178,8 @@ export async function triggerSocialPlanGeneration(args: {
             p.socials_brand_voice AS brand_voice,
             p.socials_example_posts AS example_posts,
             p.socials_default_assignees AS default_assignees,
-            p.socials_vocabulary AS vocabulary
+            p.socials_vocabulary AS vocabulary,
+            p.brand_assets_folder AS brand_assets_folder
        FROM songs s JOIN projects p ON p.id = s.project_id
       WHERE s.id = $1`,
     [args.songId],
@@ -185,6 +187,25 @@ export async function triggerSocialPlanGeneration(args: {
   if (sRes.rows.length === 0) throw new Error('song_not_found')
   const ctx = sRes.rows[0]
   if (!hasAnthropicKey()) throw new Error('socials_unavailable: ANTHROPIC_API_KEY not configured')
+
+  // List any brand assets the team has curated in Dropbox so Claude
+  // can reference real filenames instead of inventing shoot directions.
+  // Failures here are non-fatal — Claude just gets an empty list and
+  // proceeds with shoot-style image_direction values.
+  let brandAssets: Array<{ name: string; dropboxPath: string }> = []
+  if (ctx.brand_assets_folder) {
+    try {
+      const { listFolder } = await import('../dropbox')
+      const r = await listFolder(ctx.brand_assets_folder)
+      if (r.ok) {
+        brandAssets = r.entries
+          .filter((e) => e.type === 'file' && /\.(jpe?g|png|webp|gif|heic)$/i.test(e.name))
+          .map((e) => ({ name: e.name, dropboxPath: e.path }))
+      }
+    } catch {
+      // ignore — generate the plan without assets
+    }
+  }
 
   const tRes = await pool.query<{
     id: string
@@ -222,6 +243,7 @@ export async function triggerSocialPlanGeneration(args: {
         brandVoice: ctx.brand_voice ?? '',
         examplePosts,
         vocabulary: ctx.vocabulary ?? '',
+        brandAssets,
         episodeTitle: ctx.song_title,
         episodeSubtitle: ctx.song_subtitle,
         episodeTranscript: transcriptText,

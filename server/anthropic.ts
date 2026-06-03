@@ -214,6 +214,12 @@ export type GenerateInput = {
   // O'Teri") so phonetic transcripts can't corrupt the spelling of
   // recurring guests, show titles, brand terms, etc.
   vocabulary?: string
+  // Pre-existing brand assets the team has curated in Dropbox (guest
+  // headshots, logos, BTS photos, etc.). Each entry has a filename
+  // and the Dropbox path. When this list is non-empty, the prompt
+  // tells Claude to reference these files by name in image_direction
+  // instead of describing photos that would need to be shot fresh.
+  brandAssets?: Array<{ name: string; dropboxPath: string }>
   episodeTitle: string
   episodeSubtitle?: string | null
   episodeTranscript: string
@@ -251,6 +257,14 @@ function showMetadataBlock(input: GenerateInput): string {
     lines.push('')
     lines.push('SPELLING REQUIREMENTS — these names and terms must appear EXACTLY as written below in every post, regardless of how the transcript spells them (transcripts are phonetic and often wrong on proper names):')
     lines.push(vocab)
+  }
+  const assets = input.brandAssets ?? []
+  if (assets.length > 0) {
+    lines.push('')
+    lines.push('AVAILABLE BRAND ASSETS — pre-existing photos / logos the team has on file in Dropbox. When a photo_concept or story_concept (photo medium) calls for an image that one of these already covers, reference the EXACT FILENAME in image_direction (e.g. "Use cheri-headshot-warm.jpg, cropped to a tight 4:5"). Only invent a brand-new shot direction if none of these files fit:')
+    for (const a of assets.slice(0, 60)) {
+      lines.push(`  - ${a.name}`)
+    }
   }
   return lines.join('\n')
 }

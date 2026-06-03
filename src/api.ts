@@ -423,6 +423,7 @@ export type ApiProject = {
   socialsDefaultAssignees?: Partial<Record<'story_video' | 'story_photo' | 'reel_concept' | 'photo_concept', string>>
   rssFeedUrl?: string | null
   coverArtUrl?: string | null
+  brandAssetsFolder?: string | null
   brandProfile?: ApiBrandProfile | null
   brandProfileAt?: string | null
   songs: ApiSong[]
@@ -542,7 +543,7 @@ export const api = {
     return res.json() as Promise<{ ok: true; path: string }>
   },
   // Project edit
-  updateProject: (id: string, patch: { name?: string; subtitle?: string; dropboxFolder?: string; channelsSubfolder?: string | null; defaultOwners?: Record<string, string>; filmPhase?: 'pre' | 'production' | 'post' | 'wrapped'; socialsBrandVoice?: string | null; socialsVocabulary?: string | null; socialsExamplePosts?: string[]; socialsDefaultAssignees?: Partial<Record<'story_video' | 'story_photo' | 'reel_concept' | 'photo_concept', string>>; rssFeedUrl?: string | null; coverArtUrl?: string | null }) =>
+  updateProject: (id: string, patch: { name?: string; subtitle?: string; dropboxFolder?: string; channelsSubfolder?: string | null; defaultOwners?: Record<string, string>; filmPhase?: 'pre' | 'production' | 'post' | 'wrapped'; socialsBrandVoice?: string | null; socialsVocabulary?: string | null; socialsExamplePosts?: string[]; socialsDefaultAssignees?: Partial<Record<'story_video' | 'story_photo' | 'reel_concept' | 'photo_concept', string>>; rssFeedUrl?: string | null; coverArtUrl?: string | null; brandAssetsFolder?: string | null }) =>
     request<{ ok: true }>(`/api/projects/${id}`, { method: 'PATCH', body: JSON.stringify(patch) }),
   uploadPodcastEpisode: (projectId: string, body: { dropboxPath: string; title?: string; releaseDate?: string | null }) =>
     request<{ episode: { id: string; title: string; processingState: 'processing' | 'ready' | 'posted' } }>(
@@ -730,6 +731,10 @@ export const api = {
   searchPodcasts: (q: string) =>
     request<{ results: ApiPodcastSearchResult[] }>(`/api/podcasts/search?q=${encodeURIComponent(q)}`),
 
+  listBrandAssets: (projectId: string) =>
+    request<{ folder: string | null; error?: string; assets: Array<{ name: string; dropboxPath: string; size: number | null; modified: string | null }> }>(
+      `/api/projects/${projectId}/brand-assets`,
+    ),
   generateBrandProfile: (projectId: string) =>
     request<{ profile: ApiBrandProfile; generatedAt: string }>(`/api/projects/${projectId}/brand-profile`, { method: 'POST' }),
 

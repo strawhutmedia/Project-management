@@ -4,7 +4,10 @@ import { requireUser, type SessionUser } from '../auth'
 import { getProjectRole, assertWriter, assertProjectAdmin } from '../permissions'
 import { fetchPodcastFeed } from '../rss'
 import { hasAnthropicKey, generateBrandProfile } from '../anthropic'
+import { listFolder as dropboxListFolder } from '../dropbox'
 import { logInfo, logError } from '../diag'
+
+const IMAGE_EXT = /\.(jpe?g|png|webp|gif|heic)$/i
 
 // Look up the admin user (Ryan) by ADMIN_EMAIL so we can auto-assign
 // the Executive Producer role on every new podcast project. Falls back
@@ -400,6 +403,11 @@ projectsRouter.patch('/:id', async (req, res) => {
     updates.push(`socials_vocabulary = $${i++}`)
     values.push(typeof v === 'string' && v.trim() ? v.trim().slice(0, 4000) : null)
   }
+  if ('brandAssetsFolder' in (req.body ?? {})) {
+    const v = req.body.brandAssetsFolder
+    updates.push(`brand_assets_folder = $${i++}`)
+    values.push(typeof v === 'string' && v.trim() ? v.trim().slice(0, 1000) : null)
+  }
   if (Array.isArray(req.body?.socialsExamplePosts)) {
     const cleaned = (req.body.socialsExamplePosts as unknown[])
       .filter((x): x is string => typeof x === 'string' && x.trim().length > 0)
@@ -468,7 +476,7 @@ projectsRouter.get('/:id', async (req, res) => {
   const projRes = await pool.query(
     `SELECT id, name, subtitle, kind, dropbox_folder, default_owners, stage_labels, channels_subfolder, film_phase,
             socials_brand_voice, socials_example_posts, socials_default_assignees, socials_vocabulary,
-            rss_feed_url, cover_art_url,
+            rss_feed_url, cover_art_url, brand_assets_folder,
             socials_brand_profile, socials_brand_profile_at
        FROM projects WHERE id = $1`,
     [projectId],
@@ -576,6 +584,7 @@ projectsRouter.get('/:id', async (req, res) => {
         ? project.socials_default_assignees : {},
       rssFeedUrl: project.rss_feed_url ?? null,
       coverArtUrl: project.cover_art_url ?? null,
+      brandAssetsFolder: project.brand_assets_folder ?? null,
       brandProfile: project.socials_brand_profile ?? null,
       brandProfileAt: project.socials_brand_profile_at ?? null,
       songs: songs.rows.map((s: { id: string; title: string; subtitle: string | null; stage: string; release_date: string | Date | null; processing_state: string | null; autopipeline_error: string | null }) => ({
@@ -657,6 +666,36 @@ projectsRouter.delete('/:id/members/:userId', async (req, res) => {
 // (title, description, cover art URL), persist what's useful, and return
 // it. Admin-only because it touches project config. Idempotent — safe to
 // re-run when the show updates artwork.
+// GET /api/projects/:id/brand-assets — lists the image files in the
+// configured Dropbox brand-assets folder. Used by the show page card
+// to preview what's available and by the social-plan generator to
+// pass real file references to Claude.
+projectsRouter.get('/:id/brand-assets', async (req, res) => {
+  const user = (req as typeof req & { user: SessionUser }).user
+  const projectId = req.params.id
+  if (!await assertWriter(user, projectId, res)) return
+  const { rows } = await pool.query<{ brand_assets_folder: string | null }>(
+    `SELECT brand_assets_folder FROM projects WHERE id = $1`, [projectId],
+  )
+  if (rows.length === 0) { res.status(404).json({ error: 'project_not_found' }); return }
+  const folder = rows[0].brand_assets_folder
+  if (!folder) { res.json({ folder: null, assets: [] }); return }
+  const list = await dropboxListFolder(folder)
+  if (!list.ok) {
+    res.status(502).json({ folder, error: list.error, assets: [] })
+    return
+  }
+  const assets = list.entries
+    .filter((e) => e.type === 'file' && IMAGE_EXT.test(e.name))
+    .map((e) => ({
+      name: e.name,
+      dropboxPath: e.path,
+      size: e.size ?? null,
+      modified: e.modified ?? null,
+    }))
+  res.json({ folder, assets })
+})
+
 projectsRouter.post('/:id/import-rss', async (req, res) => {
   const user = (req as typeof req & { user: SessionUser }).user
   const projectId = req.params.id

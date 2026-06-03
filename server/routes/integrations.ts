@@ -264,13 +264,49 @@ integrationsRouter.post('/dropbox/share-link', requireUser, async (req, res) => 
 // by the social-plan auto-pipeline (Dropbox temp links last 4hr; we
 // resolve per-request so they don't go stale in the DB / API payload).
 integrationsRouter.get('/dropbox/file', requireUser, async (req, res) => {
+  const user = (req as typeof req & { user: SessionUser }).user
   const filePath = String(req.query.path || '')
   if (!filePath) { res.status(400).send('path required'); return }
-  // Only Slate-managed asset prefixes get the unscoped fetch —
-  // anything else has to go through the scoped Dropbox helpers above.
-  if (!filePath.startsWith('/slate-stills/') && !filePath.startsWith('/slate-clips/')) {
-    res.status(403).send('forbidden'); return
+
+  // Allowlist:
+  //   - Slate-managed asset prefixes (stills + clips we extracted)
+  //   - Any path under a project's brand_assets_folder when the user
+  //     can access that project. Lets the brand-assets card render
+  //     inline thumbnails of curated Dropbox images.
+  let allowed = filePath.startsWith('/slate-stills/') || filePath.startsWith('/slate-clips/')
+  if (!allowed) {
+    const { pool } = await import('../db')
+    if (user.role === 'admin') {
+      // Super admins can browse any configured brand-assets folder.
+      const { rows } = await pool.query<{ folder: string }>(
+        `SELECT brand_assets_folder AS folder FROM projects
+          WHERE brand_assets_folder IS NOT NULL`,
+      )
+      for (const r of rows) {
+        if (filePath === r.folder || filePath.startsWith(r.folder + '/')) {
+          allowed = true; break
+        }
+      }
+    } else {
+      // Regular users: only folders on projects they're a member of.
+      const { rows } = await pool.query<{ folder: string }>(
+        `SELECT p.brand_assets_folder AS folder
+           FROM projects p
+           LEFT JOIN project_members m
+             ON m.project_id = p.id AND m.user_id = $1
+          WHERE p.brand_assets_folder IS NOT NULL
+            AND (p.created_by = $1 OR m.user_id IS NOT NULL)`,
+        [user.id],
+      )
+      for (const r of rows) {
+        if (filePath === r.folder || filePath.startsWith(r.folder + '/')) {
+          allowed = true; break
+        }
+      }
+    }
   }
+  if (!allowed) { res.status(403).send('forbidden'); return }
+
   const { getTemporaryLink } = await import('../dropbox')
   const link = await getTemporaryLink(filePath)
   if (!link.ok || !link.url) {
