@@ -272,30 +272,6 @@ export type ApiBrandProfile = {
   reasoning: string
 }
 
-export type ApiAgentConversation = {
-  id: string
-  title: string
-  createdBy: string | null
-  totalInputTokens: number
-  totalOutputTokens: number
-  createdAt: string
-  updatedAt: string
-}
-
-export type ApiAgentMessage = {
-  id: string
-  conversationId: string
-  role: 'user' | 'assistant'
-  authorUserId: string | null
-  authorDisplayName: string | null
-  content: string
-  detectedLanguage?: string | null
-  englishTranslation?: string | null
-  toolCalls: unknown
-  toolResults: unknown
-  createdAt: string
-}
-
 export type ApiPodcastSearchResult = {
   itunesId: number | null
   title: string
@@ -754,23 +730,6 @@ export const api = {
   searchPodcasts: (q: string) =>
     request<{ results: ApiPodcastSearchResult[] }>(`/api/podcasts/search?q=${encodeURIComponent(q)}`),
 
-  // ----- Slate ↔ Claude agent chat -----
-  agentConversations: () =>
-    request<{ conversations: ApiAgentConversation[] }>('/api/agent/conversations'),
-  agentConversation: (id: string) =>
-    request<{ conversation: ApiAgentConversation; messages: ApiAgentMessage[] }>(`/api/agent/conversations/${id}`),
-  agentCreateConversation: (title?: string) =>
-    request<{ conversation: ApiAgentConversation }>('/api/agent/conversations', {
-      method: 'POST',
-      body: JSON.stringify({ title: title || undefined }),
-    }),
-  agentSend: (conversationId: string, content: string) =>
-    request<{ userMessage: ApiAgentMessage; assistantMessage: ApiAgentMessage }>(
-      `/api/agent/conversations/${conversationId}/messages`,
-      { method: 'POST', body: JSON.stringify({ content }) },
-    ),
-  agentDeleteConversation: (id: string) =>
-    request<{ ok: true }>(`/api/agent/conversations/${id}`, { method: 'DELETE' }),
   generateBrandProfile: (projectId: string) =>
     request<{ profile: ApiBrandProfile; generatedAt: string }>(`/api/projects/${projectId}/brand-profile`, { method: 'POST' }),
 

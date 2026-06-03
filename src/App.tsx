@@ -7,7 +7,6 @@ import StripboardPage from './pages/StripboardPage'
 import TranscriptPage from './pages/TranscriptPage'
 import TranscriptsLibraryPage from './pages/TranscriptsLibraryPage'
 import SchedulerPage from './pages/SchedulerPage'
-import AgentPage from './pages/AgentPage'
 import Login from './pages/Login'
 import Verify from './pages/Verify'
 import Profile from './pages/Profile'
@@ -47,7 +46,6 @@ export default function App() {
           <Route path="projects/:projectId/transcripts/:transcriptId" element={<TranscriptPage />} />
           <Route path="projects/:projectId/songs/:songId" element={<SongPage />} />
           <Route path="scheduler" element={<SchedulerPage />} />
-          <Route path="chat" element={<AgentPage />} />
         </Route>
       </Routes>
     </AuthProvider>

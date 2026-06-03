@@ -1,24 +1,9 @@
 import { Link, NavLink, Outlet, useNavigate } from 'react-router-dom'
 import { useState } from 'react'
 import { useAuth } from '../auth'
-import type { ApiUser } from '../api'
 import NotificationsBell from './NotificationsBell'
 
 const PICKED_SESSION_KEY = 'slate.dashboard.workspacePicked'
-
-// Mirrors server/routes/agent.ts allowlist so the nav link doesn't
-// show for users who'd hit a 403 if they clicked it.
-const AGENT_ALLOWED_EMAILS = new Set<string>([
-  'ryan@strawhutmedia.com',
-])
-const AGENT_ALLOWED_NAME_PATTERNS = [/caroline/i]
-function isAgentAllowed(user: ApiUser | null | undefined): boolean {
-  if (!user) return false
-  if (user.email && AGENT_ALLOWED_EMAILS.has(user.email.toLowerCase())) return true
-  const name = (user.display_name || user.name || '').trim()
-  if (name && AGENT_ALLOWED_NAME_PATTERNS.some((rx) => rx.test(name))) return true
-  return false
-}
 
 export default function Layout() {
   const { user, logout } = useAuth()
@@ -64,24 +49,6 @@ export default function Layout() {
               📅 Scheduler
             </NavLink>
 
-            {/* Chat is hard-locked to Ryan + Caroline (see
-                server/routes/agent.ts allowlist). The server enforces
-                it via 403; this hides the nav link client-side too so
-                no one else sees a dead-end. */}
-            {isAgentAllowed(user) && (
-              <NavLink
-                to="/chat"
-                className={({ isActive }) =>
-                  `hidden sm:inline-flex items-center gap-1 text-[11px] uppercase tracking-wider font-bold px-2.5 py-1 rounded-full border transition ${
-                    isActive
-                      ? 'text-stage-mastering bg-stage-mastering/10 border-stage-mastering/40'
-                      : 'text-muted border-line hover:text-text hover:border-line'
-                  }`
-                }
-              >
-                ✦ Chat
-              </NavLink>
-            )}
 
             {user?.role === 'admin' && (
               <span className="hidden sm:inline-flex items-center gap-1.5 text-[11px] uppercase tracking-wider text-stage-mastering bg-stage-mastering/10 border border-stage-mastering/40 rounded-full px-2.5 py-1 font-bold">
