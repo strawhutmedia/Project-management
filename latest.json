@@ -1,9 +1,9 @@
 {
   "version": "0.2.2",
-  "now": "2026-06-04T14:19:45.314Z",
+  "now": "2026-06-04T16:19:25.896Z",
   "boot": {
-    "startedAt": "2026-06-04T14:19:45.023Z",
-    "completedAt": "2026-06-04T14:19:45.298Z",
+    "startedAt": "2026-06-04T16:19:25.530Z",
+    "completedAt": "2026-06-04T16:19:25.881Z",
     "error": null
   },
   "env": {
@@ -71,7 +71,8 @@
       "035_show_assets_and_clip_edits.sql",
       "036_agent_chat.sql",
       "037_agent_translation.sql",
-      "038_brand_assets_folder.sql"
+      "038_brand_assets_folder.sql",
+      "039_show_chat.sql"
     ],
     "userCount": 9,
     "projectCount": 11
@@ -79,7 +80,7 @@
   "recentLog": [
     {
       "level": "info",
-      "ts": "2026-06-04T14:19:45.021Z",
+      "ts": "2026-06-04T16:19:25.526Z",
       "msg": "serving client from",
       "data": {
         "clientDir": "/app/dist"
@@ -87,7 +88,7 @@
     },
     {
       "level": "info",
-      "ts": "2026-06-04T14:19:45.023Z",
+      "ts": "2026-06-04T16:19:25.530Z",
       "msg": "boot starting",
       "data": {
         "cwd": "/app",
@@ -98,12 +99,12 @@
     },
     {
       "level": "info",
-      "ts": "2026-06-04T14:19:45.172Z",
+      "ts": "2026-06-04T16:19:25.749Z",
       "msg": "migrations complete"
     },
     {
       "level": "info",
-      "ts": "2026-06-04T14:19:45.291Z",
+      "ts": "2026-06-04T16:19:25.865Z",
       "msg": "BIYA seed: project already exists, ensured shoot days",
       "data": {
         "projectId": "12f53ed1-c6c7-4c11-8d7b-06d91744c9af"
@@ -111,12 +112,12 @@
     },
     {
       "level": "info",
-      "ts": "2026-06-04T14:19:45.298Z",
+      "ts": "2026-06-04T16:19:25.881Z",
       "msg": "listening on :8080"
     },
     {
       "level": "info",
-      "ts": "2026-06-04T14:19:45.298Z",
+      "ts": "2026-06-04T16:19:25.882Z",
       "msg": "scheduler started (every 5 min)"
     }
   ]
