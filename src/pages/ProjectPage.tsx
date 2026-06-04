@@ -13,6 +13,7 @@ import PodcastSocialsConfig from '../components/PodcastSocialsConfig'
 import PodcastRssConfig from '../components/PodcastRssConfig'
 import BrandProfileCard from '../components/BrandProfileCard'
 import BrandAssetsCard from '../components/BrandAssetsCard'
+import ShowChatCard from '../components/ShowChatCard'
 import FilmPhaseBar, { type FilmPhase } from '../components/FilmPhaseBar'
 import { useAuth } from '../auth'
 
@@ -223,6 +224,10 @@ export default function ProjectPage() {
           onChanged={reload}
         />
       )}
+
+      {/* Show chat — all project members (writer + above) can see and
+          post. Gated server-side by assertWriter so non-members 403. */}
+      <ShowChatCard projectId={project.id} />
 
       {isAdmin && project.kind === 'album' && <ProjectRolesSection project={project} members={members} onSaved={reload} />}
       {isAdmin && project.kind === 'podcast' && <PodcastTeamSection project={project} members={members} onSaved={reload} />}

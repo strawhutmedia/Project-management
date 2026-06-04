@@ -248,6 +248,19 @@ export type ApiSchedulerResponse = {
   backlog: ApiSchedulerItem[]
 }
 
+export type ApiShowChatMessage = {
+  id: string
+  projectId: string
+  role: 'user' | 'assistant'
+  authorUserId: string | null
+  authorDisplayName: string | null
+  content: string
+  model: 'sonnet' | 'opus' | null
+  inputTokens: number | null
+  outputTokens: number | null
+  createdAt: string
+}
+
 export type ApiBrandProfile = {
   brandVoice: string
   examplePosts: string[]
@@ -731,6 +744,27 @@ export const api = {
   searchPodcasts: (q: string) =>
     request<{ results: ApiPodcastSearchResult[] }>(`/api/podcasts/search?q=${encodeURIComponent(q)}`),
 
+  // Per-show chat — see server/routes/show_chat.ts
+  showChat: (projectId: string) =>
+    request<{
+      messages: ApiShowChatMessage[]
+      dailyCapCents: number
+      spentCents24h: number
+    }>(`/api/projects/${projectId}/chat`),
+  showChatSend: (projectId: string, body: { content: string; useOpus?: boolean }) =>
+    request<{
+      userMessage: ApiShowChatMessage
+      assistantMessage: ApiShowChatMessage
+      spentCents24h: number
+      dailyCapCents: number
+    }>(`/api/projects/${projectId}/chat`, {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+  showChatDelete: (projectId: string, messageId: string) =>
+    request<{ ok: true }>(`/api/projects/${projectId}/chat/${messageId}`, {
+      method: 'DELETE',
+    }),
   listBrandAssets: (projectId: string) =>
     request<{ folder: string | null; error?: string; assets: Array<{ name: string; dropboxPath: string; size: number | null; modified: string | null }> }>(
       `/api/projects/${projectId}/brand-assets`,
