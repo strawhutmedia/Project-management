@@ -16,8 +16,17 @@ import { spawn } from 'child_process'
 import fs from 'fs'
 import os from 'os'
 import path from 'path'
+// Bundled ffmpeg binary — ships in the npm package, lives at
+// node_modules/@ffmpeg-installer/<platform>-<arch>/ffmpeg. No PATH
+// dependency, works the same on Railway / local / wherever Node runs.
+// We tried Nix's `ffmpeg` package via nixpacks.toml and it never
+// reliably landed in PATH on the runtime container; this swap takes
+// system PATH out of the equation entirely.
+import ffmpegInstaller from '@ffmpeg-installer/ffmpeg'
 import { logError, logInfo } from './diag'
 import { getTemporaryLink, uploadFile } from './dropbox'
+
+const FFMPEG_PATH = ffmpegInstaller.path
 
 // Cache the ffmpeg-on-PATH check so we don't probe (or log) on every
 // frame call. Set to false if the first probe ENOENTs; subsequent
@@ -28,7 +37,7 @@ let ffmpegAvailable: boolean | null = null
 async function probeFfmpeg(): Promise<boolean> {
   if (ffmpegAvailable !== null) return ffmpegAvailable
   ffmpegAvailable = await new Promise<boolean>((resolve) => {
-    const proc = spawn('ffmpeg', ['-version'], { stdio: 'ignore' })
+    const proc = spawn(FFMPEG_PATH, ['-version'], { stdio: 'ignore' })
     proc.on('error', () => resolve(false))
     proc.on('close', (code) => resolve(code === 0))
   })
@@ -168,7 +177,7 @@ export async function extractStillsForItem(input: StillExtractInput): Promise<St
 // Thin Promise-wrapper around child_process.spawn for ffmpeg.
 function runFfmpeg(args: string[]): Promise<void> {
   return new Promise((resolve, reject) => {
-    const proc = spawn('ffmpeg', args, { stdio: ['ignore', 'ignore', 'pipe'] })
+    const proc = spawn(FFMPEG_PATH, args, { stdio: ['ignore', 'ignore', 'pipe'] })
     let stderr = ''
     proc.stderr?.on('data', (d) => { stderr += String(d) })
     proc.on('error', (err) => reject(err))
