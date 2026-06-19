@@ -99,7 +99,7 @@ export default function ProjectPage() {
   }
 
   return (
-    <div className="space-y-10">
+    <div className="space-y-10" data-theme={project.kind === 'film' ? 'film' : undefined}>
       <div>
         <Link to="/" className="text-[11px] uppercase tracking-[0.2em] text-muted hover:text-text font-bold">
           ← Projects

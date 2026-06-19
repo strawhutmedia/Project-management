@@ -72,6 +72,9 @@ export default function BudgetSection({ projectId, isAdmin }: { projectId: strin
     new Set<BudgetCategory>(['above_line', 'production', 'post', 'other']),
   )
   const [openAccountIds, setOpenAccountIds] = useState<Set<string>>(new Set())
+  // Default to the flat spreadsheet view — easier to scan and edit in one place.
+  // Users can flip to the hierarchical view for category subtotals.
+  const [viewMode, setViewMode] = useState<'items' | 'categories'>('items')
 
   async function load() {
     setLoading(true)
@@ -226,34 +229,60 @@ export default function BudgetSection({ projectId, isAdmin }: { projectId: strin
         <Stat label="Grand total" value={fmtMoney(grand, budget.currency)} accent />
       </div>
 
-      <div className="rounded-lg bg-stage-mastering/10 border border-stage-mastering/30 px-3 py-2 flex items-center justify-between gap-3 flex-wrap">
-        <p className="text-[11px] text-stage-mastering/90">
-          📋 <strong>Click any account below to expand it</strong> — add, edit, or delete individual line items inside.
-        </p>
-        <div className="flex gap-2">
+      {/* View mode toggle — flat spreadsheet for scanning vs.
+          hierarchical categories for subtotal-style review. */}
+      <div className="flex items-center justify-between gap-3 flex-wrap">
+        <div className="inline-flex rounded-lg border border-line bg-ink/40 p-0.5 text-[10px] uppercase tracking-wider font-bold">
           <button
-            onClick={() => {
-              const all = new Set<string>()
-              for (const acc of budget.accounts) all.add(acc.id)
-              setOpenAccountIds(all)
-              setOpenCategories(new Set(['above_line', 'production', 'post', 'other']))
-            }}
-            className="text-[10px] uppercase tracking-wider text-stage-mastering border border-stage-mastering/40 rounded-full px-2 py-1 hover:bg-stage-mastering/10"
+            onClick={() => setViewMode('items')}
+            className={`px-3 py-1.5 rounded-md transition ${
+              viewMode === 'items' ? 'bg-stage-mastering text-white' : 'text-muted hover:text-text'
+            }`}
           >
-            Expand all
+            📊 Items
           </button>
           <button
-            onClick={() => {
-              setOpenAccountIds(new Set())
-            }}
-            className="text-[10px] uppercase tracking-wider text-muted border border-line rounded-full px-2 py-1 hover:bg-ink/40"
+            onClick={() => setViewMode('categories')}
+            className={`px-3 py-1.5 rounded-md transition ${
+              viewMode === 'categories' ? 'bg-stage-mastering text-white' : 'text-muted hover:text-text'
+            }`}
           >
-            Collapse all
+            🗂 Categories
           </button>
         </div>
+        {viewMode === 'categories' && (
+          <div className="flex gap-2">
+            <button
+              onClick={() => {
+                const all = new Set<string>()
+                for (const acc of budget.accounts) all.add(acc.id)
+                setOpenAccountIds(all)
+                setOpenCategories(new Set(['above_line', 'production', 'post', 'other']))
+              }}
+              className="text-[10px] uppercase tracking-wider text-stage-mastering border border-stage-mastering/40 rounded-full px-2 py-1 hover:bg-stage-mastering/10"
+            >
+              Expand all
+            </button>
+            <button
+              onClick={() => setOpenAccountIds(new Set())}
+              className="text-[10px] uppercase tracking-wider text-muted border border-line rounded-full px-2 py-1 hover:bg-ink/40"
+            >
+              Collapse all
+            </button>
+          </div>
+        )}
       </div>
 
-      {openCategories.size > 0 && (
+      {viewMode === 'items' && (
+        <BudgetItemsTable
+          accounts={budget.accounts}
+          currency={budget.currency}
+          isAdmin={isAdmin}
+          onChanged={load}
+        />
+      )}
+
+      {viewMode === 'categories' && openCategories.size > 0 && (
         <div className="space-y-4">
           {totalsByCategory.filter((c) => openCategories.has(c.cat)).map(({ cat, accounts: catAccounts }) => {
             const a = CATEGORY_ACCENT[cat]
@@ -1051,6 +1080,293 @@ function Cell({
       className={`w-full bg-transparent text-xs px-1.5 py-1 rounded border border-transparent focus:border-stage-mastering/60 focus:bg-ink/40 outline-none ${
         align === 'right' ? 'text-right font-mono' : ''
       }`}
+    />
+  )
+}
+
+// ============================================================
+// Flat spreadsheet view
+// ============================================================
+//
+// Pulls every line item out of every account in the budget into a
+// single sortable / filterable table. Editing is inline per cell;
+// adding a new row requires picking an account first since items
+// belong to accounts. Account/category context is shown as a colored
+// badge on every row.
+
+function BudgetItemsTable({
+  accounts,
+  currency,
+  isAdmin,
+  onChanged,
+}: {
+  accounts: ApiBudgetAccount[]
+  currency: string
+  isAdmin: boolean
+  onChanged: () => void | Promise<void>
+}) {
+  type Row = ApiBudgetLineItem & { accountId: string; accountName: string; accountCode: string; category: BudgetCategory }
+  const allRows: Row[] = []
+  for (const acc of accounts) {
+    for (const item of acc.lineItems) {
+      allRows.push({
+        ...item,
+        accountId: acc.id,
+        accountName: acc.name,
+        accountCode: acc.code,
+        category: acc.category,
+      })
+    }
+  }
+
+  const [filter, setFilter] = useState<BudgetCategory | 'all'>('all')
+  const [query, setQuery] = useState('')
+  const [sortKey, setSortKey] = useState<'category' | 'account' | 'code' | 'description' | 'total'>('category')
+  const [sortAsc, setSortAsc] = useState(true)
+
+  const filtered = allRows.filter((r) => {
+    if (filter !== 'all' && r.category !== filter) return false
+    if (query.trim()) {
+      const q = query.trim().toLowerCase()
+      if (
+        !r.description.toLowerCase().includes(q) &&
+        !(r.code ?? '').toLowerCase().includes(q) &&
+        !r.accountName.toLowerCase().includes(q) &&
+        !(r.vendor ?? '').toLowerCase().includes(q)
+      ) return false
+    }
+    return true
+  })
+
+  filtered.sort((a, b) => {
+    const dir = sortAsc ? 1 : -1
+    switch (sortKey) {
+      case 'category':    return dir * (a.category.localeCompare(b.category) || a.accountCode.localeCompare(b.accountCode) || a.position - b.position)
+      case 'account':     return dir * (a.accountName.localeCompare(b.accountName) || a.position - b.position)
+      case 'code':        return dir * ((a.code ?? '').localeCompare(b.code ?? ''))
+      case 'description': return dir * a.description.localeCompare(b.description)
+      case 'total':       return dir * (a.total - b.total)
+    }
+  })
+
+  const visibleTotal = filtered.reduce((sum, r) => sum + r.total, 0)
+
+  function toggleSort(k: typeof sortKey) {
+    if (sortKey === k) setSortAsc(!sortAsc)
+    else { setSortKey(k); setSortAsc(true) }
+  }
+
+  return (
+    <div className="space-y-3">
+      {/* Filter row */}
+      <div className="flex items-center gap-2 flex-wrap">
+        <input
+          type="text"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder="Search description, code, account, vendor…"
+          className="flex-1 min-w-[200px] rounded-lg bg-ink/40 border border-line text-text text-xs px-2.5 py-1.5 outline-none focus:border-stage-mastering"
+        />
+        <select
+          value={filter}
+          onChange={(e) => setFilter(e.target.value as BudgetCategory | 'all')}
+          className="rounded-lg bg-ink/40 border border-line text-text text-xs px-2 py-1.5 outline-none focus:border-stage-mastering"
+        >
+          <option value="all">All categories</option>
+          <option value="above_line">Above the line</option>
+          <option value="production">Production</option>
+          <option value="post">Post</option>
+          <option value="other">Other</option>
+        </select>
+        <span className="text-[10px] text-muted ml-auto">
+          {filtered.length} item{filtered.length === 1 ? '' : 's'} · {fmtMoney(visibleTotal, currency)}
+        </span>
+      </div>
+
+      {filtered.length === 0 ? (
+        <p className="text-muted/70 text-xs italic py-6 text-center border border-dashed border-line/60 rounded-xl">
+          No items match. Try clearing the search or filter.
+        </p>
+      ) : (
+        <div className="rounded-xl border border-line/60 bg-ink/30 overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs">
+              <thead className="bg-ink/60 text-muted uppercase tracking-wider text-[9px]">
+                <tr>
+                  <SortableTh label="Category" k="category" sortKey={sortKey} sortAsc={sortAsc} onClick={toggleSort} />
+                  <SortableTh label="Account" k="account" sortKey={sortKey} sortAsc={sortAsc} onClick={toggleSort} />
+                  <SortableTh label="Code" k="code" sortKey={sortKey} sortAsc={sortAsc} onClick={toggleSort} />
+                  <SortableTh label="Description" k="description" sortKey={sortKey} sortAsc={sortAsc} onClick={toggleSort} />
+                  <th className="px-2 py-2 text-right">Amt</th>
+                  <th className="px-2 py-2 text-right">×</th>
+                  <th className="px-2 py-2 text-right">Rate</th>
+                  <th className="px-2 py-2 text-left">Units</th>
+                  <th className="px-2 py-2 text-left">Vendor</th>
+                  <th className="px-2 py-2 text-left">Date</th>
+                  <SortableTh label="Total" k="total" sortKey={sortKey} sortAsc={sortAsc} onClick={toggleSort} align="right" />
+                  {isAdmin && <th className="px-2 py-2"></th>}
+                </tr>
+              </thead>
+              <tbody>
+                {filtered.map((row) => (
+                  <ItemRow key={row.id} row={row} currency={currency} isAdmin={isAdmin} onChanged={onChanged} />
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+function SortableTh({
+  label, k, sortKey, sortAsc, onClick, align,
+}: {
+  label: string
+  k: 'category' | 'account' | 'code' | 'description' | 'total'
+  sortKey: string
+  sortAsc: boolean
+  onClick: (k: 'category' | 'account' | 'code' | 'description' | 'total') => void
+  align?: 'right'
+}) {
+  const active = sortKey === k
+  return (
+    <th className={`px-2 py-2 ${align === 'right' ? 'text-right' : 'text-left'}`}>
+      <button
+        onClick={() => onClick(k)}
+        className={`inline-flex items-center gap-1 ${active ? 'text-text' : 'hover:text-text'}`}
+      >
+        {label}
+        {active && <span className="text-[8px]">{sortAsc ? '▲' : '▼'}</span>}
+      </button>
+    </th>
+  )
+}
+
+function ItemRow({
+  row, currency, isAdmin, onChanged,
+}: {
+  row: ApiBudgetLineItem & { accountId: string; accountName: string; accountCode: string; category: BudgetCategory }
+  currency: string
+  isAdmin: boolean
+  onChanged: () => void | Promise<void>
+}) {
+  const [code, setCode] = useState(row.code ?? '')
+  const [description, setDescription] = useState(row.description)
+  const [amt, setAmt] = useState(String(row.amt))
+  const [x, setX] = useState(String(row.x))
+  const [rate, setRate] = useState(String(row.rate))
+  const [units, setUnits] = useState(row.units ?? '')
+  const [vendor, setVendor] = useState(row.vendor ?? '')
+  const [datedAt, setDatedAt] = useState(row.datedAt ? row.datedAt.slice(0, 10) : '')
+
+  useEffect(() => {
+    setCode(row.code ?? '')
+    setDescription(row.description)
+    setAmt(String(row.amt))
+    setX(String(row.x))
+    setRate(String(row.rate))
+    setUnits(row.units ?? '')
+    setVendor(row.vendor ?? '')
+    setDatedAt(row.datedAt ? row.datedAt.slice(0, 10) : '')
+  }, [row.id, row.code, row.description, row.amt, row.x, row.rate, row.units, row.vendor, row.datedAt])
+
+  async function commit(patch: Parameters<typeof api.updateBudgetItem>[1]) {
+    await api.updateBudgetItem(row.id, patch)
+    await onChanged()
+  }
+
+  async function remove() {
+    if (!confirm(`Delete "${row.description}"?`)) return
+    await api.deleteBudgetItem(row.id)
+    await onChanged()
+  }
+
+  const a = CATEGORY_ACCENT[row.category]
+  const computedTotal = (parseFloat(amt) || 0) * (parseFloat(x) || 0) * (parseFloat(rate) || 0)
+
+  return (
+    <tr className="border-t border-line/30 hover:bg-ink/40 group">
+      <td className="px-2 py-1.5">
+        <span className={`text-[9px] uppercase tracking-wider font-bold ${a.text} ${a.bg} border ${a.border} rounded-full px-1.5 py-0.5 whitespace-nowrap`}>
+          {CATEGORY_LABEL[row.category]}
+        </span>
+      </td>
+      <td className="px-2 py-1.5 text-muted whitespace-nowrap" title={row.accountName}>
+        <span className="font-mono text-[10px] text-muted/70">{row.accountCode}</span>{' '}
+        <span className="max-w-[140px] truncate inline-block align-bottom">{row.accountName}</span>
+      </td>
+      <td className="px-1 py-1 w-14">
+        <CellInput value={code} onChange={setCode} onBlur={() => code !== (row.code ?? '') && void commit({ code })} mono />
+      </td>
+      <td className="px-1 py-1 min-w-[160px]">
+        <CellInput value={description} onChange={setDescription} onBlur={() => description !== row.description && void commit({ description })} />
+      </td>
+      <td className="px-1 py-1 w-16">
+        <CellInput value={amt} onChange={setAmt} onBlur={() => parseFloat(amt) !== row.amt && void commit({ amt: parseFloat(amt) || 0 })} align="right" />
+      </td>
+      <td className="px-1 py-1 w-12">
+        <CellInput value={x} onChange={setX} onBlur={() => parseFloat(x) !== row.x && void commit({ x: parseFloat(x) || 1 })} align="right" />
+      </td>
+      <td className="px-1 py-1 w-20">
+        <CellInput value={rate} onChange={setRate} onBlur={() => parseFloat(rate) !== row.rate && void commit({ rate: parseFloat(rate) || 0 })} align="right" />
+      </td>
+      <td className="px-1 py-1 w-16">
+        <CellInput value={units} onChange={setUnits} onBlur={() => units !== (row.units ?? '') && void commit({ units })} />
+      </td>
+      <td className="px-1 py-1 w-28">
+        <CellInput value={vendor} onChange={setVendor} onBlur={() => vendor !== (row.vendor ?? '') && void commit({ vendor })} />
+      </td>
+      <td className="px-1 py-1 w-28">
+        <CellInput
+          value={datedAt}
+          onChange={setDatedAt}
+          type="date"
+          onBlur={() => {
+            const next = datedAt || null
+            const prev = row.datedAt ? row.datedAt.slice(0, 10) : null
+            if (next !== prev) void commit({ datedAt: next })
+          }}
+        />
+      </td>
+      <td className="px-2 py-1.5 text-right font-mono font-bold whitespace-nowrap">
+        {fmtMoney(computedTotal, currency)}
+      </td>
+      {isAdmin && (
+        <td className="px-2 py-1.5 text-right">
+          <button
+            onClick={() => void remove()}
+            className="text-muted/40 hover:text-urgent opacity-0 group-hover:opacity-100"
+            title="Delete"
+          >
+            ✕
+          </button>
+        </td>
+      )}
+    </tr>
+  )
+}
+
+function CellInput({
+  value, onChange, onBlur, type = 'text', align, mono,
+}: {
+  value: string
+  onChange: (v: string) => void
+  onBlur: () => void
+  type?: 'text' | 'date'
+  align?: 'right'
+  mono?: boolean
+}) {
+  return (
+    <input
+      type={type}
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      onBlur={onBlur}
+      className={`w-full bg-transparent text-xs px-1.5 py-1 rounded border border-transparent focus:border-stage-mastering/60 focus:bg-ink/40 outline-none ${
+        align === 'right' ? 'text-right font-mono' : ''
+      } ${mono ? 'font-mono' : ''}`}
     />
   )
 }
