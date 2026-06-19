@@ -1195,6 +1195,7 @@ function BudgetItemsTable({
                 <tr>
                   <SortableTh label="Category" k="category" sortKey={sortKey} sortAsc={sortAsc} onClick={toggleSort} />
                   <SortableTh label="Account" k="account" sortKey={sortKey} sortAsc={sortAsc} onClick={toggleSort} />
+                  <th className="px-2 py-2 text-left">Scene</th>
                   <SortableTh label="Code" k="code" sortKey={sortKey} sortAsc={sortAsc} onClick={toggleSort} />
                   <SortableTh label="Description" k="description" sortKey={sortKey} sortAsc={sortAsc} onClick={toggleSort} />
                   <th className="px-2 py-2 text-right">Amt</th>
@@ -1296,6 +1297,15 @@ function ItemRow({
       <td className="px-2 py-1.5 text-muted whitespace-nowrap" title={row.accountName}>
         <span className="font-mono text-[10px] text-muted/70">{row.accountCode}</span>{' '}
         <span className="max-w-[140px] truncate inline-block align-bottom">{row.accountName}</span>
+      </td>
+      <td className="px-2 py-1.5 whitespace-nowrap">
+        {row.sceneNumber ? (
+          <span className="text-[10px] font-mono font-bold text-stage-mastering bg-stage-mastering/10 border border-stage-mastering/30 rounded px-1.5 py-0.5">
+            #{row.sceneNumber}
+          </span>
+        ) : (
+          <span className="text-[10px] text-muted/40">—</span>
+        )}
       </td>
       <td className="px-1 py-1 w-14">
         <CellInput value={code} onChange={setCode} onBlur={() => code !== (row.code ?? '') && void commit({ code })} mono />

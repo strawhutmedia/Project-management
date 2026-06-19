@@ -14,8 +14,15 @@ export type ParsedScene = {
   page: number | null
   pageEighths: number
   characters: string[]
+  // Body text of the scene (Action + Dialogue paragraphs that follow the
+  // scene heading until the next heading). Cached so Claude can read it
+  // later for a budget breakdown without re-parsing the .fdx.
+  actionText: string
 }
 
+// All paragraphs, in order. Type-agnostic — we sort by Type after.
+const ANY_PARA_RE = /<Paragraph(?:\s[^>]*)?>([\s\S]*?)<\/Paragraph>/gi
+const TYPE_ATTR_RE = /\sType="([^"]+)"/i
 const PARA_RE = /<Paragraph(?:\s[^>]*)?\sType="Scene Heading"[^>]*>([\s\S]*?)<\/Paragraph>/gi
 const NUMBER_ATTR_RE = /\sNumber="([^"]+)"/i
 const LENGTH_ATTR_RE = /\sLength="([^"]+)"/i
@@ -80,54 +87,96 @@ function tagify(s: string | null): string | null {
   return s.toLowerCase().replace(/'/g, '').replace(/[^\w]+/g, '_').replace(/^_+|_+$/g, '').slice(0, 80) || null
 }
 
+function paragraphText(block: string): string {
+  let textBlock = block
+  const propsEnd = textBlock.indexOf('</SceneProperties>')
+  if (propsEnd >= 0) textBlock = textBlock.slice(propsEnd + '</SceneProperties>'.length)
+  const textPieces: string[] = []
+  const textRe = new RegExp(TEXT_INNER_RE.source, 'g')
+  let tMatch: RegExpExecArray | null
+  while ((tMatch = textRe.exec(textBlock)) !== null) {
+    textPieces.push(decodeEntities(tMatch[1]))
+  }
+  return textPieces.join('').replace(/\s+/g, ' ').trim()
+}
+
 export function parseFdx(xml: string): ParsedScene[] {
   const scenes: ParsedScene[] = []
+  // Buffer of action/dialogue lines for the scene currently being built.
+  // Flushed into scenes[scenes.length - 1].actionText when the next scene
+  // heading appears (or at end of file).
+  let bodyBuf: string[] = []
   let scriptPosition = 0
+  const paraRe = new RegExp(ANY_PARA_RE.source, 'gi')
   let match: RegExpExecArray | null
-  const paraRe = new RegExp(PARA_RE.source, 'gi')
+
+  function flush() {
+    if (scenes.length === 0) return
+    scenes[scenes.length - 1].actionText = bodyBuf.join('\n').trim()
+    bodyBuf = []
+  }
+
   while ((match = paraRe.exec(xml)) !== null) {
     const block = match[0]
-    const numberMatch = block.match(NUMBER_ATTR_RE)
-    if (!numberMatch) continue
-    const number = numberMatch[1].trim()
-    const lengthMatch = block.match(LENGTH_ATTR_RE)
-    const pageMatch = block.match(PAGE_ATTR_RE)
-    const pageEighths = lengthMatch ? parseLengthToEighths(lengthMatch[1]) : 0
-    const page = pageMatch ? parseInt(pageMatch[1], 10) : null
+    const typeMatch = block.match(TYPE_ATTR_RE)
+    const type = typeMatch ? typeMatch[1] : ''
 
-    const characters: string[] = []
-    let cMatch: RegExpExecArray | null
-    const charRe = new RegExp(CHARACTER_BEAT_RE.source, 'gi')
-    while ((cMatch = charRe.exec(block)) !== null) {
-      const name = decodeEntities(cMatch[1]).toUpperCase().replace(/\s+/g, ' ').trim()
-      if (name && !characters.includes(name)) characters.push(name)
+    if (type === 'Scene Heading') {
+      flush()
+      const numberMatch = block.match(NUMBER_ATTR_RE)
+      if (!numberMatch) continue
+      const number = numberMatch[1].trim()
+      const lengthMatch = block.match(LENGTH_ATTR_RE)
+      const pageMatch = block.match(PAGE_ATTR_RE)
+      const pageEighths = lengthMatch ? parseLengthToEighths(lengthMatch[1]) : 0
+      const page = pageMatch ? parseInt(pageMatch[1], 10) : null
+
+      const characters: string[] = []
+      let cMatch: RegExpExecArray | null
+      const charRe = new RegExp(CHARACTER_BEAT_RE.source, 'gi')
+      while ((cMatch = charRe.exec(block)) !== null) {
+        const name = decodeEntities(cMatch[1]).toUpperCase().replace(/\s+/g, ' ').trim()
+        if (name && !characters.includes(name)) characters.push(name)
+      }
+
+      const slug = paragraphText(block)
+      const { intExt, location, timeOfDay } = splitSlug(slug)
+      scriptPosition += 1
+      scenes.push({
+        number,
+        scriptPosition,
+        slug,
+        intExt,
+        location,
+        locationTag: tagify(location),
+        timeOfDay,
+        page,
+        pageEighths,
+        characters,
+        actionText: '',
+      })
+      continue
     }
 
-    let textBlock = block
-    const propsEnd = textBlock.indexOf('</SceneProperties>')
-    if (propsEnd >= 0) textBlock = textBlock.slice(propsEnd + '</SceneProperties>'.length)
-    const textPieces: string[] = []
-    const textRe = new RegExp(TEXT_INNER_RE.source, 'g')
-    let tMatch: RegExpExecArray | null
-    while ((tMatch = textRe.exec(textBlock)) !== null) {
-      textPieces.push(decodeEntities(tMatch[1]))
+    // Buffer action / dialogue / parentheticals / character cues / transitions
+    // / shots. Skip "General" since it's usually layout (page breaks, slug
+    // breaks). Anything we keep gets joined with newlines.
+    if (scenes.length === 0) continue
+    if (type === 'General') continue
+    const text = paragraphText(block)
+    if (!text) continue
+    if (type === 'Character') {
+      bodyBuf.push(`\n${text}:`)
+    } else if (type === 'Parenthetical') {
+      bodyBuf.push(`  (${text})`)
+    } else if (type === 'Dialogue') {
+      bodyBuf.push(`  ${text}`)
+    } else if (type === 'Transition') {
+      bodyBuf.push(`[${text}]`)
+    } else {
+      bodyBuf.push(text)
     }
-    const slug = textPieces.join('').replace(/\s+/g, ' ').trim()
-    const { intExt, location, timeOfDay } = splitSlug(slug)
-
-    scriptPosition += 1
-    scenes.push({
-      number,
-      scriptPosition,
-      slug,
-      intExt,
-      location,
-      locationTag: tagify(location),
-      timeOfDay,
-      page,
-      pageEighths,
-      characters,
-    })
   }
+  flush()
   return scenes
 }

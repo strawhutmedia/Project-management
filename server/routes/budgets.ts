@@ -42,9 +42,12 @@ budgetsRouter.get('/projects/:projectId', async (req, res) => {
     [budget.id],
   )
   const items = await pool.query(
-    `SELECT id, account_id, code, description, amt, units, x, rate, vendor, dated_at, notes, position
-     FROM budget_line_items
-     WHERE account_id = ANY($1) ORDER BY position ASC, created_at ASC`,
+    `SELECT li.id, li.account_id, li.scene_id, li.code, li.description, li.amt, li.units,
+            li.x, li.rate, li.vendor, li.dated_at, li.notes, li.position,
+            s.number AS scene_number
+     FROM budget_line_items li
+     LEFT JOIN scenes s ON s.id = li.scene_id
+     WHERE li.account_id = ANY($1) ORDER BY li.position ASC, li.created_at ASC`,
     [accounts.rows.map((a: { id: string }) => a.id)],
   )
   const itemsByAccount: Record<string, unknown[]> = {}
@@ -63,6 +66,8 @@ budgetsRouter.get('/projects/:projectId', async (req, res) => {
       datedAt: it.dated_at,
       notes: it.notes,
       position: it.position,
+      sceneId: it.scene_id,
+      sceneNumber: it.scene_number,
       total,
     })
   }
@@ -201,7 +206,7 @@ budgetsRouter.post('/accounts/:accountId/items', async (req, res) => {
   )
   if (lookup.rows.length === 0) { res.status(404).json({ error: 'not_found' }); return }
   if (!await assertWriter(user, lookup.rows[0].project_id, res)) return
-  const { code, description, amt, units, x, rate, vendor, datedAt, notes } = req.body ?? {}
+  const { code, description, amt, units, x, rate, vendor, datedAt, notes, sceneId } = req.body ?? {}
   if (typeof description !== 'string' || description.trim().length === 0) {
     res.status(400).json({ error: 'description_required' }); return
   }
@@ -211,11 +216,12 @@ budgetsRouter.post('/accounts/:accountId/items', async (req, res) => {
   )
   const { rows } = await pool.query(
     `INSERT INTO budget_line_items
-       (account_id, code, description, amt, units, x, rate, vendor, dated_at, notes, position, created_by)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+       (account_id, scene_id, code, description, amt, units, x, rate, vendor, dated_at, notes, position, created_by)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
      RETURNING id`,
     [
       accountId,
+      typeof sceneId === 'string' ? sceneId : null,
       typeof code === 'string' ? code : null,
       description.trim().slice(0, 200),
       Number(amt) || 0,
@@ -253,6 +259,7 @@ budgetsRouter.patch('/items/:itemId', async (req, res) => {
     ['vendor', 'vendor', (v) => (typeof v === 'string' ? v : null)],
     ['datedAt', 'dated_at', (v) => v || null],
     ['notes', 'notes', (v) => (typeof v === 'string' ? v : null)],
+    ['sceneId', 'scene_id', (v) => (typeof v === 'string' ? v : null)],
   ]
   const updates: string[] = []
   const values: unknown[] = []

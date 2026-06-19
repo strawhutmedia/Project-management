@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState, useRef } from 'react'
 import { api, type ApiScene, type ApiShootDay, type ApiStripboard } from '../api'
+import SceneDetailModal from './SceneDetailModal'
 
 // Strip styles tuned for the dark Slate UI. Each strip is a dark card with
 // a colored left stripe + colored "INT/EXT · TIME" label, so text is always
@@ -65,6 +66,7 @@ export default function Stripboard({ projectId, isAdmin, projectName }: { projec
   const [importing, setImporting] = useState(false)
   const [busy, setBusy] = useState(false)
   const [undoStack, setUndoStack] = useState<UndoEntry[]>([])
+  const [openSceneId, setOpenSceneId] = useState<string | null>(null)
   const fileInputRef = useRef<HTMLInputElement | null>(null)
   // Mirror board in a ref so moveScene can read the freshest state without
   // re-creating its closure on every render.
@@ -347,6 +349,7 @@ export default function Stripboard({ projectId, isAdmin, projectName }: { projec
           isAdmin={isAdmin}
           moveScene={moveScene}
           resolvedTod={resolvedTod}
+          onOpenScene={setOpenSceneId}
         />
         {board.days.map((day) => (
           <DayRow
@@ -357,9 +360,20 @@ export default function Stripboard({ projectId, isAdmin, projectName }: { projec
             isAdmin={isAdmin}
             moveScene={moveScene}
             resolvedTod={resolvedTod}
+            onOpenScene={setOpenSceneId}
           />
         ))}
       </div>
+
+      {openSceneId && (
+        <SceneDetailModal
+          sceneId={openSceneId}
+          scene={board.scenes.find((s) => s.id === openSceneId) ?? null}
+          isAdmin={isAdmin}
+          onClose={() => setOpenSceneId(null)}
+          onChanged={() => void load()}
+        />
+      )}
     </section>
   )
 }
@@ -371,6 +385,7 @@ function DayRow({
   isAdmin,
   moveScene,
   resolvedTod,
+  onOpenScene,
 }: {
   day: ApiShootDay | null
   label: string
@@ -378,6 +393,7 @@ function DayRow({
   isAdmin: boolean
   moveScene: (sceneId: string, toDayId: string | null, toPosition: number) => Promise<void>
   resolvedTod: Map<string, string>
+  onOpenScene: (id: string) => void
 }) {
   const [over, setOver] = useState(false)
   const [collapsed, setCollapsed] = useState(false)
@@ -448,6 +464,7 @@ function DayRow({
                   scene={s}
                   isAdmin={isAdmin}
                   resolvedTod={resolvedTod.get(s.id) ?? ''}
+                  onOpen={() => onOpenScene(s.id)}
                 />
               ))}
             </div>
@@ -462,29 +479,31 @@ function SceneCard({
   scene,
   isAdmin,
   resolvedTod,
+  onOpen,
 }: {
   scene: ApiScene
   isAdmin: boolean
   resolvedTod: string
+  onOpen: () => void
 }) {
   const kind = stripKind(scene, resolvedTod)
   const style = STRIP_STYLE[kind]
+  const hasBudget = scene.budgetItemCount > 0
   return (
-    <div
+    <button
+      type="button"
+      onClick={onOpen}
       draggable={isAdmin}
       onDragStart={(e) => {
         e.dataTransfer.setData('text/scene-id', scene.id)
         e.dataTransfer.effectAllowed = 'move'
       }}
-      className={`relative aspect-square rounded-2xl ring-1 ring-white/10 overflow-hidden ${style.card} ${
-        isAdmin ? 'cursor-grab active:cursor-grabbing' : ''
+      className={`relative text-left aspect-square rounded-2xl ring-1 ring-white/10 overflow-hidden ${style.card} ${
+        isAdmin ? 'cursor-pointer' : 'cursor-pointer'
       } hover:ring-white/40 hover:shadow-xl hover:scale-[1.02] transition flex flex-col text-white shadow-md`}
-      title={scene.slug}
+      title={`${scene.slug} — click to open breakdown`}
     >
-      {/* Inner gloss for a little dimension */}
       <div className={`h-1 w-full ${style.stripe} opacity-90`} />
-
-      {/* Bottom-up dark veil keeps white text legible on every hue, even gold */}
       <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-black/10 to-transparent pointer-events-none" />
 
       <div className="relative flex-1 flex flex-col px-3 py-2.5 min-h-0">
@@ -509,8 +528,15 @@ function SceneCard({
               {scene.characters.slice(0, 3).join('·')}{scene.characters.length > 3 ? `+${scene.characters.length - 3}` : ''}
             </div>
           )}
+          {hasBudget && (
+            <div className="text-[9px] font-mono text-white bg-black/30 rounded px-1 py-0.5 inline-block [text-shadow:0_1px_2px_rgba(0,0,0,0.5)]">
+              {scene.budgetTotal > 0
+                ? `$${Math.round(scene.budgetTotal).toLocaleString()}`
+                : `${scene.budgetItemCount} item${scene.budgetItemCount === 1 ? '' : 's'} · price me`}
+            </div>
+          )}
         </div>
       </div>
-    </div>
+    </button>
   )
 }

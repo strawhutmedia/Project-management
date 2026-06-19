@@ -147,6 +147,8 @@ export type ApiBudgetLineItem = {
   notes: string | null
   position: number
   total: number
+  sceneId: string | null
+  sceneNumber: string | null
 }
 
 export type ApiBudgetAccount = {
@@ -387,9 +389,13 @@ export type ApiScene = {
   pageEighths: number
   characters: string[]
   notes: string | null
+  actionText: string | null
+  breakdownRunAt: string | null
   shootDayId: string | null
   dayPosition: number
   locationStatus: 'unset' | 'free' | 'paid'
+  budgetTotal: number
+  budgetItemCount: number
 }
 
 export type ApiStripboard = {
@@ -637,6 +643,7 @@ export const api = {
     vendor?: string
     datedAt?: string
     notes?: string
+    sceneId?: string | null
   }) => request<{ id: string }>(`/api/budgets/accounts/${accountId}/items`, { method: 'POST', body: JSON.stringify(body) }),
   updateBudgetItem: (itemId: string, patch: Partial<{
     code: string
@@ -648,6 +655,7 @@ export const api = {
     vendor: string
     datedAt: string | null
     notes: string
+    sceneId: string | null
   }>) => request<{ ok: true }>(`/api/budgets/items/${itemId}`, { method: 'PATCH', body: JSON.stringify(patch) }),
   deleteBudgetItem: (itemId: string) =>
     request<{ ok: true }>(`/api/budgets/items/${itemId}`, { method: 'DELETE' }),
@@ -655,10 +663,15 @@ export const api = {
   stripboard: (projectId: string) =>
     request<ApiStripboard>(`/api/stripboard/projects/${projectId}`),
   importFdx: (projectId: string, xml: string) =>
-    request<{ ok: true; count: number }>(`/api/stripboard/projects/${projectId}/import-fdx`, {
+    request<{ ok: true; count: number; breakdownStarted?: boolean }>(`/api/stripboard/projects/${projectId}/import-fdx`, {
       method: 'POST',
       body: JSON.stringify({ xml }),
     }),
+  sceneBreakdown: (sceneId: string) =>
+    request<{ ok: true; itemsCreated: number; itemsSuggested: number }>(
+      `/api/stripboard/scenes/${sceneId}/breakdown`,
+      { method: 'POST' },
+    ),
   createShootDay: (projectId: string, body: { number: number; isBreak?: boolean; shootDate?: string }) =>
     request<{ id: string }>(`/api/stripboard/projects/${projectId}/days`, {
       method: 'POST',

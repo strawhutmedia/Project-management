@@ -4,6 +4,8 @@ import { requireUser, type SessionUser } from '../auth'
 import { assertWriter } from '../permissions'
 import { parseFdx } from '../fdx_parser'
 import { applyBackInYourArmsSchedule } from '../seeds/back_in_your_arms'
+import { runSceneBreakdown, runProjectBreakdown } from '../scene_breakdown'
+import { logError, logInfo } from '../diag'
 
 export const stripboardRouter = Router()
 stripboardRouter.use(requireUser)
@@ -32,11 +34,23 @@ stripboardRouter.get('/projects/:projectId', async (req, res) => {
     [projectId],
   )
   const scenes = await pool.query(
-    `SELECT id, number, script_position, slug, int_ext, location, location_tag,
-            time_of_day, page, page_eighths, characters, notes,
-            shoot_day_id, day_position, location_status
-     FROM scenes WHERE project_id = $1
-     ORDER BY shoot_day_id NULLS FIRST, day_position ASC, script_position ASC`,
+    `SELECT s.id, s.number, s.script_position, s.slug, s.int_ext, s.location, s.location_tag,
+            s.time_of_day, s.page, s.page_eighths, s.characters, s.notes,
+            s.action_text, s.breakdown_run_at,
+            s.shoot_day_id, s.day_position, s.location_status,
+            COALESCE((
+              SELECT SUM(li.amt * li.x * li.rate)
+              FROM budget_line_items li
+              WHERE li.scene_id = s.id
+            ), 0) AS scene_budget_total,
+            COALESCE((
+              SELECT COUNT(*)
+              FROM budget_line_items li
+              WHERE li.scene_id = s.id
+            ), 0) AS scene_budget_item_count
+     FROM scenes s
+     WHERE s.project_id = $1
+     ORDER BY s.shoot_day_id NULLS FIRST, s.day_position ASC, s.script_position ASC`,
     [projectId],
   )
   res.json({
@@ -51,7 +65,9 @@ stripboardRouter.get('/projects/:projectId', async (req, res) => {
       id: string; number: string; script_position: number; slug: string; int_ext: string | null;
       location: string | null; location_tag: string | null; time_of_day: string | null;
       page: number | null; page_eighths: number; characters: string[]; notes: string | null;
+      action_text: string | null; breakdown_run_at: string | null;
       shoot_day_id: string | null; day_position: number; location_status: string;
+      scene_budget_total: string | number; scene_budget_item_count: string | number;
     }) => ({
       id: s.id,
       number: s.number,
@@ -65,9 +81,13 @@ stripboardRouter.get('/projects/:projectId', async (req, res) => {
       pageEighths: s.page_eighths,
       characters: s.characters,
       notes: s.notes,
+      actionText: s.action_text,
+      breakdownRunAt: s.breakdown_run_at,
       shootDayId: s.shoot_day_id,
       dayPosition: s.day_position,
       locationStatus: s.location_status,
+      budgetTotal: Number(s.scene_budget_total) || 0,
+      budgetItemCount: Number(s.scene_budget_item_count) || 0,
     })),
   })
 })
@@ -119,9 +139,9 @@ stripboardRouter.post('/projects/:projectId/import-fdx', async (req, res) => {
       await client.query(
         `INSERT INTO scenes
            (project_id, number, script_position, slug, int_ext, location, location_tag,
-            time_of_day, page, page_eighths, characters, notes,
+            time_of_day, page, page_eighths, characters, notes, action_text,
             shoot_day_id, day_position, location_status)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)`,
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)`,
         [
           projectId,
           sc.number,
@@ -135,6 +155,7 @@ stripboardRouter.post('/projects/:projectId/import-fdx', async (req, res) => {
           sc.pageEighths,
           JSON.stringify(sc.characters),
           prior?.notes ?? null,
+          sc.actionText || null,
           prior?.shoot_day_id ?? null,
           prior?.day_position ?? 0,
           prior?.location_status ?? 'unset',
@@ -153,7 +174,21 @@ stripboardRouter.post('/projects/:projectId/import-fdx', async (req, res) => {
     if (proj.rows[0]?.name === 'Back in Your Arms') {
       autoApplied = await applyBackInYourArmsSchedule(projectId)
     }
-    res.json({ ok: true, count: parsed.length, autoApplied })
+
+    // Kick off the Claude-powered cost breakdown for every scene with action
+    // text. Runs in the background — the .fdx import response returns
+    // immediately so the producer isn't blocked on a multi-minute call.
+    // Items land as zero-cost rows in the production category, ready for
+    // the producer to price out.
+    void runProjectBreakdown(projectId, user.id).catch((err) => {
+      logError('scene breakdown background run failed', {
+        projectId,
+        error: err instanceof Error ? err.message : String(err),
+      })
+    })
+    logInfo('fdx imported, breakdown kicked off', { projectId, count: parsed.length })
+
+    res.json({ ok: true, count: parsed.length, autoApplied, breakdownStarted: true })
   } catch (err) {
     await client.query('ROLLBACK')
     res.status(500).json({ error: err instanceof Error ? err.message : String(err) })
@@ -210,6 +245,34 @@ stripboardRouter.patch('/scenes/:sceneId', async (req, res) => {
   values.push(sceneId)
   await pool.query(`UPDATE scenes SET ${updates.join(', ')} WHERE id = $${i}`, values)
   res.json({ ok: true })
+})
+
+// Run (or re-run) the Claude-powered cost breakdown for a single scene.
+// Reads the cached action_text from the .fdx, asks Claude to list everything
+// that might cost money (props, wardrobe, location, vehicles, SFX, VFX,
+// animals, weapons, extras, day-player roles, picture cars, special equipment),
+// then inserts each as a zero-cost budget_line_items row attached to the scene.
+// The producer fills in the dollar amounts.
+stripboardRouter.post('/scenes/:sceneId/breakdown', async (req, res) => {
+  const user = (req as typeof req & { user: SessionUser }).user
+  const sceneId = req.params.sceneId
+  const access = await pool.query<{ project_id: string }>(
+    `SELECT s.project_id FROM scenes s
+     JOIN projects p ON p.id = s.project_id
+     LEFT JOIN project_members m ON m.project_id = p.id AND m.user_id = $1
+     WHERE s.id = $2 AND ($3 = 'admin' OR p.created_by = $1 OR m.user_id IS NOT NULL)`,
+    [user.id, sceneId, user.role],
+  )
+  if (access.rows.length === 0) { res.status(403).json({ error: 'forbidden' }); return }
+  const projectId = access.rows[0].project_id
+  try {
+    const result = await runSceneBreakdown(sceneId, user.id)
+    res.json({ ok: true, ...result })
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err)
+    logError('scene breakdown failed', { sceneId, projectId, error: msg })
+    res.status(502).json({ error: msg.slice(0, 400) })
+  }
 })
 
 // Apply Ryan's pre-seeded "Back in Your Arms" StudioBinder schedule. Maps
