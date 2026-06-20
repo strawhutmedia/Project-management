@@ -161,6 +161,20 @@ export default function Stripboard({ projectId, isAdmin, projectName }: { projec
     }
   }
 
+  async function reanalyzeAll() {
+    if (!confirm('Re-analyze every scene with Claude? Existing zero-cost suggestions get replaced; rows you\'ve already priced are preserved. Takes ~30 seconds for a feature, costs ~$0.50.')) return
+    setBusy(true)
+    setError(null)
+    try {
+      const r = await api.reanalyzeAllScenes(projectId)
+      setError(`✓ Re-analyzing ${r.sceneCount} scenes in the background. Refresh in 30–60 seconds to see updated breakdowns.`)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'failed')
+    } finally {
+      setBusy(false)
+    }
+  }
+
   async function applyBiyaSchedule() {
     setBusy(true)
     setError(null)
@@ -312,6 +326,14 @@ export default function Stripboard({ projectId, isAdmin, projectName }: { projec
               className="text-[10px] uppercase tracking-wider text-stage-stems border border-stage-stems/40 rounded-full px-3 py-1.5 hover:bg-stage-stems/10 disabled:opacity-50"
             >
               {importing ? 'Parsing…' : '↻ Re-import .fdx'}
+            </button>
+            <button
+              onClick={() => void reanalyzeAll()}
+              disabled={busy}
+              title="Re-run Claude breakdown on every scene already in the database. No .fdx upload needed."
+              className="text-[10px] uppercase tracking-wider text-stage-mastering border border-stage-mastering/40 rounded-full px-3 py-1.5 hover:bg-stage-mastering/10 disabled:opacity-50"
+            >
+              ✨ Re-analyze all scenes
             </button>
             {projectName === 'Back in Your Arms' && (grouped?.unscheduled.length ?? 0) > 0 && (
               <button

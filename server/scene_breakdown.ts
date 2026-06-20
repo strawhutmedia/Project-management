@@ -261,19 +261,27 @@ export async function runSceneBreakdown(sceneId: string, userId: string): Promis
   }
 }
 
-// Run the breakdown for every scene in a project that has action text and
-// hasn't been broken down yet. Serial — we don't want to slam Anthropic
-// with 100 parallel requests on a feature-length script. Per-scene calls
-// are cheap (Sonnet, ~$0.005 each) so a 90-scene script totals ~$0.50.
-export async function runProjectBreakdown(projectId: string, userId: string): Promise<{ scenes: number; created: number }> {
+// Run the breakdown for every scene in a project that has action text. By
+// default skips scenes already broken down (breakdown_run_at IS NOT NULL).
+// Pass force=true to re-analyze every scene — useful when the producer
+// wants a fresh pass without re-importing the .fdx. Serial — we don't
+// want to slam Anthropic with 100 parallel requests on a feature-length
+// script. Per-scene calls are cheap (Sonnet, ~$0.005 each) so a 90-scene
+// script totals ~$0.50.
+export async function runProjectBreakdown(
+  projectId: string,
+  userId: string,
+  opts: { force?: boolean } = {},
+): Promise<{ scenes: number; created: number }> {
   if (!process.env.ANTHROPIC_API_KEY) {
     logError('scene_breakdown: no API key, skipping project breakdown', { projectId })
     return { scenes: 0, created: 0 }
   }
+  const where = opts.force
+    ? `project_id = $1 AND action_text IS NOT NULL`
+    : `project_id = $1 AND breakdown_run_at IS NULL AND action_text IS NOT NULL`
   const scenes = await pool.query<{ id: string }>(
-    `SELECT id FROM scenes
-     WHERE project_id = $1 AND breakdown_run_at IS NULL AND action_text IS NOT NULL
-     ORDER BY script_position ASC`,
+    `SELECT id FROM scenes WHERE ${where} ORDER BY script_position ASC`,
     [projectId],
   )
   let totalCreated = 0
@@ -289,6 +297,6 @@ export async function runProjectBreakdown(projectId: string, userId: string): Pr
       })
     }
   }
-  logInfo('scene_breakdown: project complete', { projectId, scenes: scenes.rows.length, created: totalCreated })
+  logInfo('scene_breakdown: project complete', { projectId, scenes: scenes.rows.length, created: totalCreated, force: !!opts.force })
   return { scenes: scenes.rows.length, created: totalCreated }
 }

@@ -672,6 +672,11 @@ export const api = {
       `/api/stripboard/scenes/${sceneId}/breakdown`,
       { method: 'POST' },
     ),
+  reanalyzeAllScenes: (projectId: string) =>
+    request<{ ok: true; sceneCount: number; started: true }>(
+      `/api/stripboard/projects/${projectId}/reanalyze-all`,
+      { method: 'POST' },
+    ),
   createShootDay: (projectId: string, body: { number: number; isBreak?: boolean; shootDate?: string }) =>
     request<{ id: string }>(`/api/stripboard/projects/${projectId}/days`, {
       method: 'POST',

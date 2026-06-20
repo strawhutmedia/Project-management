@@ -286,6 +286,37 @@ stripboardRouter.post('/scenes/:sceneId/breakdown', async (req, res) => {
   }
 })
 
+// Re-analyze every scene already in the database, without requiring a
+// fresh .fdx upload. Useful when the breakdown prompt or model changes,
+// or when the producer wants a second pass with broader coverage. Wipes
+// the existing zero-cost auto-suggestions per-scene (priced rows are
+// preserved) and re-runs Claude on each scene with action text. Runs in
+// the background — the request returns immediately. Status branch
+// republishes when finished.
+stripboardRouter.post('/projects/:projectId/reanalyze-all', async (req, res) => {
+  const user = (req as typeof req & { user: SessionUser }).user
+  const projectId = req.params.projectId
+  if (!await assertWriter(user, projectId, res)) return
+  const sceneCount = await pool.query<{ count: string }>(
+    `SELECT COUNT(*)::text AS count FROM scenes WHERE project_id = $1 AND action_text IS NOT NULL`,
+    [projectId],
+  )
+  const n = Number(sceneCount.rows[0]?.count ?? 0)
+  if (n === 0) {
+    res.status(400).json({ error: 'no_scenes', message: 'No scenes with action text. Re-import the .fdx first.' })
+    return
+  }
+  void runProjectBreakdown(projectId, user.id, { force: true })
+    .then(() => publishProjectScript(projectId))
+    .catch((err) => {
+      logError('reanalyze-all background run failed', {
+        projectId,
+        error: err instanceof Error ? err.message : String(err),
+      })
+    })
+  res.json({ ok: true, sceneCount: n, started: true })
+})
+
 // Force a re-publish of the parsed script to the status branch. Normally
 // fires automatically — this endpoint exists so a backfill / admin
 // debugging call can trigger it without re-importing the .fdx.
