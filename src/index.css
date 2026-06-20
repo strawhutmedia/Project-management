@@ -62,40 +62,80 @@ body {
   background: linear-gradient(90deg, #fbbf24, #fb923c, #f472b6, #a78bfa, #60a5fa, #2dd4bf, #34d399);
 }
 
-/* Film projects get a warmer palette for their cards / borders while
-   the rest of the app (header, footer, global page bg) stays in the
-   default dark theme. Triggered by data-theme="film" on the project
-   page root. */
+/* Film projects swap the dark studio palette for a warm paper-and-ink
+   palette — feels like a sun-bleached call sheet on a craft table.
+   Triggered by data-theme="film" on the project page root. The app
+   shell (header / footer) keeps the default dark theme so navigation
+   still feels like Slate. */
+
+/* Cream "paper" backdrop that covers the body radial gradients inside
+   the film project area. */
 [data-theme="film"] {
-  /* Slightly warmer body tint inside the film project area. The
-     radial gradients on body still bleed through; this just nudges
-     things amber. */
+  background:
+    radial-gradient(900px 500px at 8% -10%, rgba(251, 191, 36, 0.18), transparent 60%),
+    radial-gradient(900px 500px at 110% 0%, rgba(244, 114, 182, 0.10), transparent 60%),
+    radial-gradient(900px 500px at 50% 110%, rgba(167, 139, 250, 0.10), transparent 60%),
+    linear-gradient(180deg, #f7efda 0%, #ede1c2 100%);
+  min-height: 100vh;
+  padding: 1.5rem;
+  margin: -1.5rem;
+  border-radius: 0;
+  color: #2a2018;
 }
 
+/* Panels become near-white paper cards. */
 [data-theme="film"] .bg-panel\/40 {
-  background-color: rgba(56, 41, 23, 0.6) !important;
+  background-color: rgba(255, 251, 240, 0.82) !important;
 }
 [data-theme="film"] .bg-panel\/60 {
-  background-color: rgba(56, 41, 23, 0.8) !important;
+  background-color: rgba(255, 251, 240, 0.92) !important;
+}
+[data-theme="film"] .bg-panel {
+  background-color: rgba(255, 251, 240, 1) !important;
+}
+[data-theme="film"] .bg-ink\/20 {
+  background-color: rgba(232, 218, 188, 0.4) !important;
 }
 [data-theme="film"] .bg-ink\/30 {
-  background-color: rgba(34, 22, 12, 0.5) !important;
+  background-color: rgba(232, 218, 188, 0.55) !important;
 }
 [data-theme="film"] .bg-ink\/40 {
-  background-color: rgba(34, 22, 12, 0.65) !important;
+  background-color: rgba(232, 218, 188, 0.7) !important;
+}
+[data-theme="film"] .bg-ink\/50 {
+  background-color: rgba(232, 218, 188, 0.78) !important;
 }
 [data-theme="film"] .bg-ink\/60 {
-  background-color: rgba(34, 22, 12, 0.8) !important;
+  background-color: rgba(232, 218, 188, 0.85) !important;
 }
+
+/* Text flips to dark ink on cream. */
+[data-theme="film"] .text-text {
+  color: #2a2018 !important;
+}
+[data-theme="film"] .text-muted {
+  color: #7a6a55 !important;
+}
+[data-theme="film"] .text-muted\/80 { color: rgba(122, 106, 85, 0.85) !important; }
+[data-theme="film"] .text-muted\/70 { color: rgba(122, 106, 85, 0.75) !important; }
+[data-theme="film"] .text-muted\/60 { color: rgba(122, 106, 85, 0.6) !important; }
+[data-theme="film"] .text-muted\/40 { color: rgba(122, 106, 85, 0.5) !important; }
+
+/* Borders become warm tan instead of dark gray. */
 [data-theme="film"] .border-line {
-  border-color: rgba(120, 90, 55, 0.45) !important;
+  border-color: rgba(184, 156, 110, 0.6) !important;
 }
-[data-theme="film"] .border-line\/40 {
-  border-color: rgba(120, 90, 55, 0.3) !important;
+[data-theme="film"] .border-line\/40 { border-color: rgba(184, 156, 110, 0.35) !important; }
+[data-theme="film"] .border-line\/60 { border-color: rgba(184, 156, 110, 0.5) !important; }
+[data-theme="film"] .border-line\/70 { border-color: rgba(184, 156, 110, 0.65) !important; }
+
+/* Inputs need an explicit dark text on light bg. */
+[data-theme="film"] input,
+[data-theme="film"] textarea,
+[data-theme="film"] select {
+  color: #2a2018;
 }
-[data-theme="film"] .border-line\/60 {
-  border-color: rgba(120, 90, 55, 0.55) !important;
-}
-[data-theme="film"] .border-line\/70 {
-  border-color: rgba(120, 90, 55, 0.6) !important;
+[data-theme="film"] input::placeholder,
+[data-theme="film"] textarea::placeholder {
+  color: rgba(122, 106, 85, 0.55);
 }

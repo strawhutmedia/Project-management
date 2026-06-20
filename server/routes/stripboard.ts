@@ -393,6 +393,184 @@ stripboardRouter.post('/scenes/:sceneId/breakdown', async (req, res) => {
   }
 })
 
+// Breakdown progress for the live banner. Lets the UI poll while
+// Claude is grinding through scenes after an upload, so the producer
+// can see "47 / 157 analyzed" instead of staring at a static screen.
+stripboardRouter.get('/projects/:projectId/breakdown-progress', async (req, res) => {
+  const user = (req as typeof req & { user: SessionUser }).user
+  const projectId = req.params.projectId
+  if (!(await userCanAccessProject(user.id, user.role, projectId))) {
+    res.status(403).json({ error: 'forbidden' }); return
+  }
+  const { rows } = await pool.query<{
+    total_scenes: string;
+    with_action_text: string;
+    with_breakdown: string;
+    last_run_at: string | null;
+  }>(
+    `SELECT
+       COUNT(*)::text AS total_scenes,
+       COUNT(*) FILTER (WHERE action_text IS NOT NULL AND length(action_text) >= 30)::text AS with_action_text,
+       COUNT(*) FILTER (WHERE breakdown_run_at IS NOT NULL)::text AS with_breakdown,
+       MAX(breakdown_run_at)::text AS last_run_at
+     FROM scenes WHERE project_id = $1`,
+    [projectId],
+  )
+  const r = rows[0]
+  const totalScenes = Number(r.total_scenes)
+  const withActionText = Number(r.with_action_text)
+  const withBreakdown = Number(r.with_breakdown)
+  // "Running" if there's action text we haven't broken down yet AND we
+  // saw activity in the last 5 minutes. Stale (no recent activity)
+  // means the user has unbroken-down scenes but no current run.
+  const lastRunAt = r.last_run_at ? new Date(r.last_run_at).getTime() : 0
+  const fiveMinAgo = Date.now() - 5 * 60 * 1000
+  const isRunning = withBreakdown < withActionText && lastRunAt > fiveMinAgo
+  const isStale = withBreakdown < withActionText && lastRunAt <= fiveMinAgo
+  res.json({
+    totalScenes,
+    withActionText,
+    withBreakdown,
+    isRunning,
+    isStale,
+    lastRunAt: r.last_run_at,
+  })
+})
+
+// List all schedule snapshots for a project. Most recent first.
+stripboardRouter.get('/projects/:projectId/schedule-snapshots', async (req, res) => {
+  const user = (req as typeof req & { user: SessionUser }).user
+  const projectId = req.params.projectId
+  if (!(await userCanAccessProject(user.id, user.role, projectId))) {
+    res.status(403).json({ error: 'forbidden' }); return
+  }
+  const { rows } = await pool.query<{
+    id: string; name: string; description: string | null; created_at: string;
+    scene_count: number; shoot_day_count: number;
+  }>(
+    `SELECT id, name, description, created_at, scene_count, shoot_day_count
+     FROM schedule_snapshots WHERE project_id = $1 ORDER BY created_at DESC`,
+    [projectId],
+  )
+  res.json({
+    snapshots: rows.map((r) => ({
+      id: r.id,
+      name: r.name,
+      description: r.description,
+      createdAt: r.created_at,
+      sceneCount: r.scene_count,
+      shootDayCount: r.shoot_day_count,
+    })),
+  })
+})
+
+// Save the current stripboard state as a named snapshot.
+stripboardRouter.post('/projects/:projectId/schedule-snapshots', async (req, res) => {
+  const user = (req as typeof req & { user: SessionUser }).user
+  const projectId = req.params.projectId
+  if (!await assertWriter(user, projectId, res)) return
+  const name = typeof req.body?.name === 'string' ? req.body.name.trim().slice(0, 80) : ''
+  const description = typeof req.body?.description === 'string' ? req.body.description.slice(0, 500) : null
+  if (!name) { res.status(400).json({ error: 'name_required' }); return }
+
+  const daysRes = await pool.query<{ number: number; is_break: boolean; shoot_date: string | null; notes: string | null }>(
+    `SELECT number, is_break, shoot_date, notes FROM shoot_days WHERE project_id = $1 ORDER BY number`,
+    [projectId],
+  )
+  const scenesRes = await pool.query<{
+    number: string; shoot_day_number: number | null; day_position: number; location_status: string; notes: string | null;
+  }>(
+    `SELECT s.number, sd.number AS shoot_day_number, s.day_position, s.location_status, s.notes
+     FROM scenes s LEFT JOIN shoot_days sd ON sd.id = s.shoot_day_id
+     WHERE s.project_id = $1 ORDER BY s.script_position`,
+    [projectId],
+  )
+  const payload = {
+    shootDays: daysRes.rows,
+    scenes: scenesRes.rows.map((r) => ({
+      number: r.number,
+      shootDayNumber: r.shoot_day_number,
+      dayPosition: r.day_position,
+      locationStatus: r.location_status,
+      notes: r.notes,
+    })),
+  }
+  const { rows } = await pool.query<{ id: string }>(
+    `INSERT INTO schedule_snapshots
+       (project_id, name, description, created_by, scene_count, shoot_day_count, payload)
+     VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id`,
+    [projectId, name, description, user.id, scenesRes.rows.length, daysRes.rows.length, JSON.stringify(payload)],
+  )
+  logInfo('schedule snapshot saved', { projectId, snapshotId: rows[0].id, name })
+  res.json({ ok: true, id: rows[0].id })
+})
+
+// Restore a schedule snapshot — re-creates shoot days and re-assigns
+// every scene to where it was. Matches by scene number so works even
+// across re-imports.
+stripboardRouter.post('/snapshots/:snapshotId/restore', async (req, res) => {
+  const user = (req as typeof req & { user: SessionUser }).user
+  const snapshotId = req.params.snapshotId
+  const snap = await pool.query<{ project_id: string; name: string; payload: unknown }>(
+    `SELECT project_id, name, payload FROM schedule_snapshots WHERE id = $1`,
+    [snapshotId],
+  )
+  if (snap.rows.length === 0) { res.status(404).json({ error: 'not_found' }); return }
+  if (!await assertWriter(user, snap.rows[0].project_id, res)) return
+  const projectId = snap.rows[0].project_id
+  const payload = snap.rows[0].payload as {
+    shootDays: Array<{ number: number; is_break: boolean; shoot_date: string | null; notes: string | null }>
+    scenes: Array<{ number: string; shootDayNumber: number | null; dayPosition: number; locationStatus: string; notes: string | null }>
+  }
+
+  const client = await pool.connect()
+  try {
+    await client.query('BEGIN')
+    // Wipe existing shoot days. Scenes get unassigned via ON DELETE SET NULL.
+    await client.query(`DELETE FROM shoot_days WHERE project_id = $1`, [projectId])
+    const dayIdByNumber = new Map<number, string>()
+    for (const d of payload.shootDays) {
+      const { rows } = await client.query<{ id: string }>(
+        `INSERT INTO shoot_days (project_id, number, is_break, shoot_date, notes)
+         VALUES ($1, $2, $3, $4, $5) RETURNING id`,
+        [projectId, d.number, d.is_break, d.shoot_date, d.notes],
+      )
+      dayIdByNumber.set(d.number, rows[0].id)
+    }
+    for (const sc of payload.scenes) {
+      const dayId = sc.shootDayNumber != null ? dayIdByNumber.get(sc.shootDayNumber) ?? null : null
+      await client.query(
+        `UPDATE scenes SET shoot_day_id = $2, day_position = $3, location_status = $4
+         WHERE project_id = $1 AND number = $5`,
+        [projectId, dayId, sc.dayPosition, sc.locationStatus, sc.number],
+      )
+    }
+    await client.query('COMMIT')
+  } catch (err) {
+    await client.query('ROLLBACK')
+    res.status(500).json({ error: err instanceof Error ? err.message : String(err) }); return
+  } finally {
+    client.release()
+  }
+
+  void publishProjectScript(projectId)
+  logInfo('schedule snapshot restored', { projectId, snapshotId, name: snap.rows[0].name })
+  res.json({ ok: true })
+})
+
+// Delete a saved snapshot.
+stripboardRouter.delete('/snapshots/:snapshotId', async (req, res) => {
+  const user = (req as typeof req & { user: SessionUser }).user
+  const snapshotId = req.params.snapshotId
+  const snap = await pool.query<{ project_id: string }>(
+    `SELECT project_id FROM schedule_snapshots WHERE id = $1`, [snapshotId],
+  )
+  if (snap.rows.length === 0) { res.status(404).json({ error: 'not_found' }); return }
+  if (!await assertWriter(user, snap.rows[0].project_id, res)) return
+  await pool.query(`DELETE FROM schedule_snapshots WHERE id = $1`, [snapshotId])
+  res.json({ ok: true })
+})
+
 // Return the diff JSON for the most recent upload — what changed
 // compared to the previous archived version. Null when this is the
 // first upload (nothing to compare to) or when the previous parse

@@ -11,6 +11,24 @@ type ScriptArchive = {
   uploadedAt: string
 }
 
+type BreakdownProgress = {
+  totalScenes: number
+  withActionText: number
+  withBreakdown: number
+  isRunning: boolean
+  isStale: boolean
+  lastRunAt: string | null
+}
+
+type ScheduleSnapshot = {
+  id: string
+  name: string
+  description: string | null
+  createdAt: string
+  sceneCount: number
+  shootDayCount: number
+}
+
 // Strip styles tuned for the dark Slate UI. Each strip is a dark card with
 // a colored left stripe + colored "INT/EXT · TIME" label, so text is always
 // readable. The stripe is the at-a-glance type indicator (industry-standard
@@ -77,6 +95,8 @@ export default function Stripboard({ projectId, isAdmin, projectName }: { projec
   const [undoStack, setUndoStack] = useState<UndoEntry[]>([])
   const [openSceneId, setOpenSceneId] = useState<string | null>(null)
   const [archive, setArchive] = useState<ScriptArchive | null>(null)
+  const [progress, setProgress] = useState<BreakdownProgress | null>(null)
+  const [snapshots, setSnapshots] = useState<ScheduleSnapshot[]>([])
   const fileInputRef = useRef<HTMLInputElement | null>(null)
   // Mirror board in a ref so moveScene can read the freshest state without
   // re-creating its closure on every render.
@@ -101,10 +121,82 @@ export default function Stripboard({ projectId, isAdmin, projectName }: { projec
     }
   }
 
+  async function loadProgress() {
+    try {
+      const r = await api.breakdownProgress(projectId)
+      setProgress(r)
+    } catch {
+      setProgress(null)
+    }
+  }
+
+  async function loadSnapshots() {
+    try {
+      const r = await api.scheduleSnapshots(projectId)
+      setSnapshots(r.snapshots)
+    } catch {
+      setSnapshots([])
+    }
+  }
+
   useEffect(() => {
     void load()
     void loadArchive()
+    void loadProgress()
+    void loadSnapshots()
   }, [projectId])
+
+  // Poll breakdown progress every 4 seconds while it's running, so the
+  // banner updates live without the user having to refresh. Refreshes
+  // the stripboard once the run finishes so the scene chips reflect
+  // the new breakdown items.
+  useEffect(() => {
+    if (!progress || (!progress.isRunning && !progress.isStale)) return
+    if (progress.withBreakdown >= progress.withActionText) return
+    const interval = setInterval(() => { void loadProgress() }, 4000)
+    return () => clearInterval(interval)
+  }, [progress?.isRunning, progress?.withBreakdown])
+
+  // When breakdown finishes (transitions from running → not running),
+  // reload the stripboard so scene cards show updated budget chips.
+  const prevRunningRef = useRef(false)
+  useEffect(() => {
+    if (prevRunningRef.current && !progress?.isRunning) {
+      void load()
+    }
+    prevRunningRef.current = !!progress?.isRunning
+  }, [progress?.isRunning])
+
+  async function saveSnapshot() {
+    const name = prompt('Name this schedule (e.g. "Plan A — locked v1")')
+    if (!name || !name.trim()) return
+    try {
+      await api.saveScheduleSnapshot(projectId, { name: name.trim() })
+      await loadSnapshots()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'failed')
+    }
+  }
+
+  async function restoreSnapshot(snap: ScheduleSnapshot) {
+    if (!confirm(`Restore "${snap.name}"? Your current schedule will be replaced (but you can save it first if you want to keep it).`)) return
+    try {
+      await api.restoreScheduleSnapshot(snap.id)
+      await load()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'failed')
+    }
+  }
+
+  async function deleteSnapshot(snap: ScheduleSnapshot) {
+    if (!confirm(`Delete snapshot "${snap.name}"? This can't be undone.`)) return
+    try {
+      await api.deleteScheduleSnapshot(snap.id)
+      await loadSnapshots()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'failed')
+    }
+  }
 
   // Capture-and-apply scene move. Records the prior position to the undo
   // stack BEFORE applying so an undo can restore it. Cap at 50 entries.
@@ -335,6 +427,82 @@ export default function Stripboard({ projectId, isAdmin, projectName }: { projec
   return (
     <section className="rounded-2xl border border-line bg-panel/60 p-6 space-y-4">
       <ScriptChangelogCard projectId={projectId} isAdmin={isAdmin} />
+      {progress && progress.withActionText > 0 && progress.withBreakdown < progress.withActionText && (
+        <div className={`rounded-xl border px-4 py-3 ${
+          progress.isStale
+            ? 'border-urgent/40 bg-urgent/5'
+            : 'border-stage-mastering/40 bg-stage-mastering/10'
+        }`}>
+          <div className="flex items-center gap-3">
+            <span className="text-lg">
+              {progress.isStale ? '⚠️' : <span className="inline-block w-3 h-3 rounded-full bg-stage-mastering animate-pulse" />}
+            </span>
+            <div className="flex-1 min-w-0">
+              <div className="text-[11px] uppercase tracking-wider font-bold mb-0.5">
+                {progress.isStale
+                  ? `Breakdown paused — ${progress.withActionText - progress.withBreakdown} scenes still unanalyzed`
+                  : `Claude is analyzing your script · ${progress.withBreakdown} / ${progress.withActionText} scenes`}
+              </div>
+              <div className="h-1.5 bg-ink/40 rounded-full overflow-hidden">
+                <div
+                  className={`h-full transition-all duration-500 ${progress.isStale ? 'bg-urgent' : 'bg-gradient-to-r from-stage-mastering to-stage-tracking'}`}
+                  style={{ width: `${(progress.withBreakdown / Math.max(1, progress.withActionText)) * 100}%` }}
+                />
+              </div>
+              <div className="text-[10px] text-muted mt-1">
+                {progress.isStale
+                  ? 'Click "✨ Re-analyze all scenes" to resume.'
+                  : 'Stays open while it runs — you can keep working, scene chips update live.'}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+      {(snapshots.length > 0 || isAdmin) && (
+        <div className="rounded-xl border border-stage-tracking/30 bg-stage-tracking/5 px-3 py-2 flex items-center justify-between gap-3 flex-wrap text-[11px]">
+          <div className="flex items-center gap-2 flex-wrap min-w-0">
+            <span>📅</span>
+            <span className="text-muted">Saved schedules:</span>
+            {snapshots.length === 0 && (
+              <span className="text-muted/60 italic">None yet — save your current schedule before experimenting</span>
+            )}
+            {snapshots.slice(0, 5).map((s) => (
+              <span
+                key={s.id}
+                className="group flex items-center gap-1 bg-ink/40 border border-line rounded-full px-2 py-0.5"
+              >
+                <button
+                  onClick={() => void restoreSnapshot(s)}
+                  title={`Restore ${s.name} (saved ${new Date(s.createdAt).toLocaleDateString()})`}
+                  className="text-text hover:text-stage-tracking"
+                >
+                  {s.name}
+                </button>
+                {isAdmin && (
+                  <button
+                    onClick={() => void deleteSnapshot(s)}
+                    className="text-muted/40 hover:text-urgent opacity-0 group-hover:opacity-100"
+                    title="Delete this snapshot"
+                  >
+                    ✕
+                  </button>
+                )}
+              </span>
+            ))}
+            {snapshots.length > 5 && (
+              <span className="text-muted/60">+{snapshots.length - 5} more</span>
+            )}
+          </div>
+          {isAdmin && (
+            <button
+              onClick={() => void saveSnapshot()}
+              className="text-stage-tracking hover:underline"
+            >
+              💾 Save current
+            </button>
+          )}
+        </div>
+      )}
       {archive && (
         <div className="rounded-xl border border-stage-stems/30 bg-stage-stems/5 px-3 py-2 flex items-center justify-between gap-3 flex-wrap text-[11px]">
           <div className="flex items-center gap-2 min-w-0 flex-wrap">

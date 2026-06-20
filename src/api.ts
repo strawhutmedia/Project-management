@@ -678,6 +678,35 @@ export const api = {
       `/api/stripboard/projects/${projectId}/reanalyze-all`,
       { method: 'POST' },
     ),
+  breakdownProgress: (projectId: string) =>
+    request<{
+      totalScenes: number
+      withActionText: number
+      withBreakdown: number
+      isRunning: boolean
+      isStale: boolean
+      lastRunAt: string | null
+    }>(`/api/stripboard/projects/${projectId}/breakdown-progress`),
+  scheduleSnapshots: (projectId: string) =>
+    request<{
+      snapshots: Array<{
+        id: string
+        name: string
+        description: string | null
+        createdAt: string
+        sceneCount: number
+        shootDayCount: number
+      }>
+    }>(`/api/stripboard/projects/${projectId}/schedule-snapshots`),
+  saveScheduleSnapshot: (projectId: string, body: { name: string; description?: string }) =>
+    request<{ ok: true; id: string }>(
+      `/api/stripboard/projects/${projectId}/schedule-snapshots`,
+      { method: 'POST', body: JSON.stringify(body) },
+    ),
+  restoreScheduleSnapshot: (snapshotId: string) =>
+    request<{ ok: true }>(`/api/stripboard/snapshots/${snapshotId}/restore`, { method: 'POST' }),
+  deleteScheduleSnapshot: (snapshotId: string) =>
+    request<{ ok: true }>(`/api/stripboard/snapshots/${snapshotId}`, { method: 'DELETE' }),
   scriptArchive: (projectId: string) =>
     request<{
       archive: null | {
