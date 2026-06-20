@@ -44,6 +44,24 @@ producer will delete what they don't need.
 DO NOT suggest a shooting order, a schedule, a shot list, or which scenes
 to film together. Just enumerate cost items from THIS scene.
 
+Two coverage modes depending on what's provided:
+
+A) FULL — when action/dialogue text is included, scan every noun for
+   prop / wardrobe / vehicle implications and listen for off-camera
+   implications. Be exhaustive.
+
+B) HEADING-ONLY — when only the scene heading, location, and character
+   list are provided (no action text), do a conservative pass based on
+   what's typical for that location + cast. Examples:
+   - "INT. KENDRICK'S HOUSE - DAY" with characters [JASON, SAWYER]:
+     suggest a location fee, basic set dressing, wardrobe per character,
+     SAWYER as DAY_PLAYER if not a principal.
+   - "EXT. POLICE STATION - NIGHT" with [JOHN, OFFICER MILLER, BACKGROUND COPS]:
+     location, permits (exterior public), OFFICER MILLER as DAY_PLAYER,
+     uniform wardrobe, police cars as PICTURE_CARS, BACKGROUND COPS as EXTRAS.
+   In heading-only mode, do NOT invent specific hand props — you can't
+   know what characters touch without action text.
+
 For each item, return:
   - category : one of PROPS, WARDROBE, LOCATION, SET_DRESSING, VEHICLES,
     PICTURE_CARS, WEAPONS, ANIMALS, SFX, VFX, MAKEUP, HAIR, STUNTS,
@@ -164,22 +182,15 @@ export async function runSceneBreakdown(sceneId: string, userId: string): Promis
   const sceneRes = await pool.query<{
     project_id: string; slug: string; action_text: string | null; number: string;
     int_ext: string | null; location: string | null; time_of_day: string | null;
+    characters: string[];
   }>(
-    `SELECT project_id, slug, action_text, number, int_ext, location, time_of_day
+    `SELECT project_id, slug, action_text, number, int_ext, location, time_of_day, characters
      FROM scenes WHERE id = $1`,
     [sceneId],
   )
   if (sceneRes.rows.length === 0) throw new Error('scene_not_found')
   const sc = sceneRes.rows[0]
-  if (!sc.action_text || sc.action_text.trim().length < 30) {
-    // Mark as run with zero items so the UI doesn't keep prompting to
-    // analyze the same empty scene.
-    await pool.query(
-      `UPDATE scenes SET breakdown_run_at = now() WHERE id = $1`,
-      [sceneId],
-    )
-    return { itemsCreated: 0, itemsSuggested: 0, cost: { inputTokens: 0, outputTokens: 0 } }
-  }
+  const hasActionText = !!sc.action_text && sc.action_text.trim().length >= 30
 
   // Wipe previous breakdown rows for this scene so re-running gives a clean
   // result. Items the producer already attached numbers to (amt > 0) are
@@ -194,9 +205,10 @@ export async function runSceneBreakdown(sceneId: string, userId: string): Promis
     `SCENE ${sc.number}: ${sc.slug}`,
     sc.location ? `LOCATION: ${sc.location}` : '',
     sc.int_ext || sc.time_of_day ? `${sc.int_ext ?? ''} ${sc.time_of_day ?? ''}`.trim() : '',
+    sc.characters && sc.characters.length > 0 ? `CHARACTERS: ${sc.characters.join(', ')}` : '',
     '',
-    'ACTION / DIALOGUE:',
-    sc.action_text,
+    hasActionText ? 'ACTION / DIALOGUE:' : 'NOTE: No action text available — do a HEADING-ONLY pass.',
+    hasActionText ? (sc.action_text as string) : '',
   ].filter(Boolean).join('\n')
 
   let response
@@ -300,9 +312,12 @@ export async function runProjectBreakdown(
     logError('scene_breakdown: no API key, skipping project breakdown', { projectId })
     return { scenes: 0, created: 0 }
   }
+  // Include scenes WITHOUT action_text — Claude does a heading-only pass
+  // for them based on location + characters. Less detail than the full
+  // pass, but still surfaces location, day players, extras, wardrobe.
   const where = opts.force
-    ? `project_id = $1 AND action_text IS NOT NULL`
-    : `project_id = $1 AND breakdown_run_at IS NULL AND action_text IS NOT NULL`
+    ? `project_id = $1`
+    : `project_id = $1 AND breakdown_run_at IS NULL`
   const scenes = await pool.query<{ id: string }>(
     `SELECT id FROM scenes WHERE ${where} ORDER BY script_position ASC`,
     [projectId],

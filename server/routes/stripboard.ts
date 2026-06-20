@@ -305,12 +305,12 @@ stripboardRouter.post('/projects/:projectId/reanalyze-all', async (req, res) => 
   const projectId = req.params.projectId
   if (!await assertWriter(user, projectId, res)) return
   const sceneCount = await pool.query<{ count: string }>(
-    `SELECT COUNT(*)::text AS count FROM scenes WHERE project_id = $1 AND action_text IS NOT NULL`,
+    `SELECT COUNT(*)::text AS count FROM scenes WHERE project_id = $1`,
     [projectId],
   )
   const n = Number(sceneCount.rows[0]?.count ?? 0)
   if (n === 0) {
-    res.status(400).json({ error: 'no_scenes', message: 'No scenes with action text. Re-import the .fdx first.' })
+    res.status(400).json({ error: 'no_scenes', message: 'No scenes in this project. Upload the .fdx first.' })
     return
   }
   void runProjectBreakdown(projectId, user.id, { force: true })
