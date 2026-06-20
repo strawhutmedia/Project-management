@@ -672,11 +672,6 @@ export const api = {
       `/api/stripboard/scenes/${sceneId}/breakdown`,
       { method: 'POST' },
     ),
-  publishScript: (projectId: string) =>
-    request<{ ok: true; path: string; bytes: number; sceneCount: number }>(
-      `/api/stripboard/projects/${projectId}/publish-script`,
-      { method: 'POST' },
-    ),
   createShootDay: (projectId: string, body: { number: number; isBreak?: boolean; shootDate?: string }) =>
     request<{ id: string }>(`/api/stripboard/projects/${projectId}/days`, {
       method: 'POST',

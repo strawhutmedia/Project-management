@@ -5,7 +5,7 @@ import { assertWriter } from '../permissions'
 import { parseFdx } from '../fdx_parser'
 import { applyBackInYourArmsSchedule } from '../seeds/back_in_your_arms'
 import { runSceneBreakdown, runProjectBreakdown } from '../scene_breakdown'
-import { writeStatusFile, statusReportingEnabled } from '../github'
+import { publishProjectScript } from '../script_publisher'
 import { logError, logInfo } from '../diag'
 
 export const stripboardRouter = Router()
@@ -176,17 +176,25 @@ stripboardRouter.post('/projects/:projectId/import-fdx', async (req, res) => {
       autoApplied = await applyBackInYourArmsSchedule(projectId)
     }
 
+    // Publish the parsed script to the status branch immediately so Claude
+    // can read it during a chat session — even before the cost breakdown
+    // finishes. Fire-and-forget; failure is logged but doesn't block the
+    // response.
+    void publishProjectScript(projectId)
+
     // Kick off the Claude-powered cost breakdown for every scene with action
     // text. Runs in the background — the .fdx import response returns
     // immediately so the producer isn't blocked on a multi-minute call.
-    // Items land as zero-cost rows in the production category, ready for
-    // the producer to price out.
-    void runProjectBreakdown(projectId, user.id).catch((err) => {
-      logError('scene breakdown background run failed', {
-        projectId,
-        error: err instanceof Error ? err.message : String(err),
+    // When it finishes, re-publish to status so the snapshot includes the
+    // newly-suggested cost items.
+    void runProjectBreakdown(projectId, user.id)
+      .then(() => publishProjectScript(projectId))
+      .catch((err) => {
+        logError('scene breakdown background run failed', {
+          projectId,
+          error: err instanceof Error ? err.message : String(err),
+        })
       })
-    })
     logInfo('fdx imported, breakdown kicked off', { projectId, count: parsed.length })
 
     res.json({ ok: true, count: parsed.length, autoApplied, breakdownStarted: true })
@@ -268,6 +276,8 @@ stripboardRouter.post('/scenes/:sceneId/breakdown', async (req, res) => {
   const projectId = access.rows[0].project_id
   try {
     const result = await runSceneBreakdown(sceneId, user.id)
+    // Re-publish so the status snapshot reflects the new items.
+    void publishProjectScript(projectId)
     res.json({ ok: true, ...result })
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err)
@@ -276,118 +286,18 @@ stripboardRouter.post('/scenes/:sceneId/breakdown', async (req, res) => {
   }
 })
 
-// Push the current project's script (scenes + action_text + characters +
-// per-scene breakdown items) to the status branch as a JSON file. Lets
-// Ryan share the parsed script with Claude during a chat session — Claude
-// reads `projects/<slug>/script.json` from the status branch and can talk
-// about it intelligently.
-//
-// Admin only. Idempotent — overwrites the file each time.
+// Force a re-publish of the parsed script to the status branch. Normally
+// fires automatically — this endpoint exists so a backfill / admin
+// debugging call can trigger it without re-importing the .fdx.
 stripboardRouter.post('/projects/:projectId/publish-script', async (req, res) => {
   const user = (req as typeof req & { user: SessionUser }).user
   const projectId = req.params.projectId
   if (!await assertWriter(user, projectId, res)) return
-  if (!statusReportingEnabled()) {
-    res.status(500).json({ error: 'no_github_token', message: 'GITHUB_TOKEN env var not set on the server.' })
-    return
+  const r = await publishProjectScript(projectId)
+  if (!r.ok) {
+    res.status(502).json({ error: r.error || 'failed' }); return
   }
-  const proj = await pool.query<{ name: string }>(
-    `SELECT name FROM projects WHERE id = $1`, [projectId],
-  )
-  if (proj.rows.length === 0) { res.status(404).json({ error: 'not_found' }); return }
-  const projectName = proj.rows[0].name
-  const slug = projectName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 60)
-
-  const scenes = await pool.query(
-    `SELECT id, number, script_position, slug, int_ext, location, location_tag,
-            time_of_day, page, page_eighths, characters, action_text,
-            breakdown_run_at, shoot_day_id, day_position
-     FROM scenes WHERE project_id = $1 ORDER BY script_position ASC`,
-    [projectId],
-  )
-  const items = await pool.query(
-    `SELECT li.id, li.scene_id, li.code, li.description, li.amt, li.x, li.rate,
-            li.units, li.notes, li.vendor, li.dated_at,
-            a.name AS account_name, a.category
-     FROM budget_line_items li
-     JOIN budget_accounts a ON a.id = li.account_id
-     JOIN budgets b ON b.id = a.budget_id
-     WHERE b.project_id = $1
-     ORDER BY li.scene_id NULLS LAST, li.position ASC`,
-    [projectId],
-  )
-  const days = await pool.query(
-    `SELECT id, number, is_break, shoot_date FROM shoot_days
-     WHERE project_id = $1 ORDER BY number ASC`,
-    [projectId],
-  )
-
-  const itemsByScene = new Map<string, unknown[]>()
-  const projectLevelItems: unknown[] = []
-  for (const it of items.rows) {
-    const out = {
-      id: it.id,
-      category: it.code,
-      description: it.description,
-      amt: Number(it.amt),
-      x: Number(it.x),
-      rate: Number(it.rate),
-      total: Number(it.amt) * Number(it.x) * Number(it.rate),
-      notes: it.notes,
-      vendor: it.vendor,
-      datedAt: it.dated_at,
-      account: it.account_name,
-      accountCategory: it.category,
-    }
-    if (it.scene_id) {
-      const arr = itemsByScene.get(it.scene_id) ?? []
-      arr.push(out); itemsByScene.set(it.scene_id, arr)
-    } else {
-      projectLevelItems.push(out)
-    }
-  }
-
-  const dump = {
-    project: { id: projectId, name: projectName },
-    publishedAt: new Date().toISOString(),
-    counts: {
-      scenes: scenes.rows.length,
-      lineItems: items.rows.length,
-      sceneLevelItems: items.rows.filter((r) => r.scene_id).length,
-      projectLevelItems: projectLevelItems.length,
-      shootDays: days.rows.length,
-    },
-    shootDays: days.rows.map((d) => ({
-      id: d.id, number: d.number, isBreak: d.is_break, shootDate: d.shoot_date,
-    })),
-    scenes: scenes.rows.map((s) => ({
-      id: s.id,
-      number: s.number,
-      scriptPosition: s.script_position,
-      slug: s.slug,
-      intExt: s.int_ext,
-      location: s.location,
-      timeOfDay: s.time_of_day,
-      page: s.page,
-      pageEighths: s.page_eighths,
-      characters: s.characters,
-      shootDayId: s.shoot_day_id,
-      dayPosition: s.day_position,
-      breakdownRunAt: s.breakdown_run_at,
-      actionText: s.action_text,
-      breakdownItems: itemsByScene.get(s.id) ?? [],
-    })),
-    projectLevelItems,
-  }
-  const filePath = `projects/${slug}/script.json`
-  const json = JSON.stringify(dump, null, 2)
-  const result = await writeStatusFile(filePath, json, `script: publish ${projectName}`)
-  if (!result.ok) {
-    res.status(502).json({ error: result.error || 'github_write_failed' })
-    return
-  }
-  logInfo('script published to status branch', { projectId, projectName, filePath, bytes: json.length })
-  res.json({ ok: true, path: filePath, bytes: json.length, sceneCount: scenes.rows.length })
+  res.json({ ok: true, path: r.path })
 })
 
 // Apply Ryan's pre-seeded "Back in Your Arms" StudioBinder schedule. Maps

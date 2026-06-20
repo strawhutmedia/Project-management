@@ -177,18 +177,6 @@ export default function Stripboard({ projectId, isAdmin, projectName }: { projec
     }
   }
 
-  async function publishToClaude() {
-    setBusy(true)
-    setError(null)
-    try {
-      const r = await api.publishScript(projectId)
-      setError(`✓ Published ${r.sceneCount} scenes to ${r.path} (${Math.round(r.bytes / 1024)} KB). Claude can now read your script.`)
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'failed')
-    } finally {
-      setBusy(false)
-    }
-  }
 
   async function addDay(isBreak: boolean) {
     if (!board) return
@@ -334,14 +322,6 @@ export default function Stripboard({ projectId, isAdmin, projectName }: { projec
                 ✨ Apply BIYA schedule
               </button>
             )}
-            <button
-              onClick={() => void publishToClaude()}
-              disabled={busy}
-              title="Push parsed scenes + breakdown to the status branch so Claude can read it during chat"
-              className="text-[10px] uppercase tracking-wider text-stage-mastering border border-stage-mastering/40 rounded-full px-3 py-1.5 hover:bg-stage-mastering/10 disabled:opacity-50"
-            >
-              📤 Share with Claude
-            </button>
             <button
               onClick={() => void addDay(false)}
               disabled={busy}
