@@ -86,6 +86,16 @@ export default function ProjectPage() {
   const channelLabel =
     project.kind === 'podcast' ? 'episode' : project.kind === 'film' ? 'scene' : 'song'
 
+  // Apply the film theme to <body> so the whole viewport (including
+  // the body's radial gradient background) flips to the light paper
+  // palette. Cleared on unmount so other project pages don't inherit.
+  useEffect(() => {
+    if (project.kind === 'film') {
+      document.body.setAttribute('data-theme', 'film')
+      return () => { document.body.removeAttribute('data-theme') }
+    }
+  }, [project.kind])
+
   async function addChannel() {
     if (!project) return
     const title = prompt(`New ${channelLabel} title:`)

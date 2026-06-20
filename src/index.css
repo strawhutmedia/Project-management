@@ -68,19 +68,17 @@ body {
    shell (header / footer) keeps the default dark theme so navigation
    still feels like Slate. */
 
-/* Cream "paper" backdrop that covers the body radial gradients inside
-   the film project area. */
-[data-theme="film"] {
-  background:
-    radial-gradient(900px 500px at 8% -10%, rgba(251, 191, 36, 0.18), transparent 60%),
-    radial-gradient(900px 500px at 110% 0%, rgba(244, 114, 182, 0.10), transparent 60%),
+/* When a film project page mounts, ProjectPage.tsx sets data-theme="film"
+   on <body>. That swaps the dark studio body gradients for a warm cream
+   paper backdrop across the entire viewport. */
+body[data-theme="film"] {
+  background-color: #f4e8c8 !important;
+  background-image:
+    radial-gradient(900px 500px at 8% -10%, rgba(251, 191, 36, 0.22), transparent 60%),
+    radial-gradient(900px 500px at 110% 0%, rgba(244, 114, 182, 0.12), transparent 60%),
     radial-gradient(900px 500px at 50% 110%, rgba(167, 139, 250, 0.10), transparent 60%),
-    linear-gradient(180deg, #f7efda 0%, #ede1c2 100%);
-  min-height: 100vh;
-  padding: 1.5rem;
-  margin: -1.5rem;
-  border-radius: 0;
-  color: #2a2018;
+    linear-gradient(180deg, #f7efda 0%, #ede1c2 100%) !important;
+  color: #2a2018 !important;
 }
 
 /* Panels become near-white paper cards. */
