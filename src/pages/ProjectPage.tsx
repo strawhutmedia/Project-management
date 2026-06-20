@@ -48,6 +48,17 @@ export default function ProjectPage() {
     void reload()
   }, [projectId])
 
+  // Apply the film theme to <body> so the whole viewport flips to the
+  // light paper palette. Cleared on unmount so other project pages
+  // don't inherit. MUST run before the early returns to keep React's
+  // hook order stable across renders.
+  useEffect(() => {
+    if (project?.kind === 'film') {
+      document.body.setAttribute('data-theme', 'film')
+      return () => { document.body.removeAttribute('data-theme') }
+    }
+  }, [project?.kind])
+
   if (error) {
     return (
       <div className="text-muted">
@@ -85,16 +96,6 @@ export default function ProjectPage() {
 
   const channelLabel =
     project.kind === 'podcast' ? 'episode' : project.kind === 'film' ? 'scene' : 'song'
-
-  // Apply the film theme to <body> so the whole viewport (including
-  // the body's radial gradient background) flips to the light paper
-  // palette. Cleared on unmount so other project pages don't inherit.
-  useEffect(() => {
-    if (project.kind === 'film') {
-      document.body.setAttribute('data-theme', 'film')
-      return () => { document.body.removeAttribute('data-theme') }
-    }
-  }, [project.kind])
 
   async function addChannel() {
     if (!project) return
