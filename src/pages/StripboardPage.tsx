@@ -18,6 +18,16 @@ export default function StripboardPage() {
       .catch((err) => setError(err instanceof Error ? err.message : 'failed to load'))
   }, [projectId])
 
+  // Stripboard only exists for film projects, so anytime this page is
+  // mounted we want the light paper theme. Effect runs above the early
+  // returns to keep React's hook order stable.
+  useEffect(() => {
+    if (project?.kind === 'film') {
+      document.body.setAttribute('data-theme', 'film')
+      return () => { document.body.removeAttribute('data-theme') }
+    }
+  }, [project?.kind])
+
   if (error) {
     return (
       <div className="text-muted">
