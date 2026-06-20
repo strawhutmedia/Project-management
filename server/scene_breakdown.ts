@@ -296,7 +296,61 @@ export async function runSceneBreakdown(sceneId: string, userId: string): Promis
   }
 }
 
-// Run the breakdown for every scene in a project that has action text. By
+// On server boot, find every project with scenes that still need
+// breakdown (action_text present but breakdown_run_at IS NULL) and
+// kick off a background run for each. Lets a Railway redeploy resume
+// in-flight breakdowns automatically — the producer doesn't have to
+// click "Re-analyze all" after every deploy. Limited to projects
+// touched in the last 7 days so we don't blast credits on old archived
+// projects.
+export async function resumeIncompleteBreakdowns(): Promise<void> {
+  if (!process.env.ANTHROPIC_API_KEY) return
+  try {
+    const { rows } = await pool.query<{ project_id: string; pending: string; admin_id: string | null }>(
+      `SELECT
+         s.project_id,
+         COUNT(*) FILTER (WHERE s.breakdown_run_at IS NULL AND s.action_text IS NOT NULL AND length(s.action_text) >= 30)::text AS pending,
+         (SELECT u.id FROM users u WHERE u.role = 'admin' ORDER BY u.created_at ASC LIMIT 1) AS admin_id
+       FROM scenes s
+       JOIN projects p ON p.id = s.project_id
+       WHERE EXISTS (
+         SELECT 1 FROM project_script_uploads u
+         WHERE u.project_id = s.project_id
+           AND u.uploaded_at > now() - interval '7 days'
+       )
+       GROUP BY s.project_id
+       HAVING COUNT(*) FILTER (WHERE s.breakdown_run_at IS NULL AND s.action_text IS NOT NULL AND length(s.action_text) >= 30) > 0`,
+    )
+    if (rows.length === 0) return
+    logInfo('scene_breakdown: resuming incomplete breakdowns', {
+      projects: rows.length,
+      totalPending: rows.reduce((s, r) => s + Number(r.pending), 0),
+    })
+    for (const row of rows) {
+      if (!row.admin_id) continue
+      // Fire-and-forget per project. They run serially within each
+      // project; multiple projects run in parallel.
+      void runProjectBreakdown(row.project_id, row.admin_id)
+        .then(() => {
+          // Re-publish to status branch with the final breakdown.
+          // Late import to avoid a circular dep at module load.
+          import('./script_publisher').then(({ publishProjectScript }) => {
+            void publishProjectScript(row.project_id)
+          })
+        })
+        .catch((err) => {
+          logError('scene_breakdown: resume failed for project', {
+            projectId: row.project_id,
+            error: err instanceof Error ? err.message : String(err),
+          })
+        })
+    }
+  } catch (err) {
+    logError('scene_breakdown: resumeIncompleteBreakdowns crashed', {
+      error: err instanceof Error ? err.message : String(err),
+    })
+  }
+}
 // default skips scenes already broken down (breakdown_run_at IS NOT NULL).
 // Pass force=true to re-analyze every scene — useful when the producer
 // wants a fresh pass without re-importing the .fdx. Serial — we don't

@@ -125,6 +125,12 @@ async function start() {
     logInfo(`listening on :${PORT}`)
     void reportStatus()
     startScheduler()
+    // Pick up any breakdown runs that were killed by the previous
+    // shutdown (deploy / crash). Producers don't have to click
+    // "re-analyze" after every Railway redeploy.
+    void import('./scene_breakdown').then(({ resumeIncompleteBreakdowns }) => {
+      void resumeIncompleteBreakdowns()
+    })
   })
 }
 
