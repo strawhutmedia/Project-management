@@ -26,8 +26,8 @@ export async function publishProjectScript(projectId: string): Promise<{ ok: boo
 
     const scenes = await pool.query(
       `SELECT id, number, script_position, slug, int_ext, location, location_tag,
-              time_of_day, page, page_eighths, characters, action_text,
-              breakdown_run_at, shoot_day_id, day_position
+              time_of_day, page, page_eighths, characters, action_text, notes,
+              breakdown_run_at, producer_note_suggestion, shoot_day_id, day_position
        FROM scenes WHERE project_id = $1 ORDER BY script_position ASC`,
       [projectId],
     )
@@ -100,6 +100,8 @@ export async function publishProjectScript(projectId: string): Promise<{ ok: boo
         shootDayId: s.shoot_day_id,
         dayPosition: s.day_position,
         breakdownRunAt: s.breakdown_run_at,
+        producerNoteSuggestion: s.producer_note_suggestion,
+        notes: s.notes,
         actionText: s.action_text,
         breakdownItems: itemsByScene.get(s.id) ?? [],
       })),

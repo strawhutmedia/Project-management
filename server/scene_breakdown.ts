@@ -85,8 +85,26 @@ Coverage targets:
   - Capture named non-principal speaking parts as DAY_PLAYER.
   - Estimate extras counts when scripted ("a crowd of about 20 protestors").
 
+In addition to the item list, write ONE producer note (1–2 sentences)
+flagging anything notable about producing this scene — the kind of
+thing a line producer would say out loud reading the script for the
+first time. Examples:
+
+  - "Biggest cost in your script: 20+ extras, exterior, day. Plan an
+     entire shoot day around it."
+  - "Stunt + armorer + SFX makeup all converge here — that's three
+     extra department heads on this day."
+  - "Permit-heavy: closing a street + practical rain. Allow lead time."
+  - "Single-location scene with two characters. Cheap if you can lock
+     this location for a half-day."
+
+Only write a note when there's something genuinely worth flagging.
+For ordinary dialogue scenes in a standard interior, return an empty
+string for the note.
+
 Return strict JSON only — no prose. Schema:
 {
+  "producerNote": "Biggest cost in your script: 20+ extras, exterior, day. Plan an entire shoot day around it.",
   "items": [
     { "category": "PROPS", "description": "vintage rotary phone", "notes": "Kendrick slams it down" },
     ...
@@ -94,7 +112,7 @@ Return strict JSON only — no prose. Schema:
 }
 
 If the scene has no cost items (e.g. a single character talking on a
-generic phone call), return { "items": [] }.`
+generic phone call), return { "producerNote": "", "items": [] }.`
 
 type BreakdownResponse = {
   itemsCreated: number
@@ -198,12 +216,14 @@ export async function runSceneBreakdown(sceneId: string, userId: string): Promis
   const textBlock = response.content.find((b) => b.type === 'text')
   const rawText = textBlock && textBlock.type === 'text' ? textBlock.text : ''
   let items: BreakdownItem[] = []
+  let producerNote = ''
   try {
     const jsonStart = rawText.indexOf('{')
     const jsonEnd = rawText.lastIndexOf('}')
     if (jsonStart < 0 || jsonEnd < 0) throw new Error('no JSON in response')
     const parsed = JSON.parse(rawText.slice(jsonStart, jsonEnd + 1))
     if (Array.isArray(parsed.items)) items = parsed.items as BreakdownItem[]
+    if (typeof parsed.producerNote === 'string') producerNote = parsed.producerNote.trim().slice(0, 500)
   } catch (err) {
     logError('scene_breakdown: failed to parse claude response', {
       sceneId,
@@ -242,8 +262,11 @@ export async function runSceneBreakdown(sceneId: string, userId: string): Promis
   }
 
   await pool.query(
-    `UPDATE scenes SET breakdown_run_at = now() WHERE id = $1`,
-    [sceneId],
+    `UPDATE scenes
+       SET breakdown_run_at = now(),
+           producer_note_suggestion = $2
+     WHERE id = $1`,
+    [sceneId, producerNote || null],
   )
 
   logInfo('scene_breakdown: complete', {

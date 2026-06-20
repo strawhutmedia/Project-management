@@ -231,6 +231,16 @@ export default function SceneDetailModal({
             </div>
           )}
 
+          {scene.producerNoteSuggestion && (
+            <ProducerNoteCard
+              sceneId={sceneId}
+              suggestion={scene.producerNoteSuggestion}
+              existingNote={scene.notes}
+              isAdmin={isAdmin}
+              onChanged={onChanged}
+            />
+          )}
+
           {/* Items grouped by bucket */}
           {items === null ? (
             <p className="text-muted text-xs italic">Loading…</p>
@@ -405,6 +415,78 @@ function SceneItemRow({
           </button>
         )}
       </div>
+    </div>
+  )
+}
+
+// Yellow card showing Claude's producer note suggestion for a scene.
+// Apply moves it into the scene's notes field (appending if there's
+// already one). Dismiss clears the suggestion without saving.
+function ProducerNoteCard({
+  sceneId,
+  suggestion,
+  existingNote,
+  isAdmin,
+  onChanged,
+}: {
+  sceneId: string
+  suggestion: string
+  existingNote: string | null
+  isAdmin: boolean
+  onChanged: () => void
+}) {
+  const [busy, setBusy] = useState(false)
+
+  async function apply() {
+    setBusy(true)
+    try {
+      const combined = existingNote && existingNote.trim()
+        ? `${existingNote.trim()}\n\n${suggestion}`
+        : suggestion
+      await api.updateScene(sceneId, { notes: combined, producerNoteSuggestion: null })
+      onChanged()
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function dismiss() {
+    setBusy(true)
+    try {
+      await api.updateScene(sceneId, { producerNoteSuggestion: null })
+      onChanged()
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <div className="rounded-xl border border-stage-overdubs/40 bg-stage-overdubs/10 p-3 space-y-2">
+      <div className="flex items-center gap-2">
+        <span className="text-base">💡</span>
+        <span className="text-[10px] uppercase tracking-wider font-bold text-stage-overdubs">
+          Producer note from Claude
+        </span>
+      </div>
+      <p className="text-sm text-text leading-snug">{suggestion}</p>
+      {isAdmin && (
+        <div className="flex items-center gap-2 pt-1">
+          <button
+            onClick={() => void apply()}
+            disabled={busy}
+            className="text-[10px] uppercase tracking-wider font-bold text-white bg-stage-overdubs rounded-full px-3 py-1.5 hover:opacity-90 disabled:opacity-50"
+          >
+            ✓ Apply to scene notes
+          </button>
+          <button
+            onClick={() => void dismiss()}
+            disabled={busy}
+            className="text-[10px] uppercase tracking-wider text-muted border border-line rounded-full px-3 py-1.5 hover:bg-ink/40 disabled:opacity-50"
+          >
+            Dismiss
+          </button>
+        </div>
+      )}
     </div>
   )
 }

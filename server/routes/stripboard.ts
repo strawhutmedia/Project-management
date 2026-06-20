@@ -37,7 +37,7 @@ stripboardRouter.get('/projects/:projectId', async (req, res) => {
   const scenes = await pool.query(
     `SELECT s.id, s.number, s.script_position, s.slug, s.int_ext, s.location, s.location_tag,
             s.time_of_day, s.page, s.page_eighths, s.characters, s.notes,
-            s.action_text, s.breakdown_run_at,
+            s.action_text, s.breakdown_run_at, s.producer_note_suggestion,
             s.shoot_day_id, s.day_position, s.location_status,
             COALESCE((
               SELECT SUM(li.amt * li.x * li.rate)
@@ -67,6 +67,7 @@ stripboardRouter.get('/projects/:projectId', async (req, res) => {
       location: string | null; location_tag: string | null; time_of_day: string | null;
       page: number | null; page_eighths: number; characters: string[]; notes: string | null;
       action_text: string | null; breakdown_run_at: string | null;
+      producer_note_suggestion: string | null;
       shoot_day_id: string | null; day_position: number; location_status: string;
       scene_budget_total: string | number; scene_budget_item_count: string | number;
     }) => ({
@@ -84,6 +85,7 @@ stripboardRouter.get('/projects/:projectId', async (req, res) => {
       notes: s.notes,
       actionText: s.action_text,
       breakdownRunAt: s.breakdown_run_at,
+      producerNoteSuggestion: s.producer_note_suggestion,
       shootDayId: s.shoot_day_id,
       dayPosition: s.day_position,
       locationStatus: s.location_status,
@@ -250,6 +252,11 @@ stripboardRouter.patch('/scenes/:sceneId', async (req, res) => {
   if (typeof dayPosition === 'number') { updates.push(`day_position = $${i++}`); values.push(dayPosition) }
   if (typeof locationStatus === 'string') { updates.push(`location_status = $${i++}`); values.push(locationStatus) }
   if (typeof notes === 'string') { updates.push(`notes = $${i++}`); values.push(notes) }
+  if ('producerNoteSuggestion' in (req.body ?? {})) {
+    const next = req.body.producerNoteSuggestion
+    if (next === null) updates.push(`producer_note_suggestion = NULL`)
+    else if (typeof next === 'string') { updates.push(`producer_note_suggestion = $${i++}`); values.push(next) }
+  }
   if (updates.length === 0) { res.status(400).json({ error: 'no_fields' }); return }
   values.push(sceneId)
   await pool.query(`UPDATE scenes SET ${updates.join(', ')} WHERE id = $${i}`, values)

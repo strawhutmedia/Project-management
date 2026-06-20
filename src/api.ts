@@ -391,6 +391,7 @@ export type ApiScene = {
   notes: string | null
   actionText: string | null
   breakdownRunAt: string | null
+  producerNoteSuggestion: string | null
   shootDayId: string | null
   dayPosition: number
   locationStatus: 'unset' | 'free' | 'paid'
@@ -682,7 +683,7 @@ export const api = {
       method: 'POST',
       body: JSON.stringify(body),
     }),
-  updateScene: (sceneId: string, patch: { shootDayId?: string | null; dayPosition?: number; locationStatus?: 'unset' | 'free' | 'paid'; notes?: string }) =>
+  updateScene: (sceneId: string, patch: { shootDayId?: string | null; dayPosition?: number; locationStatus?: 'unset' | 'free' | 'paid'; notes?: string; producerNoteSuggestion?: string | null }) =>
     request<{ ok: true }>(`/api/stripboard/scenes/${sceneId}`, {
       method: 'PATCH',
       body: JSON.stringify(patch),
