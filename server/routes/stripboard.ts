@@ -102,6 +102,7 @@ stripboardRouter.post('/projects/:projectId/import-fdx', async (req, res) => {
   const projectId = req.params.projectId
   if (!await assertWriter(user, projectId, res)) return
   const xml = typeof req.body?.xml === 'string' ? req.body.xml : null
+  const fileName = typeof req.body?.fileName === 'string' ? req.body.fileName.slice(0, 200) : null
   if (!xml || xml.length < 100) {
     res.status(400).json({ error: 'xml_required' }); return
   }
@@ -126,6 +127,14 @@ stripboardRouter.post('/projects/:projectId/import-fdx', async (req, res) => {
   const client = await pool.connect()
   try {
     await client.query('BEGIN')
+    // Archive the raw XML so we can re-parse later when the parser
+    // evolves — never ask the producer to re-upload just because we
+    // learned to extract more.
+    await client.query(
+      `INSERT INTO project_script_uploads (project_id, uploaded_by, file_name, byte_size, scene_count, xml)
+       VALUES ($1, $2, $3, $4, $5, $6)`,
+      [projectId, user.id, fileName, xml.length, parsed.length, xml],
+    )
     // Preserve existing assignments by scene number
     const existing = await client.query(
       `SELECT number, shoot_day_id, day_position, location_status, notes
@@ -291,6 +300,132 @@ stripboardRouter.post('/scenes/:sceneId/breakdown', async (req, res) => {
     logError('scene breakdown failed', { sceneId, projectId, error: msg })
     res.status(502).json({ error: msg.slice(0, 400) })
   }
+})
+
+// Get the archive metadata (last upload's file name + bytes + date) so
+// the UI can show "📜 Source script: BIYA_v12.fdx · uploaded Jun 1 ·
+// 480 KB" with a [Re-parse] / [Download] action.
+stripboardRouter.get('/projects/:projectId/script-archive', async (req, res) => {
+  const user = (req as typeof req & { user: SessionUser }).user
+  const projectId = req.params.projectId
+  if (!(await userCanAccessProject(user.id, user.role, projectId))) {
+    res.status(403).json({ error: 'forbidden' }); return
+  }
+  const { rows } = await pool.query<{
+    id: string; file_name: string | null; byte_size: number; scene_count: number; uploaded_at: string;
+  }>(
+    `SELECT id, file_name, byte_size, scene_count, uploaded_at
+     FROM project_script_uploads WHERE project_id = $1 ORDER BY uploaded_at DESC LIMIT 1`,
+    [projectId],
+  )
+  if (rows.length === 0) { res.json({ archive: null }); return }
+  const a = rows[0]
+  res.json({
+    archive: {
+      id: a.id,
+      fileName: a.file_name,
+      byteSize: a.byte_size,
+      sceneCount: a.scene_count,
+      uploadedAt: a.uploaded_at,
+    },
+  })
+})
+
+// Download the archived XML as a .fdx file. Lets the producer recover
+// the original even if their copy is gone.
+stripboardRouter.get('/projects/:projectId/script-archive/download', async (req, res) => {
+  const user = (req as typeof req & { user: SessionUser }).user
+  const projectId = req.params.projectId
+  if (!(await userCanAccessProject(user.id, user.role, projectId))) {
+    res.status(403).json({ error: 'forbidden' }); return
+  }
+  const { rows } = await pool.query<{ xml: string; file_name: string | null }>(
+    `SELECT xml, file_name FROM project_script_uploads
+     WHERE project_id = $1 ORDER BY uploaded_at DESC LIMIT 1`,
+    [projectId],
+  )
+  if (rows.length === 0) { res.status(404).json({ error: 'no_archive' }); return }
+  const fileName = rows[0].file_name || 'script.fdx'
+  res.setHeader('Content-Type', 'application/xml')
+  res.setHeader('Content-Disposition', `attachment; filename="${fileName.replace(/"/g, '')}"`)
+  res.send(rows[0].xml)
+})
+
+// Re-parse the most recent archived .fdx for this project. Same as
+// uploading it again but uses the XML we already have on file, so it
+// works from mobile / anywhere without the original file. Picks up
+// improvements to the parser since the last run (e.g. action text
+// extraction shipped after BIYA was first uploaded).
+stripboardRouter.post('/projects/:projectId/reparse-archived', async (req, res) => {
+  const user = (req as typeof req & { user: SessionUser }).user
+  const projectId = req.params.projectId
+  if (!await assertWriter(user, projectId, res)) return
+  const archive = await pool.query<{ id: string; xml: string; file_name: string | null; uploaded_at: string }>(
+    `SELECT id, xml, file_name, uploaded_at FROM project_script_uploads
+     WHERE project_id = $1 ORDER BY uploaded_at DESC LIMIT 1`,
+    [projectId],
+  )
+  if (archive.rows.length === 0) {
+    res.status(404).json({
+      error: 'no_archive',
+      message: 'No archived .fdx for this project. Upload one now and we\'ll keep it on file from here on.',
+    })
+    return
+  }
+  const xml = archive.rows[0].xml
+  let parsed: ReturnType<typeof parseFdx>
+  try {
+    parsed = parseFdx(xml)
+  } catch (err) {
+    res.status(500).json({ error: 'parse_failed', message: err instanceof Error ? err.message : String(err) }); return
+  }
+  if (parsed.length === 0) {
+    res.status(500).json({ error: 'no_scenes', message: 'Archive parsed to zero scenes — unexpected.' }); return
+  }
+  const client = await pool.connect()
+  try {
+    await client.query('BEGIN')
+    const existing = await client.query(
+      `SELECT number, shoot_day_id, day_position, location_status, notes
+       FROM scenes WHERE project_id = $1`,
+      [projectId],
+    )
+    const existingByNumber = new Map<string, { shoot_day_id: string | null; day_position: number; location_status: string; notes: string | null }>()
+    for (const row of existing.rows) {
+      existingByNumber.set(row.number, row)
+    }
+    await client.query(`DELETE FROM scenes WHERE project_id = $1`, [projectId])
+    for (const sc of parsed) {
+      const prior = existingByNumber.get(sc.number)
+      await client.query(
+        `INSERT INTO scenes
+           (project_id, number, script_position, slug, int_ext, location, location_tag,
+            time_of_day, page, page_eighths, characters, notes, action_text,
+            shoot_day_id, day_position, location_status)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)`,
+        [
+          projectId, sc.number, sc.scriptPosition, sc.slug, sc.intExt, sc.location,
+          sc.locationTag, sc.timeOfDay, sc.page, sc.pageEighths,
+          JSON.stringify(sc.characters), prior?.notes ?? null, sc.actionText || null,
+          prior?.shoot_day_id ?? null, prior?.day_position ?? 0, prior?.location_status ?? 'unset',
+        ],
+      )
+    }
+    await client.query('COMMIT')
+  } catch (err) {
+    await client.query('ROLLBACK')
+    res.status(500).json({ error: err instanceof Error ? err.message : String(err) }); return
+  } finally {
+    client.release()
+  }
+
+  void publishProjectScript(projectId)
+  void runProjectBreakdown(projectId, user.id, { force: true })
+    .then(() => publishProjectScript(projectId))
+    .catch((err) => logError('reparse-archived breakdown failed', { projectId, error: err instanceof Error ? err.message : String(err) }))
+
+  logInfo('reparsed archived .fdx', { projectId, sceneCount: parsed.length, fileName: archive.rows[0].file_name, uploadedAt: archive.rows[0].uploaded_at })
+  res.json({ ok: true, sceneCount: parsed.length, archivedAt: archive.rows[0].uploaded_at, fileName: archive.rows[0].file_name })
 })
 
 // Re-analyze every scene already in the database, without requiring a

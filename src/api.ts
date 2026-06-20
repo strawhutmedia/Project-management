@@ -663,10 +663,10 @@ export const api = {
   // Stripboard
   stripboard: (projectId: string) =>
     request<ApiStripboard>(`/api/stripboard/projects/${projectId}`),
-  importFdx: (projectId: string, xml: string) =>
+  importFdx: (projectId: string, xml: string, fileName?: string) =>
     request<{ ok: true; count: number; breakdownStarted?: boolean }>(`/api/stripboard/projects/${projectId}/import-fdx`, {
       method: 'POST',
-      body: JSON.stringify({ xml }),
+      body: JSON.stringify({ xml, fileName }),
     }),
   sceneBreakdown: (sceneId: string) =>
     request<{ ok: true; itemsCreated: number; itemsSuggested: number }>(
@@ -678,6 +678,23 @@ export const api = {
       `/api/stripboard/projects/${projectId}/reanalyze-all`,
       { method: 'POST' },
     ),
+  scriptArchive: (projectId: string) =>
+    request<{
+      archive: null | {
+        id: string
+        fileName: string | null
+        byteSize: number
+        sceneCount: number
+        uploadedAt: string
+      }
+    }>(`/api/stripboard/projects/${projectId}/script-archive`),
+  reparseArchivedScript: (projectId: string) =>
+    request<{ ok: true; sceneCount: number; archivedAt: string; fileName: string | null }>(
+      `/api/stripboard/projects/${projectId}/reparse-archived`,
+      { method: 'POST' },
+    ),
+  scriptArchiveDownloadUrl: (projectId: string) =>
+    `/api/stripboard/projects/${projectId}/script-archive/download`,
   createShootDay: (projectId: string, body: { number: number; isBreak?: boolean; shootDate?: string }) =>
     request<{ id: string }>(`/api/stripboard/projects/${projectId}/days`, {
       method: 'POST',

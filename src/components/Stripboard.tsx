@@ -2,6 +2,14 @@ import { useEffect, useMemo, useState, useRef } from 'react'
 import { api, type ApiScene, type ApiShootDay, type ApiStripboard } from '../api'
 import SceneDetailModal from './SceneDetailModal'
 
+type ScriptArchive = {
+  id: string
+  fileName: string | null
+  byteSize: number
+  sceneCount: number
+  uploadedAt: string
+}
+
 // Strip styles tuned for the dark Slate UI. Each strip is a dark card with
 // a colored left stripe + colored "INT/EXT · TIME" label, so text is always
 // readable. The stripe is the at-a-glance type indicator (industry-standard
@@ -67,6 +75,7 @@ export default function Stripboard({ projectId, isAdmin, projectName }: { projec
   const [busy, setBusy] = useState(false)
   const [undoStack, setUndoStack] = useState<UndoEntry[]>([])
   const [openSceneId, setOpenSceneId] = useState<string | null>(null)
+  const [archive, setArchive] = useState<ScriptArchive | null>(null)
   const fileInputRef = useRef<HTMLInputElement | null>(null)
   // Mirror board in a ref so moveScene can read the freshest state without
   // re-creating its closure on every render.
@@ -82,7 +91,19 @@ export default function Stripboard({ projectId, isAdmin, projectName }: { projec
     }
   }
 
-  useEffect(() => { void load() }, [projectId])
+  async function loadArchive() {
+    try {
+      const r = await api.scriptArchive(projectId)
+      setArchive(r.archive)
+    } catch {
+      setArchive(null)
+    }
+  }
+
+  useEffect(() => {
+    void load()
+    void loadArchive()
+  }, [projectId])
 
   // Capture-and-apply scene move. Records the prior position to the undo
   // stack BEFORE applying so an undo can restore it. Cap at 50 entries.
@@ -151,13 +172,30 @@ export default function Stripboard({ projectId, isAdmin, projectName }: { projec
     setError(null)
     try {
       const xml = await file.text()
-      await api.importFdx(projectId, xml)
+      await api.importFdx(projectId, xml, file.name)
       await load()
+      await loadArchive()
     } catch (err) {
       setError(err instanceof Error ? err.message : 'import failed')
     } finally {
       setImporting(false)
       if (fileInputRef.current) fileInputRef.current.value = ''
+    }
+  }
+
+  async function reparseArchived() {
+    if (!confirm('Re-parse the archived .fdx? This uses the script we have on file (no new upload needed) and refreshes every scene\'s metadata + Claude breakdown.')) return
+    setBusy(true)
+    setError(null)
+    try {
+      const r = await api.reparseArchivedScript(projectId)
+      setError(`✓ Re-parsed ${r.sceneCount} scenes from ${r.fileName || 'archived .fdx'}. Breakdown re-running in the background — refresh in 30–60 seconds.`)
+      await load()
+      await loadArchive()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'failed')
+    } finally {
+      setBusy(false)
     }
   }
 
@@ -295,6 +333,40 @@ export default function Stripboard({ projectId, isAdmin, projectName }: { projec
 
   return (
     <section className="rounded-2xl border border-line bg-panel/60 p-6 space-y-4">
+      {archive && (
+        <div className="rounded-xl border border-stage-stems/30 bg-stage-stems/5 px-3 py-2 flex items-center justify-between gap-3 flex-wrap text-[11px]">
+          <div className="flex items-center gap-2 min-w-0 flex-wrap">
+            <span>📜</span>
+            <span className="text-muted">Script archive:</span>
+            <span className="font-mono text-text truncate max-w-[240px]" title={archive.fileName ?? ''}>
+              {archive.fileName || 'script.fdx'}
+            </span>
+            <span className="text-muted/60">
+              · {Math.round(archive.byteSize / 1024)} KB · {archive.sceneCount} scenes ·
+              uploaded {new Date(archive.uploadedAt).toLocaleDateString()}
+            </span>
+          </div>
+          {isAdmin && (
+            <div className="flex items-center gap-2 shrink-0">
+              <a
+                href={api.scriptArchiveDownloadUrl(projectId)}
+                download
+                className="text-stage-stems hover:underline"
+              >
+                Download
+              </a>
+              <button
+                onClick={() => void reparseArchived()}
+                disabled={busy}
+                title="Re-parse the archived .fdx with the current parser — no new upload needed."
+                className="text-stage-mastering hover:underline disabled:opacity-50"
+              >
+                Re-parse archive
+              </button>
+            </div>
+          )}
+        </div>
+      )}
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
           <h2 className="text-[11px] uppercase tracking-[0.2em] text-muted font-bold">🎬 Stripboard</h2>
