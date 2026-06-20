@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState, useRef } from 'react'
 import { api, type ApiScene, type ApiShootDay, type ApiStripboard } from '../api'
 import SceneDetailModal from './SceneDetailModal'
+import ScriptChangelogCard from './ScriptChangelogCard'
 
 type ScriptArchive = {
   id: string
@@ -333,6 +334,7 @@ export default function Stripboard({ projectId, isAdmin, projectName }: { projec
 
   return (
     <section className="rounded-2xl border border-line bg-panel/60 p-6 space-y-4">
+      <ScriptChangelogCard projectId={projectId} isAdmin={isAdmin} />
       {archive && (
         <div className="rounded-xl border border-stage-stems/30 bg-stage-stems/5 px-3 py-2 flex items-center justify-between gap-3 flex-wrap text-[11px]">
           <div className="flex items-center gap-2 min-w-0 flex-wrap">

@@ -688,6 +688,29 @@ export const api = {
         uploadedAt: string
       }
     }>(`/api/stripboard/projects/${projectId}/script-archive`),
+  scriptDiff: (projectId: string) =>
+    request<{
+      diff: null | {
+        added: Array<{ number: string; slug: string; location: string | null; timeOfDay: string | null; intExt: string | null; characters: string[]; pageEighths: number }>
+        removed: Array<{ number: string; slug: string; location: string | null; pageEighths: number }>
+        changed: Array<{
+          number: string
+          changes: string[]
+          before: { slug: string; location: string | null; timeOfDay: string | null; pageEighths: number; characters: string[]; actionTextLen: number }
+          after: { slug: string; location: string | null; timeOfDay: string | null; pageEighths: number; characters: string[]; actionTextLen: number }
+        }>
+        unchanged: number
+      }
+      uploadId?: string
+      uploadedAt?: string
+      fileName?: string | null
+      reviewedAt?: string | null
+    }>(`/api/stripboard/projects/${projectId}/script-diff`),
+  markScriptDiffReviewed: (projectId: string) =>
+    request<{ ok: true }>(
+      `/api/stripboard/projects/${projectId}/script-diff/mark-reviewed`,
+      { method: 'POST' },
+    ),
   reparseArchivedScript: (projectId: string) =>
     request<{ ok: true; sceneCount: number; archivedAt: string; fileName: string | null }>(
       `/api/stripboard/projects/${projectId}/reparse-archived`,

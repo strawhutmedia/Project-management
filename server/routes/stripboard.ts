@@ -124,56 +124,113 @@ stripboardRouter.post('/projects/:projectId/import-fdx', async (req, res) => {
     res.status(400).json({ error: 'no_scenes', message: 'No numbered scene headings found. Make sure the script has scene numbers turned on in Final Draft.' })
     return
   }
+  // Look up the previous upload (before we insert the new one) so we can
+  // diff against it. Then run the upsert by scene number, which preserves
+  // scene UUIDs — critical so budget items keep their scene_id link
+  // across re-uploads.
+  const prevUploadRes = await pool.query<{ id: string; xml: string }>(
+    `SELECT id, xml FROM project_script_uploads
+     WHERE project_id = $1 ORDER BY uploaded_at DESC LIMIT 1`,
+    [projectId],
+  )
+  let diffSummary: import('../script_diff').ScriptDiff | null = null
+  let diffAgainstId: string | null = null
+  if (prevUploadRes.rows.length > 0) {
+    try {
+      const prevParsed = parseFdx(prevUploadRes.rows[0].xml)
+      const { diffScripts } = await import('../script_diff')
+      diffSummary = diffScripts(prevParsed, parsed)
+      diffAgainstId = prevUploadRes.rows[0].id
+    } catch (err) {
+      logError('diffing previous upload failed, continuing without diff', {
+        projectId,
+        error: err instanceof Error ? err.message : String(err),
+      })
+    }
+  }
+
   const client = await pool.connect()
+  let changedSceneIds: string[] = []
+  let addedSceneIds: string[] = []
   try {
     await client.query('BEGIN')
     // Archive the raw XML so we can re-parse later when the parser
-    // evolves — never ask the producer to re-upload just because we
-    // learned to extract more.
+    // evolves and never ask the producer to re-upload.
     await client.query(
-      `INSERT INTO project_script_uploads (project_id, uploaded_by, file_name, byte_size, scene_count, xml)
-       VALUES ($1, $2, $3, $4, $5, $6)`,
-      [projectId, user.id, fileName, xml.length, parsed.length, xml],
+      `INSERT INTO project_script_uploads
+         (project_id, uploaded_by, file_name, byte_size, scene_count, xml, diff_against_id, diff_summary)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+      [
+        projectId, user.id, fileName, xml.length, parsed.length, xml,
+        diffAgainstId, diffSummary ? JSON.stringify(diffSummary) : null,
+      ],
     )
-    // Preserve existing assignments by scene number
-    const existing = await client.query(
-      `SELECT number, shoot_day_id, day_position, location_status, notes
-       FROM scenes WHERE project_id = $1`,
+
+    // Upsert scenes by number. UUIDs stay the same for unchanged scenes,
+    // so budget_line_items.scene_id keeps pointing at the right rows.
+    // Build a set of NEW scene numbers so we can DELETE removed scenes
+    // at the end.
+    const newNumbers = new Set(parsed.map((p) => p.number))
+    const existingRes = await client.query<{ id: string; number: string; action_text: string | null }>(
+      `SELECT id, number, action_text FROM scenes WHERE project_id = $1`,
       [projectId],
     )
-    const existingByNumber = new Map<string, { shoot_day_id: string | null; day_position: number; location_status: string; notes: string | null }>()
-    for (const row of existing.rows) {
-      existingByNumber.set(row.number, row)
+    const existingByNumber = new Map<string, { id: string; actionText: string | null }>()
+    for (const row of existingRes.rows) {
+      existingByNumber.set(row.number, { id: row.id, actionText: row.action_text })
     }
-    await client.query(`DELETE FROM scenes WHERE project_id = $1`, [projectId])
+
     for (const sc of parsed) {
       const prior = existingByNumber.get(sc.number)
-      await client.query(
-        `INSERT INTO scenes
-           (project_id, number, script_position, slug, int_ext, location, location_tag,
-            time_of_day, page, page_eighths, characters, notes, action_text,
-            shoot_day_id, day_position, location_status)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)`,
-        [
-          projectId,
-          sc.number,
-          sc.scriptPosition,
-          sc.slug,
-          sc.intExt,
-          sc.location,
-          sc.locationTag,
-          sc.timeOfDay,
-          sc.page,
-          sc.pageEighths,
-          JSON.stringify(sc.characters),
-          prior?.notes ?? null,
-          sc.actionText || null,
-          prior?.shoot_day_id ?? null,
-          prior?.day_position ?? 0,
-          prior?.location_status ?? 'unset',
-        ],
-      )
+      if (prior) {
+        // UPDATE in place — preserves UUID, schedule, notes, location
+        // status. Reset breakdown_run_at only if action text actually
+        // changed, so re-uploading the same file doesn't blow away
+        // your breakdown.
+        const actionChanged = (prior.actionText || '') !== (sc.actionText || '')
+        await client.query(
+          `UPDATE scenes SET
+             script_position = $2,
+             slug = $3,
+             int_ext = $4,
+             location = $5,
+             location_tag = $6,
+             time_of_day = $7,
+             page = $8,
+             page_eighths = $9,
+             characters = $10,
+             action_text = $11,
+             breakdown_run_at = CASE WHEN $12::boolean THEN NULL ELSE breakdown_run_at END
+           WHERE id = $1`,
+          [
+            prior.id, sc.scriptPosition, sc.slug, sc.intExt, sc.location, sc.locationTag,
+            sc.timeOfDay, sc.page, sc.pageEighths, JSON.stringify(sc.characters),
+            sc.actionText || null, actionChanged,
+          ],
+        )
+        if (actionChanged) changedSceneIds.push(prior.id)
+      } else {
+        const ins = await client.query<{ id: string }>(
+          `INSERT INTO scenes
+             (project_id, number, script_position, slug, int_ext, location, location_tag,
+              time_of_day, page, page_eighths, characters, action_text)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
+           RETURNING id`,
+          [
+            projectId, sc.number, sc.scriptPosition, sc.slug, sc.intExt, sc.location,
+            sc.locationTag, sc.timeOfDay, sc.page, sc.pageEighths,
+            JSON.stringify(sc.characters), sc.actionText || null,
+          ],
+        )
+        addedSceneIds.push(ins.rows[0].id)
+      }
     }
+    // Scenes removed in the new version — keep their budget items but
+    // null the scene_id (handled by ON DELETE SET NULL on the FK).
+    await client.query(
+      `DELETE FROM scenes WHERE project_id = $1 AND number <> ALL($2::text[])`,
+      [projectId, Array.from(newNumbers)],
+    )
     await client.query('COMMIT')
 
     // If this is the BIYA project, auto-apply Ryan's StudioBinder
@@ -193,12 +250,27 @@ stripboardRouter.post('/projects/:projectId/import-fdx', async (req, res) => {
     // response.
     void publishProjectScript(projectId)
 
-    // Kick off the Claude-powered cost breakdown for every scene with action
-    // text. Runs in the background — the .fdx import response returns
-    // immediately so the producer isn't blocked on a multi-minute call.
-    // When it finishes, re-publish to status so the snapshot includes the
+    // Kick off the Claude-powered cost breakdown. For the first upload
+    // (no previous archive) run across every scene. For subsequent
+    // uploads, only re-analyze scenes that actually changed or are new —
+    // saves cost and preserves your priced rows on unchanged scenes.
+    // When done, re-publish to status so the snapshot includes the
     // newly-suggested cost items.
-    void runProjectBreakdown(projectId, user.id)
+    const selectiveRun = async () => {
+      if (!diffSummary) {
+        await runProjectBreakdown(projectId, user.id)
+        return
+      }
+      const targets = [...new Set([...addedSceneIds, ...changedSceneIds])]
+      for (const sid of targets) {
+        try {
+          await runSceneBreakdown(sid, user.id)
+        } catch (err) {
+          logError('selective scene breakdown failed', { sceneId: sid, error: err instanceof Error ? err.message : String(err) })
+        }
+      }
+    }
+    void selectiveRun()
       .then(() => publishProjectScript(projectId))
       .catch((err) => {
         logError('scene breakdown background run failed', {
@@ -206,9 +278,28 @@ stripboardRouter.post('/projects/:projectId/import-fdx', async (req, res) => {
           error: err instanceof Error ? err.message : String(err),
         })
       })
-    logInfo('fdx imported, breakdown kicked off', { projectId, count: parsed.length })
+    logInfo('fdx imported, breakdown kicked off', {
+      projectId,
+      count: parsed.length,
+      added: addedSceneIds.length,
+      changed: changedSceneIds.length,
+      hasDiff: !!diffSummary,
+    })
 
-    res.json({ ok: true, count: parsed.length, autoApplied, breakdownStarted: true })
+    res.json({
+      ok: true,
+      count: parsed.length,
+      autoApplied,
+      breakdownStarted: true,
+      diff: diffSummary
+        ? {
+            added: diffSummary.added.length,
+            removed: diffSummary.removed.length,
+            changed: diffSummary.changed.length,
+            unchanged: diffSummary.unchanged,
+          }
+        : null,
+    })
   } catch (err) {
     await client.query('ROLLBACK')
     res.status(500).json({ error: err instanceof Error ? err.message : String(err) })
@@ -302,6 +393,60 @@ stripboardRouter.post('/scenes/:sceneId/breakdown', async (req, res) => {
   }
 })
 
+// Return the diff JSON for the most recent upload — what changed
+// compared to the previous archived version. Null when this is the
+// first upload (nothing to compare to) or when the previous parse
+// failed.
+stripboardRouter.get('/projects/:projectId/script-diff', async (req, res) => {
+  const user = (req as typeof req & { user: SessionUser }).user
+  const projectId = req.params.projectId
+  if (!(await userCanAccessProject(user.id, user.role, projectId))) {
+    res.status(403).json({ error: 'forbidden' }); return
+  }
+  const { rows } = await pool.query<{
+    id: string; diff_summary: unknown; diff_against_id: string | null;
+    uploaded_at: string; file_name: string | null; diff_reviewed_at: string | null;
+  }>(
+    `SELECT id, diff_summary, diff_against_id, uploaded_at, file_name, diff_reviewed_at
+     FROM project_script_uploads
+     WHERE project_id = $1 ORDER BY uploaded_at DESC LIMIT 1`,
+    [projectId],
+  )
+  if (rows.length === 0 || !rows[0].diff_summary) {
+    res.json({ diff: null }); return
+  }
+  // Compute scheduled / budget impact for removed scenes by looking
+  // up the orphaned budget items (scene_id IS NULL after this upload
+  // but description mentions the removed scene). Simpler: just count
+  // line items that lost their scene_id during this transaction. We
+  // don't track that yet, so for now leave budgetImpact off.
+  res.json({
+    diff: rows[0].diff_summary,
+    uploadId: rows[0].id,
+    uploadedAt: rows[0].uploaded_at,
+    fileName: rows[0].file_name,
+    reviewedAt: rows[0].diff_reviewed_at,
+  })
+})
+
+// Mark the latest diff as reviewed so the changelog card collapses
+// or disappears in the UI.
+stripboardRouter.post('/projects/:projectId/script-diff/mark-reviewed', async (req, res) => {
+  const user = (req as typeof req & { user: SessionUser }).user
+  const projectId = req.params.projectId
+  if (!await assertWriter(user, projectId, res)) return
+  await pool.query(
+    `UPDATE project_script_uploads
+     SET diff_reviewed_at = now()
+     WHERE id = (
+       SELECT id FROM project_script_uploads
+       WHERE project_id = $1 ORDER BY uploaded_at DESC LIMIT 1
+     )`,
+    [projectId],
+  )
+  res.json({ ok: true })
+})
+
 // Get the archive metadata (last upload's file name + bytes + date) so
 // the UI can show "📜 Source script: BIYA_v12.fdx · uploaded Jun 1 ·
 // 480 KB" with a [Re-parse] / [Download] action.
@@ -385,32 +530,56 @@ stripboardRouter.post('/projects/:projectId/reparse-archived', async (req, res) 
   const client = await pool.connect()
   try {
     await client.query('BEGIN')
-    const existing = await client.query(
-      `SELECT number, shoot_day_id, day_position, location_status, notes
-       FROM scenes WHERE project_id = $1`,
+    const newNumbers = new Set(parsed.map((p) => p.number))
+    const existingRes = await client.query<{ id: string; number: string }>(
+      `SELECT id, number FROM scenes WHERE project_id = $1`,
       [projectId],
     )
-    const existingByNumber = new Map<string, { shoot_day_id: string | null; day_position: number; location_status: string; notes: string | null }>()
-    for (const row of existing.rows) {
-      existingByNumber.set(row.number, row)
+    const existingById = new Map<string, string>() // number → id
+    for (const row of existingRes.rows) {
+      existingById.set(row.number, row.id)
     }
-    await client.query(`DELETE FROM scenes WHERE project_id = $1`, [projectId])
     for (const sc of parsed) {
-      const prior = existingByNumber.get(sc.number)
-      await client.query(
-        `INSERT INTO scenes
-           (project_id, number, script_position, slug, int_ext, location, location_tag,
-            time_of_day, page, page_eighths, characters, notes, action_text,
-            shoot_day_id, day_position, location_status)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)`,
-        [
-          projectId, sc.number, sc.scriptPosition, sc.slug, sc.intExt, sc.location,
-          sc.locationTag, sc.timeOfDay, sc.page, sc.pageEighths,
-          JSON.stringify(sc.characters), prior?.notes ?? null, sc.actionText || null,
-          prior?.shoot_day_id ?? null, prior?.day_position ?? 0, prior?.location_status ?? 'unset',
-        ],
-      )
+      const priorId = existingById.get(sc.number)
+      if (priorId) {
+        await client.query(
+          `UPDATE scenes SET
+             script_position = $2,
+             slug = $3,
+             int_ext = $4,
+             location = $5,
+             location_tag = $6,
+             time_of_day = $7,
+             page = $8,
+             page_eighths = $9,
+             characters = $10,
+             action_text = $11,
+             breakdown_run_at = NULL
+           WHERE id = $1`,
+          [
+            priorId, sc.scriptPosition, sc.slug, sc.intExt, sc.location, sc.locationTag,
+            sc.timeOfDay, sc.page, sc.pageEighths, JSON.stringify(sc.characters),
+            sc.actionText || null,
+          ],
+        )
+      } else {
+        await client.query(
+          `INSERT INTO scenes
+             (project_id, number, script_position, slug, int_ext, location, location_tag,
+              time_of_day, page, page_eighths, characters, action_text)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)`,
+          [
+            projectId, sc.number, sc.scriptPosition, sc.slug, sc.intExt, sc.location,
+            sc.locationTag, sc.timeOfDay, sc.page, sc.pageEighths,
+            JSON.stringify(sc.characters), sc.actionText || null,
+          ],
+        )
+      }
     }
+    await client.query(
+      `DELETE FROM scenes WHERE project_id = $1 AND number <> ALL($2::text[])`,
+      [projectId, Array.from(newNumbers)],
+    )
     await client.query('COMMIT')
   } catch (err) {
     await client.query('ROLLBACK')
