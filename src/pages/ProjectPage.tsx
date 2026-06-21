@@ -14,6 +14,7 @@ import PodcastRssConfig from '../components/PodcastRssConfig'
 import BrandProfileCard from '../components/BrandProfileCard'
 import BrandAssetsCard from '../components/BrandAssetsCard'
 import ShowChatCard from '../components/ShowChatCard'
+import ScriptOverviewCard from '../components/ScriptOverviewCard'
 import FilmPhaseBar, { type FilmPhase } from '../components/FilmPhaseBar'
 import { useAuth } from '../auth'
 
@@ -252,6 +253,14 @@ export default function ProjectPage() {
         <ProjectMembersSection projectId={project.id} members={members} currentUserId={user.id} onChanged={reload} />
       )}
 
+      {/* Film workflow: Script → Schedule → Budget. Everything flows
+          from the .fdx, so the script gets top billing on the project
+          page. Schedule lives on its own /stripboard route. Budget is
+          downstream of both. */}
+      {project.kind === 'film' && (
+        <ScriptOverviewCard projectId={project.id} isAdmin={isAdmin} />
+      )}
+
       {project.kind === 'film' && (
         <Link
           to={`/projects/${project.id}/stripboard`}
@@ -259,10 +268,10 @@ export default function ProjectPage() {
         >
           <div className="flex items-center justify-between gap-3">
             <div className="min-w-0">
-              <div className="text-[11px] uppercase tracking-[0.2em] text-muted font-bold">🎬 Stripboard</div>
+              <div className="text-[11px] uppercase tracking-[0.2em] text-muted font-bold">🎬 Schedule · Stripboard</div>
               <div className="text-sm font-bold mt-1 text-text">Open shooting schedule →</div>
               <div className="text-[11px] text-muted/80 mt-0.5">
-                Scenes by shoot day · upload .fdx · drag to reorder
+                Scenes by shoot day · drag to reorder · saved snapshots
               </div>
             </div>
             <span className="text-2xl text-muted group-hover:text-stage-mastering transition shrink-0">›</span>
