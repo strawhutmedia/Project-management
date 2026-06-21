@@ -120,6 +120,42 @@ like "12", "78A") not page numbers. Day numbers start at 1 and are
 consecutive. If you need more days than the producer asked for to fit
 everything legally, exceed the count and explain why in summary.`
 
+// Robust JSON extractor. Claude sometimes wraps the JSON in markdown
+// code fences, adds a preamble like "Here's the schedule:", or both.
+// This finds the outermost balanced {...} block in the response. Returns
+// null if no parsable JSON is found.
+function extractAndParseJson(text: string): ScheduleProposal | null {
+  // Strip markdown code fences if present.
+  let cleaned = text.replace(/```json\s*/gi, '').replace(/```\s*$/gi, '').trim()
+  // Try direct parse first.
+  try { return JSON.parse(cleaned) as ScheduleProposal } catch {}
+  // Find balanced { ... } block. Walks the string tracking brace depth,
+  // ignoring braces inside strings. Returns the first complete top-level
+  // object.
+  let depth = 0
+  let start = -1
+  let inString = false
+  let escape = false
+  for (let i = 0; i < cleaned.length; i++) {
+    const c = cleaned[i]
+    if (escape) { escape = false; continue }
+    if (c === '\\') { escape = true; continue }
+    if (c === '"' && !escape) { inString = !inString; continue }
+    if (inString) continue
+    if (c === '{') {
+      if (depth === 0) start = i
+      depth++
+    } else if (c === '}') {
+      depth--
+      if (depth === 0 && start >= 0) {
+        try { return JSON.parse(cleaned.slice(start, i + 1)) as ScheduleProposal } catch {}
+        start = -1
+      }
+    }
+  }
+  return null
+}
+
 function buildSceneCorpus(scenes: Array<{
   number: string
   slug: string
@@ -188,8 +224,13 @@ export async function proposeSchedule(
   let response
   try {
     response = await client.messages.create({
-      model: constraints.useOpus ? SCHEDULER_MODEL_OPUS : SCHEDULER_MODEL_SONNET,
-      max_tokens: 8000,
+      // Default to Opus for scheduling — it's a complex constraint
+      // problem and a one-shot operation. Sonnet fallback is available
+      // via useOpus=false but Opus does noticeably better.
+      model: constraints.useOpus === false ? SCHEDULER_MODEL_SONNET : SCHEDULER_MODEL_OPUS,
+      // 16k tokens is generous enough for a feature-length script
+      // (157 scenes × structure overhead well under this).
+      max_tokens: 16000,
       system: SYSTEM_PROMPT,
       messages: [{ role: 'user', content: userBlock }],
     })
@@ -201,19 +242,21 @@ export async function proposeSchedule(
 
   const textBlock = response.content.find((b) => b.type === 'text')
   const rawText = textBlock && textBlock.type === 'text' ? textBlock.text : ''
-  let parsed: ScheduleProposal
-  try {
-    const jsonStart = rawText.indexOf('{')
-    const jsonEnd = rawText.lastIndexOf('}')
-    if (jsonStart < 0 || jsonEnd < 0) throw new Error('no JSON in response')
-    parsed = JSON.parse(rawText.slice(jsonStart, jsonEnd + 1)) as ScheduleProposal
-  } catch (err) {
+  const parsed = extractAndParseJson(rawText)
+  if (!parsed) {
     logError('auto_scheduler: parse failed', {
       projectId,
-      error: err instanceof Error ? err.message : String(err),
-      raw: rawText.slice(0, 600),
+      rawStart: rawText.slice(0, 300),
+      rawEnd: rawText.slice(-300),
+      length: rawText.length,
+      stopReason: response.stop_reason,
+      outputTokens: response.usage.output_tokens,
     })
-    throw new Error('Claude response was not valid JSON')
+    throw new Error(
+      response.stop_reason === 'max_tokens'
+        ? 'Claude response was cut off — script may have more scenes than the schedule output can fit. Try Opus or smaller chunks.'
+        : 'Claude response was not valid JSON',
+    )
   }
 
   logInfo('auto_scheduler: proposal generated', {

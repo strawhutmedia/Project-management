@@ -26,7 +26,7 @@ export default function AutoScheduleModal({
 }) {
   const [shootDays, setShootDays] = useState(currentShootDayCount > 0 ? currentShootDayCount : 18)
   const [maxPages, setMaxPages] = useState(7)
-  const [useOpus, setUseOpus] = useState(false)
+  const [useOpus, setUseOpus] = useState(true)
   const [notes, setNotes] = useState('')
   const [thinking, setThinking] = useState(false)
   const [proposal, setProposal] = useState<Proposal | null>(null)
@@ -146,7 +146,7 @@ export default function AutoScheduleModal({
                     checked={useOpus}
                     onChange={(e) => setUseOpus(e.target.checked)}
                   />
-                  Use Opus (slower, smarter — better for complex constraints)
+                  Use Opus (recommended — better with complex constraints; uncheck for faster/cheaper Sonnet)
                 </label>
               </div>
 
