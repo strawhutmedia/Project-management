@@ -358,7 +358,7 @@ function SceneItemRow({
     (bucketOf(item.code) === 'LOCATION' || bucketOf(item.code) === 'PERMITS')
 
   return (
-    <div className="px-3 py-2 group flex items-start gap-2">
+    <div className="px-3 py-2 group flex flex-col sm:flex-row items-stretch sm:items-start gap-2">
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2 flex-wrap">
           <input
@@ -399,43 +399,58 @@ function SceneItemRow({
           />
         )}
       </div>
-      <div className="flex items-center gap-1 shrink-0">
-        <input
-          type="number"
-          value={amt}
-          onChange={(e) => setAmt(e.target.value)}
-          onBlur={() => parseFloat(amt) !== item.amt && void onUpdate({ amt: parseFloat(amt) || 0 })}
-          disabled={!isAdmin}
-          placeholder="amt"
-          className="w-14 text-xs text-right font-mono bg-ink/40 border border-line rounded px-1.5 py-1 outline-none focus:border-stage-mastering"
-        />
+      {/* Math row — on mobile this drops below the description for
+          legibility. On desktop it sits to the right. */}
+      <div className="flex items-center gap-1 shrink-0 flex-wrap justify-end">
+        <label className="flex items-center gap-1 text-[10px] text-muted">
+          <span className="sm:hidden uppercase tracking-wider">qty</span>
+          <input
+            type="number"
+            inputMode="decimal"
+            value={amt}
+            onChange={(e) => setAmt(e.target.value)}
+            onBlur={() => parseFloat(amt) !== item.amt && void onUpdate({ amt: parseFloat(amt) || 0 })}
+            disabled={!isAdmin}
+            placeholder="amt"
+            className="w-14 text-xs text-right font-mono bg-ink/40 border border-line rounded px-1.5 py-1 outline-none focus:border-stage-mastering"
+          />
+        </label>
         <span className="text-[10px] text-muted">×</span>
-        <input
-          type="number"
-          value={x}
-          onChange={(e) => setX(e.target.value)}
-          onBlur={() => parseFloat(x) !== item.x && void onUpdate({ x: parseFloat(x) || 1 })}
-          disabled={!isAdmin}
-          placeholder="×"
-          className="w-12 text-xs text-right font-mono bg-ink/40 border border-line rounded px-1.5 py-1 outline-none focus:border-stage-mastering"
-        />
-        <span className="text-[10px] text-muted">@$</span>
-        <input
-          type="number"
-          value={rate}
-          onChange={(e) => setRate(e.target.value)}
-          onBlur={() => parseFloat(rate) !== item.rate && void onUpdate({ rate: parseFloat(rate) || 0 })}
-          disabled={!isAdmin}
-          placeholder="rate"
-          className="w-16 text-xs text-right font-mono bg-ink/40 border border-line rounded px-1.5 py-1 outline-none focus:border-stage-mastering"
-        />
-        <div className="w-20 text-right font-mono font-bold text-sm text-text">
+        <label className="flex items-center gap-1 text-[10px] text-muted">
+          <span className="sm:hidden uppercase tracking-wider">days</span>
+          <input
+            type="number"
+            inputMode="decimal"
+            value={x}
+            onChange={(e) => setX(e.target.value)}
+            onBlur={() => parseFloat(x) !== item.x && void onUpdate({ x: parseFloat(x) || 1 })}
+            disabled={!isAdmin}
+            placeholder="×"
+            className="w-12 text-xs text-right font-mono bg-ink/40 border border-line rounded px-1.5 py-1 outline-none focus:border-stage-mastering"
+          />
+        </label>
+        <span className="text-[10px] text-muted">@</span>
+        <label className="flex items-center gap-1 text-[10px] text-muted">
+          <span className="sm:hidden uppercase tracking-wider">$</span>
+          <input
+            type="number"
+            inputMode="decimal"
+            value={rate}
+            onChange={(e) => setRate(e.target.value)}
+            onBlur={() => parseFloat(rate) !== item.rate && void onUpdate({ rate: parseFloat(rate) || 0 })}
+            disabled={!isAdmin}
+            placeholder="rate"
+            className="w-16 text-xs text-right font-mono bg-ink/40 border border-line rounded px-1.5 py-1 outline-none focus:border-stage-mastering"
+          />
+        </label>
+        <span className="text-[10px] text-muted">=</span>
+        <div className="min-w-[64px] text-right font-mono font-bold text-sm text-text">
           {computedTotal > 0 ? `$${Math.round(computedTotal).toLocaleString()}` : <span className="text-muted/40">—</span>}
         </div>
         {isAdmin && (
           <button
             onClick={() => void onDelete()}
-            className="text-muted/40 hover:text-urgent opacity-0 group-hover:opacity-100 px-1"
+            className="text-muted/40 hover:text-urgent px-2 py-1 sm:opacity-0 sm:group-hover:opacity-100"
             title="Remove"
           >
             ✕
