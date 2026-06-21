@@ -44,6 +44,16 @@ export default function Dashboard() {
     window.localStorage.setItem(TAB_STORAGE_KEY, tab)
   }, [tab])
 
+  // Flip to the light film theme whenever the FILMS tab is active on
+  // the Dashboard, so the look matches the film project pages. Cleared
+  // when switching to PODCASTS / MUSIC or leaving the page.
+  useEffect(() => {
+    if (tab === 'film') {
+      document.body.setAttribute('data-theme', 'film')
+      return () => { document.body.removeAttribute('data-theme') }
+    }
+  }, [tab])
+
   async function load() {
     try {
       const { projects } = await api.projects()
