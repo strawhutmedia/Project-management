@@ -141,5 +141,11 @@
     "attemptedAt": "2026-06-03T20:35:57.026Z",
     "error": "Anthropic 400: {\"type\":\"error\",\"error\":{\"type\":\"invalid_request_error\",\"message\":\"Your credit balance is too low to access the Anthropic API. Please go to Plans & Billing to upgrade or purchase credits.\"},\"request_id\":\"req_011Cbgy4fdwTv8KMaZZFgLM7\"}",
     "iterations": 0
+  },
+  "auto-schedule propose failed::{\"projectId\":\"12f53ed1-c6c7-4c11-8d7b-06d91744c9af\",\"error\":\"Claude response was": {
+    "attemptedAt": "2026-06-21T11:29:40.736Z",
+    "outcome": "fixed",
+    "summary": "Fixed JSON parsing bug in auto-scheduler where escape sequences within strings were incorrectly handled, causing valid Claude responses to be rejected as \"not valid JSON\".",
+    "iterations": 15
   }
 }
