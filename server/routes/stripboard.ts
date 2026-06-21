@@ -5,6 +5,7 @@ import { assertWriter } from '../permissions'
 import { parseFdx } from '../fdx_parser'
 import { applyBackInYourArmsSchedule } from '../seeds/back_in_your_arms'
 import { runSceneBreakdown, runProjectBreakdown } from '../scene_breakdown'
+import { proposeSchedule, applyProposedSchedule, type ScheduleProposal } from '../auto_scheduler'
 import { publishProjectScript } from '../script_publisher'
 import { logError, logInfo } from '../diag'
 
@@ -773,6 +774,53 @@ stripboardRouter.post('/projects/:projectId/reparse-archived', async (req, res) 
 
   logInfo('reparsed archived .fdx', { projectId, sceneCount: parsed.length, fileName: archive.rows[0].file_name, uploadedAt: archive.rows[0].uploaded_at })
   res.json({ ok: true, sceneCount: parsed.length, archivedAt: archive.rows[0].uploaded_at, fileName: archive.rows[0].file_name })
+})
+
+// Ask Claude to propose a shooting schedule across N days, optimizing
+// for cast continuity, location continuity, day/night separation, and
+// page count caps. Returns the proposal — does NOT apply it. The
+// producer reviews the side-by-side and explicitly chooses to apply.
+stripboardRouter.post('/projects/:projectId/auto-schedule/propose', async (req, res) => {
+  const user = (req as typeof req & { user: SessionUser }).user
+  const projectId = req.params.projectId
+  if (!await assertWriter(user, projectId, res)) return
+  const shootDays = Number(req.body?.shootDays)
+  const maxPagesPerDay = Number(req.body?.maxPagesPerDay) || 7
+  const useOpus = Boolean(req.body?.useOpus)
+  const notes = typeof req.body?.notes === 'string' ? req.body.notes.slice(0, 1000) : ''
+  if (!Number.isFinite(shootDays) || shootDays < 1 || shootDays > 200) {
+    res.status(400).json({ error: 'invalid_shootDays' }); return
+  }
+  try {
+    const proposal = await proposeSchedule(projectId, { shootDays, maxPagesPerDay, useOpus, notes })
+    res.json({ ok: true, proposal })
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err)
+    logError('auto-schedule propose failed', { projectId, error: msg })
+    res.status(502).json({ error: msg.slice(0, 400) })
+  }
+})
+
+// Apply a previously-proposed schedule. Auto-snapshots the current
+// state before swapping, so the producer can restore if the new plan
+// turns out worse.
+stripboardRouter.post('/projects/:projectId/auto-schedule/apply', async (req, res) => {
+  const user = (req as typeof req & { user: SessionUser }).user
+  const projectId = req.params.projectId
+  if (!await assertWriter(user, projectId, res)) return
+  const proposal = req.body?.proposal as ScheduleProposal | undefined
+  if (!proposal || !Array.isArray(proposal.shootDays)) {
+    res.status(400).json({ error: 'invalid_proposal' }); return
+  }
+  try {
+    const r = await applyProposedSchedule(projectId, proposal, user.id)
+    void publishProjectScript(projectId)
+    res.json({ ok: true, snapshotId: r.snapshotId })
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err)
+    logError('auto-schedule apply failed', { projectId, error: msg })
+    res.status(500).json({ error: msg.slice(0, 400) })
+  }
 })
 
 // Re-analyze every scene already in the database, without requiring a

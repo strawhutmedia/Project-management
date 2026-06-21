@@ -704,6 +704,32 @@ export const api = {
       `/api/stripboard/projects/${projectId}/reanalyze-all`,
       { method: 'POST' },
     ),
+  proposeAutoSchedule: (projectId: string, body: { shootDays: number; maxPagesPerDay: number; useOpus?: boolean; notes?: string }) =>
+    request<{
+      ok: true
+      proposal: {
+        shootDays: Array<{
+          number: number
+          isBreak: boolean
+          sceneNumbers: string[]
+          notes: string
+          warnings: string[]
+          pagesTotal: number
+          locations: string[]
+        }>
+        summary: string
+        unscheduled: string[]
+        warnings: string[]
+      }
+    }>(`/api/stripboard/projects/${projectId}/auto-schedule/propose`, {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+  applyAutoSchedule: (projectId: string, proposal: unknown) =>
+    request<{ ok: true; snapshotId: string }>(
+      `/api/stripboard/projects/${projectId}/auto-schedule/apply`,
+      { method: 'POST', body: JSON.stringify({ proposal }) },
+    ),
   breakdownProgress: (projectId: string) =>
     request<{
       totalScenes: number

@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState, useRef } from 'react'
 import { api, type ApiScene, type ApiShootDay, type ApiStripboard } from '../api'
 import SceneDetailModal from './SceneDetailModal'
 import ScriptChangelogCard from './ScriptChangelogCard'
+import AutoScheduleModal from './AutoScheduleModal'
 
 type ScriptArchive = {
   id: string
@@ -94,6 +95,7 @@ export default function Stripboard({ projectId, isAdmin, projectName }: { projec
   const [busy, setBusy] = useState(false)
   const [undoStack, setUndoStack] = useState<UndoEntry[]>([])
   const [openSceneId, setOpenSceneId] = useState<string | null>(null)
+  const [autoScheduleOpen, setAutoScheduleOpen] = useState(false)
   const [archive, setArchive] = useState<ScriptArchive | null>(null)
   const [progress, setProgress] = useState<BreakdownProgress | null>(null)
   const [snapshots, setSnapshots] = useState<ScheduleSnapshot[]>([])
@@ -577,6 +579,14 @@ export default function Stripboard({ projectId, isAdmin, projectName }: { projec
             >
               ✨ Re-analyze all scenes
             </button>
+            <button
+              onClick={() => setAutoScheduleOpen(true)}
+              disabled={busy || (board?.scenes.length ?? 0) === 0}
+              title="Let Claude plan the shoot. You'll preview and approve before anything changes."
+              className="text-[10px] uppercase tracking-wider text-white bg-gradient-to-r from-stage-tracking to-stage-mixing rounded-full px-3 py-1.5 hover:opacity-90 disabled:opacity-50 font-bold"
+            >
+              ✨ Auto-plan schedule
+            </button>
             {projectName === 'Back in Your Arms' && (grouped?.unscheduled.length ?? 0) > 0 && (
               <button
                 onClick={() => void applyBiyaSchedule()}
@@ -637,6 +647,18 @@ export default function Stripboard({ projectId, isAdmin, projectName }: { projec
           isAdmin={isAdmin}
           onClose={() => setOpenSceneId(null)}
           onChanged={() => void load()}
+        />
+      )}
+
+      {autoScheduleOpen && (
+        <AutoScheduleModal
+          projectId={projectId}
+          currentShootDayCount={board.days.filter((d) => !d.isBreak).length}
+          onClose={() => setAutoScheduleOpen(false)}
+          onApplied={() => {
+            void load()
+            void loadSnapshots()
+          }}
         />
       )}
     </section>
