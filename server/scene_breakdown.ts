@@ -72,11 +72,23 @@ For each item, return:
     the script — e.g. "needs to be practical, character throws it"
 
 Category guide:
-  PROPS         : hand props characters touch. CAST WIDE — anything a
-                  character could pick up, set down, eat off of, throw,
-                  break, hide behind. A fork on a table counts if it's
-                  meant to be in shot. List items down to "fork",
-                  "pack of cigarettes", "$20 bill", "set of car keys".
+  PROPS         : hand props characters touch. Two tiers — pick the
+                  right one per item:
+                    BUNDLE generic / routine items into a single row:
+                      "dinner place settings for 8", "diner table
+                      dressing", "schoolkid's backpack contents",
+                      "ER nurse's tray of supplies". Don't itemize
+                      every fork and spoon when the script just
+                      establishes "a dinner."
+                    ITEMIZE props that the action specifically calls
+                      out, that drive a beat, that an actor handles,
+                      or that have a unique cost:
+                      "vintage rotary phone (Kendrick slams it)",
+                      "$20 bill that changes hands", "the antique
+                      pocket watch", "the kitchen knife (used as
+                      weapon)", "loaded revolver, period correct".
+                  Rule of thumb: would the prop master treat this as
+                  one buy, or as a hero item to source individually?
   WARDROBE      : list ONE row per character per scene, in the form:
                   description = "CHARACTER NAME: outfit description"
                   e.g. "JANE: white sundress, no jewelry, sandals"
