@@ -44,16 +44,6 @@ export default function Dashboard() {
     window.localStorage.setItem(TAB_STORAGE_KEY, tab)
   }, [tab])
 
-  // Flip to the light film theme whenever the FILMS tab is active on
-  // the Dashboard, so the look matches the film project pages. Cleared
-  // when switching to PODCASTS / MUSIC or leaving the page.
-  useEffect(() => {
-    if (tab === 'film') {
-      document.body.setAttribute('data-theme', 'film')
-      return () => { document.body.removeAttribute('data-theme') }
-    }
-  }, [tab])
-
   async function load() {
     try {
       const { projects } = await api.projects()
@@ -97,6 +87,16 @@ export default function Dashboard() {
 
   const visibleProjects = projects?.filter((p) => p.kind === tab) ?? []
   const activeMeta = TABS.find((t) => t.value === tab)!
+
+  // Flip to the light film theme only when the user is actually past
+  // the workspace picker AND looking at the FILMS tab. The picker
+  // itself should stay dark since it doesn't show film content yet.
+  useEffect(() => {
+    if (!showPicker && tab === 'film') {
+      document.body.setAttribute('data-theme', 'film')
+      return () => { document.body.removeAttribute('data-theme') }
+    }
+  }, [tab, showPicker])
 
   if (showPicker) {
     return (
