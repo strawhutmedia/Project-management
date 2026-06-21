@@ -138,11 +138,19 @@ function extractAndParseJson(text: string): ScheduleProposal | null {
   let escape = false
   for (let i = 0; i < cleaned.length; i++) {
     const c = cleaned[i]
-    if (escape) { escape = false; continue }
-    if (c === '\\') { escape = true; continue }
-    if (c === '"' && !escape) { inString = !inString; continue }
-    if (inString) continue
-    if (c === '{') {
+    if (inString) {
+      if (escape) {
+        escape = false
+      } else if (c === '\\') {
+        escape = true
+      } else if (c === '"') {
+        inString = false
+      }
+      continue
+    }
+    if (c === '"') {
+      inString = true
+    } else if (c === '{') {
       if (depth === 0) start = i
       depth++
     } else if (c === '}') {
