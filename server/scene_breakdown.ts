@@ -72,16 +72,34 @@ For each item, return:
     the script — e.g. "needs to be practical, character throws it"
 
 Category guide:
-  PROPS         : hand props characters touch (phone, gun, suitcase, book)
-  WARDROBE      : costumes / specific clothing called out in the script
-  LOCATION      : the place itself (location fee, permit indicator)
+  PROPS         : hand props characters touch. CAST WIDE — anything a
+                  character could pick up, set down, eat off of, throw,
+                  break, hide behind. A fork on a table counts if it's
+                  meant to be in shot. List items down to "fork",
+                  "pack of cigarettes", "$20 bill", "set of car keys".
+  WARDROBE      : list ONE row per character per scene, in the form:
+                  description = "CHARACTER NAME: outfit description"
+                  e.g. "JANE: white sundress, no jewelry, sandals"
+                  e.g. "OFFICER MILLER: police uniform, badge, sidearm
+                        on belt"
+                  If the script doesn't specify, infer something sensible
+                  from the scene context (period, location, weather).
+                  The producer will mark reused outfits as shared later.
+  LOCATION      : the place itself (location fee, permit indicator).
+                  One row per scene; the producer marks it shared across
+                  scenes at the same location later.
   SET_DRESSING  : items that decorate the set but characters don't use
+                  ("framed photos on mantle", "stack of old newspapers",
+                  "blood pooling on floor")
   VEHICLES      : production vehicles, not in-shot cars
-  PICTURE_CARS  : cars/trucks/bikes seen on camera
+  PICTURE_CARS  : cars/trucks/bikes seen on camera (be specific:
+                  "1967 Mustang fastback", "rusted pickup truck")
   WEAPONS       : firearms, knives, anything requiring an armorer
   ANIMALS       : any creature on set (requires wrangler)
-  SFX           : practical effects — explosions, smoke, rain, fire, blood
-  VFX           : anything requiring post — CG creature, screen replacement
+  SFX           : practical effects — explosions, smoke, rain, fire,
+                  blood squibs, breakaway furniture
+  VFX           : anything requiring post — CG creature, screen
+                  replacement, removed wires, plate shots
   MAKEUP        : specialty makeup (bruises, wounds, age, character look)
   HAIR          : wigs, period styles, anything beyond standard
   STUNTS        : any physical action requiring a stunt coordinator
@@ -94,6 +112,10 @@ Category guide:
   PERMITS       : street closures, exterior locations, public spaces
   CATERING      : only if scripted (banquet, feast scenes) — otherwise omit
   OTHER         : anything else with a clear cost
+
+Be exhaustive — when in doubt, include it. The producer prefers to
+DELETE items they don't need over discovering missing ones in week 3
+of prep.
 
 Coverage targets:
   - Scan EVERY noun in action lines for prop / wardrobe / vehicle implications.

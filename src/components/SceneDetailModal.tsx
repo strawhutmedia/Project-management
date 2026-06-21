@@ -6,7 +6,7 @@
 // number. Producer can add rows, edit descriptions, delete, and re-run the
 // breakdown to refresh from the script.
 import { useEffect, useState } from 'react'
-import { api, type ApiBudgetLineItem, type ApiScene } from '../api'
+import { api, type ApiScene } from '../api'
 
 // Category buckets in the order the producer would walk a real breakdown
 // sheet. Claude tags rows with the bucket via the `code` field on the
@@ -84,7 +84,24 @@ function bucketOf(code: string | null): Bucket {
   return BUCKET_ORDER.includes(k) ? k : 'OTHER'
 }
 
-type SceneItem = ApiBudgetLineItem & { accountId: string }
+type SceneItem = {
+  id: string
+  code: string | null
+  description: string
+  amt: number
+  units: string | null
+  x: number
+  rate: number
+  vendor: string | null
+  datedAt: string | null
+  notes: string | null
+  position: number
+  total: number
+  resourceType: string | null
+  resourceKey: string | null
+  sceneUsageCount: number
+  isSceneOnly: boolean
+}
 
 export default function SceneDetailModal({
   sceneId,
@@ -106,20 +123,9 @@ export default function SceneDetailModal({
   async function loadItems() {
     if (!scene) return
     try {
-      const projectId = await projectIdOf(scene.id)
-      const r = await api.budget(projectId)
-      const all: SceneItem[] = []
-      for (const acc of r.budget.accounts) {
-        for (const li of acc.lineItems) {
-          if (li.sceneId === sceneId) {
-            all.push({ ...li, accountId: acc.id })
-          }
-        }
-      }
-      setItems(all)
+      const r = await api.sceneBudgetItems(sceneId)
+      setItems(r.items)
     } catch (err) {
-      // If no budget yet, just show empty list. The breakdown call will
-      // create one on the fly.
       const msg = err instanceof Error ? err.message : 'failed'
       if (msg.includes('no_budget') || msg.includes('404')) {
         setItems([])
@@ -276,9 +282,12 @@ export default function SceneDetailModal({
                         <SceneItemRow
                           key={it.id}
                           item={it}
+                          sceneId={sceneId}
+                          sceneLocationTag={scene?.locationTag ?? null}
                           isAdmin={isAdmin}
                           onUpdate={(patch) => updateItem(it.id, patch)}
                           onDelete={() => deleteItem(it.id)}
+                          onChanged={loadItems}
                         />
                       ))}
                     </div>
@@ -304,34 +313,22 @@ export default function SceneDetailModal({
   )
 }
 
-// Look up the project id for a scene via the stripboard list. Lightweight —
-// the modal already has the scene prop, but we need projectId to fetch the
-// budget. Cached at module scope.
-const projectIdCache = new Map<string, string>()
-async function projectIdOf(sceneId: string): Promise<string> {
-  const cached = projectIdCache.get(sceneId)
-  if (cached) return cached
-  // The scene id maps to one project. Walk known projects (cheap — one
-  // call) to find the parent. Falls back to the project listed in the
-  // current URL if present, which is the common case.
-  const m = window.location.pathname.match(/\/project\/([^/?#]+)/)
-  if (m) {
-    projectIdCache.set(sceneId, m[1])
-    return m[1]
-  }
-  throw new Error('cannot resolve projectId for scene')
-}
-
 function SceneItemRow({
   item,
+  sceneId,
+  sceneLocationTag,
   isAdmin,
   onUpdate,
   onDelete,
+  onChanged,
 }: {
-  item: ApiBudgetLineItem
+  item: SceneItem
+  sceneId: string
+  sceneLocationTag: string | null
   isAdmin: boolean
   onUpdate: (patch: Parameters<typeof api.updateBudgetItem>[1]) => Promise<void>
   onDelete: () => Promise<void>
+  onChanged: () => Promise<void>
 }) {
   const [description, setDescription] = useState(item.description)
   const [amt, setAmt] = useState(String(item.amt))
@@ -347,19 +344,49 @@ function SceneItemRow({
     setNotes(item.notes ?? '')
   }, [item.id, item.description, item.amt, item.rate, item.x, item.notes])
 
+  async function makeSharedLocation() {
+    if (!sceneLocationTag) return
+    if (!confirm('Mark this cost as shared with every scene at the same location? You\'ll edit it once and the change applies everywhere.')) return
+    await api.promoteItemToShared(item.id, { sceneId, kind: 'LOCATION' })
+    await onChanged()
+  }
+
   const computedTotal = (parseFloat(amt) || 0) * (parseFloat(x) || 0) * (parseFloat(rate) || 0)
+  const isShared = item.resourceType !== null
+  const canPromoteToLocation =
+    !isShared && isAdmin && sceneLocationTag &&
+    (bucketOf(item.code) === 'LOCATION' || bucketOf(item.code) === 'PERMITS')
 
   return (
     <div className="px-3 py-2 group flex items-start gap-2">
       <div className="flex-1 min-w-0">
-        <input
-          type="text"
-          value={description}
-          onChange={(e) => setDescription(e.target.value)}
-          onBlur={() => description !== item.description && void onUpdate({ description })}
-          disabled={!isAdmin}
-          className="w-full bg-transparent text-sm text-text outline-none border-b border-transparent focus:border-stage-mastering/60 pb-0.5"
-        />
+        <div className="flex items-center gap-2 flex-wrap">
+          <input
+            type="text"
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+            onBlur={() => description !== item.description && void onUpdate({ description })}
+            disabled={!isAdmin}
+            className="flex-1 min-w-0 bg-transparent text-sm text-text outline-none border-b border-transparent focus:border-stage-mastering/60 pb-0.5"
+          />
+          {isShared && (
+            <span
+              className="text-[9px] uppercase tracking-wider font-bold text-stage-mastering bg-stage-mastering/15 border border-stage-mastering/40 rounded-full px-2 py-0.5 whitespace-nowrap"
+              title={`Shared ${item.resourceType?.toLowerCase()} · used in ${item.sceneUsageCount} scene${item.sceneUsageCount === 1 ? '' : 's'}`}
+            >
+              ⇆ Used in {item.sceneUsageCount} scene{item.sceneUsageCount === 1 ? '' : 's'}
+            </span>
+          )}
+          {canPromoteToLocation && (
+            <button
+              onClick={() => void makeSharedLocation()}
+              className="text-[9px] uppercase tracking-wider text-muted hover:text-stage-mastering border border-line hover:border-stage-mastering/40 rounded-full px-2 py-0.5 whitespace-nowrap opacity-0 group-hover:opacity-100"
+              title="Share this cost with every scene at the same location"
+            >
+              📍 Share with all "{sceneLocationTag}" scenes
+            </button>
+          )}
+        </div>
         {(item.notes || notes) && (
           <input
             type="text"

@@ -3,6 +3,7 @@ import { pool } from '../db'
 import { requireUser, type SessionUser } from '../auth'
 import { assertWriter } from '../permissions'
 import { STUDIOBINDER_ACCOUNTS } from '../budget_template'
+import { getSceneBudgetItems } from '../scene_budget'
 import { logInfo } from '../diag'
 
 export const budgetsRouter = Router()
@@ -206,7 +207,7 @@ budgetsRouter.post('/accounts/:accountId/items', async (req, res) => {
   )
   if (lookup.rows.length === 0) { res.status(404).json({ error: 'not_found' }); return }
   if (!await assertWriter(user, lookup.rows[0].project_id, res)) return
-  const { code, description, amt, units, x, rate, vendor, datedAt, notes, sceneId } = req.body ?? {}
+  const { code, description, amt, units, x, rate, vendor, datedAt, notes, sceneId, resourceType, resourceKey } = req.body ?? {}
   if (typeof description !== 'string' || description.trim().length === 0) {
     res.status(400).json({ error: 'description_required' }); return
   }
@@ -216,8 +217,9 @@ budgetsRouter.post('/accounts/:accountId/items', async (req, res) => {
   )
   const { rows } = await pool.query(
     `INSERT INTO budget_line_items
-       (account_id, scene_id, code, description, amt, units, x, rate, vendor, dated_at, notes, position, created_by)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+       (account_id, scene_id, code, description, amt, units, x, rate, vendor, dated_at, notes,
+        resource_type, resource_key, position, created_by)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
      RETURNING id`,
     [
       accountId,
@@ -231,6 +233,8 @@ budgetsRouter.post('/accounts/:accountId/items', async (req, res) => {
       typeof vendor === 'string' ? vendor : null,
       datedAt || null,
       typeof notes === 'string' ? notes : null,
+      typeof resourceType === 'string' ? resourceType.slice(0, 40) : null,
+      typeof resourceKey === 'string' ? resourceKey.slice(0, 80) : null,
       posRes.rows[0].next,
       user.id,
     ],
@@ -260,6 +264,8 @@ budgetsRouter.patch('/items/:itemId', async (req, res) => {
     ['datedAt', 'dated_at', (v) => v || null],
     ['notes', 'notes', (v) => (typeof v === 'string' ? v : null)],
     ['sceneId', 'scene_id', (v) => (typeof v === 'string' ? v : null)],
+    ['resourceType', 'resource_type', (v) => (typeof v === 'string' ? v.slice(0, 40) : null)],
+    ['resourceKey', 'resource_key', (v) => (typeof v === 'string' ? v.slice(0, 80) : null)],
   ]
   const updates: string[] = []
   const values: unknown[] = []
@@ -288,4 +294,64 @@ budgetsRouter.delete('/items/:itemId', async (req, res) => {
   if (!await assertWriter(user, lookup.rows[0].project_id, res)) return
   await pool.query(`DELETE FROM budget_line_items WHERE id = $1`, [itemId])
   res.json({ ok: true })
+})
+
+// All budget items relevant to a scene — scene-specific + shared
+// resources matched by location_tag / character / explicit junction.
+// Used by the SceneDetailModal. Returns sceneUsageCount so the UI
+// can show "Used in 17 scenes" badges on shared rows.
+budgetsRouter.get('/scenes/:sceneId/items', async (req, res) => {
+  const user = (req as typeof req & { user: SessionUser }).user
+  const sceneId = req.params.sceneId
+  const lookup = await pool.query<{ project_id: string }>(
+    `SELECT project_id FROM scenes WHERE id = $1`, [sceneId],
+  )
+  if (lookup.rows.length === 0) { res.status(404).json({ error: 'not_found' }); return }
+  if (!(await pool.query(
+    `SELECT 1 FROM projects p
+     LEFT JOIN project_members m ON m.project_id = p.id AND m.user_id = $1
+     WHERE p.id = $2 AND ($3 = 'admin' OR p.created_by = $1 OR m.user_id IS NOT NULL) LIMIT 1`,
+    [user.id, lookup.rows[0].project_id, user.role],
+  )).rows.length) {
+    res.status(403).json({ error: 'forbidden' }); return
+  }
+  const items = await getSceneBudgetItems(sceneId)
+  res.json({ items })
+})
+
+// "Make this item shared across every scene with the same
+// location/character/etc." A convenience for the SceneDetailModal:
+// the producer clicks "📍 Make shared with all scenes at this
+// location" and we set resource_type + resource_key based on the
+// scene context.
+budgetsRouter.post('/items/:itemId/promote-to-shared', async (req, res) => {
+  const user = (req as typeof req & { user: SessionUser }).user
+  const itemId = req.params.itemId
+  const sceneId = typeof req.body?.sceneId === 'string' ? req.body.sceneId : null
+  const kind = typeof req.body?.kind === 'string' ? req.body.kind : null
+  if (!sceneId || !kind) { res.status(400).json({ error: 'sceneId_and_kind_required' }); return }
+  const lookup = await pool.query<{ project_id: string }>(
+    `SELECT b.project_id FROM budget_line_items li
+       JOIN budget_accounts a ON a.id = li.account_id
+       JOIN budgets b ON b.id = a.budget_id WHERE li.id = $1`, [itemId],
+  )
+  if (lookup.rows.length === 0) { res.status(404).json({ error: 'not_found' }); return }
+  if (!await assertWriter(user, lookup.rows[0].project_id, res)) return
+
+  if (kind === 'LOCATION') {
+    const scn = await pool.query<{ location_tag: string | null }>(
+      `SELECT location_tag FROM scenes WHERE id = $1`, [sceneId],
+    )
+    const tag = scn.rows[0]?.location_tag
+    if (!tag) { res.status(400).json({ error: 'no_location_tag' }); return }
+    await pool.query(
+      `UPDATE budget_line_items
+         SET resource_type = 'LOCATION', resource_key = $1, scene_id = NULL
+       WHERE id = $2`,
+      [tag, itemId],
+    )
+    res.json({ ok: true, resourceType: 'LOCATION', resourceKey: tag })
+    return
+  }
+  res.status(400).json({ error: 'unsupported_kind', message: 'Only LOCATION promote supported for now.' })
 })

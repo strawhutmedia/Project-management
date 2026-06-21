@@ -660,6 +660,32 @@ export const api = {
   }>) => request<{ ok: true }>(`/api/budgets/items/${itemId}`, { method: 'PATCH', body: JSON.stringify(patch) }),
   deleteBudgetItem: (itemId: string) =>
     request<{ ok: true }>(`/api/budgets/items/${itemId}`, { method: 'DELETE' }),
+  sceneBudgetItems: (sceneId: string) =>
+    request<{
+      items: Array<{
+        id: string
+        code: string | null
+        description: string
+        amt: number
+        units: string | null
+        x: number
+        rate: number
+        vendor: string | null
+        datedAt: string | null
+        notes: string | null
+        position: number
+        total: number
+        resourceType: string | null
+        resourceKey: string | null
+        sceneUsageCount: number
+        isSceneOnly: boolean
+      }>
+    }>(`/api/budgets/scenes/${sceneId}/items`),
+  promoteItemToShared: (itemId: string, body: { sceneId: string; kind: 'LOCATION' | 'CHARACTER' }) =>
+    request<{ ok: true; resourceType: string; resourceKey: string }>(
+      `/api/budgets/items/${itemId}/promote-to-shared`,
+      { method: 'POST', body: JSON.stringify(body) },
+    ),
   // Stripboard
   stripboard: (projectId: string) =>
     request<ApiStripboard>(`/api/stripboard/projects/${projectId}`),
