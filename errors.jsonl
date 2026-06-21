@@ -95,3 +95,4 @@
 {"level":"error","ts":"2026-06-02T21:27:34.795Z","msg":"agent: workdir sync failed","data":{"error":"git_clone_failed: spawn_error"}}
 {"level":"error","ts":"2026-06-02T21:28:09.655Z","msg":"agent: workdir sync failed","data":{"error":"git_clone_failed: spawn_error"}}
 {"level":"error","ts":"2026-06-03T18:51:26.830Z","msg":"agent: claude call failed","data":{"conversationId":"0f76e7cb-c061-4a23-a977-a781b08448c5","iter":7,"error":"400 {\"type\":\"error\",\"error\":{\"type\":\"invalid_request_error\",\"message\":\"Your credit balance is too low to access the Anthropic API. Please go to Plans & Billing to upgrade or purchase credits.\"},\"request_id\":\"req_011Cbgq6ToB7Uy2H26N4fFMS\"}"}}
+{"level":"error","ts":"2026-06-21T04:44:05.519Z","msg":"auto-schedule propose failed","data":{"projectId":"12f53ed1-c6c7-4c11-8d7b-06d91744c9af","error":"Claude response was not valid JSON"}}
