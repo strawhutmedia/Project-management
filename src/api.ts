@@ -76,6 +76,36 @@ export type ApiMember = {
   project_role: 'admin' | 'user' | 'viewer' | null
 }
 
+export type ApiEpisodeCut = {
+  id: string
+  songId: string
+  label: string
+  description: string | null
+  dropboxPath: string | null
+  url: string | null
+  durationMs: number | null
+  status: 'in_review' | 'needs_changes' | 'approved' | 'superseded'
+  uploadedBy: string | null
+  uploadedByName: string | null
+  uploadedAt: string
+  position: number
+  noteCount: number
+  unresolvedCount: number
+}
+
+export type ApiCutNote = {
+  id: string
+  cutId: string
+  authorUserId: string | null
+  authorName: string | null
+  content: string
+  timestampMs: number | null
+  resolved: boolean
+  resolvedAt: string | null
+  resolvedBy: string | null
+  createdAt: string
+}
+
 export type ApiNotification = {
   id: string
   kind: string
@@ -974,6 +1004,28 @@ export const api = {
   transcriptTxtUrl: (id: string) => `/api/transcripts/${id}/txt`,
   transcriptMediaUrl: (id: string) =>
     request<{ url: string; fileName: string }>(`/api/transcripts/${id}/media-url`),
+
+  // Episode cuts + per-cut notes
+  episodeCuts: (songId: string) =>
+    request<{ cuts: ApiEpisodeCut[] }>(`/api/songs/${songId}/cuts`),
+  createEpisodeCut: (songId: string, body: { label: string; description?: string; dropboxPath?: string; url?: string; durationMs?: number }) =>
+    request<{ ok: true; id: string }>(`/api/songs/${songId}/cuts`, {
+      method: 'POST', body: JSON.stringify(body),
+    }),
+  updateEpisodeCut: (cutId: string, patch: Partial<{ label: string; description: string | null; dropboxPath: string | null; url: string | null; durationMs: number | null; status: 'in_review' | 'needs_changes' | 'approved' | 'superseded' }>) =>
+    request<{ ok: true }>(`/api/cuts/${cutId}`, { method: 'PATCH', body: JSON.stringify(patch) }),
+  deleteEpisodeCut: (cutId: string) =>
+    request<{ ok: true }>(`/api/cuts/${cutId}`, { method: 'DELETE' }),
+  cutNotes: (cutId: string) =>
+    request<{ notes: ApiCutNote[] }>(`/api/cuts/${cutId}/notes`),
+  createCutNote: (cutId: string, body: { content: string; timestampMs?: number | null }) =>
+    request<{ ok: true; id: string }>(`/api/cuts/${cutId}/notes`, {
+      method: 'POST', body: JSON.stringify(body),
+    }),
+  updateCutNote: (noteId: string, patch: { resolved?: boolean; content?: string }) =>
+    request<{ ok: true }>(`/api/notes/${noteId}`, { method: 'PATCH', body: JSON.stringify(patch) }),
+  deleteCutNote: (noteId: string) =>
+    request<{ ok: true }>(`/api/notes/${noteId}`, { method: 'DELETE' }),
 
   // Notifications
   notifications: () => request<{ notifications: ApiNotification[]; unreadCount: number }>('/api/notifications'),

@@ -17,6 +17,7 @@ import { socialsRouter } from './routes/socials'
 import { podcastsRouter } from './routes/podcasts'
 import { schedulerRouter as socialSchedulerRouter } from './routes/scheduler'
 import { showChatRouter } from './routes/show_chat'
+import { episodeCutsRouter } from './routes/episode_cuts'
 import { seedBackInYourArms } from './seeds/back_in_your_arms'
 import { ensureRyanIsPodcastEp } from './routes/projects'
 import { startScheduler } from './scheduler'
@@ -59,6 +60,7 @@ app.use('/api/scheduler', socialSchedulerRouter)
 // show_chat mounts on /api directly because its routes are
 // /api/projects/:id/chat — colocated with project-scoped endpoints.
 app.use('/api', showChatRouter)
+app.use('/api', episodeCutsRouter)
 
 const clientDir = path.resolve(process.cwd(), 'dist')
 logInfo('serving client from', { clientDir })

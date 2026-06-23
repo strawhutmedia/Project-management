@@ -6,6 +6,7 @@ import StagePill from '../components/StagePill'
 import InlineEdit from '../components/InlineEdit'
 import DropboxFolderPicker from '../components/DropboxFolderPicker'
 import AddLinkModal from '../components/AddLinkModal'
+import CutsSection from '../components/CutsSection'
 import MentionInput, { renderWithMentions } from '../components/MentionInput'
 import DueDateChip from '../components/DueDateChip'
 import TranscriptsSection from '../components/TranscriptsSection'
@@ -183,6 +184,7 @@ export default function SongPage() {
             const canWrite = myProjectRole === 'admin' || myProjectRole === 'user'
             return (
               <>
+                <CutsSection songId={song.id} songFolder={song.dropboxFolder} canWrite={canWrite} />
                 <TranscriptsSection projectId={song.projectId} songId={song.id} canWrite={canWrite}
                   projectRoot={song.projectRoot} />
                 <SocialsSection projectId={song.projectId} songId={song.id} canWrite={canWrite} members={members} showName={song.projectName} coverArtUrl={song.projectCoverArtUrl ?? null} />
