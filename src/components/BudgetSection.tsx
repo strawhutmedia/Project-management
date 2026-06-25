@@ -328,6 +328,7 @@ export default function BudgetSection({ projectId, isAdmin }: { projectId: strin
         {isAdmin && (
           <div className="flex items-center gap-2 flex-wrap">
             <PopulateCastButton projectId={projectId} onPopulated={load} />
+            <ConsolidateWardrobeButton projectId={projectId} onChanged={load} />
             <ResetPricesButton projectId={projectId} onReset={load} />
           </div>
         )}
@@ -1703,6 +1704,42 @@ function PopulateCastButton({
       title="Pull every character from the script into the CAST account, bucketed by appearance count"
     >
       {busy ? 'Populating…' : '👥 Populate cast from script'}
+    </button>
+  )
+}
+
+// "Consolidate wardrobe by character" — merges every per-scene
+// wardrobe row into one shared row per character. Once consolidated,
+// pricing the row once shows up on every scene that character is in.
+function ConsolidateWardrobeButton({
+  projectId,
+  onChanged,
+}: {
+  projectId: string
+  onChanged: () => void | Promise<void>
+}) {
+  const [busy, setBusy] = useState(false)
+  async function run() {
+    if (!confirm('Consolidate every per-scene wardrobe row into one shared row per character? Existing prices roll up (highest survives). Each character\'s consolidated row will then auto-show on every scene that character appears in.')) return
+    setBusy(true)
+    try {
+      const r = await api.consolidateWardrobe(projectId)
+      await onChanged()
+      alert(`✓ Consolidated ${r.consolidated} wardrobe rows into ${r.charactersFound} character${r.charactersFound === 1 ? '' : 's'}. Each shows up automatically in every scene that character is in.`)
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'failed')
+    } finally {
+      setBusy(false)
+    }
+  }
+  return (
+    <button
+      onClick={() => void run()}
+      disabled={busy}
+      className="text-[10px] uppercase tracking-wider text-stage-tracking border border-stage-tracking/40 rounded-full px-3 py-1.5 hover:bg-stage-tracking/10 disabled:opacity-50"
+      title="Roll up all per-scene wardrobe items into one shared row per character"
+    >
+      {busy ? 'Consolidating…' : '👔 Consolidate wardrobe by character'}
     </button>
   )
 }

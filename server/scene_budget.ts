@@ -74,6 +74,7 @@ export async function getSceneBudgetItems(sceneId: string): Promise<SceneBudgetI
               li.scene_id = $2
            OR (li.resource_type = 'LOCATION' AND li.resource_key = $3 AND $3 IS NOT NULL)
            OR (li.resource_type = 'CHARACTER' AND li.resource_key = ANY($4::text[]))
+           OR (li.resource_type = 'WARDROBE' AND li.resource_key = ANY($4::text[]))
            OR EXISTS (
              SELECT 1 FROM scene_budget_items sbi
              WHERE sbi.budget_line_item_id = li.id AND sbi.scene_id = $2
@@ -90,7 +91,7 @@ export async function getSceneBudgetItems(sceneId: string): Promise<SceneBudgetI
          (CASE
            WHEN li.resource_type = 'LOCATION' AND li.resource_key IS NOT NULL
              THEN (SELECT COUNT(*) FROM scenes WHERE project_id = $1 AND location_tag = li.resource_key)
-           WHEN li.resource_type = 'CHARACTER' AND li.resource_key IS NOT NULL
+           WHEN li.resource_type IN ('CHARACTER', 'WARDROBE') AND li.resource_key IS NOT NULL
              THEN (SELECT COUNT(*) FROM scenes WHERE project_id = $1
                      AND EXISTS (SELECT 1 FROM jsonb_array_elements_text(characters) c
                                   WHERE lower(regexp_replace(c, '[^a-zA-Z0-9]+', '_', 'g')) = li.resource_key))

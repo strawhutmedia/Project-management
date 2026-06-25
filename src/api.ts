@@ -716,6 +716,11 @@ export const api = {
         currentSection: string | null
       }>
     }>(`/api/projects/${projectId}/presence`),
+  consolidateWardrobe: (projectId: string) =>
+    request<{ ok: true; charactersFound: number; consolidated: number }>(
+      `/api/budgets/projects/${projectId}/consolidate-wardrobe`,
+      { method: 'POST' },
+    ),
   populateCastFromScript: (projectId: string) =>
     request<{ ok: true; count: number }>(
       `/api/budgets/projects/${projectId}/populate-cast-from-script`,

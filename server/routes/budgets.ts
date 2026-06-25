@@ -522,3 +522,108 @@ budgetsRouter.post('/projects/:projectId/populate-cast-from-script', async (req,
   logInfo('cast populated from script', { projectId, by: user.id, count: ranked.length })
   res.json({ ok: true, count: ranked.length })
 })
+
+// Wardrobe gets repeated across scenes whenever the same character
+// appears — Claude generates a per-scene wardrobe row for each, with
+// slightly different descriptions. This consolidates them: one row
+// per character, marked as a shared WARDROBE resource keyed on the
+// character's name. Any scene the character is in will see it.
+//
+// Logic:
+//   - Find every line item where code = 'WARDROBE' and the item isn't
+//     already a shared resource
+//   - Parse the character name from the description (the part before
+//     the first colon — Claude formats them as "JANE: white sundress")
+//   - Group by normalized character name
+//   - Pick the highest non-zero price as the rolled-up cost (so any
+//     pricing already entered survives)
+//   - Delete the per-scene rows in the group
+//   - Insert one new shared row per character with
+//     resource_type='WARDROBE', resource_key=<normalized name>
+//   - Characters without a colon prefix get bucketed as "Misc wardrobe"
+//
+// Returns counts so the producer knows what happened.
+budgetsRouter.post('/projects/:projectId/consolidate-wardrobe', async (req, res) => {
+  const user = (req as typeof req & { user: SessionUser }).user
+  const projectId = req.params.projectId
+  if (!await assertWriter(user, projectId, res)) return
+
+  const { rows } = await pool.query<{
+    id: string; description: string; amt: string; x: string; rate: string;
+    account_id: string;
+  }>(
+    `SELECT li.id, li.description, li.amt, li.x, li.rate, li.account_id
+     FROM budget_line_items li
+     JOIN budget_accounts a ON a.id = li.account_id
+     JOIN budgets b ON b.id = a.budget_id
+     WHERE b.project_id = $1 AND li.code = 'WARDROBE' AND li.resource_type IS NULL`,
+    [projectId],
+  )
+  if (rows.length === 0) {
+    res.json({ ok: true, consolidated: 0, charactersFound: 0 })
+    return
+  }
+
+  // Normalize the character name the same way scenes.characters
+  // entries get normalized in scene_budget.ts (lowercase, non-word
+  // chars to underscores).
+  function normalizeKey(s: string): string {
+    return s.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '').slice(0, 80)
+  }
+  function characterFromDescription(d: string): { display: string; key: string } {
+    const colonIdx = d.indexOf(':')
+    if (colonIdx > 0 && colonIdx < 60) {
+      const name = d.slice(0, colonIdx).trim()
+      return { display: name.toUpperCase(), key: normalizeKey(name) }
+    }
+    return { display: 'MISC', key: 'misc_wardrobe' }
+  }
+
+  type Group = { display: string; key: string; ids: string[]; maxCost: number; accountId: string }
+  const groups = new Map<string, Group>()
+  for (const r of rows) {
+    const { display, key } = characterFromDescription(r.description)
+    if (!key) continue
+    const cost = Number(r.amt) * Number(r.x) * Number(r.rate)
+    const existing = groups.get(key)
+    if (existing) {
+      existing.ids.push(r.id)
+      if (cost > existing.maxCost) existing.maxCost = cost
+    } else {
+      groups.set(key, { display, key, ids: [r.id], maxCost: cost, accountId: r.account_id })
+    }
+  }
+
+  let consolidated = 0
+  for (const g of groups.values()) {
+    if (g.ids.length < 2 && g.maxCost === 0) continue // skip singletons with no value
+    await pool.query(
+      `DELETE FROM budget_line_items WHERE id = ANY($1::uuid[])`,
+      [g.ids],
+    )
+    const posRes = await pool.query<{ next: number }>(
+      `SELECT COALESCE(MAX(position), 0) + 10 AS next FROM budget_line_items WHERE account_id = $1`,
+      [g.accountId],
+    )
+    await pool.query(
+      `INSERT INTO budget_line_items
+        (account_id, code, description, amt, x, rate, units, notes, resource_type, resource_key, position, created_by)
+       VALUES ($1, 'WARDROBE', $2, 1, 1, $3, 'Flat', $4, 'WARDROBE', $5, $6, $7)`,
+      [
+        g.accountId,
+        `${g.display} — full wardrobe (all scenes)`,
+        g.maxCost,
+        `Consolidated from ${g.ids.length} scene-level wardrobe item${g.ids.length === 1 ? '' : 's'}.`,
+        g.key,
+        posRes.rows[0].next,
+        user.id,
+      ],
+    )
+    consolidated += g.ids.length
+  }
+
+  markProjectDirty(projectId)
+  emit(projectId, 'budget.bulk.changed', { reason: 'consolidate_wardrobe' }, user.id)
+  logInfo('wardrobe consolidated', { projectId, by: user.id, characters: groups.size, deletedRows: consolidated })
+  res.json({ ok: true, charactersFound: groups.size, consolidated })
+})
