@@ -6,7 +6,7 @@ import { parseFdx } from '../fdx_parser'
 import { applyBackInYourArmsSchedule } from '../seeds/back_in_your_arms'
 import { runSceneBreakdown, runProjectBreakdown } from '../scene_breakdown'
 import { proposeSchedule, applyProposedSchedule, type ScheduleProposal } from '../auto_scheduler'
-import { publishProjectScript } from '../script_publisher'
+import { publishProjectScript, markProjectDirty } from '../script_publisher'
 import { logError, logInfo } from '../diag'
 
 export const stripboardRouter = Router()
@@ -361,6 +361,7 @@ stripboardRouter.patch('/scenes/:sceneId', async (req, res) => {
   if (updates.length === 0) { res.status(400).json({ error: 'no_fields' }); return }
   values.push(sceneId)
   await pool.query(`UPDATE scenes SET ${updates.join(', ')} WHERE id = $${i}`, values)
+  markProjectDirty(access.rows[0].project_id)
   res.json({ ok: true })
 })
 

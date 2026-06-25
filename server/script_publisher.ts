@@ -11,6 +11,30 @@ import { pool } from './db'
 import { writeStatusFile, statusReportingEnabled } from './github'
 import { logError, logInfo } from './diag'
 
+// Debounced publish queue. When a producer is rapidly editing budget
+// prices or shuffling scenes, we don't want a GitHub write per
+// keystroke. markProjectDirty schedules a publish 30 seconds out;
+// subsequent calls within that window reset the timer so only ONE
+// publish fires after the producer pauses. Per-project — different
+// projects don't interfere.
+const pendingPublishes = new Map<string, NodeJS.Timeout>()
+const DEBOUNCE_MS = 30_000
+
+export function markProjectDirty(projectId: string): void {
+  const existing = pendingPublishes.get(projectId)
+  if (existing) clearTimeout(existing)
+  const timer = setTimeout(() => {
+    pendingPublishes.delete(projectId)
+    void publishProjectScript(projectId).catch((err) => {
+      logError('debounced publish failed', {
+        projectId,
+        error: err instanceof Error ? err.message : String(err),
+      })
+    })
+  }, DEBOUNCE_MS)
+  pendingPublishes.set(projectId, timer)
+}
+
 export async function publishProjectScript(projectId: string): Promise<{ ok: boolean; path?: string; error?: string }> {
   if (!statusReportingEnabled()) {
     logInfo('publishProjectScript: skipped, no GITHUB_TOKEN', { projectId })

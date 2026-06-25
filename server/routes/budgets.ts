@@ -4,6 +4,7 @@ import { requireUser, type SessionUser } from '../auth'
 import { assertWriter } from '../permissions'
 import { STUDIOBINDER_ACCOUNTS } from '../budget_template'
 import { getSceneBudgetItems } from '../scene_budget'
+import { markProjectDirty } from '../script_publisher'
 import { logInfo } from '../diag'
 
 export const budgetsRouter = Router()
@@ -239,6 +240,7 @@ budgetsRouter.post('/accounts/:accountId/items', async (req, res) => {
       user.id,
     ],
   )
+  markProjectDirty(lookup.rows[0].project_id)
   res.json({ id: rows[0].id })
 })
 
@@ -279,6 +281,7 @@ budgetsRouter.patch('/items/:itemId', async (req, res) => {
   if (updates.length === 0) { res.status(400).json({ error: 'no_fields' }); return }
   values.push(itemId)
   await pool.query(`UPDATE budget_line_items SET ${updates.join(', ')} WHERE id = $${i}`, values)
+  markProjectDirty(lookup.rows[0].project_id)
   res.json({ ok: true })
 })
 
@@ -293,6 +296,7 @@ budgetsRouter.delete('/items/:itemId', async (req, res) => {
   if (lookup.rows.length === 0) { res.status(404).json({ error: 'not_found' }); return }
   if (!await assertWriter(user, lookup.rows[0].project_id, res)) return
   await pool.query(`DELETE FROM budget_line_items WHERE id = $1`, [itemId])
+  markProjectDirty(lookup.rows[0].project_id)
   res.json({ ok: true })
 })
 
@@ -350,6 +354,7 @@ budgetsRouter.post('/items/:itemId/promote-to-shared', async (req, res) => {
        WHERE id = $2`,
       [tag, itemId],
     )
+    markProjectDirty(lookup.rows[0].project_id)
     res.json({ ok: true, resourceType: 'LOCATION', resourceKey: tag })
     return
   }

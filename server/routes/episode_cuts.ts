@@ -10,6 +10,7 @@ import { Router } from 'express'
 import { pool } from '../db'
 import { requireUser, type SessionUser } from '../auth'
 import { assertWriter } from '../permissions'
+import { markProjectDirty } from '../script_publisher'
 import { logInfo } from './../diag'
 
 export const episodeCutsRouter = Router()
@@ -103,6 +104,7 @@ episodeCutsRouter.post('/songs/:songId/cuts', async (req, res) => {
     [songId, label, description, dropboxPath, url, durationMs, user.id],
   )
   logInfo('episode cut created', { songId, cutId: rows[0].id, label, by: user.id })
+  markProjectDirty(projectId)
   res.json({ ok: true, id: rows[0].id })
 })
 
@@ -142,6 +144,7 @@ episodeCutsRouter.patch('/cuts/:cutId', async (req, res) => {
   if (updates.length === 0) { res.status(400).json({ error: 'no_fields' }); return }
   values.push(cutId)
   await pool.query(`UPDATE episode_cuts SET ${updates.join(', ')} WHERE id = $${i}`, values)
+  markProjectDirty(lookup.rows[0].project_id)
   res.json({ ok: true })
 })
 
@@ -150,14 +153,16 @@ episodeCutsRouter.patch('/cuts/:cutId', async (req, res) => {
 episodeCutsRouter.delete('/cuts/:cutId', async (req, res) => {
   const user = (req as typeof req & { user: SessionUser }).user
   const cutId = req.params.cutId
-  const { rows } = await pool.query<{ uploaded_by: string | null }>(
-    `SELECT uploaded_by FROM episode_cuts WHERE id = $1`, [cutId],
+  const { rows } = await pool.query<{ uploaded_by: string | null; project_id: string }>(
+    `SELECT c.uploaded_by, s.project_id FROM episode_cuts c
+     JOIN songs s ON s.id = c.song_id WHERE c.id = $1`, [cutId],
   )
   if (rows.length === 0) { res.status(404).json({ error: 'not_found' }); return }
   if (user.role !== 'admin' && rows[0].uploaded_by !== user.id) {
     res.status(403).json({ error: 'forbidden' }); return
   }
   await pool.query(`DELETE FROM episode_cuts WHERE id = $1`, [cutId])
+  markProjectDirty(rows[0].project_id)
   res.json({ ok: true })
 })
 
@@ -221,6 +226,7 @@ episodeCutsRouter.post('/cuts/:cutId/notes', async (req, res) => {
      VALUES ($1, $2, $3, $4) RETURNING id`,
     [cutId, user.id, content, timestampMs],
   )
+  markProjectDirty(lookup.rows[0].project_id)
   res.json({ ok: true, id: rows[0].id })
 })
 
@@ -258,6 +264,7 @@ episodeCutsRouter.patch('/notes/:noteId', async (req, res) => {
       [req.body.content.slice(0, 3000), noteId],
     )
   }
+  markProjectDirty(lookup.rows[0].project_id)
   res.json({ ok: true })
 })
 
@@ -274,5 +281,6 @@ episodeCutsRouter.delete('/notes/:noteId', async (req, res) => {
     res.status(403).json({ error: 'forbidden' }); return
   }
   await pool.query(`DELETE FROM cut_notes WHERE id = $1`, [noteId])
+  markProjectDirty(lookup.rows[0].project_id)
   res.json({ ok: true })
 })
