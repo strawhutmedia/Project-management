@@ -895,3 +895,28 @@ projectsRouter.get('/:id/presence', async (req, res) => {
     })),
   })
 })
+
+// Real-time event stream for a project. Frontend opens an EventSource
+// and gets per-row patches as they happen — no polling, no flicker.
+import { addListener as addEventsListener } from '../events'
+projectsRouter.get('/:id/events', async (req, res) => {
+  const user = (req as typeof req & { user: SessionUser }).user
+  const projectId = req.params.id
+  if (await getProjectRole(user.id, user.role, projectId) === null) {
+    res.status(403).json({ error: 'forbidden' }); return
+  }
+  res.setHeader('Content-Type', 'text/event-stream')
+  res.setHeader('Cache-Control', 'no-cache, no-transform')
+  res.setHeader('Connection', 'keep-alive')
+  res.setHeader('X-Accel-Buffering', 'no')
+  res.flushHeaders?.()
+  res.write(`event: connected\ndata: {"userId":"${user.id}"}\n\n`)
+  const cleanup = addEventsListener(projectId, { userId: user.id, res })
+  const heartbeat = setInterval(() => {
+    try { res.write(`: heartbeat\n\n`) } catch {}
+  }, 25_000)
+  req.on('close', () => {
+    clearInterval(heartbeat)
+    cleanup()
+  })
+})

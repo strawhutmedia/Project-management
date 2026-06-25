@@ -5,7 +5,48 @@ import { assertWriter } from '../permissions'
 import { STUDIOBINDER_ACCOUNTS } from '../budget_template'
 import { getSceneBudgetItems } from '../scene_budget'
 import { markProjectDirty } from '../script_publisher'
+import { emit } from '../events'
 import { logInfo } from '../diag'
+
+// After any budget mutation, fetch the canonical row state and emit it
+// over SSE so connected clients can patch their local state without a
+// full refetch. Returns the item shape used by the front-end.
+async function emitItemUpdated(projectId: string, itemId: string, byUserId: string) {
+  const { rows } = await pool.query(
+    `SELECT li.id, li.account_id, li.scene_id, li.code, li.description, li.amt,
+            li.units, li.x, li.rate, li.vendor, li.dated_at, li.notes, li.position,
+            li.resource_type, li.resource_key,
+            s.number AS scene_number
+     FROM budget_line_items li
+     LEFT JOIN scenes s ON s.id = li.scene_id
+     WHERE li.id = $1`,
+    [itemId],
+  )
+  if (rows.length === 0) return
+  const it = rows[0]
+  const total = Number(it.amt) * Number(it.x) * Number(it.rate)
+  emit(projectId, 'budget.item.updated', {
+    item: {
+      id: it.id,
+      accountId: it.account_id,
+      code: it.code,
+      description: it.description,
+      amt: Number(it.amt),
+      units: it.units,
+      x: Number(it.x),
+      rate: Number(it.rate),
+      vendor: it.vendor,
+      datedAt: it.dated_at,
+      notes: it.notes,
+      position: it.position,
+      sceneId: it.scene_id,
+      sceneNumber: it.scene_number,
+      resourceType: it.resource_type,
+      resourceKey: it.resource_key,
+      total,
+    },
+  }, byUserId)
+}
 
 export const budgetsRouter = Router()
 budgetsRouter.use(requireUser)
@@ -241,6 +282,7 @@ budgetsRouter.post('/accounts/:accountId/items', async (req, res) => {
     ],
   )
   markProjectDirty(lookup.rows[0].project_id)
+  void emitItemUpdated(lookup.rows[0].project_id, rows[0].id, user.id)
   res.json({ id: rows[0].id })
 })
 
@@ -282,6 +324,7 @@ budgetsRouter.patch('/items/:itemId', async (req, res) => {
   values.push(itemId)
   await pool.query(`UPDATE budget_line_items SET ${updates.join(', ')} WHERE id = $${i}`, values)
   markProjectDirty(lookup.rows[0].project_id)
+  void emitItemUpdated(lookup.rows[0].project_id, itemId, user.id)
   res.json({ ok: true })
 })
 
@@ -297,6 +340,7 @@ budgetsRouter.delete('/items/:itemId', async (req, res) => {
   if (!await assertWriter(user, lookup.rows[0].project_id, res)) return
   await pool.query(`DELETE FROM budget_line_items WHERE id = $1`, [itemId])
   markProjectDirty(lookup.rows[0].project_id)
+  emit(lookup.rows[0].project_id, 'budget.item.deleted', { itemId }, user.id)
   res.json({ ok: true })
 })
 
@@ -390,6 +434,7 @@ budgetsRouter.post('/projects/:projectId/reset-prices', async (req, res) => {
     [projectId, validCats],
   )
   markProjectDirty(projectId)
+  emit(projectId, 'budget.bulk.changed', { reason: 'reset_prices' }, user.id)
   logInfo('budget prices reset', { projectId, by: user.id, kept: validCats, zeroed: Number(result.rows[0].count) })
   res.json({ ok: true, zeroed: Number(result.rows[0].count), keptCategories: validCats })
 })

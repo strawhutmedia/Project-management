@@ -6,6 +6,7 @@ import {
   type ApiBudgetLineItem,
   type BudgetCategory,
 } from '../api'
+import { useProjectEvents } from '../useProjectEvents'
 
 const CATEGORY_LABEL: Record<BudgetCategory, string> = {
   above_line: 'Above the Line',
@@ -107,6 +108,58 @@ export default function BudgetSection({ projectId, isAdmin }: { projectId: strin
     document.addEventListener('visibilitychange', onVisible)
     return () => document.removeEventListener('visibilitychange', onVisible)
   }, [projectId])
+
+  // Real-time updates via SSE. Each event patches the local budget
+  // state precisely — only the affected ItemRow re-renders, the rest
+  // of the table stays untouched (no flicker). Events from the
+  // current user are filtered out in the hook itself so the
+  // optimistic local state isn't clobbered.
+  useProjectEvents(projectId, (event) => {
+    if (event.type === 'budget.item.updated') {
+      const newItem = event.data.item as (ApiBudgetLineItem & { accountId: string }) | undefined
+      if (!newItem || !newItem.id) return
+      setBudget((b) => {
+        if (!b) return b
+        let touched = false
+        const accounts = b.accounts.map((acc) => {
+          if (acc.id !== newItem.accountId) {
+            // Item might be moving accounts — also remove from previous account if present
+            const stripped = acc.lineItems.filter((li) => li.id !== newItem.id)
+            if (stripped.length !== acc.lineItems.length) {
+              touched = true
+              return { ...acc, lineItems: stripped }
+            }
+            return acc
+          }
+          touched = true
+          const existing = acc.lineItems.find((li) => li.id === newItem.id)
+          if (existing) {
+            return { ...acc, lineItems: acc.lineItems.map((li) => (li.id === newItem.id ? newItem : li)) }
+          }
+          return { ...acc, lineItems: [...acc.lineItems, newItem] }
+        })
+        return touched ? { ...b, accounts } : b
+      })
+    } else if (event.type === 'budget.item.deleted') {
+      const itemId = event.data.itemId as string
+      if (!itemId) return
+      setBudget((b) => {
+        if (!b) return b
+        return {
+          ...b,
+          accounts: b.accounts.map((acc) => ({
+            ...acc,
+            lineItems: acc.lineItems.filter((li) => li.id !== itemId),
+          })),
+        }
+      })
+    } else if (event.type === 'budget.bulk.changed') {
+      // Big change (reset, breakdown finished) — full reload is fine
+      // since user wasn't necessarily in the middle of editing one
+      // specific row.
+      void load()
+    }
+  })
 
   if (loading) {
     return (
