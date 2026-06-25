@@ -690,6 +690,11 @@ export const api = {
   }>) => request<{ ok: true }>(`/api/budgets/items/${itemId}`, { method: 'PATCH', body: JSON.stringify(patch) }),
   deleteBudgetItem: (itemId: string) =>
     request<{ ok: true }>(`/api/budgets/items/${itemId}`, { method: 'DELETE' }),
+  resetBudgetPrices: (projectId: string, keepCategories: BudgetCategory[]) =>
+    request<{ ok: true; zeroed: number; keptCategories: string[] }>(
+      `/api/budgets/projects/${projectId}/reset-prices`,
+      { method: 'POST', body: JSON.stringify({ keepCategories }) },
+    ),
   sceneBudgetItems: (sceneId: string) =>
     request<{
       items: Array<{

@@ -360,3 +360,36 @@ budgetsRouter.post('/items/:itemId/promote-to-shared', async (req, res) => {
   }
   res.status(400).json({ error: 'unsupported_kind', message: 'Only LOCATION promote supported for now.' })
 })
+
+// Zero out prices on every budget item in a project — gives the
+// producer a clean plate to start from. Optionally preserves prices
+// on items in specific categories (e.g. keepCategories=['above_line']
+// to keep cast/director fees the team already negotiated).
+// Descriptions, scene attachments, and resource links stay intact.
+budgetsRouter.post('/projects/:projectId/reset-prices', async (req, res) => {
+  const user = (req as typeof req & { user: SessionUser }).user
+  const projectId = req.params.projectId
+  if (!await assertWriter(user, projectId, res)) return
+  const keepRaw = req.body?.keepCategories
+  const keepCategories = Array.isArray(keepRaw)
+    ? keepRaw.filter((c): c is string => typeof c === 'string')
+    : []
+  const validCats = keepCategories.filter((c) => ['above_line', 'production', 'post', 'other'].includes(c))
+  const result = await pool.query<{ count: string }>(
+    `WITH updated AS (
+       UPDATE budget_line_items li
+         SET amt = 0, x = 1, rate = 0
+       FROM budget_accounts a, budgets b
+       WHERE li.account_id = a.id
+         AND a.budget_id = b.id
+         AND b.project_id = $1
+         AND a.category <> ALL($2::text[])
+       RETURNING li.id
+     )
+     SELECT COUNT(*)::text AS count FROM updated`,
+    [projectId, validCats],
+  )
+  markProjectDirty(projectId)
+  logInfo('budget prices reset', { projectId, by: user.id, kept: validCats, zeroed: Number(result.rows[0].count) })
+  res.json({ ok: true, zeroed: Number(result.rows[0].count), keptCategories: validCats })
+})

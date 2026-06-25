@@ -250,6 +250,9 @@ export default function BudgetSection({ projectId, isAdmin }: { projectId: strin
             🗂 Categories
           </button>
         </div>
+        {isAdmin && (
+          <ResetPricesButton projectId={projectId} onReset={load} />
+        )}
         {viewMode === 'categories' && (
           <div className="flex gap-2">
             <button
@@ -1455,5 +1458,96 @@ function CellInput({
         align === 'right' ? 'text-right font-mono' : ''
       } ${mono ? 'font-mono' : ''}`}
     />
+  )
+}
+
+// "Reset all prices to $0" — gives the producer a clean plate before
+// a budget meeting. Modal asks which (if any) categories to PRESERVE
+// existing prices on, so e.g. cast deals already negotiated stay put.
+function ResetPricesButton({
+  projectId,
+  onReset,
+}: {
+  projectId: string
+  onReset: () => void | Promise<void>
+}) {
+  const [open, setOpen] = useState(false)
+  const [keepAboveLine, setKeepAboveLine] = useState(false)
+  const [keepProduction, setKeepProduction] = useState(false)
+  const [keepPost, setKeepPost] = useState(false)
+  const [keepOther, setKeepOther] = useState(false)
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  async function reset() {
+    setBusy(true); setError(null)
+    const keep: BudgetCategory[] = []
+    if (keepAboveLine) keep.push('above_line')
+    if (keepProduction) keep.push('production')
+    if (keepPost) keep.push('post')
+    if (keepOther) keep.push('other')
+    try {
+      const r = await api.resetBudgetPrices(projectId, keep)
+      await onReset()
+      setOpen(false)
+      alert(`✓ Reset ${r.zeroed} item${r.zeroed === 1 ? '' : 's'} to $0.${keep.length > 0 ? ` Kept prices in: ${keep.join(', ')}.` : ''}`)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'failed')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <>
+      <button
+        onClick={() => setOpen(true)}
+        className="text-[10px] uppercase tracking-wider text-urgent border border-urgent/40 rounded-full px-3 py-1.5 hover:bg-urgent/10"
+        title="Zero out every line item — descriptions stay, just the dollar amounts go to $0"
+      >
+        ↺ Reset all prices
+      </button>
+      {open && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => setOpen(false)}>
+          <div onClick={(e) => e.stopPropagation()} className="w-full max-w-md rounded-2xl border border-line bg-panel shadow-2xl">
+            <div className="border-b border-line px-5 py-4">
+              <div className="text-[10px] uppercase tracking-wider text-urgent font-bold mb-1">⚠️ Reset all prices to $0</div>
+              <p className="text-[11px] text-muted">
+                Every line item's amount × multiplier × rate gets set to zero.
+                Descriptions, scene attachments, vendors, and notes stay. Pick
+                any categories you want to PRESERVE prices in.
+              </p>
+            </div>
+            <div className="px-5 py-4 space-y-2 text-sm">
+              {([
+                ['above_line', 'Above the Line', keepAboveLine, setKeepAboveLine, 'cast, director, producer fees you\'ve already negotiated'],
+                ['production', 'Production', keepProduction, setKeepProduction, 'crew, equipment, locations'],
+                ['post', 'Post', keepPost, setKeepPost, 'editing, music, color, sound'],
+                ['other', 'Other', keepOther, setKeepOther, 'publicity, legal, insurance'],
+              ] as const).map(([key, label, val, set, hint]) => (
+                <label key={key} className="flex items-start gap-2 cursor-pointer">
+                  <input type="checkbox" checked={val} onChange={(e) => set(e.target.checked)} className="mt-1" />
+                  <div>
+                    <div className="text-text font-bold">Keep {label}</div>
+                    <div className="text-[10px] text-muted">{hint}</div>
+                  </div>
+                </label>
+              ))}
+              {error && <div className="rounded-lg border border-urgent/40 bg-urgent/10 text-urgent text-xs px-3 py-2">{error}</div>}
+            </div>
+            <div className="border-t border-line px-5 py-4 flex items-center justify-end gap-2">
+              <button onClick={() => setOpen(false)} className="text-[10px] uppercase tracking-wider text-muted hover:text-text border border-line rounded-full px-3 py-1.5">Cancel</button>
+              <button
+                onClick={() => void reset()}
+                disabled={busy}
+                className="rounded-full bg-urgent text-white font-bold uppercase tracking-wider text-[10px] px-4 py-1.5 disabled:opacity-50"
+              >
+                {busy ? 'Resetting…' : 'Reset prices'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
   )
 }
