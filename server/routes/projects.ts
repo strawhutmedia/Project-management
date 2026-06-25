@@ -5,6 +5,7 @@ import { getProjectRole, assertWriter, assertProjectAdmin } from '../permissions
 import { fetchPodcastFeed } from '../rss'
 import { hasAnthropicKey, generateBrandProfile } from '../anthropic'
 import { listFolder as dropboxListFolder } from '../dropbox'
+import { markProjectDirty } from '../script_publisher'
 import { logInfo, logError } from '../diag'
 
 const IMAGE_EXT = /\.(jpe?g|png|webp|gif|heic)$/i
@@ -212,6 +213,7 @@ projectsRouter.post('/:id/songs', async (req, res) => {
     [projectId, title.slice(0, 200), subtitle, position, dropboxFolder],
   )
   logInfo('song created', { id: rows[0].id, projectId, title })
+  markProjectDirty(projectId)
   res.json({ song: rows[0] })
 })
 
@@ -467,6 +469,7 @@ projectsRouter.patch('/:id', async (req, res) => {
   }
   values.push(projectId)
   await pool.query(`UPDATE projects SET ${updates.join(', ')} WHERE id = $${i}`, values)
+  markProjectDirty(projectId)
   res.json({ ok: true })
 })
 
@@ -618,6 +621,7 @@ projectsRouter.post('/:id/members', async (req, res) => {
      ON CONFLICT (project_id, user_id) DO UPDATE SET role = EXCLUDED.role`,
     [projectId, userId, role],
   )
+  markProjectDirty(projectId)
   res.json({ ok: true })
 })
 
@@ -634,6 +638,7 @@ projectsRouter.patch('/:id/members/:userId', async (req, res) => {
      ON CONFLICT (project_id, user_id) DO UPDATE SET role = EXCLUDED.role`,
     [projectId, req.params.userId, role],
   )
+  markProjectDirty(projectId)
   res.json({ ok: true })
 })
 
@@ -659,6 +664,7 @@ projectsRouter.delete('/:id/members/:userId', async (req, res) => {
     `DELETE FROM project_members WHERE project_id = $1 AND user_id = $2`,
     [projectId, req.params.userId],
   )
+  markProjectDirty(projectId)
   res.json({ ok: true })
 })
 

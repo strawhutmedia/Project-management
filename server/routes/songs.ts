@@ -2,8 +2,25 @@ import { Router } from 'express'
 import { pool } from '../db'
 import { requireUser, type SessionUser } from '../auth'
 import { assertSongWriter, getSongRole } from '../permissions'
+import { markProjectDirty } from '../script_publisher'
 import { logInfo } from '../diag'
 import { findMentionedUsers, notify } from '../notifications'
+
+// Mark the parent project dirty (debounced status branch publish) after
+// any mutation on this song / task / comment / link. Lets Claude see
+// the latest state when chatting.
+async function markSongDirty(songId: string) {
+  const { rows } = await pool.query<{ project_id: string }>(
+    `SELECT project_id FROM songs WHERE id = $1`, [songId],
+  )
+  if (rows[0]) markProjectDirty(rows[0].project_id)
+}
+async function markTaskDirty(taskId: string) {
+  const { rows } = await pool.query<{ project_id: string }>(
+    `SELECT s.project_id FROM tasks t JOIN songs s ON s.id = t.song_id WHERE t.id = $1`, [taskId],
+  )
+  if (rows[0]) markProjectDirty(rows[0].project_id)
+}
 
 export const songsRouter = Router()
 songsRouter.use(requireUser)
@@ -307,6 +324,7 @@ songsRouter.patch('/:id', async (req, res) => {
     // non-critical
   }
 
+  await markSongDirty(req.params.id)
   res.json({ ok: true })
 })
 
@@ -371,6 +389,7 @@ songsRouter.post('/:id/tasks', async (req, res) => {
     // non-critical
   }
 
+  await markSongDirty(req.params.id)
   res.json({ task })
 })
 
@@ -446,6 +465,7 @@ songsRouter.patch('/tasks/:taskId', async (req, res) => {
     }
   }
 
+  await markTaskDirty(req.params.taskId)
   res.json({ ok: true })
 })
 
@@ -458,7 +478,9 @@ songsRouter.delete('/tasks/:taskId', async (req, res) => {
     return
   }
   if (!await assertSongWriter(user, accessRes.rows[0].song_id, res)) return
+  const songIdForDirty = accessRes.rows[0].song_id
   await pool.query(`DELETE FROM tasks WHERE id = $1`, [taskId])
+  await markSongDirty(songIdForDirty)
   res.json({ ok: true })
 })
 
@@ -506,6 +528,7 @@ songsRouter.post('/:id/comments', async (req, res) => {
     // non-critical
   }
 
+  await markSongDirty(req.params.id)
   res.json({
     comment: {
       id: c.id,
@@ -535,6 +558,7 @@ songsRouter.delete('/comments/:commentId', async (req, res) => {
     return
   }
   await pool.query(`DELETE FROM comments WHERE id = $1`, [commentId])
+  await markSongDirty(c.song_id)
   res.json({ ok: true })
 })
 
@@ -572,6 +596,7 @@ songsRouter.post('/:id/links', async (req, res) => {
      RETURNING id, label, url, created_at`,
     [songId, label.trim().slice(0, 120), url.trim().slice(0, 2000), user.id],
   )
+  await markSongDirty(songId)
   res.json({ link: rows[0] })
 })
 
@@ -602,6 +627,7 @@ songsRouter.patch('/links/:linkId', async (req, res) => {
   }
   values.push(linkId)
   await pool.query(`UPDATE links SET ${updates.join(', ')} WHERE id = $${i}`, values)
+  await markSongDirty(rows[0].song_id)
   res.json({ ok: true })
 })
 
@@ -615,5 +641,6 @@ songsRouter.delete('/links/:linkId', async (req, res) => {
   }
   if (!await assertSongWriter(user, rows[0].song_id, res)) return
   await pool.query(`DELETE FROM links WHERE id = $1`, [linkId])
+  await markSongDirty(rows[0].song_id)
   res.json({ ok: true })
 })
