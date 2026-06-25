@@ -414,9 +414,15 @@ budgetsRouter.get('/shoot-days/:shootDayId/items', async (req, res) => {
   })
 })
 
-// Quick-add a day-level item without picking an account — auto-routes
-// to the "Day Costs" account (created lazily), categorized as
-// production. Description + cost are the only required fields.
+// Quick-add a day-level item. Bucketed by code:
+//   CAST       — cast on call that day (actor day rates)
+//   CREW       — crew on call (positions like DP, AD, mixer)
+//   EQUIPMENT  — camera/grip/electric/sound rentals
+//   LOCATION   — location fees for this specific shoot day
+//   CATERING   — meals
+//   OTHER      — transport, parking, base camp, etc.
+// All routed into the lazy "Day Costs" account so they roll up into
+// Production target.
 budgetsRouter.post('/shoot-days/:shootDayId/quick-add', async (req, res) => {
   const user = (req as typeof req & { user: SessionUser }).user
   const shootDayId = req.params.shootDayId
@@ -427,6 +433,8 @@ budgetsRouter.post('/shoot-days/:shootDayId/quick-add', async (req, res) => {
   if (!await assertWriter(user, lookup.rows[0].project_id, res)) return
   const description = String(req.body?.description ?? '').trim().slice(0, 200)
   const cost = Number(req.body?.cost) || 0
+  const codeRaw = String(req.body?.code ?? 'OTHER').toUpperCase()
+  const code = ['CAST', 'CREW', 'EQUIPMENT', 'LOCATION', 'CATERING', 'OTHER'].includes(codeRaw) ? codeRaw : 'OTHER'
   if (!description) { res.status(400).json({ error: 'description_required' }); return }
 
   // Find or lazily create the budget + "Day Costs" account
@@ -461,13 +469,89 @@ budgetsRouter.post('/shoot-days/:shootDayId/quick-add', async (req, res) => {
   )
   const { rows } = await pool.query<{ id: string }>(
     `INSERT INTO budget_line_items
-       (account_id, shoot_day_id, description, amt, x, rate, units, position, created_by)
-     VALUES ($1, $2, $3, 1, 1, $4, 'Flat', $5, $6) RETURNING id`,
-    [accountId, shootDayId, description, cost, posRes.rows[0].next, user.id],
+       (account_id, shoot_day_id, code, description, amt, x, rate, units, position, created_by)
+     VALUES ($1, $2, $3, $4, 1, 1, $5, 'Flat', $6, $7) RETURNING id`,
+    [accountId, shootDayId, code, description, cost, posRes.rows[0].next, user.id],
   )
   markProjectDirty(lookup.rows[0].project_id)
   void emitItemUpdated(lookup.rows[0].project_id, rows[0].id, user.id)
   res.json({ ok: true, id: rows[0].id })
+})
+
+// Auto-add one CAST row per character appearing in the scenes
+// scheduled for this shoot day. Each row gets the character name as
+// description, code='CAST', amount=0 — producer fills in the day
+// rate. Skips characters already represented as a day cost row to
+// keep idempotent.
+budgetsRouter.post('/shoot-days/:shootDayId/auto-add-cast', async (req, res) => {
+  const user = (req as typeof req & { user: SessionUser }).user
+  const shootDayId = req.params.shootDayId
+  const lookup = await pool.query<{ project_id: string }>(
+    `SELECT project_id FROM shoot_days WHERE id = $1`, [shootDayId],
+  )
+  if (lookup.rows.length === 0) { res.status(404).json({ error: 'not_found' }); return }
+  if (!await assertWriter(user, lookup.rows[0].project_id, res)) return
+
+  const characters = await pool.query<{ name: string }>(
+    `SELECT DISTINCT jsonb_array_elements_text(characters) AS name
+     FROM scenes WHERE shoot_day_id = $1`,
+    [shootDayId],
+  )
+  const names = characters.rows.map((r) => r.name).filter(Boolean)
+  if (names.length === 0) {
+    res.json({ ok: true, added: 0, message: 'No scenes scheduled on this day yet.' }); return
+  }
+
+  const existing = await pool.query<{ description: string }>(
+    `SELECT description FROM budget_line_items
+     WHERE shoot_day_id = $1 AND code = 'CAST'`,
+    [shootDayId],
+  )
+  const existingNames = new Set(existing.rows.map((r) => r.description.toUpperCase()))
+  const newNames = names.filter((n) => !existingNames.has(n.toUpperCase()))
+
+  if (newNames.length === 0) {
+    res.json({ ok: true, added: 0, message: 'All characters on call already have cast rows.' }); return
+  }
+
+  // Find / create Day Costs account
+  const budget = await pool.query<{ id: string }>(
+    `SELECT id FROM budgets WHERE project_id = $1`, [lookup.rows[0].project_id],
+  )
+  if (budget.rows.length === 0) { res.status(400).json({ error: 'no_budget' }); return }
+  let acct = await pool.query<{ id: string }>(
+    `SELECT id FROM budget_accounts WHERE budget_id = $1 AND code = '__day_costs__' LIMIT 1`,
+    [budget.rows[0].id],
+  )
+  let accountId: string
+  if (acct.rows.length === 0) {
+    const posRes = await pool.query<{ next: number }>(
+      `SELECT COALESCE(MAX(position), 0) + 10 AS next FROM budget_accounts WHERE budget_id = $1`,
+      [budget.rows[0].id],
+    )
+    const created = await pool.query<{ id: string }>(
+      `INSERT INTO budget_accounts (budget_id, code, name, category, position)
+       VALUES ($1, '__day_costs__', 'Day Costs', 'production', $2) RETURNING id`,
+      [budget.rows[0].id, posRes.rows[0].next],
+    )
+    accountId = created.rows[0].id
+  } else {
+    accountId = acct.rows[0].id
+  }
+
+  let position = 0
+  for (const name of newNames) {
+    position += 10
+    await pool.query(
+      `INSERT INTO budget_line_items
+        (account_id, shoot_day_id, code, description, amt, x, rate, units, position, created_by)
+       VALUES ($1, $2, 'CAST', $3, 1, 1, 0, 'Day rate', $4, $5)`,
+      [accountId, shootDayId, name, position, user.id],
+    )
+  }
+  markProjectDirty(lookup.rows[0].project_id)
+  emit(lookup.rows[0].project_id, 'budget.bulk.changed', { reason: 'auto_cast' }, user.id)
+  res.json({ ok: true, added: newNames.length, characters: newNames })
 })
 
 // "Make this item shared across every scene with the same

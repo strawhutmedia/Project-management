@@ -897,6 +897,21 @@ function LegendChip({ label, className }: { label: string; className: string }) 
 // Day-level budget items: equipment rental, crew rate, catering, base
 // camp, etc. — costs that belong to a whole shoot day rather than a
 // single scene. Collapsed by default; click the header to expand.
+// Per-day budget bucketed by category. The day is the primary unit
+// of cost — cast, crew, equipment, locations, catering all rolled
+// up per-day, with cast auto-populated from the day's scheduled
+// scenes.
+type DayCostItem = { id: string; description: string; total: number; amt: number; rate: number; code: string | null }
+
+const DAY_BUCKETS: Array<{ code: string; label: string; icon: string }> = [
+  { code: 'CAST',      label: 'Cast on call',  icon: '🎭' },
+  { code: 'CREW',      label: 'Crew',          icon: '👷' },
+  { code: 'EQUIPMENT', label: 'Equipment',     icon: '🎥' },
+  { code: 'LOCATION',  label: 'Locations',     icon: '📍' },
+  { code: 'CATERING',  label: 'Catering',      icon: '🍽' },
+  { code: 'OTHER',     label: 'Other',         icon: '🚐' },
+]
+
 function DayCostsSection({
   shootDayId,
   isAdmin,
@@ -905,15 +920,16 @@ function DayCostsSection({
   isAdmin: boolean
 }) {
   const [expanded, setExpanded] = useState(false)
-  const [items, setItems] = useState<Array<{ id: string; description: string; total: number; amt: number; rate: number }> | null>(null)
-  const [newDesc, setNewDesc] = useState('')
-  const [newCost, setNewCost] = useState('')
+  const [items, setItems] = useState<DayCostItem[] | null>(null)
   const [busy, setBusy] = useState(false)
 
   async function load() {
     try {
       const r = await api.dayBudgetItems(shootDayId)
-      setItems(r.items.map((it) => ({ id: it.id, description: it.description, total: it.total, amt: it.amt, rate: it.rate })))
+      setItems(r.items.map((it) => ({
+        id: it.id, description: it.description, total: it.total,
+        amt: it.amt, rate: it.rate, code: it.code,
+      })))
     } catch {
       setItems([])
     }
@@ -923,18 +939,23 @@ function DayCostsSection({
     if (expanded && items === null) void load()
   }, [expanded])
 
-  async function add() {
-    const description = newDesc.trim()
-    const cost = parseFloat(newCost) || 0
-    if (!description) return
+  async function autoAddCast() {
     setBusy(true)
     try {
-      await api.quickAddDayCost(shootDayId, { description, cost })
-      setNewDesc(''); setNewCost('')
+      const r = await api.autoAddCastForDay(shootDayId)
       await load()
+      if (r.added === 0 && r.message) alert(r.message)
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'failed')
     } finally {
       setBusy(false)
     }
+  }
+
+  async function add(code: string, description: string, cost: number) {
+    if (!description.trim()) return
+    await api.quickAddDayCost(shootDayId, { description: description.trim(), cost, code })
+    await load()
   }
 
   async function updateCost(id: string, cost: number) {
@@ -957,7 +978,7 @@ function DayCostsSection({
       >
         <span className="flex items-center gap-2">
           <span>{expanded ? '▾' : '▸'}</span>
-          <span className="font-bold">📋 Day costs</span>
+          <span className="font-bold">💰 Day budget</span>
           <span className="text-muted/70">
             ({(items ?? []).length} item{(items ?? []).length === 1 ? '' : 's'})
           </span>
@@ -968,44 +989,127 @@ function DayCostsSection({
       </button>
 
       {expanded && (
-        <div className="mt-2 space-y-1.5">
+        <div className="mt-2 space-y-3">
           {items === null ? (
             <p className="text-[11px] text-muted italic">Loading…</p>
-          ) : items.length === 0 ? (
-            <p className="text-[11px] text-muted/70 italic">No day costs yet. Add camera rental, catering, base-camp fees, crew overtime — anything that's whole-day cost rather than per-scene.</p>
           ) : (
-            items.map((it) => (
-              <DayCostRow key={it.id} item={it} isAdmin={isAdmin} onUpdate={(cost) => void updateCost(it.id, cost)} onDelete={() => void remove(it.id)} />
+            DAY_BUCKETS.map((bucket) => (
+              <DayBucket
+                key={bucket.code}
+                code={bucket.code}
+                label={bucket.label}
+                icon={bucket.icon}
+                items={items.filter((i) => (i.code ?? 'OTHER') === bucket.code)}
+                isAdmin={isAdmin}
+                onAdd={(desc, cost) => add(bucket.code, desc, cost)}
+                onUpdate={updateCost}
+                onDelete={remove}
+                onAutoAddCast={bucket.code === 'CAST' ? autoAddCast : undefined}
+                busyAutoAdd={busy}
+              />
             ))
-          )}
-          {isAdmin && (
-            <div className="flex items-center gap-2 pt-1">
-              <input
-                type="text"
-                value={newDesc}
-                onChange={(e) => setNewDesc(e.target.value)}
-                placeholder="e.g. Camera package, Catering for 25, Base camp"
-                className="flex-1 rounded-lg bg-ink/40 border border-line text-text text-xs px-2 py-1.5 outline-none focus:border-stage-mastering"
-              />
-              <input
-                type="number"
-                inputMode="decimal"
-                value={newCost}
-                onChange={(e) => setNewCost(e.target.value)}
-                placeholder="$ cost"
-                className="w-24 rounded-lg bg-ink/40 border border-line text-text text-xs px-2 py-1.5 text-right font-mono outline-none focus:border-stage-mastering"
-              />
-              <button
-                onClick={() => void add()}
-                disabled={busy || !newDesc.trim()}
-                className="rounded-full bg-stage-mastering text-white font-bold uppercase tracking-wider text-[10px] px-3 py-1.5 disabled:opacity-50"
-              >
-                + Add
-              </button>
-            </div>
           )}
         </div>
       )}
+    </div>
+  )
+}
+
+function DayBucket({
+  code,
+  label,
+  icon,
+  items,
+  isAdmin,
+  onAdd,
+  onUpdate,
+  onDelete,
+  onAutoAddCast,
+  busyAutoAdd,
+}: {
+  code: string
+  label: string
+  icon: string
+  items: DayCostItem[]
+  isAdmin: boolean
+  onAdd: (description: string, cost: number) => void | Promise<void>
+  onUpdate: (id: string, cost: number) => void | Promise<void>
+  onDelete: (id: string) => void | Promise<void>
+  onAutoAddCast?: () => void | Promise<void>
+  busyAutoAdd?: boolean
+}) {
+  const [desc, setDesc] = useState('')
+  const [cost, setCost] = useState('')
+  const subtotal = items.reduce((s, i) => s + i.total, 0)
+
+  const placeholders: Record<string, string> = {
+    CAST:      'e.g. SAWYER, JASON KENDRICK',
+    CREW:      'e.g. DP, 1st AD, sound mixer, gaffer',
+    EQUIPMENT: 'e.g. Camera package, grip truck, sound kit',
+    LOCATION:  'e.g. Kendrick\'s house day fee, permit',
+    CATERING:  'e.g. Crew lunch for 25, craft service',
+    OTHER:     'e.g. Transport, parking, base camp',
+  }
+
+  return (
+    <div className="rounded-lg border border-line/60 bg-ink/20 px-3 py-2">
+      <div className="flex items-center justify-between text-[10px] uppercase tracking-wider mb-2">
+        <span className="flex items-center gap-2">
+          <span className="text-base">{icon}</span>
+          <span className="font-bold text-text">{label}</span>
+          <span className="text-muted/70">({items.length})</span>
+          {onAutoAddCast && isAdmin && (
+            <button
+              onClick={() => void onAutoAddCast()}
+              disabled={busyAutoAdd}
+              className="ml-2 text-[9px] normal-case tracking-normal text-stage-mastering hover:underline disabled:opacity-50"
+              title="Add every character scheduled on this day"
+            >
+              {busyAutoAdd ? 'Adding…' : '+ Auto-add from scenes'}
+            </button>
+          )}
+        </span>
+        <span className="font-mono text-text font-bold">
+          ${Math.round(subtotal).toLocaleString()}
+        </span>
+      </div>
+      <div className="space-y-1">
+        {items.map((it) => (
+          <DayCostRow
+            key={it.id}
+            item={it}
+            isAdmin={isAdmin}
+            onUpdate={(cost) => void onUpdate(it.id, cost)}
+            onDelete={() => void onDelete(it.id)}
+          />
+        ))}
+        {isAdmin && (
+          <div className="flex items-center gap-2 pt-1">
+            <input
+              type="text"
+              value={desc}
+              onChange={(e) => setDesc(e.target.value)}
+              placeholder={placeholders[code] ?? ''}
+              className="flex-1 rounded bg-ink/40 border border-line text-text text-xs px-2 py-1 outline-none focus:border-stage-mastering"
+            />
+            <input
+              type="number"
+              inputMode="decimal"
+              value={cost}
+              onChange={(e) => setCost(e.target.value)}
+              placeholder="$"
+              className="w-20 rounded bg-ink/40 border border-line text-text text-xs px-2 py-1 text-right font-mono outline-none focus:border-stage-mastering"
+            />
+            <button
+              onClick={() => { void onAdd(desc, parseFloat(cost) || 0); setDesc(''); setCost('') }}
+              disabled={!desc.trim()}
+              className="rounded bg-stage-mastering text-white font-bold uppercase tracking-wider text-[10px] px-2.5 py-1 disabled:opacity-50"
+            >
+              + Add
+            </button>
+          </div>
+        )}
+      </div>
     </div>
   )
 }

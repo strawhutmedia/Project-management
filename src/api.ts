@@ -720,10 +720,15 @@ export const api = {
     request<{ items: Array<{ id: string; accountId: string; code: string | null; description: string; amt: number; units: string | null; x: number; rate: number; vendor: string | null; datedAt: string | null; notes: string | null; position: number; total: number }> }>(
       `/api/budgets/shoot-days/${shootDayId}/items`,
     ),
-  quickAddDayCost: (shootDayId: string, body: { description: string; cost: number }) =>
+  quickAddDayCost: (shootDayId: string, body: { description: string; cost: number; code?: string }) =>
     request<{ ok: true; id: string }>(
       `/api/budgets/shoot-days/${shootDayId}/quick-add`,
       { method: 'POST', body: JSON.stringify(body) },
+    ),
+  autoAddCastForDay: (shootDayId: string) =>
+    request<{ ok: true; added: number; characters?: string[]; message?: string }>(
+      `/api/budgets/shoot-days/${shootDayId}/auto-add-cast`,
+      { method: 'POST' },
     ),
   clusterWardrobe: (projectId: string) =>
     request<{ ok: true; characters: number; outfitsCreated: number; itemsConsolidated: number }>(
