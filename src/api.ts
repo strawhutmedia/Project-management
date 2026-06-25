@@ -725,6 +725,11 @@ export const api = {
       `/api/budgets/shoot-days/${shootDayId}/quick-add`,
       { method: 'POST', body: JSON.stringify(body) },
     ),
+  clusterWardrobe: (projectId: string) =>
+    request<{ ok: true; characters: number; outfitsCreated: number; itemsConsolidated: number }>(
+      `/api/budgets/projects/${projectId}/cluster-wardrobe`,
+      { method: 'POST' },
+    ),
   consolidateWardrobe: (projectId: string) =>
     request<{ ok: true; charactersFound: number; consolidated: number }>(
       `/api/budgets/projects/${projectId}/consolidate-wardrobe`,

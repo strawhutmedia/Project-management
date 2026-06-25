@@ -4,6 +4,7 @@ import { requireUser, type SessionUser } from '../auth'
 import { assertWriter } from '../permissions'
 import { STUDIOBINDER_ACCOUNTS } from '../budget_template'
 import { getSceneBudgetItems } from '../scene_budget'
+import { clusterProjectWardrobe } from '../wardrobe_clustering'
 import { markProjectDirty } from '../script_publisher'
 import { emit } from '../events'
 import { logInfo } from '../diag'
@@ -625,7 +626,27 @@ budgetsRouter.post('/projects/:projectId/populate-cast-from-script', async (req,
   res.json({ ok: true, count: ranked.length })
 })
 
-// Wardrobe gets repeated across scenes whenever the same character
+// Smart wardrobe clustering: for each character, send all their
+// per-scene wardrobe descriptions to Claude, get back distinct
+// outfit clusters, create one shared row per outfit attached to
+// every scene where that outfit appears. Producer prices once,
+// covers every scene that uses the same look.
+budgetsRouter.post('/projects/:projectId/cluster-wardrobe', async (req, res) => {
+  const user = (req as typeof req & { user: SessionUser }).user
+  const projectId = req.params.projectId
+  if (!await assertWriter(user, projectId, res)) return
+  try {
+    const result = await clusterProjectWardrobe(projectId, user.id)
+    markProjectDirty(projectId)
+    emit(projectId, 'budget.bulk.changed', { reason: 'cluster_wardrobe' }, user.id)
+    res.json({ ok: true, ...result })
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err)
+    res.status(502).json({ error: msg.slice(0, 400) })
+  }
+})
+
+// Legacy dumb "consolidate everything per character" — kept for now
 // appears — Claude generates a per-scene wardrobe row for each, with
 // slightly different descriptions. This consolidates them: one row
 // per character, marked as a shared WARDROBE resource keyed on the

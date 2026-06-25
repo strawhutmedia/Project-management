@@ -1708,9 +1708,11 @@ function PopulateCastButton({
   )
 }
 
-// "Consolidate wardrobe by character" — merges every per-scene
-// wardrobe row into one shared row per character. Once consolidated,
-// pricing the row once shows up on every scene that character is in.
+// "Cluster wardrobe by outfit" — Claude reads every per-scene
+// wardrobe description, groups them into distinct outfits per
+// character, and creates one shared row per outfit attached to the
+// right scenes. Sawyer's "casual day" outfit becomes one row; her
+// "running gear" becomes another; both auto-show on the right scenes.
 function ConsolidateWardrobeButton({
   projectId,
   onChanged,
@@ -1720,12 +1722,12 @@ function ConsolidateWardrobeButton({
 }) {
   const [busy, setBusy] = useState(false)
   async function run() {
-    if (!confirm('Consolidate every per-scene wardrobe row into one shared row per character? Existing prices roll up (highest survives). Each character\'s consolidated row will then auto-show on every scene that character appears in.')) return
+    if (!confirm('Have Claude group the per-scene wardrobe rows into distinct OUTFITS per character (a character can have multiple outfits — casual day, formal evening, running gear, etc.) and create one shared row per outfit? Existing prices roll up (highest in each cluster survives). Each outfit row will auto-show on every scene where it appears.')) return
     setBusy(true)
     try {
-      const r = await api.consolidateWardrobe(projectId)
+      const r = await api.clusterWardrobe(projectId)
       await onChanged()
-      alert(`✓ Consolidated ${r.consolidated} wardrobe rows into ${r.charactersFound} character${r.charactersFound === 1 ? '' : 's'}. Each shows up automatically in every scene that character is in.`)
+      alert(`✓ Clustered ${r.itemsConsolidated} wardrobe rows into ${r.outfitsCreated} distinct outfit${r.outfitsCreated === 1 ? '' : 's'} across ${r.characters} character${r.characters === 1 ? '' : 's'}.`)
     } catch (err) {
       alert(err instanceof Error ? err.message : 'failed')
     } finally {
@@ -1737,9 +1739,9 @@ function ConsolidateWardrobeButton({
       onClick={() => void run()}
       disabled={busy}
       className="text-[10px] uppercase tracking-wider text-stage-tracking border border-stage-tracking/40 rounded-full px-3 py-1.5 hover:bg-stage-tracking/10 disabled:opacity-50"
-      title="Roll up all per-scene wardrobe items into one shared row per character"
+      title="Have Claude cluster wardrobe descriptions into distinct outfits per character. Each outfit gets one shared row, attached to all scenes that use it."
     >
-      {busy ? 'Consolidating…' : '👔 Consolidate wardrobe by character'}
+      {busy ? 'Clustering…' : '👔 Cluster wardrobe by outfit'}
     </button>
   )
 }
