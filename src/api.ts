@@ -716,6 +716,15 @@ export const api = {
         currentSection: string | null
       }>
     }>(`/api/projects/${projectId}/presence`),
+  dayBudgetItems: (shootDayId: string) =>
+    request<{ items: Array<{ id: string; accountId: string; code: string | null; description: string; amt: number; units: string | null; x: number; rate: number; vendor: string | null; datedAt: string | null; notes: string | null; position: number; total: number }> }>(
+      `/api/budgets/shoot-days/${shootDayId}/items`,
+    ),
+  quickAddDayCost: (shootDayId: string, body: { description: string; cost: number }) =>
+    request<{ ok: true; id: string }>(
+      `/api/budgets/shoot-days/${shootDayId}/quick-add`,
+      { method: 'POST', body: JSON.stringify(body) },
+    ),
   consolidateWardrobe: (projectId: string) =>
     request<{ ok: true; charactersFound: number; consolidated: number }>(
       `/api/budgets/projects/${projectId}/consolidate-wardrobe`,

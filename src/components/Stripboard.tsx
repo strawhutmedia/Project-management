@@ -633,6 +633,16 @@ export default function Stripboard({ projectId, isAdmin, projectName }: { projec
 
       {error && <p className="text-urgent text-sm">{error}</p>}
 
+      <div className="flex items-center gap-3 flex-wrap text-[10px] uppercase tracking-wider text-muted border border-line/40 bg-ink/20 rounded-xl px-3 py-2">
+        <span className="font-bold text-text">Color key</span>
+        <LegendChip label="EXT Day"   className="bg-gradient-to-br from-yellow-400 to-yellow-600" />
+        <LegendChip label="INT Day"   className="bg-gradient-to-br from-pink-500 to-rose-600" />
+        <LegendChip label="EXT Night" className="bg-gradient-to-br from-emerald-600 to-emerald-900" />
+        <LegendChip label="INT Night" className="bg-gradient-to-br from-blue-600 to-blue-900" />
+        <LegendChip label="Sunset / Magic Hour" className="bg-gradient-to-br from-red-500 to-orange-500" />
+        <LegendChip label="Time unspecified" className="bg-gradient-to-br from-slate-600 to-slate-800" />
+      </div>
+
       <div className="space-y-2">
         <DayRow
           day={null}
@@ -779,6 +789,7 @@ function DayRow({
               ))}
             </div>
           )}
+          {day && !day.isBreak && <DayCostsSection shootDayId={day.id} isAdmin={isAdmin} />}
         </div>
       )}
     </div>
@@ -871,5 +882,162 @@ function SceneCard({
         </div>
       </div>
     </button>
+  )
+}
+
+function LegendChip({ label, className }: { label: string; className: string }) {
+  return (
+    <span className="inline-flex items-center gap-1.5">
+      <span className={`w-3 h-3 rounded-sm ${className}`} />
+      <span className="text-text normal-case tracking-normal">{label}</span>
+    </span>
+  )
+}
+
+// Day-level budget items: equipment rental, crew rate, catering, base
+// camp, etc. — costs that belong to a whole shoot day rather than a
+// single scene. Collapsed by default; click the header to expand.
+function DayCostsSection({
+  shootDayId,
+  isAdmin,
+}: {
+  shootDayId: string
+  isAdmin: boolean
+}) {
+  const [expanded, setExpanded] = useState(false)
+  const [items, setItems] = useState<Array<{ id: string; description: string; total: number; amt: number; rate: number }> | null>(null)
+  const [newDesc, setNewDesc] = useState('')
+  const [newCost, setNewCost] = useState('')
+  const [busy, setBusy] = useState(false)
+
+  async function load() {
+    try {
+      const r = await api.dayBudgetItems(shootDayId)
+      setItems(r.items.map((it) => ({ id: it.id, description: it.description, total: it.total, amt: it.amt, rate: it.rate })))
+    } catch {
+      setItems([])
+    }
+  }
+
+  useEffect(() => {
+    if (expanded && items === null) void load()
+  }, [expanded])
+
+  async function add() {
+    const description = newDesc.trim()
+    const cost = parseFloat(newCost) || 0
+    if (!description) return
+    setBusy(true)
+    try {
+      await api.quickAddDayCost(shootDayId, { description, cost })
+      setNewDesc(''); setNewCost('')
+      await load()
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function updateCost(id: string, cost: number) {
+    await api.updateBudgetItem(id, { rate: cost, amt: 1, x: 1 })
+    await load()
+  }
+
+  async function remove(id: string) {
+    await api.deleteBudgetItem(id)
+    await load()
+  }
+
+  const total = (items ?? []).reduce((s, i) => s + i.total, 0)
+
+  return (
+    <div className="border-t border-line/40 mt-2 pt-2 px-1">
+      <button
+        onClick={() => setExpanded(!expanded)}
+        className="w-full flex items-center justify-between text-[10px] uppercase tracking-wider text-muted hover:text-text"
+      >
+        <span className="flex items-center gap-2">
+          <span>{expanded ? '▾' : '▸'}</span>
+          <span className="font-bold">📋 Day costs</span>
+          <span className="text-muted/70">
+            ({(items ?? []).length} item{(items ?? []).length === 1 ? '' : 's'})
+          </span>
+        </span>
+        <span className="font-mono text-text font-bold">
+          ${Math.round(total).toLocaleString()}
+        </span>
+      </button>
+
+      {expanded && (
+        <div className="mt-2 space-y-1.5">
+          {items === null ? (
+            <p className="text-[11px] text-muted italic">Loading…</p>
+          ) : items.length === 0 ? (
+            <p className="text-[11px] text-muted/70 italic">No day costs yet. Add camera rental, catering, base-camp fees, crew overtime — anything that's whole-day cost rather than per-scene.</p>
+          ) : (
+            items.map((it) => (
+              <DayCostRow key={it.id} item={it} isAdmin={isAdmin} onUpdate={(cost) => void updateCost(it.id, cost)} onDelete={() => void remove(it.id)} />
+            ))
+          )}
+          {isAdmin && (
+            <div className="flex items-center gap-2 pt-1">
+              <input
+                type="text"
+                value={newDesc}
+                onChange={(e) => setNewDesc(e.target.value)}
+                placeholder="e.g. Camera package, Catering for 25, Base camp"
+                className="flex-1 rounded-lg bg-ink/40 border border-line text-text text-xs px-2 py-1.5 outline-none focus:border-stage-mastering"
+              />
+              <input
+                type="number"
+                inputMode="decimal"
+                value={newCost}
+                onChange={(e) => setNewCost(e.target.value)}
+                placeholder="$ cost"
+                className="w-24 rounded-lg bg-ink/40 border border-line text-text text-xs px-2 py-1.5 text-right font-mono outline-none focus:border-stage-mastering"
+              />
+              <button
+                onClick={() => void add()}
+                disabled={busy || !newDesc.trim()}
+                className="rounded-full bg-stage-mastering text-white font-bold uppercase tracking-wider text-[10px] px-3 py-1.5 disabled:opacity-50"
+              >
+                + Add
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function DayCostRow({
+  item,
+  isAdmin,
+  onUpdate,
+  onDelete,
+}: {
+  item: { id: string; description: string; total: number; amt: number; rate: number }
+  isAdmin: boolean
+  onUpdate: (cost: number) => void
+  onDelete: () => void
+}) {
+  const [cost, setCost] = useState(String(item.rate))
+  useEffect(() => { setCost(String(item.rate)) }, [item.rate])
+  return (
+    <div className="flex items-center gap-2 text-xs px-2 py-1 rounded bg-ink/30 border border-line/40">
+      <span className="flex-1 text-text truncate" title={item.description}>{item.description}</span>
+      <input
+        type="number"
+        inputMode="decimal"
+        value={cost}
+        onChange={(e) => setCost(e.target.value)}
+        onBlur={() => { const v = parseFloat(cost) || 0; if (v !== item.rate) onUpdate(v) }}
+        disabled={!isAdmin}
+        className="w-24 text-right font-mono bg-ink/40 border border-line rounded px-2 py-1 outline-none focus:border-stage-mastering"
+      />
+      {isAdmin && (
+        <button onClick={onDelete} className="text-muted/40 hover:text-urgent px-1" title="Delete">✕</button>
+      )}
+    </div>
   )
 }

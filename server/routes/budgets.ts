@@ -249,7 +249,7 @@ budgetsRouter.post('/accounts/:accountId/items', async (req, res) => {
   )
   if (lookup.rows.length === 0) { res.status(404).json({ error: 'not_found' }); return }
   if (!await assertWriter(user, lookup.rows[0].project_id, res)) return
-  const { code, description, amt, units, x, rate, vendor, datedAt, notes, sceneId, resourceType, resourceKey } = req.body ?? {}
+  const { code, description, amt, units, x, rate, vendor, datedAt, notes, sceneId, shootDayId, resourceType, resourceKey } = req.body ?? {}
   if (typeof description !== 'string' || description.trim().length === 0) {
     res.status(400).json({ error: 'description_required' }); return
   }
@@ -259,13 +259,14 @@ budgetsRouter.post('/accounts/:accountId/items', async (req, res) => {
   )
   const { rows } = await pool.query(
     `INSERT INTO budget_line_items
-       (account_id, scene_id, code, description, amt, units, x, rate, vendor, dated_at, notes,
+       (account_id, scene_id, shoot_day_id, code, description, amt, units, x, rate, vendor, dated_at, notes,
         resource_type, resource_key, position, created_by)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
      RETURNING id`,
     [
       accountId,
       typeof sceneId === 'string' ? sceneId : null,
+      typeof shootDayId === 'string' ? shootDayId : null,
       typeof code === 'string' ? code : null,
       description.trim().slice(0, 200),
       Number(amt) || 0,
@@ -308,6 +309,7 @@ budgetsRouter.patch('/items/:itemId', async (req, res) => {
     ['datedAt', 'dated_at', (v) => v || null],
     ['notes', 'notes', (v) => (typeof v === 'string' ? v : null)],
     ['sceneId', 'scene_id', (v) => (typeof v === 'string' ? v : null)],
+    ['shootDayId', 'shoot_day_id', (v) => (typeof v === 'string' ? v : null)],
     ['resourceType', 'resource_type', (v) => (typeof v === 'string' ? v.slice(0, 40) : null)],
     ['resourceKey', 'resource_key', (v) => (typeof v === 'string' ? v.slice(0, 80) : null)],
   ]
@@ -365,6 +367,106 @@ budgetsRouter.get('/scenes/:sceneId/items', async (req, res) => {
   }
   const items = await getSceneBudgetItems(sceneId)
   res.json({ items })
+})
+
+// Items attached to a specific shoot day (equipment, crew, catering,
+// vehicles for that day). Lighter than the scene-budget query — no
+// shared-resource matching, just direct shoot_day_id = X.
+budgetsRouter.get('/shoot-days/:shootDayId/items', async (req, res) => {
+  const user = (req as typeof req & { user: SessionUser }).user
+  const shootDayId = req.params.shootDayId
+  const lookup = await pool.query<{ project_id: string }>(
+    `SELECT project_id FROM shoot_days WHERE id = $1`, [shootDayId],
+  )
+  if (lookup.rows.length === 0) { res.status(404).json({ error: 'not_found' }); return }
+  const access = await pool.query(
+    `SELECT 1 FROM projects p
+     LEFT JOIN project_members m ON m.project_id = p.id AND m.user_id = $1
+     WHERE p.id = $2 AND ($3 = 'admin' OR p.created_by = $1 OR m.user_id IS NOT NULL) LIMIT 1`,
+    [user.id, lookup.rows[0].project_id, user.role],
+  )
+  if (access.rows.length === 0) { res.status(403).json({ error: 'forbidden' }); return }
+  const { rows } = await pool.query(
+    `SELECT li.id, li.account_id, li.code, li.description, li.amt, li.units,
+            li.x, li.rate, li.vendor, li.dated_at, li.notes, li.position
+     FROM budget_line_items li
+     WHERE li.shoot_day_id = $1
+     ORDER BY li.position ASC, li.created_at ASC`,
+    [shootDayId],
+  )
+  res.json({
+    items: rows.map((r) => ({
+      id: r.id,
+      accountId: r.account_id,
+      code: r.code,
+      description: r.description,
+      amt: Number(r.amt),
+      units: r.units,
+      x: Number(r.x),
+      rate: Number(r.rate),
+      vendor: r.vendor,
+      datedAt: r.dated_at,
+      notes: r.notes,
+      position: r.position,
+      total: Number(r.amt) * Number(r.x) * Number(r.rate),
+    })),
+  })
+})
+
+// Quick-add a day-level item without picking an account — auto-routes
+// to the "Day Costs" account (created lazily), categorized as
+// production. Description + cost are the only required fields.
+budgetsRouter.post('/shoot-days/:shootDayId/quick-add', async (req, res) => {
+  const user = (req as typeof req & { user: SessionUser }).user
+  const shootDayId = req.params.shootDayId
+  const lookup = await pool.query<{ project_id: string }>(
+    `SELECT project_id FROM shoot_days WHERE id = $1`, [shootDayId],
+  )
+  if (lookup.rows.length === 0) { res.status(404).json({ error: 'not_found' }); return }
+  if (!await assertWriter(user, lookup.rows[0].project_id, res)) return
+  const description = String(req.body?.description ?? '').trim().slice(0, 200)
+  const cost = Number(req.body?.cost) || 0
+  if (!description) { res.status(400).json({ error: 'description_required' }); return }
+
+  // Find or lazily create the budget + "Day Costs" account
+  const budget = await pool.query<{ id: string }>(
+    `SELECT id FROM budgets WHERE project_id = $1`, [lookup.rows[0].project_id],
+  )
+  if (budget.rows.length === 0) { res.status(400).json({ error: 'no_budget', message: 'Create a budget first.' }); return }
+  const budgetId = budget.rows[0].id
+  let dayAcct = await pool.query<{ id: string }>(
+    `SELECT id FROM budget_accounts WHERE budget_id = $1 AND code = '__day_costs__' LIMIT 1`,
+    [budgetId],
+  )
+  let accountId: string
+  if (dayAcct.rows.length === 0) {
+    const posRes = await pool.query<{ next: number }>(
+      `SELECT COALESCE(MAX(position), 0) + 10 AS next FROM budget_accounts WHERE budget_id = $1`,
+      [budgetId],
+    )
+    const created = await pool.query<{ id: string }>(
+      `INSERT INTO budget_accounts (budget_id, code, name, category, position)
+       VALUES ($1, '__day_costs__', 'Day Costs', 'production', $2) RETURNING id`,
+      [budgetId, posRes.rows[0].next],
+    )
+    accountId = created.rows[0].id
+  } else {
+    accountId = dayAcct.rows[0].id
+  }
+
+  const posRes = await pool.query<{ next: number }>(
+    `SELECT COALESCE(MAX(position), 0) + 10 AS next FROM budget_line_items WHERE account_id = $1`,
+    [accountId],
+  )
+  const { rows } = await pool.query<{ id: string }>(
+    `INSERT INTO budget_line_items
+       (account_id, shoot_day_id, description, amt, x, rate, units, position, created_by)
+     VALUES ($1, $2, $3, 1, 1, $4, 'Flat', $5, $6) RETURNING id`,
+    [accountId, shootDayId, description, cost, posRes.rows[0].next, user.id],
+  )
+  markProjectDirty(lookup.rows[0].project_id)
+  void emitItemUpdated(lookup.rows[0].project_id, rows[0].id, user.id)
+  res.json({ ok: true, id: rows[0].id })
 })
 
 // "Make this item shared across every scene with the same
