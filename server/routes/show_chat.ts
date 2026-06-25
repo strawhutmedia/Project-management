@@ -178,6 +178,7 @@ async function buildSystemPrompt(projectId: string): Promise<string> {
 showChatRouter.get('/projects/:id/chat', async (req, res) => {
   const user = (req as typeof req & { user: SessionUser }).user
   const projectId = req.params.id
+  if (user.role !== 'admin') { res.status(403).json({ error: 'super_admin_only' }); return }
   if (!await assertWriter(user, projectId, res)) return
   const { rows } = await pool.query<MessageRow>(
     `SELECT m.*, u.display_name AS author_display_name
@@ -199,6 +200,7 @@ showChatRouter.get('/projects/:id/chat', async (req, res) => {
 showChatRouter.post('/projects/:id/chat', async (req, res) => {
   const user = (req as typeof req & { user: SessionUser }).user
   const projectId = req.params.id
+  if (user.role !== 'admin') { res.status(403).json({ error: 'super_admin_only' }); return }
   if (!await assertWriter(user, projectId, res)) return
   const content = String(req.body?.content || '').trim()
   if (!content) { res.status(400).json({ error: 'content required' }); return }
@@ -299,6 +301,7 @@ showChatRouter.post('/projects/:id/chat', async (req, res) => {
 showChatRouter.delete('/projects/:id/chat/:messageId', async (req, res) => {
   const user = (req as typeof req & { user: SessionUser }).user
   const projectId = req.params.id
+  if (user.role !== 'admin') { res.status(403).json({ error: 'super_admin_only' }); return }
   if (!await assertWriter(user, projectId, res)) return
   await pool.query(
     `DELETE FROM show_chat_messages WHERE id = $1 AND project_id = $2`,

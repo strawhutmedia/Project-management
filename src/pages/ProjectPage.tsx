@@ -239,9 +239,10 @@ export default function ProjectPage() {
         />
       )}
 
-      {/* Show chat — all project members (writer + above) can see and
-          post. Gated server-side by assertWriter so non-members 403. */}
-      <ShowChatCard projectId={project.id} />
+      {/* Show chat — super-admin only. Workspace admins (Ryan) get
+          the Claude assistant; project members at any level don't see
+          it. Gated server-side too. */}
+      {user?.role === 'admin' && <ShowChatCard projectId={project.id} />}
 
       {isAdmin && project.kind === 'album' && <ProjectRolesSection project={project} members={members} onSaved={reload} />}
       {isAdmin && project.kind === 'podcast' && <PodcastTeamSection project={project} members={members} onSaved={reload} />}
