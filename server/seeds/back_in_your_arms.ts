@@ -137,25 +137,13 @@ export async function seedBackInYourArms(): Promise<void> {
          WHERE project_id = $1`,
         [projId],
       )
-      // Populate line items if total spend is still $0 (i.e. nothing entered yet)
-      const budgetRow = await pool.query<{ id: string }>(
-        `SELECT id FROM budgets WHERE project_id = $1`,
-        [projId],
-      )
-      if (budgetRow.rows.length > 0) {
-        const budgetId = budgetRow.rows[0].id
-        const totalSpend = await pool.query<{ total: string }>(
-          `SELECT COALESCE(SUM(li.amt * li.x * li.rate), 0)::text AS total
-             FROM budget_line_items li
-             JOIN budget_accounts a ON a.id = li.account_id
-             WHERE a.budget_id = $1`,
-          [budgetId],
-        )
-        if (Number(totalSpend.rows[0].total) === 0) {
-          await populateBiyaBudgetAmounts(pool, budgetId)
-          logInfo('BIYA seed: populated budget amounts on existing project', { projectId: projId })
-        }
-      }
+      // Used to auto-populate the budget if total spend was $0 — but
+      // that fought with the "Reset all prices" button: every Railway
+      // redeploy after a reset would silently re-stamp the
+      // StudioBinder defaults back on top of Ryan's clean plate. The
+      // populate path is intentionally NOT re-run here on existing
+      // projects; first-time creation in the INSERT branch below
+      // still seeds defaults once.
       logInfo('BIYA seed: project already exists, ensured shoot days', { projectId: projId })
       return
     }
