@@ -1123,6 +1123,18 @@ function BudgetItemsTable({
   const [query, setQuery] = useState('')
   const [sortKey, setSortKey] = useState<'category' | 'account' | 'code' | 'description' | 'total'>('category')
   const [sortAsc, setSortAsc] = useState(true)
+  // Categories start collapsed — 1500+ rows is overwhelming on first
+  // load. Producer expands the categories they're working on. When a
+  // search query is active, all matching categories auto-expand so
+  // the matches are visible without an extra click.
+  const [expandedCats, setExpandedCats] = useState<Set<BudgetCategory>>(new Set())
+  function toggleCat(c: BudgetCategory) {
+    setExpandedCats((s) => {
+      const next = new Set(s)
+      if (next.has(c)) next.delete(c); else next.add(c)
+      return next
+    })
+  }
 
   const filtered = allRows.filter((r) => {
     if (filter !== 'all' && r.category !== filter) return false
@@ -1187,36 +1199,98 @@ function BudgetItemsTable({
         <p className="text-muted/70 text-xs italic py-6 text-center border border-dashed border-line/60 rounded-xl">
           No items match. Try clearing the search or filter.
         </p>
-      ) : (
-        <div className="rounded-xl border border-line/60 bg-ink/30 overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full text-xs">
-              <thead className="bg-ink/60 text-muted uppercase tracking-wider text-[9px]">
-                <tr>
-                  <SortableTh label="Category" k="category" sortKey={sortKey} sortAsc={sortAsc} onClick={toggleSort} />
-                  <SortableTh label="Account" k="account" sortKey={sortKey} sortAsc={sortAsc} onClick={toggleSort} />
-                  <th className="px-2 py-2 text-left">Scene</th>
-                  <SortableTh label="Code" k="code" sortKey={sortKey} sortAsc={sortAsc} onClick={toggleSort} />
-                  <SortableTh label="Description" k="description" sortKey={sortKey} sortAsc={sortAsc} onClick={toggleSort} />
-                  <th className="px-2 py-2 text-right">Amt</th>
-                  <th className="px-2 py-2 text-right">×</th>
-                  <th className="px-2 py-2 text-right">Rate</th>
-                  <th className="px-2 py-2 text-left">Units</th>
-                  <th className="px-2 py-2 text-left">Vendor</th>
-                  <th className="px-2 py-2 text-left">Date</th>
-                  <SortableTh label="Total" k="total" sortKey={sortKey} sortAsc={sortAsc} onClick={toggleSort} align="right" />
-                  {isAdmin && <th className="px-2 py-2"></th>}
-                </tr>
-              </thead>
-              <tbody>
-                {filtered.map((row) => (
-                  <ItemRow key={row.id} row={row} currency={currency} isAdmin={isAdmin} onChanged={onChanged} />
-                ))}
-              </tbody>
-            </table>
+      ) : (() => {
+        // Group filtered rows by category. Each card renders its own
+        // collapsible header + body. When the user typed a query, all
+        // categories with at least one match auto-expand. Without a
+        // query they're collapsed by default — the producer can open
+        // the categories they're working on.
+        const grouped = new Map<BudgetCategory, Row[]>()
+        for (const r of filtered) {
+          const arr = grouped.get(r.category) ?? []
+          arr.push(r)
+          grouped.set(r.category, arr)
+        }
+        const hasQuery = query.trim().length > 0
+        const orderedCats = CATEGORY_ORDER.filter((c) => grouped.has(c))
+        return (
+          <div className="space-y-2">
+            <div className="flex items-center gap-2 text-[10px] text-muted">
+              <button
+                onClick={() => setExpandedCats(new Set(orderedCats))}
+                className="hover:text-text uppercase tracking-wider"
+              >
+                Expand all
+              </button>
+              <span>·</span>
+              <button
+                onClick={() => setExpandedCats(new Set())}
+                className="hover:text-text uppercase tracking-wider"
+              >
+                Collapse all
+              </button>
+            </div>
+            {orderedCats.map((cat) => {
+              const rows = grouped.get(cat)!
+              const total = rows.reduce((s, r) => s + r.total, 0)
+              const priced = rows.filter((r) => r.total > 0).length
+              const open = expandedCats.has(cat) || hasQuery
+              const accent = CATEGORY_ACCENT[cat]
+              return (
+                <div key={cat} className={`rounded-xl border ${accent.border} ${accent.bg} overflow-hidden`}>
+                  <button
+                    onClick={() => toggleCat(cat)}
+                    className="w-full flex items-center justify-between gap-3 px-3 py-2.5 text-left hover:bg-ink/30"
+                  >
+                    <div className="flex items-center gap-2 min-w-0">
+                      <span className="text-[10px] text-muted">{open ? '▾' : '▸'}</span>
+                      <span className={`text-[10px] uppercase tracking-wider font-bold ${accent.text}`}>
+                        {CATEGORY_LABEL[cat]}
+                      </span>
+                      <span className="text-[10px] text-muted">
+                        · {rows.length} item{rows.length === 1 ? '' : 's'}
+                        {priced > 0 && rows.length > priced && (
+                          <> · {priced} priced</>
+                        )}
+                      </span>
+                    </div>
+                    <div className="font-mono font-bold text-sm text-text shrink-0">
+                      {fmtMoney(total, currency)}
+                    </div>
+                  </button>
+                  {open && (
+                    <div className="overflow-x-auto border-t border-line/40 bg-ink/30">
+                      <table className="w-full text-xs">
+                        <thead className="bg-ink/60 text-muted uppercase tracking-wider text-[9px]">
+                          <tr>
+                            <SortableTh label="Account" k="account" sortKey={sortKey} sortAsc={sortAsc} onClick={toggleSort} />
+                            <th className="px-2 py-2 text-left">Scene</th>
+                            <SortableTh label="Code" k="code" sortKey={sortKey} sortAsc={sortAsc} onClick={toggleSort} />
+                            <SortableTh label="Description" k="description" sortKey={sortKey} sortAsc={sortAsc} onClick={toggleSort} />
+                            <th className="px-2 py-2 text-right">Amt</th>
+                            <th className="px-2 py-2 text-right">×</th>
+                            <th className="px-2 py-2 text-right">Rate</th>
+                            <th className="px-2 py-2 text-left">Units</th>
+                            <th className="px-2 py-2 text-left">Vendor</th>
+                            <th className="px-2 py-2 text-left">Date</th>
+                            <SortableTh label="Total" k="total" sortKey={sortKey} sortAsc={sortAsc} onClick={toggleSort} align="right" />
+                            {isAdmin && <th className="px-2 py-2"></th>}
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {rows.map((row) => (
+                            <ItemRow key={row.id} row={row} currency={currency} isAdmin={isAdmin} onChanged={onChanged} hideCategory />
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </div>
+              )
+            })}
           </div>
-        </div>
-      )}
+        )
+      })()}
     </div>
   )
 }
@@ -1246,12 +1320,13 @@ function SortableTh({
 }
 
 function ItemRow({
-  row, currency, isAdmin, onChanged,
+  row, currency, isAdmin, onChanged, hideCategory,
 }: {
   row: ApiBudgetLineItem & { accountId: string; accountName: string; accountCode: string; category: BudgetCategory }
   currency: string
   isAdmin: boolean
   onChanged: () => void | Promise<void>
+  hideCategory?: boolean
 }) {
   const [code, setCode] = useState(row.code ?? '')
   const [description, setDescription] = useState(row.description)
@@ -1289,11 +1364,13 @@ function ItemRow({
 
   return (
     <tr className="border-t border-line/30 hover:bg-ink/40 group">
-      <td className="px-2 py-1.5">
-        <span className={`text-[9px] uppercase tracking-wider font-bold ${a.text} ${a.bg} border ${a.border} rounded-full px-1.5 py-0.5 whitespace-nowrap`}>
-          {CATEGORY_LABEL[row.category]}
-        </span>
-      </td>
+      {!hideCategory && (
+        <td className="px-2 py-1.5">
+          <span className={`text-[9px] uppercase tracking-wider font-bold ${a.text} ${a.bg} border ${a.border} rounded-full px-1.5 py-0.5 whitespace-nowrap`}>
+            {CATEGORY_LABEL[row.category]}
+          </span>
+        </td>
+      )}
       <td className="px-2 py-1.5 text-muted whitespace-nowrap" title={row.accountName}>
         <span className="font-mono text-[10px] text-muted/70">{row.accountCode}</span>{' '}
         <span className="max-w-[140px] truncate inline-block align-bottom">{row.accountName}</span>
