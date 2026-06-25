@@ -14,7 +14,7 @@
     "rssFeedUrl": null,
     "createdAt": "2026-04-29T22:31:46.421Z"
   },
-  "publishedAt": "2026-06-25T22:38:19.443Z",
+  "publishedAt": "2026-06-25T22:38:56.153Z",
   "counts": {
     "scenes": 157,
     "lineItems": 1754,
@@ -27877,8 +27877,8 @@
       "description": "Grip",
       "amt": 1,
       "x": 1,
-      "rate": 248,
-      "total": 248,
+      "rate": 250,
+      "total": 250,
       "notes": null,
       "vendor": null,
       "datedAt": null,
