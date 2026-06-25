@@ -690,6 +690,20 @@ export const api = {
   }>) => request<{ ok: true }>(`/api/budgets/items/${itemId}`, { method: 'PATCH', body: JSON.stringify(patch) }),
   deleteBudgetItem: (itemId: string) =>
     request<{ ok: true }>(`/api/budgets/items/${itemId}`, { method: 'DELETE' }),
+  presenceHeartbeat: (projectId: string, section?: string) =>
+    request<{ ok: true }>(`/api/projects/${projectId}/presence/heartbeat`, {
+      method: 'POST', body: JSON.stringify({ section: section ?? null }),
+    }),
+  projectPresence: (projectId: string) =>
+    request<{
+      presence: Array<{
+        userId: string
+        displayName: string | null
+        email: string
+        lastSeenAt: string
+        currentSection: string | null
+      }>
+    }>(`/api/projects/${projectId}/presence`),
   resetBudgetPrices: (projectId: string, keepCategories: BudgetCategory[]) =>
     request<{ ok: true; zeroed: number; keptCategories: string[] }>(
       `/api/budgets/projects/${projectId}/reset-prices`,

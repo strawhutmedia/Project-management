@@ -844,3 +844,54 @@ projectsRouter.post('/:id/brand-profile', async (req, res) => {
   )
   res.json({ profile: result.profile, generatedAt: new Date().toISOString() })
 })
+
+// Presence: heartbeat from any client currently viewing the project.
+// 30-second cadence is sweet spot — small enough that the "Who's here"
+// list feels live, large enough that even a 50-user workspace is < 2
+// req/sec.
+projectsRouter.post('/:id/presence/heartbeat', async (req, res) => {
+  const user = (req as typeof req & { user: SessionUser }).user
+  const projectId = req.params.id
+  if (await getProjectRole(user.id, user.role, projectId) === null) {
+    res.status(403).json({ error: 'forbidden' }); return
+  }
+  const section = typeof req.body?.section === 'string' ? req.body.section.slice(0, 64) : null
+  await pool.query(
+    `INSERT INTO project_presence (project_id, user_id, last_seen_at, current_section)
+     VALUES ($1, $2, now(), $3)
+     ON CONFLICT (project_id, user_id)
+     DO UPDATE SET last_seen_at = now(), current_section = EXCLUDED.current_section`,
+    [projectId, user.id, section],
+  )
+  res.json({ ok: true })
+})
+
+// Who's actively in the project right now (last 90 seconds).
+projectsRouter.get('/:id/presence', async (req, res) => {
+  const user = (req as typeof req & { user: SessionUser }).user
+  const projectId = req.params.id
+  if (await getProjectRole(user.id, user.role, projectId) === null) {
+    res.status(403).json({ error: 'forbidden' }); return
+  }
+  const { rows } = await pool.query<{
+    user_id: string; display_name: string | null; email: string;
+    last_seen_at: string; current_section: string | null;
+  }>(
+    `SELECT p.user_id, u.display_name, u.email, p.last_seen_at, p.current_section
+     FROM project_presence p
+     JOIN users u ON u.id = p.user_id
+     WHERE p.project_id = $1
+       AND p.last_seen_at > now() - interval '90 seconds'
+     ORDER BY p.last_seen_at DESC`,
+    [projectId],
+  )
+  res.json({
+    presence: rows.map((r) => ({
+      userId: r.user_id,
+      displayName: r.display_name,
+      email: r.email,
+      lastSeenAt: r.last_seen_at,
+      currentSection: r.current_section,
+    })),
+  })
+})

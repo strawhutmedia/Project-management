@@ -15,6 +15,7 @@ import BrandProfileCard from '../components/BrandProfileCard'
 import BrandAssetsCard from '../components/BrandAssetsCard'
 import ShowChatCard from '../components/ShowChatCard'
 import ScriptOverviewCard from '../components/ScriptOverviewCard'
+import PresenceBar from '../components/PresenceBar'
 import FilmPhaseBar, { type FilmPhase } from '../components/FilmPhaseBar'
 import { useAuth } from '../auth'
 
@@ -112,6 +113,7 @@ export default function ProjectPage() {
 
   return (
     <div className="space-y-10" data-theme={project.kind === 'film' ? 'film' : undefined}>
+      <PresenceBar projectId={project.id} />
       <div>
         <Link to="/" className="text-[11px] uppercase tracking-[0.2em] text-muted hover:text-text font-bold">
           ← Projects
