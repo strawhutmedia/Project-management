@@ -7,6 +7,8 @@
 // breakdown to refresh from the script.
 import { useEffect, useState } from 'react'
 import { api, type ApiScene } from '../api'
+import { useProjectEvents } from '../useProjectEvents'
+import { useRowClaims, useRowClaimSender, useOtherClaim, colorForUser, initialsFor } from '../useRowClaims'
 
 // Category buckets in the order the producer would walk a real breakdown
 // sheet. Claude tags rows with the bucket via the `code` field on the
@@ -105,12 +107,14 @@ type SceneItem = {
 
 export default function SceneDetailModal({
   sceneId,
+  projectId,
   scene,
   isAdmin,
   onClose,
   onChanged,
 }: {
   sceneId: string
+  projectId: string
   scene: ApiScene | null
   isAdmin: boolean
   onClose: () => void
@@ -136,6 +140,18 @@ export default function SceneDetailModal({
   }
 
   useEffect(() => { void loadItems() }, [sceneId])
+
+  // Row claims (so Alex/Ryan see each other locking inputs in the
+  // scene modal too) + live SSE patches for budget items.
+  const { claims, applyEvent: applyClaimEvent } = useRowClaims(projectId)
+  useProjectEvents(projectId, (event) => {
+    if (event.type === 'presence.claim' || event.type === 'presence.release') {
+      applyClaimEvent(event.type, event.data)
+    } else if (event.type === 'budget.item.updated' || event.type === 'budget.item.deleted' || event.type === 'budget.bulk.changed') {
+      // Scene budget item set may have changed — refetch.
+      void loadItems()
+    }
+  })
 
   // Refetch when the tab regains focus rather than polling on a
   // timer — interval polls caused visible flicker mid-edit.
@@ -293,6 +309,8 @@ export default function SceneDetailModal({
                           key={it.id}
                           item={it}
                           sceneId={sceneId}
+                          projectId={projectId}
+                          claims={claims}
                           sceneLocationTag={scene?.locationTag ?? null}
                           isAdmin={isAdmin}
                           onUpdate={(patch) => updateItem(it.id, patch)}
@@ -326,6 +344,8 @@ export default function SceneDetailModal({
 function SceneItemRow({
   item,
   sceneId,
+  projectId,
+  claims,
   sceneLocationTag,
   isAdmin,
   onUpdate,
@@ -334,12 +354,20 @@ function SceneItemRow({
 }: {
   item: SceneItem
   sceneId: string
+  projectId: string
+  claims: Map<string, { rowType: string; rowId: string; userId: string; displayName: string | null }>
   sceneLocationTag: string | null
   isAdmin: boolean
   onUpdate: (patch: Parameters<typeof api.updateBudgetItem>[1]) => Promise<void>
   onDelete: () => Promise<void>
   onChanged: () => Promise<void>
 }) {
+  const otherClaim = useOtherClaim(claims, 'budget_item', item.id)
+  const { onFocus: claimFocus, onBlur: claimBlur } = useRowClaimSender(projectId, 'budget_item', item.id)
+  const lockedByOther = !!otherClaim
+  const lockedColor = otherClaim ? colorForUser(otherClaim.userId) : null
+  const lockedInitials = otherClaim ? initialsFor(otherClaim.displayName, otherClaim.userId) : ''
+
   const [description, setDescription] = useState(item.description)
   const [amt, setAmt] = useState(String(item.amt))
   const [rate, setRate] = useState(String(item.rate))
@@ -375,8 +403,9 @@ function SceneItemRow({
             type="text"
             value={description}
             onChange={(e) => setDescription(e.target.value)}
-            onBlur={() => description !== item.description && void onUpdate({ description })}
-            disabled={!isAdmin}
+            onBlur={() => { if (description !== item.description) void onUpdate({ description }); claimBlur() }}
+            disabled={!isAdmin || lockedByOther}
+            onFocus={claimFocus}
             className="flex-1 min-w-0 bg-transparent text-sm text-text outline-none border-b border-transparent focus:border-stage-mastering/60 pb-0.5"
           />
           {isShared && (
@@ -385,6 +414,15 @@ function SceneItemRow({
               title={`Shared ${item.resourceType?.toLowerCase()} · used in ${item.sceneUsageCount} scene${item.sceneUsageCount === 1 ? '' : 's'}`}
             >
               ⇆ Used in {item.sceneUsageCount} scene{item.sceneUsageCount === 1 ? '' : 's'}
+            </span>
+          )}
+          {lockedByOther && (
+            <span
+              className="text-[9px] uppercase tracking-wider font-bold rounded-full px-2 py-0.5 text-white whitespace-nowrap"
+              style={{ backgroundColor: lockedColor ?? '#94a3b8' }}
+              title={`${otherClaim?.displayName ?? 'Someone'} is editing this row`}
+            >
+              {lockedInitials} editing
             </span>
           )}
           {canPromoteToLocation && (
@@ -403,64 +441,56 @@ function SceneItemRow({
             value={notes}
             placeholder="Notes…"
             onChange={(e) => setNotes(e.target.value)}
-            onBlur={() => notes !== (item.notes ?? '') && void onUpdate({ notes })}
-            disabled={!isAdmin}
+            onBlur={() => { if (notes !== (item.notes ?? '')) void onUpdate({ notes }); claimBlur() }}
+            disabled={!isAdmin || lockedByOther}
+            onFocus={claimFocus}
             className="w-full bg-transparent text-[11px] text-muted italic outline-none mt-0.5"
           />
         )}
       </div>
-      {/* Math row — on mobile this drops below the description for
-          legibility. On desktop it sits to the right. */}
-      <div className="flex items-center gap-1 shrink-0 flex-wrap justify-end">
-        <label className="flex items-center gap-1 text-[10px] text-muted">
-          <span className="sm:hidden uppercase tracking-wider">qty</span>
-          <input
-            type="number"
-            inputMode="decimal"
-            value={amt}
-            onChange={(e) => setAmt(e.target.value)}
-            onBlur={() => parseFloat(amt) !== item.amt && void onUpdate({ amt: parseFloat(amt) || 0 })}
-            disabled={!isAdmin}
-            placeholder="amt"
-            className="w-14 text-xs text-right font-mono bg-ink/40 border border-line rounded px-1.5 py-1 outline-none focus:border-stage-mastering"
-          />
-        </label>
-        <span className="text-[10px] text-muted">×</span>
-        <label className="flex items-center gap-1 text-[10px] text-muted">
-          <span className="sm:hidden uppercase tracking-wider">days</span>
-          <input
-            type="number"
-            inputMode="decimal"
-            value={x}
-            onChange={(e) => setX(e.target.value)}
-            onBlur={() => parseFloat(x) !== item.x && void onUpdate({ x: parseFloat(x) || 1 })}
-            disabled={!isAdmin}
-            placeholder="×"
-            className="w-12 text-xs text-right font-mono bg-ink/40 border border-line rounded px-1.5 py-1 outline-none focus:border-stage-mastering"
-          />
-        </label>
-        <span className="text-[10px] text-muted">@</span>
-        <label className="flex items-center gap-1 text-[10px] text-muted">
-          <span className="sm:hidden uppercase tracking-wider">$</span>
+      {/* Two-input simplified math: $ Cost × Days = Total. The
+          legacy "×" multiplier from StudioBinder defaults to 1 and
+          stays hidden — producers rarely need a third dimension at
+          the scene level. */}
+      <div className="flex items-center gap-2 shrink-0 flex-wrap justify-end">
+        <label className="flex flex-col items-start gap-0.5">
+          <span className="text-[9px] uppercase tracking-wider text-muted font-bold">Cost ($)</span>
           <input
             type="number"
             inputMode="decimal"
             value={rate}
             onChange={(e) => setRate(e.target.value)}
-            onBlur={() => parseFloat(rate) !== item.rate && void onUpdate({ rate: parseFloat(rate) || 0 })}
-            disabled={!isAdmin}
-            placeholder="rate"
-            className="w-16 text-xs text-right font-mono bg-ink/40 border border-line rounded px-1.5 py-1 outline-none focus:border-stage-mastering"
+            onBlur={() => { if (parseFloat(rate) !== item.rate) void onUpdate({ rate: parseFloat(rate) || 0 }); claimBlur() }}
+            disabled={!isAdmin || lockedByOther}
+            onFocus={claimFocus}
+            placeholder="0"
+            className="w-20 text-sm text-right font-mono bg-ink/40 border border-line rounded px-2 py-1.5 outline-none focus:border-stage-mastering"
           />
         </label>
-        <span className="text-[10px] text-muted">=</span>
-        <div className="min-w-[64px] text-right font-mono font-bold text-sm text-text">
-          {computedTotal > 0 ? `$${Math.round(computedTotal).toLocaleString()}` : <span className="text-muted/40">—</span>}
+        <label className="flex flex-col items-start gap-0.5">
+          <span className="text-[9px] uppercase tracking-wider text-muted font-bold">Days</span>
+          <input
+            type="number"
+            inputMode="decimal"
+            value={amt}
+            onChange={(e) => setAmt(e.target.value)}
+            onBlur={() => { if (parseFloat(amt) !== item.amt) void onUpdate({ amt: parseFloat(amt) || 1 }); claimBlur() }}
+            disabled={!isAdmin || lockedByOther}
+            onFocus={claimFocus}
+            placeholder="1"
+            className="w-14 text-sm text-right font-mono bg-ink/40 border border-line rounded px-2 py-1.5 outline-none focus:border-stage-mastering"
+          />
+        </label>
+        <div className="flex flex-col items-end gap-0.5">
+          <span className="text-[9px] uppercase tracking-wider text-muted font-bold">= Total</span>
+          <div className="min-w-[80px] text-right font-mono font-bold text-base text-text px-1 py-1">
+            {computedTotal > 0 ? `$${Math.round(computedTotal).toLocaleString()}` : <span className="text-muted/40">—</span>}
+          </div>
         </div>
         {isAdmin && (
           <button
             onClick={() => void onDelete()}
-            className="text-muted/40 hover:text-urgent px-2 py-1 sm:opacity-0 sm:group-hover:opacity-100"
+            className="text-muted/40 hover:text-urgent px-2 py-1 self-end mb-1"
             title="Remove"
           >
             ✕

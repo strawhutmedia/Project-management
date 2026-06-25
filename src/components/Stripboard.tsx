@@ -220,6 +220,23 @@ export default function Stripboard({ projectId, isAdmin, projectName }: { projec
     }
   }
 
+  // Drop a scene onto another scene card → insert just before the
+  // target, in the target's shoot day. Works for intra-day reorder
+  // AND for jumping a scene to a specific slot in another day.
+  async function reorderScene(draggedSceneId: string, targetSceneId: string) {
+    const board = boardRef.current
+    if (!board) return
+    const dragged = board.scenes.find((s) => s.id === draggedSceneId)
+    const target = board.scenes.find((s) => s.id === targetSceneId)
+    if (!dragged || !target) return
+    const targetDayId = target.shootDayId
+    // Compute the new position: just before the target. Re-number
+    // by sliding everything in target's day to even multiples of 10
+    // so the dragged scene's position is target.position - 5.
+    const newPos = Math.max(0, target.dayPosition - 5)
+    await moveScene(draggedSceneId, targetDayId, newPos)
+  }
+
   async function undo() {
     setUndoStack((stack) => {
       const last = stack[stack.length - 1]
@@ -623,6 +640,7 @@ export default function Stripboard({ projectId, isAdmin, projectName }: { projec
           scenes={grouped?.unscheduled ?? []}
           isAdmin={isAdmin}
           moveScene={moveScene}
+          reorderScene={reorderScene}
           resolvedTod={resolvedTod}
           onOpenScene={setOpenSceneId}
         />
@@ -634,6 +652,7 @@ export default function Stripboard({ projectId, isAdmin, projectName }: { projec
             scenes={grouped?.byDay.get(day.id) ?? []}
             isAdmin={isAdmin}
             moveScene={moveScene}
+          reorderScene={reorderScene}
             resolvedTod={resolvedTod}
             onOpenScene={setOpenSceneId}
           />
@@ -643,6 +662,7 @@ export default function Stripboard({ projectId, isAdmin, projectName }: { projec
       {openSceneId && (
         <SceneDetailModal
           sceneId={openSceneId}
+          projectId={projectId}
           scene={board.scenes.find((s) => s.id === openSceneId) ?? null}
           isAdmin={isAdmin}
           onClose={() => setOpenSceneId(null)}
@@ -671,12 +691,14 @@ function DayRow({
   scenes,
   isAdmin,
   moveScene,
+  reorderScene,
   resolvedTod,
   onOpenScene,
 }: {
   day: ApiShootDay | null
   label: string
   scenes: ApiScene[]
+  reorderScene: (draggedSceneId: string, targetSceneId: string) => void
   isAdmin: boolean
   moveScene: (sceneId: string, toDayId: string | null, toPosition: number) => Promise<void>
   resolvedTod: Map<string, string>
@@ -752,6 +774,7 @@ function DayRow({
                   isAdmin={isAdmin}
                   resolvedTod={resolvedTod.get(s.id) ?? ''}
                   onOpen={() => onOpenScene(s.id)}
+                  onReorder={reorderScene}
                 />
               ))}
             </div>
@@ -767,25 +790,48 @@ function SceneCard({
   isAdmin,
   resolvedTod,
   onOpen,
+  onReorder,
 }: {
   scene: ApiScene
   isAdmin: boolean
   resolvedTod: string
   onOpen: () => void
+  onReorder: (draggedSceneId: string, targetSceneId: string) => void
 }) {
   const kind = stripKind(scene, resolvedTod)
   const style = STRIP_STYLE[kind]
   const hasBudget = scene.budgetItemCount > 0
+  const [dragOver, setDragOver] = useState(false)
   return (
     <button
       type="button"
       onClick={onOpen}
       draggable={isAdmin}
+      onDragOver={(e) => {
+        if (!isAdmin) return
+        const draggedId = e.dataTransfer.types.includes('text/scene-id')
+        if (!draggedId) return
+        e.preventDefault()
+        e.stopPropagation()
+        setDragOver(true)
+      }}
+      onDragLeave={() => setDragOver(false)}
+      onDrop={(e) => {
+        if (!isAdmin) return
+        const draggedSceneId = e.dataTransfer.getData('text/scene-id')
+        setDragOver(false)
+        if (!draggedSceneId || draggedSceneId === scene.id) return
+        e.preventDefault()
+        e.stopPropagation()
+        onReorder(draggedSceneId, scene.id)
+      }}
       onDragStart={(e) => {
         e.dataTransfer.setData('text/scene-id', scene.id)
         e.dataTransfer.effectAllowed = 'move'
       }}
-      className={`relative text-left aspect-square rounded-2xl ring-1 ring-white/10 overflow-hidden ${style.card} ${
+      className={`relative text-left aspect-square rounded-2xl ring-1 ${
+        dragOver ? 'ring-4 ring-stage-mastering' : 'ring-white/10'
+      } overflow-hidden ${style.card} ${
         isAdmin ? 'cursor-pointer' : 'cursor-pointer'
       } hover:ring-white/40 hover:shadow-xl hover:scale-[1.02] transition flex flex-col text-white shadow-md`}
       title={`${scene.slug} — click to open breakdown`}
