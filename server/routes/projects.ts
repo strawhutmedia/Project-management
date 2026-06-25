@@ -920,3 +920,54 @@ projectsRouter.get('/:id/events', async (req, res) => {
     cleanup()
   })
 })
+
+import { claimRow, releaseRow, getClaims, emit as emitEvent } from '../events'
+
+// Claim a row for live editing. Other clients see "X is editing this
+// row" and the inputs disable for them. Auto-expires after 30s if
+// the client stops refreshing the claim. Frontend re-claims on every
+// keystroke / refocus while the input is active.
+projectsRouter.post('/:id/presence/claim', async (req, res) => {
+  const user = (req as typeof req & { user: SessionUser }).user
+  const projectId = req.params.id
+  if (await getProjectRole(user.id, user.role, projectId) === null) {
+    res.status(403).json({ error: 'forbidden' }); return
+  }
+  const rowType = String(req.body?.rowType ?? '').slice(0, 40)
+  const rowId = String(req.body?.rowId ?? '').slice(0, 80)
+  if (!rowType || !rowId) { res.status(400).json({ error: 'rowType_and_rowId_required' }); return }
+  const { changed } = claimRow(projectId, rowType, rowId, user.id, user.display_name || null)
+  if (changed) {
+    emitEvent(projectId, 'presence.claim', {
+      rowType, rowId, userId: user.id, displayName: user.display_name || null,
+    }, user.id)
+  }
+  res.json({ ok: true })
+})
+
+projectsRouter.post('/:id/presence/release', async (req, res) => {
+  const user = (req as typeof req & { user: SessionUser }).user
+  const projectId = req.params.id
+  if (await getProjectRole(user.id, user.role, projectId) === null) {
+    res.status(403).json({ error: 'forbidden' }); return
+  }
+  const rowType = String(req.body?.rowType ?? '').slice(0, 40)
+  const rowId = String(req.body?.rowId ?? '').slice(0, 80)
+  if (!rowType || !rowId) { res.status(400).json({ error: 'rowType_and_rowId_required' }); return }
+  const removed = releaseRow(projectId, rowType, rowId, user.id)
+  if (removed) {
+    emitEvent(projectId, 'presence.release', { rowType, rowId, userId: user.id }, user.id)
+  }
+  res.json({ ok: true })
+})
+
+// Snapshot of current claims — used by clients to bootstrap state when
+// they connect (in case they missed the events).
+projectsRouter.get('/:id/presence/claims', async (req, res) => {
+  const user = (req as typeof req & { user: SessionUser }).user
+  const projectId = req.params.id
+  if (await getProjectRole(user.id, user.role, projectId) === null) {
+    res.status(403).json({ error: 'forbidden' }); return
+  }
+  res.json({ claims: getClaims(projectId) })
+})

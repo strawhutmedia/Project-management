@@ -694,6 +694,18 @@ export const api = {
     request<{ ok: true }>(`/api/projects/${projectId}/presence/heartbeat`, {
       method: 'POST', body: JSON.stringify({ section: section ?? null }),
     }),
+  claimRow: (projectId: string, rowType: string, rowId: string) =>
+    request<{ ok: true }>(`/api/projects/${projectId}/presence/claim`, {
+      method: 'POST', body: JSON.stringify({ rowType, rowId }),
+    }),
+  releaseRow: (projectId: string, rowType: string, rowId: string) =>
+    request<{ ok: true }>(`/api/projects/${projectId}/presence/release`, {
+      method: 'POST', body: JSON.stringify({ rowType, rowId }),
+    }),
+  projectClaims: (projectId: string) =>
+    request<{ claims: Array<{ rowType: string; rowId: string; userId: string; displayName: string | null }> }>(
+      `/api/projects/${projectId}/presence/claims`,
+    ),
   projectPresence: (projectId: string) =>
     request<{
       presence: Array<{

@@ -7,6 +7,7 @@ import {
   type BudgetCategory,
 } from '../api'
 import { useProjectEvents } from '../useProjectEvents'
+import { useRowClaims, useRowClaimSender, useOtherClaim, colorForUser, initialsFor } from '../useRowClaims'
 
 const CATEGORY_LABEL: Record<BudgetCategory, string> = {
   above_line: 'Above the Line',
@@ -109,12 +110,21 @@ export default function BudgetSection({ projectId, isAdmin }: { projectId: strin
     return () => document.removeEventListener('visibilitychange', onVisible)
   }, [projectId])
 
+  // Row claim tracking: who's currently editing what. The map is
+  // used by ItemRow to disable inputs + show a "Alex is editing" badge
+  // when another user has claimed the same row.
+  const { claims, applyEvent: applyClaimEvent } = useRowClaims(projectId)
+
   // Real-time updates via SSE. Each event patches the local budget
   // state precisely — only the affected ItemRow re-renders, the rest
   // of the table stays untouched (no flicker). Events from the
   // current user are filtered out in the hook itself so the
   // optimistic local state isn't clobbered.
   useProjectEvents(projectId, (event) => {
+    if (event.type === 'presence.claim' || event.type === 'presence.release') {
+      applyClaimEvent(event.type, event.data)
+      return
+    }
     if (event.type === 'budget.item.updated') {
       const newItem = event.data.item as (ApiBudgetLineItem & { accountId: string }) | undefined
       if (!newItem || !newItem.id) return
@@ -347,6 +357,8 @@ export default function BudgetSection({ projectId, isAdmin }: { projectId: strin
           currency={budget.currency}
           isAdmin={isAdmin}
           onChanged={load}
+          projectId={projectId}
+          claims={claims}
         />
       )}
 
@@ -1167,11 +1179,15 @@ function BudgetItemsTable({
   currency,
   isAdmin,
   onChanged,
+  projectId,
+  claims,
 }: {
   accounts: ApiBudgetAccount[]
   currency: string
   isAdmin: boolean
   onChanged: () => void | Promise<void>
+  projectId: string
+  claims: Map<string, { rowType: string; rowId: string; userId: string; displayName: string | null }>
 }) {
   type Row = ApiBudgetLineItem & { accountId: string; accountName: string; accountCode: string; category: BudgetCategory }
   const allRows: Row[] = []
@@ -1347,7 +1363,7 @@ function BudgetItemsTable({
                         </thead>
                         <tbody>
                           {rows.map((row) => (
-                            <ItemRow key={row.id} row={row} currency={currency} isAdmin={isAdmin} onChanged={onChanged} hideCategory />
+                            <ItemRow key={row.id} row={row} currency={currency} isAdmin={isAdmin} onChanged={onChanged} hideCategory projectId={projectId} claims={claims} />
                           ))}
                         </tbody>
                       </table>
@@ -1388,14 +1404,34 @@ function SortableTh({
 }
 
 function ItemRow({
-  row, currency, isAdmin, onChanged, hideCategory,
+  row, currency, isAdmin, onChanged, hideCategory, projectId, claims,
 }: {
   row: ApiBudgetLineItem & { accountId: string; accountName: string; accountCode: string; category: BudgetCategory }
   currency: string
   isAdmin: boolean
   onChanged: () => void | Promise<void>
   hideCategory?: boolean
+  projectId: string
+  claims: Map<string, { rowType: string; rowId: string; userId: string; displayName: string | null }>
 }) {
+  const otherClaim = useOtherClaim(claims, 'budget_item', row.id)
+  const { onFocus: claimFocus, onBlur: claimBlur } = useRowClaimSender(projectId, 'budget_item', row.id)
+  const lockedByOther = !!otherClaim
+  const lockedColor = otherClaim ? colorForUser(otherClaim.userId) : null
+  const lockedInitials = otherClaim ? initialsFor(otherClaim.displayName, otherClaim.userId) : ''
+
+  // When another user is editing, disable our inputs so we can't
+  // accidentally stomp on their work. We still see the value live as
+  // they type (the budget.item.updated event patches the row state on
+  // every save).
+  // Chain the cell's commit-on-blur with our row-release-on-blur.
+  function wrap(commit: () => void) {
+    return {
+      onFocus: claimFocus,
+      onBlur: () => { commit(); claimBlur() },
+      disabled: !isAdmin || lockedByOther,
+    }
+  }
   const [code, setCode] = useState(row.code ?? '')
   const [description, setDescription] = useState(row.description)
   const [amt, setAmt] = useState(String(row.amt))
@@ -1453,36 +1489,45 @@ function ItemRow({
         )}
       </td>
       <td className="px-1 py-1 w-14">
-        <CellInput value={code} onChange={setCode} onBlur={() => code !== (row.code ?? '') && void commit({ code })} mono />
+        <CellInput value={code} onChange={setCode} mono {...wrap(() => { if (code !== (row.code ?? '')) void commit({ code }) })} />
       </td>
-      <td className="px-1 py-1 min-w-[160px]">
-        <CellInput value={description} onChange={setDescription} onBlur={() => description !== row.description && void commit({ description })} />
+      <td className="px-1 py-1 min-w-[160px] relative">
+        <CellInput value={description} onChange={setDescription} {...wrap(() => { if (description !== row.description) void commit({ description }) })} />
+        {lockedByOther && (
+          <span
+            className="absolute top-0.5 right-1 text-[8px] font-bold uppercase tracking-wider rounded px-1.5 py-0.5 text-white pointer-events-none"
+            style={{ backgroundColor: lockedColor ?? '#94a3b8' }}
+            title={`${otherClaim?.displayName ?? 'Someone'} is editing this row`}
+          >
+            {lockedInitials} editing
+          </span>
+        )}
       </td>
       <td className="px-1 py-1 w-16">
-        <CellInput value={amt} onChange={setAmt} onBlur={() => parseFloat(amt) !== row.amt && void commit({ amt: parseFloat(amt) || 0 })} align="right" />
+        <CellInput value={amt} onChange={setAmt} align="right" {...wrap(() => { if (parseFloat(amt) !== row.amt) void commit({ amt: parseFloat(amt) || 0 }) })} />
       </td>
       <td className="px-1 py-1 w-12">
-        <CellInput value={x} onChange={setX} onBlur={() => parseFloat(x) !== row.x && void commit({ x: parseFloat(x) || 1 })} align="right" />
+        <CellInput value={x} onChange={setX} align="right" {...wrap(() => { if (parseFloat(x) !== row.x) void commit({ x: parseFloat(x) || 1 }) })} />
       </td>
       <td className="px-1 py-1 w-20">
-        <CellInput value={rate} onChange={setRate} onBlur={() => parseFloat(rate) !== row.rate && void commit({ rate: parseFloat(rate) || 0 })} align="right" />
+        <CellInput value={rate} onChange={setRate} align="right" {...wrap(() => { if (parseFloat(rate) !== row.rate) void commit({ rate: parseFloat(rate) || 0 }) })} />
       </td>
       <td className="px-1 py-1 w-16">
-        <CellInput value={units} onChange={setUnits} onBlur={() => units !== (row.units ?? '') && void commit({ units })} />
+        <CellInput value={units} onChange={setUnits} {...wrap(() => { if (units !== (row.units ?? '')) void commit({ units }) })} />
       </td>
       <td className="px-1 py-1 w-28">
-        <CellInput value={vendor} onChange={setVendor} onBlur={() => vendor !== (row.vendor ?? '') && void commit({ vendor })} />
+        <CellInput value={vendor} onChange={setVendor} {...wrap(() => { if (vendor !== (row.vendor ?? '')) void commit({ vendor }) })} />
       </td>
       <td className="px-1 py-1 w-28">
         <CellInput
           value={datedAt}
           onChange={setDatedAt}
           type="date"
-          onBlur={() => {
+          {...wrap(() => {
             const next = datedAt || null
             const prev = row.datedAt ? row.datedAt.slice(0, 10) : null
             if (next !== prev) void commit({ datedAt: next })
-          }}
+          })}
         />
       </td>
       <td className="px-2 py-1.5 text-right font-mono font-bold whitespace-nowrap">
@@ -1504,14 +1549,16 @@ function ItemRow({
 }
 
 function CellInput({
-  value, onChange, onBlur, type = 'text', align, mono,
+  value, onChange, onBlur, onFocus, type = 'text', align, mono, disabled,
 }: {
   value: string
   onChange: (v: string) => void
   onBlur: () => void
+  onFocus?: () => void
   type?: 'text' | 'date'
   align?: 'right'
   mono?: boolean
+  disabled?: boolean
 }) {
   return (
     <input
@@ -1519,7 +1566,9 @@ function CellInput({
       value={value}
       onChange={(e) => onChange(e.target.value)}
       onBlur={onBlur}
-      className={`w-full bg-transparent text-xs px-1.5 py-1 rounded border border-transparent focus:border-stage-mastering/60 focus:bg-ink/40 outline-none ${
+      onFocus={onFocus}
+      disabled={disabled}
+      className={`w-full bg-transparent text-xs px-1.5 py-1 rounded border border-transparent focus:border-stage-mastering/60 focus:bg-ink/40 outline-none disabled:opacity-50 disabled:cursor-not-allowed ${
         align === 'right' ? 'text-right font-mono' : ''
       } ${mono ? 'font-mono' : ''}`}
     />

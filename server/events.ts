@@ -58,3 +58,75 @@ export function emit(
 export function listenerCount(projectId: string): number {
   return listenersByProject.get(projectId)?.size ?? 0
 }
+
+// Row claims — who's currently editing what. Auto-expire claims after
+// 30 seconds with no refresh so a closed tab doesn't hold a row
+// hostage forever.
+type Claim = {
+  userId: string
+  displayName: string | null
+  claimedAt: number
+}
+
+const claimsByProject = new Map<string, Map<string, Claim>>()
+const CLAIM_TTL_MS = 30_000
+
+function claimKey(rowType: string, rowId: string): string {
+  return `${rowType}::${rowId}`
+}
+
+function pruneExpiredClaims(projectId: string): boolean {
+  const map = claimsByProject.get(projectId)
+  if (!map) return false
+  const now = Date.now()
+  let changed = false
+  for (const [k, claim] of map) {
+    if (now - claim.claimedAt > CLAIM_TTL_MS) {
+      map.delete(k)
+      changed = true
+    }
+  }
+  if (map.size === 0) claimsByProject.delete(projectId)
+  return changed
+}
+
+export function claimRow(
+  projectId: string,
+  rowType: string,
+  rowId: string,
+  userId: string,
+  displayName: string | null,
+): { changed: boolean; claim: Claim } {
+  pruneExpiredClaims(projectId)
+  let map = claimsByProject.get(projectId)
+  if (!map) { map = new Map(); claimsByProject.set(projectId, map) }
+  const key = claimKey(rowType, rowId)
+  const existing = map.get(key)
+  const claim: Claim = { userId, displayName, claimedAt: Date.now() }
+  map.set(key, claim)
+  const changed = !existing || existing.userId !== userId
+  return { changed, claim }
+}
+
+export function releaseRow(projectId: string, rowType: string, rowId: string, userId: string): boolean {
+  const map = claimsByProject.get(projectId)
+  if (!map) return false
+  const key = claimKey(rowType, rowId)
+  const existing = map.get(key)
+  if (!existing || existing.userId !== userId) return false
+  map.delete(key)
+  if (map.size === 0) claimsByProject.delete(projectId)
+  return true
+}
+
+export function getClaims(projectId: string): Array<{ rowType: string; rowId: string; userId: string; displayName: string | null }> {
+  pruneExpiredClaims(projectId)
+  const map = claimsByProject.get(projectId)
+  if (!map) return []
+  const out: Array<{ rowType: string; rowId: string; userId: string; displayName: string | null }> = []
+  for (const [k, claim] of map) {
+    const [rowType, rowId] = k.split('::')
+    out.push({ rowType, rowId, userId: claim.userId, displayName: claim.displayName })
+  }
+  return out
+}

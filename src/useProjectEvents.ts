@@ -49,6 +49,8 @@ export function useProjectEvents(
       'budget.bulk.changed',
       'scene.updated',
       'cut.updated',
+      'presence.claim',
+      'presence.release',
       'connected',
     ]
     const listeners = types.map((t) => {
