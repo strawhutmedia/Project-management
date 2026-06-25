@@ -1,21 +1,35 @@
 import { Link, Navigate, useParams } from 'react-router-dom'
 import { useEffect, useState } from 'react'
-import { api, type ApiProject } from '../api'
+import { api, type ApiProject, type ApiMember } from '../api'
 import { useAuth } from '../auth'
 import Stripboard from '../components/Stripboard'
 
 export default function StripboardPage() {
   const { projectId } = useParams()
   const { user } = useAuth()
-  const isAdmin = user?.role === 'admin'
   const [project, setProject] = useState<ApiProject | null>(null)
+  const [members, setMembers] = useState<ApiMember[]>([])
   const [error, setError] = useState<string | null>(null)
+
+  // canWrite = workspace admin OR project-level admin OR project-level
+  // writer ("user"). Anyone with editor access on the project should
+  // get the full Stripboard / scene modal editing toolkit; "isAdmin"
+  // was too narrow and silently locked collaborators out.
+  const me = members.find((m) => m.id === user?.id)
+  const myProjectRole = me?.project_role ?? null
+  const canWrite =
+    user?.role === 'admin' ||
+    myProjectRole === 'admin' ||
+    myProjectRole === 'user'
 
   useEffect(() => {
     if (!projectId) return
     api.project(projectId)
       .then(({ project }) => setProject(project))
       .catch((err) => setError(err instanceof Error ? err.message : 'failed to load'))
+    api.projectMembers(projectId)
+      .then(({ members }) => setMembers(members))
+      .catch(() => {})
   }, [projectId])
 
   // Stripboard only exists for film projects, so anytime this page is
@@ -52,7 +66,7 @@ export default function StripboardPage() {
           ← {project.name}
         </Link>
       </div>
-      <Stripboard projectId={project.id} isAdmin={isAdmin} projectName={project.name} />
+      <Stripboard projectId={project.id} isAdmin={canWrite} projectName={project.name} />
     </div>
   )
 }

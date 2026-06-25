@@ -428,7 +428,7 @@ function SceneItemRow({
           {canPromoteToLocation && (
             <button
               onClick={() => void makeSharedLocation()}
-              className="text-[9px] uppercase tracking-wider text-muted hover:text-stage-mastering border border-line hover:border-stage-mastering/40 rounded-full px-2 py-0.5 whitespace-nowrap opacity-0 group-hover:opacity-100"
+              className="text-[9px] uppercase tracking-wider text-stage-mastering border border-stage-mastering/40 rounded-full px-2 py-0.5 whitespace-nowrap hover:bg-stage-mastering/10"
               title="Share this cost with every scene at the same location"
             >
               📍 Share with all "{sceneLocationTag}" scenes
