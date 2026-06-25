@@ -96,18 +96,16 @@ export default function BudgetSection({ projectId, isAdmin }: { projectId: strin
     void load()
   }, [projectId])
 
-  // Auto-refresh every 15 seconds so a teammate's edits appear without
-  // a manual reload. SKIP the refresh while the user has any input
-  // focused — overwriting an active input would lose what they're
-  // typing. Also skip when the tab isn't visible.
+  // Refetch only when the tab regains focus after being hidden. That's
+  // the moment a teammate's edits matter most — when the user comes
+  // back. Avoids the constant flicker of interval-based polling while
+  // they're actively reading or editing.
   useEffect(() => {
-    const timer = setInterval(() => {
-      if (document.hidden) return
-      const active = document.activeElement
-      if (active && (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA' || active.tagName === 'SELECT')) return
-      void load()
-    }, 15_000)
-    return () => clearInterval(timer)
+    function onVisible() {
+      if (!document.hidden) void load()
+    }
+    document.addEventListener('visibilitychange', onVisible)
+    return () => document.removeEventListener('visibilitychange', onVisible)
   }, [projectId])
 
   if (loading) {

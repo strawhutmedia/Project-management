@@ -137,18 +137,14 @@ export default function SceneDetailModal({
 
   useEffect(() => { void loadItems() }, [sceneId])
 
-  // Auto-refresh every 10 seconds while the modal is open so a
-  // teammate's edits to this scene's items appear without manual
-  // reload. Skips when an input is focused (would overwrite the
-  // value the user is typing) or when the tab isn't visible.
+  // Refetch when the tab regains focus rather than polling on a
+  // timer — interval polls caused visible flicker mid-edit.
   useEffect(() => {
-    const timer = setInterval(() => {
-      if (document.hidden) return
-      const active = document.activeElement
-      if (active && (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA' || active.tagName === 'SELECT')) return
-      void loadItems()
-    }, 10_000)
-    return () => clearInterval(timer)
+    function onVisible() {
+      if (!document.hidden) void loadItems()
+    }
+    document.addEventListener('visibilitychange', onVisible)
+    return () => document.removeEventListener('visibilitychange', onVisible)
   }, [sceneId])
 
   async function runBreakdown() {
