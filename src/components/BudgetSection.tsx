@@ -326,7 +326,10 @@ export default function BudgetSection({ projectId, isAdmin }: { projectId: strin
           </button>
         </div>
         {isAdmin && (
-          <ResetPricesButton projectId={projectId} onReset={load} />
+          <div className="flex items-center gap-2 flex-wrap">
+            <PopulateCastButton projectId={projectId} onPopulated={load} />
+            <ResetPricesButton projectId={projectId} onReset={load} />
+          </div>
         )}
         {viewMode === 'categories' && (
           <div className="flex gap-2">
@@ -1663,5 +1666,43 @@ function ResetPricesButton({
         </div>
       )}
     </>
+  )
+}
+
+// "Populate cast from script" — replaces the generic Lead Cast /
+// Supporting Cast / Day Players template rows with one row per
+// actual character from the script, bucketed by scene count.
+function PopulateCastButton({
+  projectId,
+  onPopulated,
+}: {
+  projectId: string
+  onPopulated: () => void | Promise<void>
+}) {
+  const [busy, setBusy] = useState(false)
+
+  async function run() {
+    if (!confirm('Replace the generic Lead/Supporting/Day Player rows with one row per character from the script? Existing priced cast rows stay put.')) return
+    setBusy(true)
+    try {
+      const r = await api.populateCastFromScript(projectId)
+      await onPopulated()
+      alert(`✓ Added ${r.count} cast rows from the script — Lead, Supporting, and Day Players bucketed by scene count.`)
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'failed')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <button
+      onClick={() => void run()}
+      disabled={busy}
+      className="text-[10px] uppercase tracking-wider text-stage-mastering border border-stage-mastering/40 rounded-full px-3 py-1.5 hover:bg-stage-mastering/10 disabled:opacity-50"
+      title="Pull every character from the script into the CAST account, bucketed by appearance count"
+    >
+      {busy ? 'Populating…' : '👥 Populate cast from script'}
+    </button>
   )
 }

@@ -438,3 +438,87 @@ budgetsRouter.post('/projects/:projectId/reset-prices', async (req, res) => {
   logInfo('budget prices reset', { projectId, by: user.id, kept: validCats, zeroed: Number(result.rows[0].count) })
   res.json({ ok: true, zeroed: Number(result.rows[0].count), keptCategories: validCats })
 })
+
+// Replace the generic Lead/Supporting/Day Player template rows in
+// the CAST account with one row per character from the script.
+// Buckets:
+//   Lead Cast (14-01)        top 2 by scene count
+//   Supporting Cast (14-02)  3+ scene appearances, not in Lead
+//   Day Players (14-03)      1–2 scene appearances
+// Sub-codes append the character index (14-01-a, -b, ...). Producer
+// can edit, delete, or merge after — same as Claude's breakdown.
+budgetsRouter.post('/projects/:projectId/populate-cast-from-script', async (req, res) => {
+  const user = (req as typeof req & { user: SessionUser }).user
+  const projectId = req.params.projectId
+  if (!await assertWriter(user, projectId, res)) return
+
+  // Aggregate characters across all scenes
+  const scenes = await pool.query<{ characters: string[] }>(
+    `SELECT characters FROM scenes WHERE project_id = $1`,
+    [projectId],
+  )
+  const counts = new Map<string, number>()
+  for (const s of scenes.rows) {
+    for (const c of s.characters ?? []) {
+      const name = String(c).trim()
+      if (!name) continue
+      counts.set(name, (counts.get(name) ?? 0) + 1)
+    }
+  }
+  if (counts.size === 0) {
+    res.status(400).json({ error: 'no_characters', message: 'No characters found. Upload a .fdx first.' })
+    return
+  }
+  const ranked = Array.from(counts.entries())
+    .sort((a, b) => b[1] - a[1])
+    .map(([name, scenes]) => ({ name, scenes }))
+
+  // Find the CAST account (14-00) on this project's budget
+  const acct = await pool.query<{ id: string }>(
+    `SELECT a.id FROM budget_accounts a
+     JOIN budgets b ON b.id = a.budget_id
+     WHERE b.project_id = $1 AND a.code = '14-00'
+     LIMIT 1`,
+    [projectId],
+  )
+  if (acct.rows.length === 0) {
+    res.status(400).json({ error: 'no_cast_account', message: 'CAST account (14-00) not found on this budget.' })
+    return
+  }
+  const accountId = acct.rows[0].id
+
+  // Wipe existing CAST line items only if they are still zero-cost
+  // (template placeholders or breakdown defaults). Priced rows the
+  // producer already entered stay put.
+  await pool.query(
+    `DELETE FROM budget_line_items
+     WHERE account_id = $1 AND amt = 0 AND x = 1 AND rate = 0`,
+    [accountId],
+  )
+
+  let position = 0
+  const LEAD = 2
+  for (const { name, scenes } of ranked) {
+    position += 10
+    const bucket = position <= LEAD * 10 ? 'Lead' : scenes >= 3 ? 'Supporting' : 'Day Player'
+    const code = bucket === 'Lead' ? '14-01' : bucket === 'Supporting' ? '14-02' : '14-03'
+    await pool.query(
+      `INSERT INTO budget_line_items
+        (account_id, code, description, amt, x, rate, units, notes, position, created_by)
+       VALUES ($1, $2, $3, 0, 1, 0, $4, $5, $6, $7)`,
+      [
+        accountId,
+        code,
+        name,
+        bucket === 'Lead' ? 'Flat' : 'Days',
+        `${scenes} scene${scenes === 1 ? '' : 's'} in script`,
+        position,
+        user.id,
+      ],
+    )
+  }
+  markProjectDirty(projectId)
+  emit(projectId, 'budget.bulk.changed', { reason: 'populate_cast' }, user.id)
+  logInfo('cast populated from script', { projectId, by: user.id, count: ranked.length })
+  res.json({ ok: true, count: ranked.length })
+})

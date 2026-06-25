@@ -716,6 +716,11 @@ export const api = {
         currentSection: string | null
       }>
     }>(`/api/projects/${projectId}/presence`),
+  populateCastFromScript: (projectId: string) =>
+    request<{ ok: true; count: number }>(
+      `/api/budgets/projects/${projectId}/populate-cast-from-script`,
+      { method: 'POST' },
+    ),
   resetBudgetPrices: (projectId: string, keepCategories: BudgetCategory[]) =>
     request<{ ok: true; zeroed: number; keptCategories: string[] }>(
       `/api/budgets/projects/${projectId}/reset-prices`,
