@@ -266,6 +266,10 @@ export default function ProjectPage() {
           The schedule + budget is what the team is in here to DO; everything
           else is configuration. */}
       {project.kind === 'film' && (
+        <FilmExportsBar projectId={project.id} projectName={project.name} />
+      )}
+
+      {project.kind === 'film' && (
         <Stripboard projectId={project.id} isAdmin={isAdmin} projectName={project.name} />
       )}
 
@@ -957,6 +961,46 @@ function FilmSettingsPanel({
           )}
         </div>
       )}
+    </section>
+  )
+}
+
+// Export bar — surfaces the five industry-standard PDFs as one-click
+// downloads. Anchors above the stripboard so producers see it when
+// they land on the page.
+function FilmExportsBar({ projectId, projectName }: { projectId: string; projectName: string }) {
+  const baseUrl = `/api/exports/projects/${projectId}`
+  const docs = [
+    { href: `${baseUrl}/budget-topsheet.pdf`,   label: '💰 Budget Top Sheet',   hint: '1-page summary' },
+    { href: `${baseUrl}/budget-detailed.pdf`,   label: '📊 Detailed Budget',    hint: 'Every line item' },
+    { href: `${baseUrl}/stripboard.pdf`,        label: '🎬 Production Board',   hint: 'Stripboard, color-coded' },
+    { href: `${baseUrl}/dood.pdf`,              label: '📅 Day-Out-of-Days',    hint: 'Cast × days matrix' },
+    { href: `${baseUrl}/cast-list.pdf`,         label: '🎭 Cast List + Rates',  hint: 'Day rates × work days' },
+  ]
+  return (
+    <section className="rounded-2xl border border-line bg-panel/60 p-4">
+      <div className="flex items-center justify-between gap-3 flex-wrap mb-3">
+        <div>
+          <h2 className="text-[11px] uppercase tracking-[0.2em] text-muted font-bold">📄 Exports</h2>
+          <p className="text-[11px] text-muted/80 mt-0.5">
+            Print-ready PDFs for {projectName} · investors, line producers, crew handouts.
+          </p>
+        </div>
+      </div>
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-2">
+        {docs.map((d) => (
+          <a
+            key={d.href}
+            href={d.href}
+            download
+            className="rounded-lg border border-line bg-ink/30 hover:bg-ink/50 hover:border-stage-mastering/40 transition px-3 py-2 group"
+          >
+            <div className="text-xs font-bold text-text">{d.label}</div>
+            <div className="text-[10px] text-muted mt-0.5">{d.hint}</div>
+            <div className="text-[10px] text-stage-mastering mt-1 group-hover:underline">Download PDF →</div>
+          </a>
+        ))}
+      </div>
     </section>
   )
 }

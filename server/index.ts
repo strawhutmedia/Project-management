@@ -18,6 +18,7 @@ import { podcastsRouter } from './routes/podcasts'
 import { schedulerRouter as socialSchedulerRouter } from './routes/scheduler'
 import { showChatRouter } from './routes/show_chat'
 import { episodeCutsRouter } from './routes/episode_cuts'
+import { exportsRouter } from './routes/exports'
 import { seedBackInYourArms } from './seeds/back_in_your_arms'
 import { ensureRyanIsPodcastEp } from './routes/projects'
 import { startScheduler } from './scheduler'
@@ -78,6 +79,7 @@ app.use('/api/scheduler', socialSchedulerRouter)
 // /api/projects/:id/chat — colocated with project-scoped endpoints.
 app.use('/api', showChatRouter)
 app.use('/api', episodeCutsRouter)
+app.use('/api/exports', exportsRouter)
 
 const clientDir = path.resolve(process.cwd(), 'dist')
 logInfo('serving client from', { clientDir })
