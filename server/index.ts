@@ -35,6 +35,23 @@ const app = express()
 const PORT = parseInt(process.env.PORT || '8080', 10)
 
 app.disable('x-powered-by')
+
+// Catch malformed URI errors early (e.g., /%c0) and return 400 without logging
+// These are typically from bots/scanners and are not actionable errors
+app.use((req, res, next) => {
+  try {
+    decodeURIComponent(req.path)
+    next()
+  } catch (err) {
+    if (err instanceof URIError) {
+      // Silently reject with 400 - these are malformed requests, not server errors
+      res.status(400).send('Bad Request')
+    } else {
+      next(err)
+    }
+  }
+})
+
 app.use(express.json({ limit: '20mb' }))
 app.use(cookieParser())
 
@@ -97,6 +114,12 @@ app.use((err: Error, req: express.Request, res: express.Response, _next: express
   if (isClientAbort) {
     // Silently ignore - no need to log or send response (client is gone)
     logInfo('client aborted request', { method: req.method, path: req.path })
+    return
+  }
+  
+  // Ignore malformed URI errors (from bots/scanners) - these are not actionable
+  if (err instanceof URIError || err.message?.includes('Failed to decode param')) {
+    res.status(400).send('Bad Request')
     return
   }
   
