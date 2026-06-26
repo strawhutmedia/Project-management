@@ -84,7 +84,7 @@ logInfo('serving client from', { clientDir })
 // Hashed assets (index-XXXX.js, index-YYYY.css) are cache-immutable; everything
 // else (notably index.html) must NOT be cached or iOS Safari can pin the user
 // to a stale bundle for up to an hour after a deploy.
-app.use(express.static(clientDir, {
+const staticMiddleware = express.static(clientDir, {
   index: false,
   setHeaders(res, file) {
     if (/\/assets\/.+\.(js|css|woff2?|ttf|svg|png|jpg|webp)$/.test(file)) {
@@ -93,7 +93,21 @@ app.use(express.static(clientDir, {
       res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate')
     }
   },
-}))
+})
+
+// Wrap static middleware to catch and suppress URI decoding errors
+app.use((req, res, next) => {
+  staticMiddleware(req, res, (err) => {
+    if (err && (err instanceof URIError || err.message?.includes('Failed to decode param'))) {
+      // Silently reject malformed URIs with 400 - these are from bots/scanners
+      res.status(400).send('Bad Request')
+    } else if (err) {
+      next(err)
+    } else {
+      next()
+    }
+  })
+})
 app.get('*', (_req, res) => {
   res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate')
   res.sendFile(path.join(clientDir, 'index.html'), (err) => {
