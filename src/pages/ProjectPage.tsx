@@ -16,6 +16,7 @@ import BrandAssetsCard from '../components/BrandAssetsCard'
 import ShowChatCard from '../components/ShowChatCard'
 import ScriptOverviewCard from '../components/ScriptOverviewCard'
 import PresenceBar from '../components/PresenceBar'
+import Stripboard from '../components/Stripboard'
 import FilmPhaseBar, { type FilmPhase } from '../components/FilmPhaseBar'
 import { useAuth } from '../auth'
 
@@ -241,8 +242,9 @@ export default function ProjectPage() {
 
       {/* Show chat — super-admin only. Workspace admins (Ryan) get
           the Claude assistant; project members at any level don't see
-          it. Gated server-side too. */}
-      {user?.role === 'admin' && <ShowChatCard projectId={project.id} />}
+          it. Gated server-side too. NON-FILM only — for film projects
+          this gets folded into the Settings panel below. */}
+      {user?.role === 'admin' && project.kind !== 'film' && <ShowChatCard projectId={project.id} />}
 
       {isAdmin && project.kind === 'album' && <ProjectRolesSection project={project} members={members} onSaved={reload} />}
       {isAdmin && project.kind === 'podcast' && <PodcastTeamSection project={project} members={members} onSaved={reload} />}
@@ -250,39 +252,35 @@ export default function ProjectPage() {
       {isAdmin && project.kind === 'podcast' && <BrandAssetsCard project={project} onSaved={reload} />}
       {isAdmin && project.kind === 'podcast' && <BrandProfileCard project={project} members={members} onSaved={reload} />}
       {isAdmin && project.kind === 'podcast' && <PodcastSocialsConfig project={project} members={members} onSaved={reload} />}
-      {isAdmin && project.kind === 'film' && <FilmTeamSection project={project} members={members} onSaved={reload} />}
 
-      {isAdmin && user?.id && (
+      {/* Members section — NON-FILM. Film projects fold this into the
+          Settings panel below. */}
+      {isAdmin && user?.id && project.kind !== 'film' && (
         <ProjectMembersSection projectId={project.id} members={members} currentUserId={user.id} onChanged={reload} />
       )}
 
-      {/* Film workflow: Script → Schedule → Budget. Everything flows
-          from the .fdx, so the script gets top billing on the project
-          page. Schedule lives on its own /stripboard route. Budget is
-          downstream of both. */}
+      {/* FILM PROJECT LAYOUT:
+            1. 🎬 Stripboard (embedded — the main work area)
+            2. 💰 Budget summary
+            3. ⚙️ Settings (collapsible: Script, Team, Members, Show Chat)
+          The schedule + budget is what the team is in here to DO; everything
+          else is configuration. */}
       {project.kind === 'film' && (
-        <ScriptOverviewCard projectId={project.id} isAdmin={isAdmin} />
-      )}
-
-      {project.kind === 'film' && (
-        <Link
-          to={`/projects/${project.id}/stripboard`}
-          className="block rounded-2xl border border-line bg-panel/60 p-5 hover:border-stage-mastering/60 hover:bg-panel transition group"
-        >
-          <div className="flex items-center justify-between gap-3">
-            <div className="min-w-0">
-              <div className="text-[11px] uppercase tracking-[0.2em] text-muted font-bold">🎬 Schedule · Stripboard</div>
-              <div className="text-sm font-bold mt-1 text-text">Open shooting schedule →</div>
-              <div className="text-[11px] text-muted/80 mt-0.5">
-                Scenes by shoot day · drag to reorder · saved snapshots
-              </div>
-            </div>
-            <span className="text-2xl text-muted group-hover:text-stage-mastering transition shrink-0">›</span>
-          </div>
-        </Link>
+        <Stripboard projectId={project.id} isAdmin={isAdmin} projectName={project.name} />
       )}
 
       {project.kind === 'film' && <BudgetSection projectId={project.id} isAdmin={isAdmin} />}
+
+      {project.kind === 'film' && (
+        <FilmSettingsPanel
+          project={project}
+          members={members}
+          isAdmin={isAdmin}
+          isSuperAdmin={user?.role === 'admin'}
+          currentUserId={user?.id ?? ''}
+          onReload={reload}
+        />
+      )}
 
       {project.kind === 'podcast' && (
         <Link
@@ -914,3 +912,51 @@ function projectReleaseLabel(yyyyMmDd: string): string {
   return `${-diff}d ago`
 }
 
+
+// Settings panel for film projects — collapses all the configuration
+// (script, team, members, Claude chat) out of the way so the
+// stripboard + budget are the dominant content. Expanded by default
+// the first time, then producer can collapse it once they're working.
+function FilmSettingsPanel({
+  project,
+  members,
+  isAdmin,
+  isSuperAdmin,
+  currentUserId,
+  onReload,
+}: {
+  project: ApiProject
+  members: ApiMember[]
+  isAdmin: boolean
+  isSuperAdmin: boolean
+  currentUserId: string
+  onReload: () => void | Promise<void>
+}) {
+  const [expanded, setExpanded] = useState(false)
+  return (
+    <section className="rounded-2xl border border-line bg-panel/40">
+      <button
+        onClick={() => setExpanded(!expanded)}
+        className="w-full flex items-center justify-between gap-3 px-5 py-4 text-left hover:bg-panel/60 transition rounded-2xl"
+      >
+        <div className="flex items-center gap-3">
+          <span className="text-[11px] uppercase tracking-[0.2em] text-muted font-bold">⚙️ Settings</span>
+          <span className="text-[11px] text-muted/70">
+            script · team · members{isSuperAdmin ? ' · Claude chat' : ''}
+          </span>
+        </div>
+        <span className="text-muted text-xl">{expanded ? '▾' : '▸'}</span>
+      </button>
+      {expanded && (
+        <div className="px-5 pb-5 space-y-6 border-t border-line/40 pt-4">
+          <ScriptOverviewCard projectId={project.id} isAdmin={isAdmin} />
+          {isSuperAdmin && <ShowChatCard projectId={project.id} />}
+          {isAdmin && <FilmTeamSection project={project} members={members} onSaved={onReload} />}
+          {isAdmin && currentUserId && (
+            <ProjectMembersSection projectId={project.id} members={members} currentUserId={currentUserId} onChanged={onReload} />
+          )}
+        </div>
+      )}
+    </section>
+  )
+}
