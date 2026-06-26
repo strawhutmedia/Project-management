@@ -819,11 +819,15 @@ function SceneCard({
       onClick={onOpen}
       draggable={isAdmin}
       onDragOver={(e) => {
+        // Type-checking dataTransfer.types during dragover is unreliable
+        // across browsers (Safari sometimes returns a DOMStringList
+        // without .includes, and some types are hidden until drop for
+        // security). Just unconditionally accept the drop when admin
+        // and let onDrop verify the payload.
         if (!isAdmin) return
-        const draggedId = e.dataTransfer.types.includes('text/scene-id')
-        if (!draggedId) return
         e.preventDefault()
         e.stopPropagation()
+        e.dataTransfer.dropEffect = 'move'
         setDragOver(true)
       }}
       onDragLeave={() => setDragOver(false)}
@@ -901,7 +905,17 @@ function LegendChip({ label, className }: { label: string; className: string }) 
 // of cost — cast, crew, equipment, locations, catering all rolled
 // up per-day, with cast auto-populated from the day's scheduled
 // scenes.
-type DayCostItem = { id: string; description: string; total: number; amt: number; rate: number; code: string | null }
+type DayCostItem = {
+  id: string
+  description: string
+  total: number
+  amt: number
+  rate: number
+  code: string | null
+  spansAllShootDays: boolean
+  isSource: boolean
+  sourceShootDayId: string | null
+}
 
 const DAY_BUCKETS: Array<{ code: string; label: string; icon: string }> = [
   { code: 'CAST',      label: 'Cast on call',  icon: '🎭' },
@@ -929,6 +943,9 @@ function DayCostsSection({
       setItems(r.items.map((it) => ({
         id: it.id, description: it.description, total: it.total,
         amt: it.amt, rate: it.rate, code: it.code,
+        spansAllShootDays: it.spansAllShootDays,
+        isSource: it.isSource,
+        sourceShootDayId: it.sourceShootDayId,
       })))
     } catch {
       setItems([])
@@ -960,6 +977,11 @@ function DayCostsSection({
 
   async function updateCost(id: string, cost: number) {
     await api.updateBudgetItem(id, { rate: cost, amt: 1, x: 1 })
+    await load()
+  }
+
+  async function toggleRunOfShoot(id: string, current: boolean) {
+    await api.updateBudgetItem(id, { spansAllShootDays: !current })
     await load()
   }
 
@@ -1004,6 +1026,7 @@ function DayCostsSection({
                 onAdd={(desc, cost) => add(bucket.code, desc, cost)}
                 onUpdate={updateCost}
                 onDelete={remove}
+                onToggleRunOfShoot={toggleRunOfShoot}
                 onAutoAddCast={bucket.code === 'CAST' ? autoAddCast : undefined}
                 busyAutoAdd={busy}
               />
@@ -1024,6 +1047,7 @@ function DayBucket({
   onAdd,
   onUpdate,
   onDelete,
+  onToggleRunOfShoot,
   onAutoAddCast,
   busyAutoAdd,
 }: {
@@ -1035,6 +1059,7 @@ function DayBucket({
   onAdd: (description: string, cost: number) => void | Promise<void>
   onUpdate: (id: string, cost: number) => void | Promise<void>
   onDelete: (id: string) => void | Promise<void>
+  onToggleRunOfShoot: (id: string, current: boolean) => void | Promise<void>
   onAutoAddCast?: () => void | Promise<void>
   busyAutoAdd?: boolean
 }) {
@@ -1081,6 +1106,7 @@ function DayBucket({
             isAdmin={isAdmin}
             onUpdate={(cost) => void onUpdate(it.id, cost)}
             onDelete={() => void onDelete(it.id)}
+            onToggleRunOfShoot={() => void onToggleRunOfShoot(it.id, it.spansAllShootDays)}
           />
         ))}
         {isAdmin && (
@@ -1119,27 +1145,66 @@ function DayCostRow({
   isAdmin,
   onUpdate,
   onDelete,
+  onToggleRunOfShoot,
 }: {
-  item: { id: string; description: string; total: number; amt: number; rate: number }
+  item: DayCostItem
   isAdmin: boolean
   onUpdate: (cost: number) => void
   onDelete: () => void
+  onToggleRunOfShoot: () => void
 }) {
   const [cost, setCost] = useState(String(item.rate))
   useEffect(() => { setCost(String(item.rate)) }, [item.rate])
+
+  // A run-of-shoot item appears on every day's view but is only
+  // editable on the day it lives on (the "source"). On other days
+  // it's read-only and visually marked.
+  const isRos = item.spansAllShootDays
+  const isMirror = isRos && !item.isSource
+  const editable = isAdmin && !isMirror
+
   return (
-    <div className="flex items-center gap-2 text-xs px-2 py-1 rounded bg-ink/30 border border-line/40">
-      <span className="flex-1 text-text truncate" title={item.description}>{item.description}</span>
+    <div className={`flex items-center gap-2 text-xs px-2 py-1 rounded border ${
+      isMirror ? 'bg-stage-mastering/5 border-stage-mastering/20' : 'bg-ink/30 border-line/40'
+    }`}>
+      <span className="flex-1 text-text truncate" title={item.description}>
+        {item.description}
+        {isMirror && (
+          <span className="ml-1.5 text-[9px] uppercase tracking-wider text-stage-mastering/70 italic">
+            · run of shoot (edit on source day)
+          </span>
+        )}
+      </span>
+      {isAdmin && (
+        <button
+          onClick={onToggleRunOfShoot}
+          disabled={isMirror}
+          title={
+            isMirror
+              ? 'Run of shoot — edit on the source day'
+              : isRos
+                ? 'Currently applies to every shoot day. Click to revert to just this day.'
+                : 'Click to apply this cost to every shoot day in the production'
+          }
+          className={`text-[10px] uppercase tracking-wider rounded-full border px-2 py-0.5 ${
+            isRos
+              ? 'bg-stage-mastering text-white border-stage-mastering'
+              : 'text-muted border-line hover:text-stage-mastering hover:border-stage-mastering/40'
+          } disabled:opacity-50 disabled:cursor-not-allowed`}
+        >
+          🔁 {isRos ? 'Run of shoot' : 'Single day'}
+        </button>
+      )}
       <input
         type="number"
         inputMode="decimal"
         value={cost}
         onChange={(e) => setCost(e.target.value)}
         onBlur={() => { const v = parseFloat(cost) || 0; if (v !== item.rate) onUpdate(v) }}
-        disabled={!isAdmin}
-        className="w-24 text-right font-mono bg-ink/40 border border-line rounded px-2 py-1 outline-none focus:border-stage-mastering"
+        disabled={!editable}
+        className="w-24 text-right font-mono bg-ink/40 border border-line rounded px-2 py-1 outline-none focus:border-stage-mastering disabled:opacity-60"
       />
-      {isAdmin && (
+      {isAdmin && !isMirror && (
         <button onClick={onDelete} className="text-muted/40 hover:text-urgent px-1" title="Delete">✕</button>
       )}
     </div>

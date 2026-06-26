@@ -311,6 +311,7 @@ budgetsRouter.patch('/items/:itemId', async (req, res) => {
     ['notes', 'notes', (v) => (typeof v === 'string' ? v : null)],
     ['sceneId', 'scene_id', (v) => (typeof v === 'string' ? v : null)],
     ['shootDayId', 'shoot_day_id', (v) => (typeof v === 'string' ? v : null)],
+    ['spansAllShootDays', 'spans_all_shoot_days', (v) => Boolean(v)],
     ['resourceType', 'resource_type', (v) => (typeof v === 'string' ? v.slice(0, 40) : null)],
     ['resourceKey', 'resource_key', (v) => (typeof v === 'string' ? v.slice(0, 80) : null)],
   ]
@@ -387,13 +388,32 @@ budgetsRouter.get('/shoot-days/:shootDayId/items', async (req, res) => {
     [user.id, lookup.rows[0].project_id, user.role],
   )
   if (access.rows.length === 0) { res.status(403).json({ error: 'forbidden' }); return }
-  const { rows } = await pool.query(
+  // Return items physically attached to this shoot day PLUS any
+  // "run of shoot" items attached to ANY other shoot day in the
+  // same project — those show up on every day's view as read-only
+  // info (counts once in total but visible everywhere).
+  const { rows } = await pool.query<{
+    id: string; account_id: string; code: string | null; description: string;
+    amt: string; units: string | null; x: string; rate: string;
+    vendor: string | null; dated_at: string | null; notes: string | null;
+    position: number; spans_all_shoot_days: boolean;
+    is_source: boolean; source_shoot_day_id: string | null;
+  }>(
     `SELECT li.id, li.account_id, li.code, li.description, li.amt, li.units,
-            li.x, li.rate, li.vendor, li.dated_at, li.notes, li.position
+            li.x, li.rate, li.vendor, li.dated_at, li.notes, li.position,
+            li.spans_all_shoot_days,
+            (li.shoot_day_id = $1) AS is_source,
+            li.shoot_day_id AS source_shoot_day_id
      FROM budget_line_items li
-     WHERE li.shoot_day_id = $1
-     ORDER BY li.position ASC, li.created_at ASC`,
-    [shootDayId],
+     JOIN budget_accounts a ON a.id = li.account_id
+     JOIN budgets b ON b.id = a.budget_id
+     WHERE b.project_id = $2
+       AND (
+         li.shoot_day_id = $1
+         OR (li.spans_all_shoot_days = TRUE AND li.shoot_day_id IS NOT NULL)
+       )
+     ORDER BY li.spans_all_shoot_days DESC, li.position ASC, li.created_at ASC`,
+    [shootDayId, lookup.rows[0].project_id],
   )
   res.json({
     items: rows.map((r) => ({
@@ -410,6 +430,9 @@ budgetsRouter.get('/shoot-days/:shootDayId/items', async (req, res) => {
       notes: r.notes,
       position: r.position,
       total: Number(r.amt) * Number(r.x) * Number(r.rate),
+      spansAllShootDays: r.spans_all_shoot_days,
+      isSource: r.is_source,
+      sourceShootDayId: r.source_shoot_day_id,
     })),
   })
 })
