@@ -147,5 +147,17 @@
     "outcome": "fixed",
     "summary": "Fixed JSON parsing bug in auto-scheduler where escape sequences within strings were incorrectly handled, causing valid Claude responses to be rejected as \"not valid JSON\".",
     "iterations": 15
+  },
+  "unhandled error::{\"message\":\"Failed to decode param '/%c0'\",\"stack\":\"URIError: Failed to decode p": {
+    "attemptedAt": "2026-06-26T09:51:36.048Z",
+    "outcome": "fixed",
+    "summary": "Added middleware to catch and silently reject malformed URI requests (e.g., /%c0) with 400 Bad Request, preventing URIError from being logged as unhandled errors.",
+    "iterations": 11
+  },
+  "unhandled error::{\"message\":\"Failed to decode param '/%c0/'\",\"stack\":\"URIError: Failed to decode ": {
+    "attemptedAt": "2026-06-26T09:52:51.963Z",
+    "outcome": "fixed",
+    "summary": "Wrapped express.static middleware to catch and silently suppress URI decoding errors from malformed requests (e.g., /%c0/) that were being logged as unhandled errors.",
+    "iterations": 13
   }
 }
