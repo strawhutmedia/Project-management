@@ -908,6 +908,7 @@ function LegendChip({ label, className }: { label: string; className: string }) 
 type DayCostItem = {
   id: string
   description: string
+  vendor: string | null
   total: number
   amt: number
   rate: number
@@ -941,7 +942,7 @@ function DayCostsSection({
     try {
       const r = await api.dayBudgetItems(shootDayId)
       setItems(r.items.map((it) => ({
-        id: it.id, description: it.description, total: it.total,
+        id: it.id, description: it.description, vendor: it.vendor, total: it.total,
         amt: it.amt, rate: it.rate, code: it.code,
         spansAllShootDays: it.spansAllShootDays,
         isSource: it.isSource,
@@ -969,9 +970,13 @@ function DayCostsSection({
     }
   }
 
-  async function add(code: string, description: string, cost: number) {
+  async function add(code: string, description: string, vendor: string, cost: number) {
     if (!description.trim()) return
-    await api.quickAddDayCost(shootDayId, { description: description.trim(), cost, code })
+    await api.quickAddDayCost(shootDayId, {
+      description: description.trim(),
+      vendor: vendor.trim() || undefined,
+      cost, code,
+    })
     await load()
   }
 
@@ -1023,7 +1028,7 @@ function DayCostsSection({
                 icon={bucket.icon}
                 items={items.filter((i) => (i.code ?? 'OTHER') === bucket.code)}
                 isAdmin={isAdmin}
-                onAdd={(desc, cost) => add(bucket.code, desc, cost)}
+                onAdd={(desc, vendor, cost) => add(bucket.code, desc, vendor, cost)}
                 onUpdate={updateCost}
                 onDelete={remove}
                 onToggleRunOfShoot={toggleRunOfShoot}
@@ -1056,7 +1061,7 @@ function DayBucket({
   icon: string
   items: DayCostItem[]
   isAdmin: boolean
-  onAdd: (description: string, cost: number) => void | Promise<void>
+  onAdd: (description: string, vendor: string, cost: number) => void | Promise<void>
   onUpdate: (id: string, cost: number) => void | Promise<void>
   onDelete: (id: string) => void | Promise<void>
   onToggleRunOfShoot: (id: string, current: boolean) => void | Promise<void>
@@ -1064,17 +1069,22 @@ function DayBucket({
   busyAutoAdd?: boolean
 }) {
   const [desc, setDesc] = useState('')
+  const [vendor, setVendor] = useState('')
   const [cost, setCost] = useState('')
   const subtotal = items.reduce((s, i) => s + i.total, 0)
 
-  const placeholders: Record<string, string> = {
-    CAST:      'e.g. SAWYER, JASON KENDRICK',
-    CREW:      'e.g. DP, 1st AD, sound mixer, gaffer',
-    EQUIPMENT: 'e.g. Camera package, grip truck, sound kit',
-    LOCATION:  'e.g. Kendrick\'s house day fee, permit',
-    CATERING:  'e.g. Crew lunch for 25, craft service',
-    OTHER:     'e.g. Transport, parking, base camp',
+  // Two-input descriptions: a ROLE/CHARACTER/ITEM and a PERSON/VENDOR.
+  // The combination is what the producer needs to see at a glance —
+  // "DP — John Smith — $300" or "SAWYER — Allison Wall — $300".
+  const placeholders: Record<string, { desc: string; vendor: string }> = {
+    CAST:      { desc: 'Character (e.g. SAWYER)',           vendor: 'Actor (e.g. Allison Wall)' },
+    CREW:      { desc: 'Role (e.g. DP, 1st AD, mixer)',     vendor: 'Person (e.g. John Smith)' },
+    EQUIPMENT: { desc: 'Item (e.g. Camera package)',        vendor: 'Vendor (e.g. Panavision)' },
+    LOCATION:  { desc: 'Location (e.g. Kendrick\'s house)', vendor: 'Owner / mgr / fee source' },
+    CATERING:  { desc: 'Meal (e.g. Crew lunch for 25)',     vendor: 'Caterer' },
+    OTHER:     { desc: 'Description',                       vendor: 'Vendor / payee (opt.)' },
   }
+  const ph = placeholders[code] ?? placeholders.OTHER
 
   return (
     <div className="rounded-lg border border-line/60 bg-ink/20 px-3 py-2">
@@ -1110,13 +1120,20 @@ function DayBucket({
           />
         ))}
         {isAdmin && (
-          <div className="flex items-center gap-2 pt-1">
+          <div className="flex items-center gap-2 pt-1 flex-wrap sm:flex-nowrap">
             <input
               type="text"
               value={desc}
               onChange={(e) => setDesc(e.target.value)}
-              placeholder={placeholders[code] ?? ''}
-              className="flex-1 rounded bg-ink/40 border border-line text-text text-xs px-2 py-1 outline-none focus:border-stage-mastering"
+              placeholder={ph.desc}
+              className="flex-1 min-w-[140px] rounded bg-ink/40 border border-line text-text text-xs px-2 py-1 outline-none focus:border-stage-mastering"
+            />
+            <input
+              type="text"
+              value={vendor}
+              onChange={(e) => setVendor(e.target.value)}
+              placeholder={ph.vendor}
+              className="flex-1 min-w-[140px] rounded bg-ink/40 border border-line text-text text-xs px-2 py-1 outline-none focus:border-stage-mastering"
             />
             <input
               type="number"
@@ -1127,7 +1144,7 @@ function DayBucket({
               className="w-20 rounded bg-ink/40 border border-line text-text text-xs px-2 py-1 text-right font-mono outline-none focus:border-stage-mastering"
             />
             <button
-              onClick={() => { void onAdd(desc, parseFloat(cost) || 0); setDesc(''); setCost('') }}
+              onClick={() => { void onAdd(desc, vendor, parseFloat(cost) || 0); setDesc(''); setVendor(''); setCost('') }}
               disabled={!desc.trim()}
               className="rounded bg-stage-mastering text-white font-bold uppercase tracking-wider text-[10px] px-2.5 py-1 disabled:opacity-50"
             >
@@ -1167,14 +1184,21 @@ function DayCostRow({
     <div className={`flex items-center gap-2 text-xs px-2 py-1 rounded border ${
       isMirror ? 'bg-stage-mastering/5 border-stage-mastering/20' : 'bg-ink/30 border-line/40'
     }`}>
-      <span className="flex-1 text-text truncate" title={item.description}>
-        {item.description}
-        {isMirror && (
-          <span className="ml-1.5 text-[9px] uppercase tracking-wider text-stage-mastering/70 italic">
-            · run of shoot (edit on source day)
-          </span>
-        )}
-      </span>
+      <div className="flex-1 min-w-0">
+        <div className="flex items-baseline gap-2">
+          <span className="text-text truncate" title={item.description}>{item.description}</span>
+          {item.vendor && (
+            <span className="text-muted text-[11px] truncate" title={item.vendor}>
+              — {item.vendor}
+            </span>
+          )}
+          {isMirror && (
+            <span className="text-[9px] uppercase tracking-wider text-stage-mastering/70 italic shrink-0">
+              · run of shoot (edit on source day)
+            </span>
+          )}
+        </div>
+      </div>
       {isAdmin && (
         <button
           onClick={onToggleRunOfShoot}

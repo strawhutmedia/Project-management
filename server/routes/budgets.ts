@@ -455,6 +455,7 @@ budgetsRouter.post('/shoot-days/:shootDayId/quick-add', async (req, res) => {
   if (lookup.rows.length === 0) { res.status(404).json({ error: 'not_found' }); return }
   if (!await assertWriter(user, lookup.rows[0].project_id, res)) return
   const description = String(req.body?.description ?? '').trim().slice(0, 200)
+  const vendor = req.body?.vendor != null ? String(req.body.vendor).trim().slice(0, 200) : null
   const cost = Number(req.body?.cost) || 0
   const codeRaw = String(req.body?.code ?? 'OTHER').toUpperCase()
   const code = ['CAST', 'CREW', 'EQUIPMENT', 'LOCATION', 'CATERING', 'OTHER'].includes(codeRaw) ? codeRaw : 'OTHER'
@@ -492,9 +493,9 @@ budgetsRouter.post('/shoot-days/:shootDayId/quick-add', async (req, res) => {
   )
   const { rows } = await pool.query<{ id: string }>(
     `INSERT INTO budget_line_items
-       (account_id, shoot_day_id, code, description, amt, x, rate, units, position, created_by)
-     VALUES ($1, $2, $3, $4, 1, 1, $5, 'Flat', $6, $7) RETURNING id`,
-    [accountId, shootDayId, code, description, cost, posRes.rows[0].next, user.id],
+       (account_id, shoot_day_id, code, description, vendor, amt, x, rate, units, position, created_by)
+     VALUES ($1, $2, $3, $4, $5, 1, 1, $6, 'Flat', $7, $8) RETURNING id`,
+    [accountId, shootDayId, code, description, vendor || null, cost, posRes.rows[0].next, user.id],
   )
   markProjectDirty(lookup.rows[0].project_id)
   void emitItemUpdated(lookup.rows[0].project_id, rows[0].id, user.id)
