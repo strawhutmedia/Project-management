@@ -151,7 +151,12 @@ function itemTotal(it: LineItem): number {
 }
 
 function setupPdf(res: Response, fileName: string, landscape = false): typeof PDFDocument.prototype {
-  const doc = new PDFDocument({ size: 'LETTER', layout: landscape ? 'landscape' : 'portrait', margin: 40 })
+  const doc = new PDFDocument({
+    size: 'LETTER',
+    layout: landscape ? 'landscape' : 'portrait',
+    margin: 40,
+    bufferPages: true,  // required so addPageNumbers can switchToPage
+  })
   res.setHeader('Content-Type', 'application/pdf')
   res.setHeader('Content-Disposition', `attachment; filename="${fileName.replace(/"/g, '')}"`)
   doc.pipe(res)
@@ -260,6 +265,7 @@ export async function budgetTopSheetPdf(projectId: string, res: Response): Promi
   doc.text(`${budget.shoot_days} shoot days · ${budget.currency} · drafted ${new Date().toISOString().slice(0, 10)}`,
     40, doc.page.height - 60, { align: 'center', width: doc.page.width - 80 })
 
+  addPageNumbers(doc, project, 'BUDGET TOP SHEET')
   doc.end()
 }
 
@@ -305,16 +311,84 @@ export async function budgetDetailedPdf(projectId: string, res: Response): Promi
       doc.moveDown(0.2)
     }
   }
+  addPageNumbers(doc, project, 'DETAILED BUDGET')
   doc.end()
 }
 
 // ────────────────────────────────────────────────────────────────────
 // 3. STRIPBOARD / PRODUCTION BOARD
 // ────────────────────────────────────────────────────────────────────
+// Assign industry-standard cast numbers. Most-appearing character =
+// #1 (the lead), next = #2, etc. Returns a Map<character_name, number>
+// and the reverse map for legend rendering.
+export function buildCastNumbers(scenes: Scene[]): {
+  numberOf: Map<string, number>
+  legend: Array<{ number: number; name: string; sceneCount: number }>
+} {
+  const counts = new Map<string, number>()
+  for (const s of scenes) {
+    for (const c of s.characters ?? []) {
+      counts.set(c, (counts.get(c) ?? 0) + 1)
+    }
+  }
+  const ordered = Array.from(counts.entries())
+    .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+  const numberOf = new Map<string, number>()
+  const legend: Array<{ number: number; name: string; sceneCount: number }> = []
+  ordered.forEach(([name, count], i) => {
+    numberOf.set(name, i + 1)
+    legend.push({ number: i + 1, name, sceneCount: count })
+  })
+  return { numberOf, legend }
+}
+
 export async function stripboardPdf(projectId: string, res: Response): Promise<void> {
   const { project, scenes, shootDays } = await loadProjectContext(projectId)
   const doc = setupPdf(res, `${slug(project.name)}-stripboard.pdf`, true)
   pageHeader(doc, project, 'PRODUCTION BOARD')
+
+  // Build cast numbers from all scenes (so unscheduled scenes also
+  // get a number).
+  const { numberOf, legend } = buildCastNumbers(scenes)
+
+  // CAST LEGEND — block at the top of page 1 so the AD can decode
+  // the cast numbers on every strip. Multi-column grid.
+  doc.font('Helvetica-Bold').fontSize(10).fillColor('#1a1a1a').text('CAST NUMBERS')
+  doc.moveDown(0.2)
+  const colCount = 4
+  const colW = (doc.page.width - 80) / colCount
+  let col = 0
+  let rowY = doc.y
+  const rowH = 11
+  doc.font('Helvetica').fontSize(8).fillColor('#333')
+  for (const c of legend) {
+    const cx = 40 + col * colW
+    doc.font('Helvetica-Bold').fontSize(8).fillColor('#1a1a1a')
+    doc.text(String(c.number).padStart(2, ' '), cx, rowY, { width: 18, continued: true })
+    doc.font('Helvetica').fillColor('#333')
+    doc.text(`  ${c.name}`, { width: colW - 18 - 30, continued: true })
+    doc.fillColor('#888').font('Helvetica-Oblique')
+    doc.text(`  ${c.sceneCount} sc`, { width: 30, align: 'right' })
+    col += 1
+    if (col >= colCount) { col = 0; rowY += rowH }
+  }
+  if (col !== 0) rowY += rowH
+  doc.y = rowY + 8
+  doc.strokeColor('#1a1a1a').lineWidth(0.5).moveTo(40, doc.y).lineTo(doc.page.width - 40, doc.y).stroke()
+  doc.moveDown(0.5)
+
+  // STRIP COLUMN HEADERS (sticky-ish — re-rendered at top of each
+  // new page below)
+  function stripHeaders(y: number) {
+    doc.font('Helvetica-Bold').fontSize(7).fillColor('#666')
+    doc.text('SC#',      54,  y, { width: 30 })
+    doc.text('I/E TIME', 84,  y, { width: 100 })
+    doc.text('LOCATION / SLUG', 184, y, { width: 300 })
+    doc.text('PGS',     484, y, { width: 40, align: 'right' })
+    doc.text('CAST',    540, y, { width: doc.page.width - 580 })
+  }
+  stripHeaders(doc.y)
+  doc.y += 12
 
   const scenesByDay = new Map<string | null, Scene[]>()
   for (const s of scenes) {
@@ -325,7 +399,10 @@ export async function stripboardPdf(projectId: string, res: Response): Promise<v
 
   function renderDay(label: string, isBreak: boolean, scns: Scene[]) {
     const dayPages = scns.reduce((sum, s) => sum + s.page_eighths, 0)
-    if (doc.y > doc.page.height - 120) doc.addPage({ layout: 'landscape', margin: 40 })
+    if (doc.y > doc.page.height - 120) {
+      doc.addPage({ layout: 'landscape', margin: 40 })
+      stripHeaders(doc.y); doc.y += 12
+    }
     doc.moveDown(0.4)
     doc.font('Helvetica-Bold').fontSize(11).fillColor(isBreak ? '#888' : '#1a1a1a')
       .text(`${label}  —  ${scns.length} scenes  ·  ${fmtEighths(dayPages)} pages`)
@@ -336,7 +413,10 @@ export async function stripboardPdf(projectId: string, res: Response): Promise<v
       return
     }
     for (const s of scns) {
-      if (doc.y > doc.page.height - 60) doc.addPage({ layout: 'landscape', margin: 40 })
+      if (doc.y > doc.page.height - 60) {
+        doc.addPage({ layout: 'landscape', margin: 40 })
+        stripHeaders(doc.y); doc.y += 12
+      }
       const kind = stripKind(s.int_ext, s.time_of_day)
       const [r, g, b] = STRIP_COLORS[kind] ?? STRIP_COLORS.DEFAULT
       const y = doc.y
@@ -351,8 +431,15 @@ export async function stripboardPdf(projectId: string, res: Response): Promise<v
       doc.font('Helvetica').fontSize(9).fillColor('#333')
       doc.text(`${s.int_ext ?? ''} · ${s.time_of_day ?? ''}`, 84, y + 5, { width: 100 })
       doc.text(s.location ?? s.slug.slice(0, 60), 184, y + 5, { width: 300, ellipsis: true })
-      doc.text(fmtEighths(s.page_eighths), 484, y + 5, { width: 60 })
-      doc.text(s.characters.slice(0, 5).join(', '), 544, y + 5, { width: 200, ellipsis: true })
+      doc.text(fmtEighths(s.page_eighths), 484, y + 5, { width: 40, align: 'right' })
+      // Cast NUMBERS (industry standard), not names
+      const castNums = (s.characters ?? [])
+        .map((c) => numberOf.get(c))
+        .filter((n): n is number => typeof n === 'number')
+        .sort((a, b) => a - b)
+        .join(', ')
+      doc.font('Helvetica-Bold').fillColor('#1a1a1a')
+        .text(castNums || '—', 540, y + 5, { width: doc.page.width - 580, ellipsis: true })
       doc.y = y + 22
     }
   }
@@ -366,6 +453,7 @@ export async function stripboardPdf(projectId: string, res: Response): Promise<v
     renderDay(label, d.is_break, scns)
   }
 
+  addPageNumbers(doc, project, 'PRODUCTION BOARD')
   doc.end()
 }
 
@@ -377,20 +465,23 @@ export async function doodPdf(projectId: string, res: Response): Promise<void> {
   const doc = setupPdf(res, `${slug(project.name)}-dood.pdf`, true)
   pageHeader(doc, project, 'DAY-OUT-OF-DAYS')
 
-  // Build character × shoot-day matrix
-  const characters = new Set<string>()
-  for (const s of scenes) for (const c of s.characters ?? []) characters.add(c)
-  const allChars = Array.from(characters).sort()
+  const { numberOf } = buildCastNumbers(scenes)
+  const allChars = Array.from(numberOf.entries())
+    .sort((a, b) => a[1] - b[1])  // by cast number
+    .map(([name]) => name)
 
   const shootingDays = shootDays.filter((d) => !d.is_break)
   if (shootingDays.length === 0 || allChars.length === 0) {
     doc.fontSize(12).fillColor('#666').text('Schedule a shoot day with cast first.')
+    addPageNumbers(doc, project, 'DAY-OUT-OF-DAYS')
     doc.end(); return
   }
 
-  // For each character: which days they work
-  type CharRow = { name: string; days: Map<number, boolean>; start: number | null; finish: number | null; workCount: number }
-  const rows: CharRow[] = allChars.map((c) => ({ name: c, days: new Map(), start: null, finish: null, workCount: 0 }))
+  type CharRow = { castNum: number; name: string; days: Map<number, boolean>; start: number | null; finish: number | null; workCount: number }
+  const rows: CharRow[] = allChars.map((c) => ({
+    castNum: numberOf.get(c)!, name: c, days: new Map(),
+    start: null, finish: null, workCount: 0,
+  }))
   const rowByName = new Map(rows.map((r) => [r.name, r]))
   for (const s of scenes) {
     if (!s.shoot_day_id) continue
@@ -410,25 +501,26 @@ export async function doodPdf(projectId: string, res: Response): Promise<void> {
     r.start = dayNums[0] ?? null
     r.finish = dayNums[dayNums.length - 1] ?? null
   }
-  // Sort by start day, then most work days
-  rows.sort((a, b) => (a.start ?? 999) - (b.start ?? 999) || b.workCount - a.workCount)
+  rows.sort((a, b) => a.castNum - b.castNum)  // by cast number, not start day — standard for DOOD
 
-  // Render matrix
-  const charColW = 140
-  const dayColW = Math.max(18, (doc.page.width - 80 - charColW - 180) / shootingDays.length)
+  const numColW = 28
+  const charColW = 120
+  const dayColW = Math.max(16, (doc.page.width - 80 - numColW - charColW - 180) / shootingDays.length)
   const startX = 40
   let y = doc.y + 4
 
   // Header row
-  doc.font('Helvetica-Bold').fontSize(8).fillColor('#1a1a1a')
-  doc.text('CHARACTER', startX, y, { width: charColW })
+  doc.font('Helvetica-Bold').fontSize(7).fillColor('#1a1a1a')
+  doc.text('#', startX, y, { width: numColW, align: 'center' })
+  doc.text('CHARACTER', startX + numColW, y, { width: charColW })
   for (let i = 0; i < shootingDays.length; i++) {
     const d = shootingDays[i]
-    doc.text(String(d.number), startX + charColW + i * dayColW, y, { width: dayColW, align: 'center' })
+    doc.text(String(d.number), startX + numColW + charColW + i * dayColW, y, { width: dayColW, align: 'center' })
   }
-  doc.text('START', startX + charColW + shootingDays.length * dayColW, y, { width: 50, align: 'center' })
-  doc.text('FINISH', startX + charColW + shootingDays.length * dayColW + 50, y, { width: 50, align: 'center' })
-  doc.text('WORK', startX + charColW + shootingDays.length * dayColW + 100, y, { width: 50, align: 'center' })
+  const summaryX = startX + numColW + charColW + shootingDays.length * dayColW
+  doc.text('START',  summaryX,       y, { width: 50, align: 'center' })
+  doc.text('FINISH', summaryX + 50,  y, { width: 50, align: 'center' })
+  doc.text('WORK',   summaryX + 100, y, { width: 50, align: 'center' })
   y += 14
   doc.strokeColor('#1a1a1a').lineWidth(0.5).moveTo(startX, y).lineTo(doc.page.width - 40, y).stroke()
   y += 4
@@ -439,33 +531,34 @@ export async function doodPdf(projectId: string, res: Response): Promise<void> {
       doc.addPage({ layout: 'landscape', margin: 40 })
       y = 40
     }
-    doc.fillColor('#1a1a1a').text(row.name, startX, y, { width: charColW, ellipsis: true })
+    doc.fillColor('#1a1a1a').font('Helvetica-Bold').fontSize(8)
+      .text(String(row.castNum), startX, y, { width: numColW, align: 'center' })
+    doc.font('Helvetica').text(row.name, startX + numColW, y, { width: charColW, ellipsis: true })
     for (let i = 0; i < shootingDays.length; i++) {
       const d = shootingDays[i]
-      const cx = startX + charColW + i * dayColW
+      const cx = startX + numColW + charColW + i * dayColW
       if (row.days.has(d.number)) {
-        // Work day
         doc.rect(cx + 1, y - 1, dayColW - 2, 10).fillColor('#10b981').fill()
         doc.fillColor('#fff').font('Helvetica-Bold').fontSize(7)
           .text('W', cx, y, { width: dayColW, align: 'center' })
         doc.font('Helvetica').fontSize(8)
       } else if (row.start != null && row.finish != null && d.number > row.start && d.number < row.finish) {
-        // Hold day
         doc.fillColor('#999').text('H', cx, y, { width: dayColW, align: 'center' })
       }
     }
     doc.fillColor('#1a1a1a')
-    doc.text(String(row.start ?? '—'), startX + charColW + shootingDays.length * dayColW, y, { width: 50, align: 'center' })
-    doc.text(String(row.finish ?? '—'), startX + charColW + shootingDays.length * dayColW + 50, y, { width: 50, align: 'center' })
-    doc.font('Helvetica-Bold').text(String(row.workCount), startX + charColW + shootingDays.length * dayColW + 100, y, { width: 50, align: 'center' })
+    doc.text(String(row.start ?? '—'), summaryX, y, { width: 50, align: 'center' })
+    doc.text(String(row.finish ?? '—'), summaryX + 50, y, { width: 50, align: 'center' })
+    doc.font('Helvetica-Bold').text(String(row.workCount), summaryX + 100, y, { width: 50, align: 'center' })
     doc.font('Helvetica')
     y += 14
   }
 
-  // Legend
   if (y > doc.page.height - 60) { doc.addPage({ layout: 'landscape', margin: 40 }); y = 40 }
   y += 8
-  doc.fontSize(8).fillColor('#666').text('W = Work day · H = Hold day (between start and finish)', startX, y)
+  doc.fontSize(8).fillColor('#666')
+    .text('# = Cast number (matches production board) · W = Work day · H = Hold day (between start and finish)', startX, y)
+  addPageNumbers(doc, project, 'DAY-OUT-OF-DAYS')
   doc.end()
 }
 
@@ -531,12 +624,20 @@ export async function castListPdf(projectId: string, res: Response): Promise<voi
     if (seenChars.has(char.toUpperCase())) continue
     rows.push({ character: char, actor: null, dayRate: 0, workDays: workDaysFor(char), sceneCount: sc, total: 0 })
   }
-  rows.sort((a, b) => b.workDays - a.workDays || b.sceneCount - a.sceneCount)
+  const { numberOf } = buildCastNumbers(scenes)
+  // Sort by cast number (industry standard) so the list matches the
+  // board and the DOOD.
+  rows.sort((a, b) => {
+    const na = numberOf.get(a.character) ?? numberOf.get(a.character.toUpperCase()) ?? 999
+    const nb = numberOf.get(b.character) ?? numberOf.get(b.character.toUpperCase()) ?? 999
+    return na - nb
+  })
 
   // Table
-  const xCharacter = 40, xActor = 200, xScenes = 360, xWorkDays = 410, xRate = 460, xTotal = 520
+  const xNum = 40, xCharacter = 70, xActor = 220, xScenes = 380, xWorkDays = 430, xRate = 480, xTotal = 530
   let y = doc.y + 4
   doc.font('Helvetica-Bold').fontSize(9).fillColor('#1a1a1a')
+  doc.text('#', xNum, y, { width: 25, align: 'center' })
   doc.text('CHARACTER', xCharacter, y)
   doc.text('ACTOR', xActor, y)
   doc.text('SCENES', xScenes, y, { width: 50, align: 'right' })
@@ -551,7 +652,10 @@ export async function castListPdf(projectId: string, res: Response): Promise<voi
   doc.font('Helvetica').fontSize(9).fillColor('#1a1a1a')
   for (const r of rows) {
     if (y > doc.page.height - 60) { doc.addPage(); y = 40 }
-    doc.text(r.character, xCharacter, y, { width: 160, ellipsis: true })
+    const num = numberOf.get(r.character) ?? numberOf.get(r.character.toUpperCase())
+    doc.font('Helvetica-Bold').text(num ? String(num) : '—', xNum, y, { width: 25, align: 'center' })
+    doc.font('Helvetica')
+    doc.text(r.character, xCharacter, y, { width: 150, ellipsis: true })
     doc.text(r.actor ?? '—', xActor, y, { width: 160, ellipsis: true })
     doc.text(String(r.sceneCount), xScenes, y, { width: 50, align: 'right' })
     doc.text(String(r.workDays), xWorkDays, y, { width: 50, align: 'right' })
@@ -568,9 +672,31 @@ export async function castListPdf(projectId: string, res: Response): Promise<voi
   doc.text('TOTAL CAST', xWorkDays - 60, y, { width: 110, align: 'right' })
   doc.text(fmtMoney(grand, budget?.currency ?? 'USD'), xTotal, y, { width: 60, align: 'right' })
 
+  addPageNumbers(doc, project, 'CAST LIST · DAY RATES')
   doc.end()
 }
 
 function slug(s: string): string {
   return s.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 60) || 'project'
+}
+
+// Stamp page X of Y + project name on every page once the document
+// has been fully laid out. Called right before doc.end().
+function addPageNumbers(doc: typeof PDFDocument.prototype, project: ProjectRow, docTitle: string) {
+  const range = doc.bufferedPageRange()
+  const total = range.count
+  for (let i = 0; i < total; i++) {
+    doc.switchToPage(range.start + i)
+    const y = doc.page.height - 30
+    doc.save()
+    doc.font('Helvetica').fontSize(8).fillColor('#888')
+    doc.text(`${project.name} · ${docTitle}`, 40, y, {
+      width: (doc.page.width - 80) / 2, align: 'left', lineBreak: false,
+    })
+    doc.text(`Page ${i + 1} of ${total} · drafted ${new Date().toISOString().slice(0, 10)}`,
+      doc.page.width / 2, y, {
+        width: (doc.page.width - 80) / 2, align: 'right', lineBreak: false,
+      })
+    doc.restore()
+  }
 }
