@@ -1,5 +1,12 @@
 import { useEffect, useMemo, useState, useRef } from 'react'
 import { api, type ApiScene, type ApiShootDay, type ApiStripboard } from '../api'
+import SceneMoveConfirm, { type SceneMoveContext } from './SceneMoveConfirm'
+
+type PendingMove = {
+  ctx: SceneMoveContext
+  toDayId: string | null
+  toPosition: number
+}
 
 // Strip styles tuned for the dark Slate UI. Each strip is a dark card with
 // a colored left stripe + colored "INT/EXT · TIME" label, so text is always
@@ -65,6 +72,10 @@ export default function Stripboard({ projectId, isAdmin, projectName }: { projec
   const [importing, setImporting] = useState(false)
   const [busy, setBusy] = useState(false)
   const [undoStack, setUndoStack] = useState<UndoEntry[]>([])
+  // When the producer drags a scene to a different day, we surface a
+  // modal listing the cost implications before the move applies.
+  // Intra-day reorders bypass it.
+  const [pendingMove, setPendingMove] = useState<PendingMove | null>(null)
   const fileInputRef = useRef<HTMLInputElement | null>(null)
   // Mirror board in a ref so moveScene can read the freshest state without
   // re-creating its closure on every render.
@@ -82,9 +93,9 @@ export default function Stripboard({ projectId, isAdmin, projectName }: { projec
 
   useEffect(() => { void load() }, [projectId])
 
-  // Capture-and-apply scene move. Records the prior position to the undo
-  // stack BEFORE applying so an undo can restore it. Cap at 50 entries.
-  async function moveScene(sceneId: string, toDayId: string | null, toPosition: number) {
+  // Apply the actual scene move. Records the prior position to the
+  // undo stack BEFORE applying so an undo can restore it. Cap at 50.
+  async function applyMove(sceneId: string, toDayId: string | null, toPosition: number) {
     const cur = boardRef.current?.scenes.find((s) => s.id === sceneId)
     if (!cur) return
     const entry: UndoEntry = {
@@ -100,6 +111,28 @@ export default function Stripboard({ projectId, isAdmin, projectName }: { projec
     } catch (err) {
       console.error('move failed', err)
     }
+  }
+
+  // Capture-and-apply scene move. Cross-day moves go through a cost
+  // recompute confirmation modal so the producer sees implications
+  // (cast call-day delta, new location, page count, attached cost,
+  // Run-of-Shoot catering) BEFORE the schedule shifts. Intra-day
+  // reorders bypass the modal — they have no cost implications.
+  async function moveScene(sceneId: string, toDayId: string | null, toPosition: number) {
+    const board = boardRef.current
+    const cur = board?.scenes.find((s) => s.id === sceneId)
+    if (!board || !cur) return
+    if (cur.shootDayId === toDayId) {
+      await applyMove(sceneId, toDayId, toPosition)
+      return
+    }
+    const fromDay = board.days.find((d) => d.id === cur.shootDayId) ?? null
+    const toDay = board.days.find((d) => d.id === toDayId) ?? null
+    setPendingMove({
+      ctx: { scene: cur, fromDay, toDay, allScenes: board.scenes },
+      toDayId,
+      toPosition,
+    })
   }
 
   async function undo() {
@@ -360,6 +393,18 @@ export default function Stripboard({ projectId, isAdmin, projectName }: { projec
           />
         ))}
       </div>
+
+      {pendingMove && (
+        <SceneMoveConfirm
+          ctx={pendingMove.ctx}
+          onCancel={() => setPendingMove(null)}
+          onConfirm={() => {
+            const m = pendingMove
+            setPendingMove(null)
+            void applyMove(m.ctx.scene.id, m.toDayId, m.toPosition)
+          }}
+        />
+      )}
     </section>
   )
 }

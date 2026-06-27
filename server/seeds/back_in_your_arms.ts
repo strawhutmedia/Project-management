@@ -156,6 +156,13 @@ export async function seedBackInYourArms(): Promise<void> {
           logInfo('BIYA seed: populated budget amounts on existing project', { projectId: projId })
         }
       }
+      // One-shot migration: bring the catering line into the new
+      // "5% safety net · Run of Shoot" form decided after the seed
+      // first ran. Idempotent — only upgrades the legacy "(18 days)"
+      // line; no-op once the new line is in place. Runs AFTER any
+      // re-populate above so a freshly-stamped legacy line gets
+      // upgraded in the same boot.
+      await migrateBiyaCateringLine(projId)
       logInfo('BIYA seed: project already exists, ensured shoot days', { projectId: projId })
       return
     }
@@ -296,6 +303,7 @@ async function addLine(
   description: string,
   rate: number,
   code?: string,
+  ros = false,
 ): Promise<void> {
   const acc = await client.query(
     `SELECT id FROM budget_accounts WHERE budget_id = $1 AND code = $2`,
@@ -309,9 +317,9 @@ async function addLine(
   )
   const next = (posRes.rows[0] as { next: number }).next
   await client.query(
-    `INSERT INTO budget_line_items (account_id, code, description, amt, x, rate, position)
-     VALUES ($1, $2, $3, 1, 1, $4, $5)`,
-    [accId, code ?? null, description, rate, next],
+    `INSERT INTO budget_line_items (account_id, code, description, amt, x, rate, position, spans_all_shoot_days)
+     VALUES ($1, $2, $3, 1, 1, $4, $5, $6)`,
+    [accId, code ?? null, description, rate, next, ros],
   )
 }
 
@@ -400,8 +408,16 @@ async function populateBiyaBudgetAmounts(
   await setLine(client, budgetId, '36-00', 'sfx materials', 3000)
   await setLine(client, budgetId, '36-00', 'sfx tech', 2000)
 
-  // BTL TRAVEL & CATERING — catering bucketed under General Expense for now
-  await addLine(client, budgetId, '57-00', 'Catering / craft service (18 days)', 24000, '57-07')
+  // BTL TRAVEL & CATERING — catering bucketed under General Expense for now.
+  // 5% of the $500K production cap = $25K, set as ONE flat Run-of-Shoot
+  // line per Ryan's call. Treated as a safety-net allowance covering both
+  // craft service and lunches across the entire shoot; counted once
+  // (not per-day) so move-scene cost recompute doesn't double-charge it.
+  await addLine(
+    client, budgetId, '57-00',
+    'Craft & catering (5% safety net · Run of Shoot)',
+    25000, '57-07', true,
+  )
 
   // POST PRODUCTION
   await setLine(client, budgetId, '45-00', 'asst editor', 2000)
@@ -439,6 +455,55 @@ async function populateBiyaBudgetAmounts(
   // INSURANCE (Admin)
   await setLine(client, budgetId, '58-00', 'production package', 12000)
   await setLine(client, budgetId, '58-00', 'e&o insurance', 4000)
+}
+
+// One-shot migration for the BIYA catering line.
+// Old form: "Catering / craft service (18 days)" @ $24,000, per-day
+// New form: "Craft & catering (5% safety net · Run of Shoot)" @ $25,000, RoS
+// Idempotent — if the new line is already present, does nothing.
+async function migrateBiyaCateringLine(projectId: string): Promise<void> {
+  const budget = await pool.query<{ id: string }>(
+    `SELECT id FROM budgets WHERE project_id = $1`, [projectId],
+  )
+  if (budget.rows.length === 0) return
+  const budgetId = budget.rows[0].id
+  const acc = await pool.query<{ id: string }>(
+    `SELECT id FROM budget_accounts WHERE budget_id = $1 AND code = '57-00'`,
+    [budgetId],
+  )
+  if (acc.rows.length === 0) return
+  const accId = acc.rows[0].id
+  // Look for the existing catering / craft line by description.
+  const existing = await pool.query<{ id: string; description: string }>(
+    `SELECT id, description FROM budget_line_items
+     WHERE account_id = $1 AND lower(description) LIKE '%caterin%'`,
+    [accId],
+  )
+  if (existing.rows.length === 0) {
+    // Brand-new project that somehow skipped this line — add it.
+    await addLine(
+      pool, budgetId, '57-00',
+      'Craft & catering (5% safety net · Run of Shoot)',
+      25000, '57-07', true,
+    )
+    return
+  }
+  // Update the first match to the new form; if there were duplicates,
+  // delete the rest so the budget stays clean.
+  const [first, ...dups] = existing.rows
+  await pool.query(
+    `UPDATE budget_line_items
+       SET description = $1, amt = 1, x = 1, rate = 25000,
+           spans_all_shoot_days = true, code = COALESCE(code, '57-07')
+     WHERE id = $2`,
+    ['Craft & catering (5% safety net · Run of Shoot)', first.id],
+  )
+  if (dups.length > 0) {
+    await pool.query(
+      `DELETE FROM budget_line_items WHERE id = ANY($1::uuid[])`,
+      [dups.map((d) => d.id)],
+    )
+  }
 }
 
 async function ensureFilmTeam(
