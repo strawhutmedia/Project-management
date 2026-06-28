@@ -220,21 +220,67 @@ export default function Stripboard({ projectId, isAdmin, projectName }: { projec
     }
   }
 
-  // Drop a scene onto another scene card → insert just before the
-  // target, in the target's shoot day. Works for intra-day reorder
-  // AND for jumping a scene to a specific slot in another day.
-  async function reorderScene(draggedSceneId: string, targetSceneId: string) {
+  // Drop a scene onto another scene card. `insertion` tells us whether
+  // the drop landed on the LEFT half of the target (place before) or
+  // the RIGHT half (place after) — the old code always inserted before,
+  // so you could never push a scene past the right-most card.
+  //
+  // The fix:
+  //   1. Rebuild the target day's full ordered list, removing the
+  //      dragged scene and inserting at target ± 1.
+  //   2. Renumber every scene in the day as 10, 20, 30, … so positions
+  //      don't drift into fractional collisions over time.
+  //   3. PATCH only the scenes whose position actually changed.
+  async function reorderScene(
+    draggedSceneId: string,
+    targetSceneId: string,
+    insertion: 'before' | 'after',
+  ) {
     const board = boardRef.current
     if (!board) return
     const dragged = board.scenes.find((s) => s.id === draggedSceneId)
     const target = board.scenes.find((s) => s.id === targetSceneId)
     if (!dragged || !target) return
     const targetDayId = target.shootDayId
-    // Compute the new position: just before the target. Re-number
-    // by sliding everything in target's day to even multiples of 10
-    // so the dragged scene's position is target.position - 5.
-    const newPos = Math.max(0, target.dayPosition - 5)
-    await moveScene(draggedSceneId, targetDayId, newPos)
+
+    // Record undo BEFORE the renumber so a single ⌘Z restores the
+    // dragged scene's previous position.
+    setUndoStack((stack) => [
+      ...stack.slice(-49),
+      {
+        sceneId: draggedSceneId,
+        shootDayId: dragged.shootDayId,
+        dayPosition: dragged.dayPosition,
+        sceneNumber: dragged.number,
+      },
+    ])
+
+    // Build the target day's ordered list (excluding the dragged scene),
+    // then insert dragged at target's index ± 1.
+    const dayList = board.scenes
+      .filter((s) => s.shootDayId === targetDayId && s.id !== draggedSceneId)
+      .sort((a, b) => a.dayPosition - b.dayPosition || a.scriptPosition - b.scriptPosition)
+
+    const targetIdx = dayList.findIndex((s) => s.id === targetSceneId)
+    if (targetIdx === -1) return
+    const insertAt = insertion === 'after' ? targetIdx + 1 : targetIdx
+    const newOrder = [...dayList.slice(0, insertAt), dragged, ...dayList.slice(insertAt)]
+
+    // Renumber to clean multiples of 10 and PATCH only the scenes whose
+    // (shootDayId, dayPosition) actually changed. The dragged scene may
+    // also be changing shootDayId if this was a cross-day drop.
+    const patches: Array<Promise<unknown>> = []
+    for (let i = 0; i < newOrder.length; i++) {
+      const s = newOrder[i]
+      const newPos = (i + 1) * 10
+      const dayChanged = s.id === draggedSceneId && s.shootDayId !== targetDayId
+      if (s.dayPosition === newPos && !dayChanged) continue
+      const patch: { shootDayId?: string | null; dayPosition: number } = { dayPosition: newPos }
+      if (dayChanged) patch.shootDayId = targetDayId
+      patches.push(api.updateScene(s.id, patch).catch((e) => console.error('reorder patch failed', e)))
+    }
+    await Promise.all(patches)
+    await load()
   }
 
   async function undo() {
@@ -708,7 +754,7 @@ function DayRow({
   day: ApiShootDay | null
   label: string
   scenes: ApiScene[]
-  reorderScene: (draggedSceneId: string, targetSceneId: string) => void
+  reorderScene: (draggedSceneId: string, targetSceneId: string, insertion: 'before' | 'after') => void
   isAdmin: boolean
   moveScene: (sceneId: string, toDayId: string | null, toPosition: number) => Promise<void>
   resolvedTod: Map<string, string>
@@ -725,7 +771,12 @@ function DayRow({
     setOver(false)
     const sceneId = e.dataTransfer.getData('text/scene-id')
     if (!sceneId) return
-    await moveScene(sceneId, day?.id ?? null, scenes.length)
+    // Append to the END of the day. Old code used scenes.length, but
+    // existing scenes are renumbered as 10, 20, 30… so a "length"
+    // value of 3 lands BEFORE everyone. Compute one slot past the
+    // current max so the dropped scene actually shows up last.
+    const maxPos = scenes.reduce((m, s) => Math.max(m, s.dayPosition), 0)
+    await moveScene(sceneId, day?.id ?? null, maxPos + 10)
   }
 
   const isUnscheduled = day === null
@@ -807,7 +858,7 @@ function SceneCard({
   isAdmin: boolean
   resolvedTod: string
   onOpen: () => void
-  onReorder: (draggedSceneId: string, targetSceneId: string) => void
+  onReorder: (draggedSceneId: string, targetSceneId: string, insertion: 'before' | 'after') => void
 }) {
   const kind = stripKind(scene, resolvedTod)
   const style = STRIP_STYLE[kind]
@@ -838,7 +889,15 @@ function SceneCard({
         if (!draggedSceneId || draggedSceneId === scene.id) return
         e.preventDefault()
         e.stopPropagation()
-        onReorder(draggedSceneId, scene.id)
+        // Decide before/after based on where in the card the cursor
+        // landed. Cards are square-ish, so the X axis is the natural
+        // split for left-to-right reading order; on a desktop with
+        // multi-column grid, the columns also flow left-to-right, so
+        // X bisection gives the expected "insert here" feel.
+        const rect = e.currentTarget.getBoundingClientRect()
+        const dropX = e.clientX - rect.left
+        const insertion: 'before' | 'after' = dropX < rect.width / 2 ? 'before' : 'after'
+        onReorder(draggedSceneId, scene.id, insertion)
       }}
       onDragStart={(e) => {
         e.dataTransfer.setData('text/scene-id', scene.id)
