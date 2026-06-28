@@ -1181,14 +1181,19 @@ function DayCostRow({
   const editable = isAdmin && !isMirror
 
   return (
-    <div className={`flex items-center gap-2 text-xs px-2 py-1 rounded border ${
+    // flex-wrap + `basis-full` on the description block gives it its
+    // own full-width line on mobile portrait, so role labels like
+    // "1st AC", "Steadicam", "Wardrobe sup." aren't truncated to
+    // "1st AC" / "Sted…" / "War…". On sm+ the layout collapses back
+    // to a single row.
+    <div className={`flex flex-wrap sm:flex-nowrap items-center gap-2 text-xs px-2 py-1 rounded border ${
       isMirror ? 'bg-stage-mastering/5 border-stage-mastering/20' : 'bg-ink/30 border-line/40'
     }`}>
-      <div className="flex-1 min-w-0">
-        <div className="flex items-baseline gap-2">
-          <span className="text-text truncate" title={item.description}>{item.description}</span>
+      <div className="basis-full sm:basis-auto sm:flex-1 min-w-0 order-1">
+        <div className="flex items-baseline gap-2 flex-wrap">
+          <span className="text-text break-words sm:truncate" title={item.description}>{item.description}</span>
           {item.vendor && (
-            <span className="text-muted text-[11px] truncate" title={item.vendor}>
+            <span className="text-muted text-[11px] break-words sm:truncate" title={item.vendor}>
               — {item.vendor}
             </span>
           )}
@@ -1210,7 +1215,7 @@ function DayCostRow({
                 ? 'Currently applies to every shoot day. Click to revert to just this day.'
                 : 'Click to apply this cost to every shoot day in the production'
           }
-          className={`text-[10px] uppercase tracking-wider rounded-full border px-2 py-0.5 ${
+          className={`order-2 text-[10px] uppercase tracking-wider rounded-full border px-2 py-0.5 ${
             isRos
               ? 'bg-stage-mastering text-white border-stage-mastering'
               : 'text-muted border-line hover:text-stage-mastering hover:border-stage-mastering/40'
@@ -1226,10 +1231,10 @@ function DayCostRow({
         onChange={(e) => setCost(e.target.value)}
         onBlur={() => { const v = parseFloat(cost) || 0; if (v !== item.rate) onUpdate(v) }}
         disabled={!editable}
-        className="w-24 text-right font-mono bg-ink/40 border border-line rounded px-2 py-1 outline-none focus:border-stage-mastering disabled:opacity-60"
+        className="order-3 ml-auto sm:ml-0 w-24 text-right font-mono bg-ink/40 border border-line rounded px-2 py-1 outline-none focus:border-stage-mastering disabled:opacity-60"
       />
       {isAdmin && !isMirror && (
-        <button onClick={onDelete} className="text-muted/40 hover:text-urgent px-1" title="Delete">✕</button>
+        <button onClick={onDelete} className="order-4 text-muted/40 hover:text-urgent px-1" title="Delete">✕</button>
       )}
     </div>
   )
