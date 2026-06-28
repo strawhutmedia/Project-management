@@ -14,7 +14,7 @@
     "rssFeedUrl": null,
     "createdAt": "2026-04-29T22:31:46.421Z"
   },
-  "publishedAt": "2026-06-25T22:49:43.036Z",
+  "publishedAt": "2026-06-28T06:38:56.135Z",
   "counts": {
     "scenes": 157,
     "lineItems": 1755,
@@ -11570,7 +11570,7 @@
       "pageEighths": 3,
       "characters": [],
       "shootDayId": "435644f4-d678-4834-bdb2-868555ae2b84",
-      "dayPosition": 18,
+      "dayPosition": 10,
       "breakdownRunAt": "2026-06-21T00:04:48.273Z",
       "producerNoteSuggestion": "Single-location, single-character scene with minimal props — cheap half-day interior. Note the exterior light switch as a scripted practical detail that pays off later; confirm with the art department that the switch placement is achievable on whichever bathroom set or location is chosen.",
       "notes": null,
@@ -11718,7 +11718,7 @@
         "SAWYER"
       ],
       "shootDayId": "435644f4-d678-4834-bdb2-868555ae2b84",
-      "dayPosition": 19,
+      "dayPosition": 15,
       "breakdownRunAt": "2026-06-21T00:05:00.920Z",
       "producerNoteSuggestion": "Armorer required on set for the handgun even though Sawyer only handles it briefly — that's an additional department head for what is otherwise a fast, simple interior scene. Good candidate for a short shoot block.",
       "notes": null,
