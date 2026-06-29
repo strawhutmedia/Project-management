@@ -19,12 +19,9 @@ const MAX_TRANSCRIPT_CHARS = 200_000
 
 carouselRouter.post('/preview', async (req, res) => {
   const user = (req as typeof req & { user: SessionUser }).user
-  // Admin-gated since each call burns tokens. We can relax to
-  // project-writer later when we wire it into a project context.
-  if (user.role !== 'admin') {
-    res.status(403).json({ error: 'forbidden' })
-    return
-  }
+  // Any logged-in user can generate. Each call burns Claude tokens,
+  // so we log who's calling and how big the transcript was — that's
+  // enough to spot abuse without locking out Caroline / the social team.
   if (!hasAnthropicKey()) {
     res.status(503).json({ error: 'anthropic_key_missing' })
     return
@@ -64,6 +61,13 @@ carouselRouter.post('/preview', async (req, res) => {
       episodeNumber: typeof episodeNumber === 'number' ? episodeNumber : null,
       episodeTranscript: transcript,
     })
+    // Audit trail so we know who's burning tokens.
+    // eslint-disable-next-line no-console
+    console.log(
+      `[carousel] generated · user=${user.id} show=${showName} chars=${transcript.length} ` +
+      `slides=${result.deck.slides.length} input_tokens=${result.usage.inputTokens} ` +
+      `output_tokens=${result.usage.outputTokens}`,
+    )
     res.json(result)
   } catch (err) {
     logError('carousel route: generation failed', {

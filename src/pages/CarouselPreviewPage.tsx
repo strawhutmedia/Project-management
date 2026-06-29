@@ -56,6 +56,46 @@ export default function CarouselPreviewPage() {
           The renderer is per-show preset-driven, so every podcast gets its own visual identity
           (palette, logo, dot-wave colors, accent rules) while sharing the same engine.
         </p>
+
+        <details className="max-w-3xl rounded-xl border border-line/60 bg-ink/30 p-3" open>
+          <summary className="cursor-pointer text-[11px] uppercase tracking-wider text-stage-mastering font-bold">
+            How to use this page
+          </summary>
+          <ol className="mt-3 space-y-2 text-xs text-muted list-decimal list-inside">
+            <li>
+              <span className="font-bold text-text">Sanity-check the visual first.</span>{' '}
+              Click <span className="font-mono">Sample (no transcript needed)</span> and compare the
+              7 sample slides to the reference Soul &amp; Science deck. If anything looks off
+              (type weight, color, spacing, dot-wave shape), flag it before generating real content.
+            </li>
+            <li>
+              <span className="font-bold text-text">Generate from a transcript.</span>{' '}
+              Click <span className="font-mono">Generate from transcript</span>, paste the
+              full episode transcript into the textarea, optionally fill in episode title + number,
+              hit <span className="font-mono">✨ Generate carousel</span>. Claude takes ~30–60 sec
+              and returns a 5–7 slide spec branded to the selected show.
+            </li>
+            <li>
+              <span className="font-bold text-text">Upload only the assets you have.</span>{' '}
+              A yellow panel will appear listing every asset the design wants (host photo,
+              brand logos, etc.). Each is optional — slides render with labeled placeholders
+              if you skip an upload, so you can still ship a deck text-and-diagrams-only.
+            </li>
+            <li>
+              <span className="font-bold text-text">Review and download.</span>{' '}
+              Slides preview live in Step 3. When the deck looks right, click
+              <span className="font-mono"> ↓ Download all slides as ZIP</span>{' '}
+              and you'll get sequentially-numbered 1080×1350 PNGs ready for Instagram upload.
+            </li>
+          </ol>
+          <p className="mt-3 text-[11px] text-muted/70">
+            v1 caveat: only the <span className="font-bold text-text">Soul &amp; Science</span> preset
+            is wired right now. Other shows will use its palette until per-show config lands.
+            Expect headlines and accent-word splits to need a tweak after the first run — let us
+            know what to refine.
+          </p>
+        </details>
+
         <div className="flex flex-wrap items-center gap-3">
           <ModeButton current={mode} value="sample" setMode={setMode}>
             Sample (no transcript needed)
