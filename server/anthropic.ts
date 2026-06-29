@@ -937,3 +937,335 @@ Return strict JSON per the schema.`
     },
   }
 }
+
+// ============================================================
+// PODCAST CAROUSEL DECK GENERATOR
+// ============================================================
+// Given an episode transcript + a show's visual preset, drafts a
+// 5–7 slide social-media carousel matching the show's design system
+// (e.g. Soul & Science: dark bg, two-tier accent headlines, concept
+// diagrams, brand-callout slides for outside brands referenced,
+// host-finale closer with the episode's "lesson").
+//
+// Output is enforced to a strict JSON schema that mirrors SlideSpec
+// on the client (src/lib/carouselDeckImage.ts). The client adapts
+// the flat schema into its discriminated-union SlideSpec[].
+
+export type CarouselGenerateInput = {
+  showName: string
+  hostName?: string
+  presetKey: string
+  episodeTitle?: string | null
+  episodeNumber?: number | null
+  episodeTranscript: string
+}
+
+export type RawDeckSlide = {
+  kind: 'cover' | 'thesis' | 'callout' | 'brand-callout' | 'finale' | 'quote'
+  // cover / general
+  title?: string
+  eyebrow?: string
+  // thesis / callout / brand-callout
+  headline?: string
+  accent?: string
+  accentSecondary?: string
+  body?: string
+  brandLabel?: string
+  // thesis diagram
+  diagramLayout?: 'two-circle' | 'three-stage' | 'none'
+  diagramNodeAIcon?: string
+  diagramNodeALabel?: string
+  diagramNodeASub?: string
+  diagramNodeBIcon?: string
+  diagramNodeBLabel?: string
+  diagramNodeBSub?: string
+  diagramMidpointLabel?: string
+  diagramMidpointSub?: string
+  // callout traits
+  trait1Icon?: string
+  trait1Word?: string
+  trait2Icon?: string
+  trait2Word?: string
+  trait3Icon?: string
+  trait3Word?: string
+  // brand-callout
+  bodyParagraphs?: string[]
+  finalLine?: string
+  // finale
+  lessonHeadline?: string
+  lessonBody?: string
+  tagline?: string
+  // quote
+  quoteText?: string
+  quoteSpeaker?: string
+  // asset hints — what the slide WOULD use if uploaded
+  needsHostPhoto?: boolean
+  needsBrandLogo?: boolean
+  needsCollageImage?: boolean
+  assetHint?: string  // free-form note like "Tripadvisor logo + Viator logo"
+}
+
+export type RawDeck = {
+  slides: RawDeckSlide[]
+  asset_requests: Array<{
+    slot: 'host_photo' | 'show_logo' | 'platform_icons' | 'brand_logo' | 'collage_image'
+    description: string  // "Tripadvisor logo + Viator logo for slide 4"
+    slide_index: number  // 1-based
+  }>
+}
+
+export type CarouselGenerateResult = {
+  deck: RawDeck
+  usage: {
+    inputTokens: number
+    outputTokens: number
+    cacheCreationInputTokens: number
+    cacheReadInputTokens: number
+  }
+}
+
+const CONCEPT_ICONS = [
+  'heritage', 'momentum', 'bridge', 'voice', 'target', 'compass', 'spark', 'pulse',
+] as const
+
+const DECK_SCHEMA = {
+  type: 'object',
+  additionalProperties: false,
+  required: ['slides', 'asset_requests'],
+  properties: {
+    slides: {
+      type: 'array',
+      minItems: 5,
+      maxItems: 7,
+      items: {
+        type: 'object',
+        additionalProperties: false,
+        required: ['kind'],
+        properties: {
+          kind: { enum: ['cover', 'thesis', 'callout', 'brand-callout', 'finale', 'quote'] },
+          title: { type: 'string' },
+          eyebrow: { type: 'string' },
+          headline: { type: 'string' },
+          accent: { type: 'string' },
+          accentSecondary: { type: 'string' },
+          body: { type: 'string' },
+          brandLabel: { type: 'string' },
+          diagramLayout: { enum: ['two-circle', 'three-stage', 'none'] },
+          diagramNodeAIcon: { enum: [...CONCEPT_ICONS] },
+          diagramNodeALabel: { type: 'string' },
+          diagramNodeASub: { type: 'string' },
+          diagramNodeBIcon: { enum: [...CONCEPT_ICONS] },
+          diagramNodeBLabel: { type: 'string' },
+          diagramNodeBSub: { type: 'string' },
+          diagramMidpointLabel: { type: 'string' },
+          diagramMidpointSub: { type: 'string' },
+          trait1Icon: { enum: [...CONCEPT_ICONS] },
+          trait1Word: { type: 'string' },
+          trait2Icon: { enum: [...CONCEPT_ICONS] },
+          trait2Word: { type: 'string' },
+          trait3Icon: { enum: [...CONCEPT_ICONS] },
+          trait3Word: { type: 'string' },
+          bodyParagraphs: { type: 'array', items: { type: 'string' }, maxItems: 4 },
+          finalLine: { type: 'string' },
+          lessonHeadline: { type: 'string' },
+          lessonBody: { type: 'string' },
+          tagline: { type: 'string' },
+          quoteText: { type: 'string' },
+          quoteSpeaker: { type: 'string' },
+          needsHostPhoto: { type: 'boolean' },
+          needsBrandLogo: { type: 'boolean' },
+          needsCollageImage: { type: 'boolean' },
+          assetHint: { type: 'string' },
+        },
+      },
+    },
+    asset_requests: {
+      type: 'array',
+      maxItems: 12,
+      items: {
+        type: 'object',
+        additionalProperties: false,
+        required: ['slot', 'description', 'slide_index'],
+        properties: {
+          slot: { enum: ['host_photo', 'show_logo', 'platform_icons', 'brand_logo', 'collage_image'] },
+          description: { type: 'string' },
+          slide_index: { type: 'integer', minimum: 1, maximum: 7 },
+        },
+      },
+    },
+  },
+}
+
+const DECK_SYSTEM_PROMPT = `You are an art director for a high-end podcast social team.
+
+Given an episode transcript, you produce a 5–7 slide Instagram carousel
+that walks a reader through the episode's central argument and ends
+with a "lesson" + listen-now CTA.
+
+The visual system is fixed and brand-driven (the client renders the
+slides — you only write the content). Your job is to choose the
+RIGHT SHAPE for each slide, write the punchy display copy, and tag
+the asset slots the design will need.
+
+Slide shape vocabulary (pick the best fit for each beat):
+
+  cover           Episode title card. Use an eyebrow like "EPISODE 12"
+                  and a tight all-caps title (max ~8 words).
+
+  thesis          A core argument. Headline (1 sentence, up to ~12
+                  words) with the punchline as an "accent" suffix
+                  that will render in the show's primary color.
+                  Optional body (1–4 short sentences) supports the
+                  claim. Optionally include a concept diagram via
+                  diagramLayout — "two-circle" for opposed concepts
+                  (Heritage vs. Momentum) or "three-stage" with a
+                  bridge for transitional concepts (Old → Bridge → New).
+                  Choose two icons from: heritage (castle / legacy),
+                  momentum (chevron / future), bridge (the work),
+                  voice (audience), target (relevance), compass
+                  (direction), spark (idea), pulse (heartbeat).
+
+  callout         Three-trait list slide. Headline with TWO accent
+                  segments — "accent" renders primary, "accentSecondary"
+                  renders in the secondary color. Trait1/2/3 each pair
+                  an icon (same vocab) with a single word ending in a
+                  period ("Real.", "Relevant.", "Resonant."). Use a
+                  body with 3 short imperatives ("Know your audience.")
+                  if it deepens the point.
+
+  brand-callout   When the episode anchors on an OUTSIDE brand
+                  (Tripadvisor, Lands' End, White Castle, etc.).
+                  Two-tier accent headline. bodyParagraphs is an
+                  array of 2–4 short paragraphs separated by accent
+                  rules. finalLine is the bottom-line callout in
+                  secondary color. Set brandLabel to the brand name.
+                  Set needsBrandLogo or needsCollageImage so the team
+                  can upload the asset.
+
+  finale          The closer. lessonHeadline defaults to "THE LESSON:"
+                  — keep it that or use a 2-3 word equivalent ending
+                  in a colon. lessonBody is the takeaway (2–3
+                  sentences). Tagline is a 2-3 word punchline in
+                  primary color ("Realness. Relevance. Resonance.").
+                  This slide ALWAYS has needsHostPhoto: true.
+
+  quote           Pull-quote from a guest or host. Use sparingly.
+
+Structure rules:
+  - Slide 1 is always "cover".
+  - The last slide is always "finale".
+  - The middle 3–5 slides build the argument: 2–3 thesis slides
+    setting up the central tension, then 1–2 brand-callout slides
+    if the episode references outside brands, then 1 callout slide
+    if there's a clean three-trait conclusion.
+  - Headlines: bold, punchy, never more than 12 words. Use all-caps
+    or sentence case — the renderer will uppercase. Avoid filler
+    ("In this episode…", "We talked about…"). Lead with the claim.
+  - Accent words: pick the most LOADED word(s) of the headline as
+    the accent. The accent must be a SUFFIX of the headline (the
+    renderer color-splits by suffix match).
+  - Body copy: short. Two-three short sentences max. Line breaks
+    are honored.
+  - Diagram tags: only on thesis slides. Two-circle for opposed
+    concepts, three-stage for "old → bridge → new" arcs.
+
+Asset requests:
+  After laying out the slides, list every external asset the design
+  would benefit from. Slots:
+    - host_photo:     for the finale (always)
+    - show_logo:      if the show has an uploaded wordmark
+    - platform_icons: Apple Podcasts / Spotify / YouTube
+    - brand_logo:     for each brand-callout slide
+    - collage_image:  for any slide where uploaded photos would add
+                      visual richness (vintage photos, screenshot
+                      mockups, product shots)
+  Description should be specific ("Tripadvisor app screenshot mockup
+  with Viator feed posts") so the team knows what to upload.
+
+Tone:
+  Match the show's voice. For business / strategy podcasts (Soul &
+  Science is one): confident, declarative, no jargon, no hedging.
+  Big claims in clean type.
+
+Return EXACTLY this JSON shape — no commentary.`
+
+function carouselShowBlock(input: CarouselGenerateInput): string {
+  return [
+    `SHOW: ${input.showName}`,
+    input.hostName ? `HOST: ${input.hostName}` : '',
+    `PRESET: ${input.presetKey}`,
+  ].filter(Boolean).join('\n')
+}
+
+function carouselEpisodeBlock(input: CarouselGenerateInput): string {
+  const head: string[] = []
+  if (input.episodeNumber != null) head.push(`EPISODE #${input.episodeNumber}`)
+  if (input.episodeTitle) head.push(`TITLE: ${input.episodeTitle}`)
+  return [
+    head.join(' · '),
+    '',
+    'TRANSCRIPT:',
+    input.episodeTranscript,
+  ].filter((x) => x !== '').join('\n')
+}
+
+export async function generateCarouselDeck(input: CarouselGenerateInput): Promise<CarouselGenerateResult> {
+  logInfo('carousel: generating deck', {
+    showName: input.showName,
+    presetKey: input.presetKey,
+    transcriptChars: input.episodeTranscript.length,
+  })
+  let response
+  try {
+    response = await client.messages.create({
+      model: MODEL,
+      max_tokens: 8000,
+      system: DECK_SYSTEM_PROMPT,
+      messages: [
+        {
+          role: 'user',
+          content: [
+            {
+              type: 'text',
+              text: carouselShowBlock(input),
+              cache_control: { type: 'ephemeral' },
+            },
+            { type: 'text', text: carouselEpisodeBlock(input) },
+          ],
+        },
+      ],
+      output_config: {
+        format: { type: 'json_schema', schema: DECK_SCHEMA },
+      },
+    })
+  } catch (err) {
+    logError('carousel: claude call failed', { error: err instanceof Error ? err.message : String(err) })
+    throw err
+  }
+  const textBlock = response.content.find((b) => b.type === 'text')
+  if (!textBlock || textBlock.type !== 'text') {
+    throw new Error('carousel: claude returned no text block')
+  }
+  let deck: RawDeck
+  try {
+    deck = JSON.parse(textBlock.text) as RawDeck
+  } catch (err) {
+    logError('carousel: invalid JSON from claude', { body: textBlock.text.slice(0, 500) })
+    throw new Error(`carousel: invalid JSON: ${err instanceof Error ? err.message : String(err)}`)
+  }
+  logInfo('carousel: deck generated', {
+    slides: deck.slides.length,
+    assetRequests: deck.asset_requests.length,
+    cacheRead: response.usage.cache_read_input_tokens ?? 0,
+    cacheCreate: response.usage.cache_creation_input_tokens ?? 0,
+  })
+  return {
+    deck,
+    usage: {
+      inputTokens: response.usage.input_tokens,
+      outputTokens: response.usage.output_tokens,
+      cacheCreationInputTokens: response.usage.cache_creation_input_tokens ?? 0,
+      cacheReadInputTokens: response.usage.cache_read_input_tokens ?? 0,
+    },
+  }
+}

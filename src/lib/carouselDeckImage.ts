@@ -23,6 +23,13 @@ const FULL_H = 1350
 // ============================================================
 
 export type ShowDeckPreset = {
+  // Stable identifier (used by the server endpoint + UI selector).
+  key: string
+  // Display name in the show selector.
+  displayName: string
+  // Tagline / format like "WITH JASON HARRIS" — shown above the host
+  // photo on the finale slide. Optional.
+  hostTagline?: string
   // Logo lockup as a two-line word mark. "name1" sits on top in the
   // primary color, "name2" beneath it in the secondary. Renders to
   // 56pt condensed black, slight kerning. Mirrors the SOUL&/SCIENCE
@@ -39,10 +46,16 @@ export type ShowDeckPreset = {
     ink: string        // body text on bg, near-white
     inkDim: string     // muted secondary text
   }
-  // The first slide's title block (cover slide).
-  cover?: {
-    eyebrow?: string   // small line over the title
-    photoUrl?: string  // optional cover photo on the left half
+  // Optional asset URLs. When present, the renderer overlays them in
+  // the right places (host photo on finale, replacing the canvas-drawn
+  // logo wordmark, etc.). Caller is responsible for preloading them.
+  assets?: {
+    logoLockupUrl?: string     // PNG/SVG to replace top-left wordmark
+    hostPhotoUrl?: string      // square portrait, ideally transparent
+    platforms?: Array<{        // shown on the finale strip
+      name: string             // "Apple Podcasts" / "Spotify" / "YouTube"
+      iconUrl: string          // 64×64+ icon
+    }>
   }
 }
 
@@ -66,6 +79,32 @@ export type SlideSpec =
       brandMark?: { label: string }
     }
   | { kind: 'quote'; text: string; speaker?: string }
+  | {
+      // Brand-callout used when an episode references a specific
+      // outside brand (Tripadvisor / Lands' End / White Castle / etc.).
+      // The body is a multi-paragraph "rule-separated" stack on the
+      // left, with an optional collage image on the right. Two-tier
+      // accent coloring on the headline.
+      kind: 'brand-callout'
+      headline: string                  // e.g. "MEET TRAVELERS WHERE THEY ALREADY ARE."
+      accent: string                    // primary-colored chunk, e.g. "WHERE THEY"
+      accentSecondary?: string          // secondary-colored chunk, e.g. "ALREADY ARE."
+      bodyParagraphs: string[]          // each renders as its own block with a rule above
+      finalLine?: string                // the bottom-line callout in secondary color
+      collageImageKey?: string          // key into the preloaded images map
+      brandLabel?: string               // text label of the brand (footer)
+    }
+  | {
+      // Episode finale — slide 7 in the reference deck. Host photo
+      // top-right inside a thin primary-colored frame, "THE LESSON:"
+      // headline, body, primary-colored tagline, then a "Listen to
+      // <show> wherever you stream podcasts." strip with the show
+      // platforms.
+      kind: 'finale'
+      lessonHeadline?: string           // defaults to "THE LESSON:"
+      lessonBody: string                // multi-line body paragraph
+      tagline?: string                  // primary color, e.g. "Realness. Relevance. Resonance."
+    }
 
 export type ConceptIconKey =
   | 'heritage'   // castle (legacy / past)
@@ -96,6 +135,9 @@ export type DeckRenderInput = {
   slide: SlideSpec
   index: number     // 1-based
   total: number     // total slides in the deck
+  // Pre-loaded asset images keyed by URL or asset key. Renderer is
+  // synchronous; caller should preloadDeckImages() before rendering.
+  images?: Map<string, HTMLImageElement>
 }
 
 // ============================================================
@@ -103,6 +145,9 @@ export type DeckRenderInput = {
 // Once the preset config UI exists, this becomes a default fallback.
 // ============================================================
 export const SOUL_AND_SCIENCE_PRESET: ShowDeckPreset = {
+  key: 'soul-and-science',
+  displayName: 'Soul & Science',
+  hostTagline: 'WITH JASON HARRIS',
   logo: { name1: 'SOUL&', name2: 'SCIENCE', weight: 'black' },
   palette: {
     primary:   '#E91E47',
@@ -111,6 +156,15 @@ export const SOUL_AND_SCIENCE_PRESET: ShowDeckPreset = {
     ink:       '#FFFFFF',
     inkDim:    '#A0A6B0',
   },
+}
+
+// All built-in show presets. Once the preset-config UI lands, this
+// becomes the seed/fallback list and per-show overrides live in the
+// database.
+export const BUILT_IN_PRESETS: ShowDeckPreset[] = [SOUL_AND_SCIENCE_PRESET]
+
+export function findPreset(key: string): ShowDeckPreset | undefined {
+  return BUILT_IN_PRESETS.find((p) => p.key === key)
 }
 
 // ============================================================
@@ -130,17 +184,52 @@ export function renderDeckSlideCanvas(
   if (!ctx) return canvas
 
   drawBackground(ctx, W, H, input.preset)
-  drawLogoLockup(ctx, scale, input.preset)
+  drawLogoLockup(ctx, scale, input.preset, input.images)
   drawPageIndicator(ctx, W, scale, input.preset, input.index, input.total)
   drawDotWave(ctx, W, H, scale, input.preset)
 
   switch (input.slide.kind) {
-    case 'cover':    drawCoverSlide(ctx, W, H, scale, input.slide, input.preset); break
-    case 'thesis':   drawThesisSlide(ctx, W, H, scale, input.slide, input.preset); break
-    case 'callout':  drawCalloutSlide(ctx, W, H, scale, input.slide, input.preset); break
-    case 'quote':    drawQuoteSlide(ctx, W, H, scale, input.slide, input.preset); break
+    case 'cover':         drawCoverSlide(ctx, W, H, scale, input.slide, input.preset); break
+    case 'thesis':        drawThesisSlide(ctx, W, H, scale, input.slide, input.preset); break
+    case 'callout':       drawCalloutSlide(ctx, W, H, scale, input.slide, input.preset); break
+    case 'quote':         drawQuoteSlide(ctx, W, H, scale, input.slide, input.preset); break
+    case 'brand-callout': drawBrandCalloutSlide(ctx, W, H, scale, input.slide, input.preset, input.images); break
+    case 'finale':        drawFinaleSlide(ctx, W, H, scale, input.slide, input.preset, input.images); break
   }
   return canvas
+}
+
+// Preload every asset referenced by the preset + slide list. Returns a
+// Map keyed by URL → HTMLImageElement, ready to pass into render input.
+// Failures resolve to a Map missing that key; renderer falls back to
+// canvas-drawn placeholders.
+export async function preloadDeckImages(
+  preset: ShowDeckPreset, slides: SlideSpec[],
+): Promise<Map<string, HTMLImageElement>> {
+  const urls = new Set<string>()
+  if (preset.assets?.logoLockupUrl) urls.add(preset.assets.logoLockupUrl)
+  if (preset.assets?.hostPhotoUrl) urls.add(preset.assets.hostPhotoUrl)
+  for (const p of preset.assets?.platforms ?? []) {
+    if (p.iconUrl) urls.add(p.iconUrl)
+  }
+  for (const s of slides) {
+    if (s.kind === 'brand-callout' && s.collageImageKey) urls.add(s.collageImageKey)
+    if (s.kind === 'cover' && s.photoUrl) urls.add(s.photoUrl)
+  }
+  const map = new Map<string, HTMLImageElement>()
+  await Promise.all(
+    [...urls].map((url) => new Promise<void>((resolve) => {
+      const img = new Image()
+      img.crossOrigin = 'anonymous'
+      let settled = false
+      const done = () => { if (!settled) { settled = true; resolve() } }
+      setTimeout(done, 6000)
+      img.onload = () => { map.set(url, img); done() }
+      img.onerror = () => done()
+      img.src = url
+    })),
+  )
+  return map
 }
 
 // ============================================================
@@ -151,9 +240,22 @@ function drawBackground(ctx: CanvasRenderingContext2D, W: number, H: number, pre
   ctx.fillRect(0, 0, W, H)
 }
 
-function drawLogoLockup(ctx: CanvasRenderingContext2D, s: number, preset: ShowDeckPreset) {
+function drawLogoLockup(
+  ctx: CanvasRenderingContext2D, s: number, preset: ShowDeckPreset,
+  images?: Map<string, HTMLImageElement>,
+) {
   const x = 70 * s
   const y = 70 * s
+  // If the show uploaded a real wordmark asset, prefer that — better
+  // edges and exact kerning than Helvetica Black.
+  const logoUrl = preset.assets?.logoLockupUrl
+  const img = logoUrl ? images?.get(logoUrl) : null
+  if (img) {
+    const h = 130 * s
+    const w = (img.width / img.height) * h
+    ctx.drawImage(img, x, y, w, h)
+    return
+  }
   ctx.textAlign = 'left'
   ctx.textBaseline = 'top'
   const size = 52 * s
@@ -500,6 +602,339 @@ function drawQuoteSlide(
     ctx.textBaseline = 'top'
     ctx.fillText(slide.speaker.toUpperCase(), padX, H - 140 * s)
   }
+}
+
+// ============================================================
+// Slide: BRAND-CALLOUT (subject-brand episode anchor — slide 5 in ref)
+// ============================================================
+function drawBrandCalloutSlide(
+  ctx: CanvasRenderingContext2D, W: number, H: number, s: number,
+  slide: Extract<SlideSpec, { kind: 'brand-callout' }>, preset: ShowDeckPreset,
+  images?: Map<string, HTMLImageElement>,
+) {
+  const family = '"Helvetica Neue", "Inter", Arial, sans-serif'
+  const padX = 70 * s
+
+  // 3-line headline with two-tier accent (white prefix, primary mid, secondary suffix).
+  const head = slide.headline.toUpperCase()
+  const acc = slide.accent.toUpperCase()
+  const acc2 = (slide.accentSecondary ?? '').toUpperCase()
+  let body = head
+  if (acc2 && body.endsWith(acc2)) body = body.slice(0, body.length - acc2.length).trimEnd()
+  if (acc && body.endsWith(acc)) body = body.slice(0, body.length - acc.length).trimEnd()
+  const combined = [body, acc, acc2].filter(Boolean).join(' ')
+
+  const headlineTop = 220 * s
+  const leftColW = (W - padX * 2) * 0.55
+  const sized = sizeForWrap(ctx, combined, {
+    maxWidth: leftColW,
+    maxHeight: H * 0.32,
+    maxFontPx: 100 * s,
+    minFontPx: 54 * s,
+    fontFamily: family,
+    fontWeight: '900',
+    lineHeightRatio: 0.98,
+  })
+  const accWords = new Set(acc.split(/\s+/).filter(Boolean))
+  const acc2Words = new Set(acc2.split(/\s+/).filter(Boolean))
+  ctx.textAlign = 'left'
+  ctx.textBaseline = 'top'
+  const lineH = sized.fontPx * 0.98
+  let cursorY = headlineTop
+  for (const line of sized.lines) {
+    let cursorX = padX
+    for (const w of line.split(' ')) {
+      ctx.font = `900 ${sized.fontPx}px ${family}`
+      ctx.fillStyle =
+        acc2Words.has(w) ? preset.palette.secondary :
+        accWords.has(w)  ? preset.palette.primary :
+        preset.palette.ink
+      ctx.fillText(w, cursorX, cursorY)
+      cursorX += ctx.measureText(w).width + ctx.measureText(' ').width
+    }
+    cursorY += lineH
+  }
+
+  // Left-column body stack: each paragraph gets a thin primary rule
+  // above it. The "finalLine" gets secondary color treatment.
+  const bodyTop = headlineTop + sized.lines.length * lineH + 40 * s
+  let by = bodyTop
+  const colW = leftColW
+  for (let i = 0; i < slide.bodyParagraphs.length; i++) {
+    // accent rule
+    ctx.strokeStyle = preset.palette.primary
+    ctx.lineWidth = 3 * s
+    ctx.beginPath()
+    ctx.moveTo(padX, by - 14 * s)
+    ctx.lineTo(padX + 40 * s, by - 14 * s)
+    ctx.stroke()
+    // paragraph text
+    ctx.fillStyle = preset.palette.ink
+    ctx.textAlign = 'left'
+    const para = slide.bodyParagraphs[i]
+    const paraSize = sizeForWrap(ctx, para, {
+      maxWidth: colW, maxHeight: 100 * s,
+      maxFontPx: 26 * s, minFontPx: 18 * s,
+      fontFamily: family, fontWeight: '500', lineHeightRatio: 1.3,
+    })
+    ctx.font = `500 ${paraSize.fontPx}px ${family}`
+    const plh = paraSize.fontPx * 1.3
+    paraSize.lines.forEach((ln, li) => {
+      ctx.fillText(ln, padX, by + li * plh)
+    })
+    by += paraSize.lines.length * plh + 30 * s
+  }
+  if (slide.finalLine) {
+    ctx.fillStyle = preset.palette.secondary
+    ctx.font = `700 ${28 * s}px ${family}`
+    ctx.textAlign = 'left'
+    ctx.fillText(slide.finalLine, padX, by)
+  }
+
+  // Right column: collage image OR a typographic placeholder card.
+  const colX = padX + leftColW + 30 * s
+  const colTop = headlineTop
+  const colW2 = W - colX - padX
+  const colH = H - colTop - 240 * s
+  const img = slide.collageImageKey ? images?.get(slide.collageImageKey) : null
+  if (img) {
+    const aspect = img.width / img.height
+    let drawW = colW2, drawH = drawW / aspect
+    if (drawH > colH) { drawH = colH; drawW = drawH * aspect }
+    const dx = colX + (colW2 - drawW) / 2
+    const dy = colTop + (colH - drawH) / 2
+    ctx.drawImage(img, dx, dy, drawW, drawH)
+  } else {
+    // No asset yet → draw a thin-bordered placeholder card hinting at
+    // the slot ("BRAND ASSET / [brandLabel]") so the user can see
+    // where the upload will land.
+    ctx.strokeStyle = `rgba(${hexRgbStr(preset.palette.primary)}, 0.4)`
+    ctx.lineWidth = 2 * s
+    ctx.setLineDash([10 * s, 8 * s])
+    roundRectPath(ctx, colX, colTop, colW2, colH, 20 * s)
+    ctx.stroke()
+    ctx.setLineDash([])
+    ctx.fillStyle = preset.palette.inkDim
+    ctx.font = `700 ${16 * s}px ${family}`
+    ctx.textAlign = 'center'
+    ctx.textBaseline = 'middle'
+    ctx.fillText('[ BRAND ASSET ]', colX + colW2 / 2, colTop + colH / 2 - 12 * s)
+    if (slide.brandLabel) {
+      ctx.font = `900 ${30 * s}px ${family}`
+      ctx.fillStyle = preset.palette.ink
+      ctx.fillText(slide.brandLabel.toUpperCase(), colX + colW2 / 2, colTop + colH / 2 + 20 * s)
+    }
+  }
+}
+
+// ============================================================
+// Slide: FINALE (host headshot + lesson + platforms — slide 7 in ref)
+// ============================================================
+function drawFinaleSlide(
+  ctx: CanvasRenderingContext2D, W: number, H: number, s: number,
+  slide: Extract<SlideSpec, { kind: 'finale' }>, preset: ShowDeckPreset,
+  images?: Map<string, HTMLImageElement>,
+) {
+  const family = '"Helvetica Neue", "Inter", Arial, sans-serif'
+  const padX = 70 * s
+  // Frame the upper portion: bordered rect containing the show
+  // wordmark (left) and host photo (right).
+  const frameY = 180 * s
+  const frameH = 440 * s
+  const frameW = W - padX * 2
+  ctx.strokeStyle = preset.palette.primary
+  ctx.lineWidth = 3 * s
+  roundRectPath(ctx, padX, frameY, frameW, frameH, 12 * s)
+  ctx.stroke()
+
+  // Left half of the frame: big show wordmark + tagline
+  const lockupX = padX + 40 * s
+  ctx.fillStyle = preset.palette.primary
+  ctx.font = `900 ${72 * s}px ${family}`
+  ctx.textAlign = 'left'
+  ctx.textBaseline = 'top'
+  ctx.fillText(preset.logo.name1, lockupX, frameY + 80 * s)
+  ctx.fillStyle = preset.palette.secondary
+  ctx.fillText(preset.logo.name2, lockupX, frameY + 80 * s + 72 * s)
+  if (preset.hostTagline) {
+    ctx.fillStyle = preset.palette.ink
+    ctx.font = `700 ${22 * s}px ${family}`
+    ctx.fillText(preset.hostTagline.toUpperCase(), lockupX, frameY + 80 * s + 72 * s * 2 + 18 * s)
+  }
+
+  // Right half of the frame: host headshot (preserves aspect, anchored
+  // to the right edge, vertically centered).
+  const photoUrl = preset.assets?.hostPhotoUrl
+  const photoImg = photoUrl ? images?.get(photoUrl) : null
+  const photoW = frameW * 0.45
+  if (photoImg) {
+    const aspect = photoImg.width / photoImg.height
+    let dw = photoW, dh = dw / aspect
+    if (dh > frameH - 6 * s) { dh = frameH - 6 * s; dw = dh * aspect }
+    const dx = padX + frameW - dw - 3 * s
+    const dy = frameY + (frameH - dh) / 2
+    ctx.save()
+    roundRectPath(ctx, padX + 3 * s, frameY + 3 * s, frameW - 6 * s, frameH - 6 * s, 10 * s)
+    ctx.clip()
+    ctx.drawImage(photoImg, dx, dy, dw, dh)
+    ctx.restore()
+  } else {
+    // Placeholder for the host photo slot
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.05)'
+    const phX = padX + frameW - photoW - 3 * s
+    const phY = frameY + 3 * s
+    ctx.fillRect(phX, phY, photoW, frameH - 6 * s)
+    ctx.fillStyle = preset.palette.inkDim
+    ctx.font = `700 ${16 * s}px ${family}`
+    ctx.textAlign = 'center'
+    ctx.textBaseline = 'middle'
+    ctx.fillText('[ HOST PHOTO ]', phX + photoW / 2, phY + (frameH - 6 * s) / 2)
+  }
+
+  // "THE LESSON:" headline
+  const lessonY = frameY + frameH + 60 * s
+  const lessonHead = (slide.lessonHeadline ?? 'THE LESSON:').toUpperCase()
+  ctx.textAlign = 'left'
+  ctx.textBaseline = 'top'
+  ctx.font = `900 ${90 * s}px ${family}`
+  const colonIdx = lessonHead.lastIndexOf(':')
+  if (colonIdx >= 0) {
+    const main = lessonHead.slice(0, colonIdx)
+    const tail = lessonHead.slice(colonIdx) // ':'
+    ctx.fillStyle = preset.palette.ink
+    ctx.fillText(main, padX, lessonY)
+    const mainW = ctx.measureText(main).width
+    ctx.fillStyle = preset.palette.primary
+    ctx.fillText(tail, padX + mainW, lessonY)
+  } else {
+    ctx.fillStyle = preset.palette.ink
+    ctx.fillText(lessonHead, padX, lessonY)
+  }
+
+  // Thin accent rule under the lesson headline
+  ctx.strokeStyle = preset.palette.primary
+  ctx.lineWidth = 3 * s
+  ctx.beginPath()
+  ctx.moveTo(padX, lessonY + 100 * s)
+  ctx.lineTo(padX + 50 * s, lessonY + 100 * s)
+  ctx.stroke()
+
+  // Lesson body
+  ctx.fillStyle = preset.palette.ink
+  ctx.font = `500 ${28 * s}px ${family}`
+  const bodyLines = wrapLines(ctx, slide.lessonBody, W - padX * 2)
+  const bodyLh = 28 * s * 1.35
+  ctx.textBaseline = 'top'
+  bodyLines.forEach((ln, i) => ctx.fillText(ln, padX, lessonY + 130 * s + i * bodyLh))
+
+  // Tagline (primary)
+  if (slide.tagline) {
+    const tagY = lessonY + 130 * s + bodyLines.length * bodyLh + 30 * s
+    ctx.fillStyle = preset.palette.primary
+    ctx.font = `700 ${26 * s}px ${family}`
+    ctx.fillText(slide.tagline, padX, tagY)
+  }
+
+  // Footer strip: "Listen to <show> wherever you stream podcasts." + platforms
+  const footerY = H - 130 * s
+  ctx.strokeStyle = preset.palette.inkDim
+  ctx.lineWidth = 1 * s
+  ctx.globalAlpha = 0.3
+  ctx.beginPath()
+  ctx.moveTo(padX, footerY - 20 * s)
+  ctx.lineTo(W - padX, footerY - 20 * s)
+  ctx.stroke()
+  ctx.globalAlpha = 1
+
+  // Headphone icon (canvas-drawn)
+  drawHeadphoneIcon(ctx, padX + 30 * s, footerY + 28 * s, 28 * s, preset.palette.primary)
+
+  ctx.fillStyle = preset.palette.ink
+  ctx.font = `700 ${22 * s}px ${family}`
+  ctx.textAlign = 'left'
+  ctx.textBaseline = 'middle'
+  const showWord = preset.displayName
+  const intro = 'Listen to '
+  const outro = ' wherever you stream podcasts.'
+  const introX = padX + 80 * s
+  ctx.fillText(intro, introX, footerY + 14 * s)
+  const showX = introX + ctx.measureText(intro).width
+  ctx.fillStyle = preset.palette.primary
+  // Split on '&' to mirror the show palette
+  const amp = showWord.indexOf('&')
+  if (amp > 0) {
+    const left = showWord.slice(0, amp).trim()
+    const right = showWord.slice(amp + 1).trim()
+    ctx.fillStyle = preset.palette.primary
+    ctx.fillText(left, showX, footerY + 14 * s)
+    const leftW = ctx.measureText(left).width
+    ctx.fillStyle = preset.palette.ink
+    ctx.fillText(' & ', showX + leftW, footerY + 14 * s)
+    const ampW = ctx.measureText(' & ').width
+    ctx.fillStyle = preset.palette.secondary
+    ctx.fillText(right, showX + leftW + ampW, footerY + 14 * s)
+    const rightW = ctx.measureText(right).width
+    ctx.fillStyle = preset.palette.inkDim
+    ctx.font = `500 ${20 * s}px ${family}`
+    ctx.fillText(outro, showX + leftW + ampW + rightW, footerY + 14 * s)
+    // Second line — "wherever you stream podcasts."
+  } else {
+    ctx.fillText(showWord, showX, footerY + 14 * s)
+    ctx.fillStyle = preset.palette.inkDim
+    ctx.font = `500 ${20 * s}px ${family}`
+    ctx.fillText(outro, showX + ctx.measureText(showWord).width, footerY + 14 * s)
+  }
+
+  // Platform icons on the right
+  const platforms = preset.assets?.platforms ?? []
+  const iconSize = 56 * s
+  const iconGap = 16 * s
+  let px = W - padX - iconSize
+  for (let i = platforms.length - 1; i >= 0; i--) {
+    const p = platforms[i]
+    const pImg = images?.get(p.iconUrl)
+    if (pImg) {
+      ctx.drawImage(pImg, px, footerY - iconSize / 2 + 14 * s, iconSize, iconSize)
+    } else {
+      // Round placeholder
+      ctx.fillStyle = preset.palette.inkDim
+      ctx.beginPath()
+      ctx.arc(px + iconSize / 2, footerY + 14 * s, iconSize / 2, 0, Math.PI * 2)
+      ctx.fill()
+      ctx.fillStyle = preset.palette.bg
+      ctx.font = `900 ${10 * s}px ${family}`
+      ctx.textAlign = 'center'
+      ctx.textBaseline = 'middle'
+      ctx.fillText(p.name.slice(0, 3).toUpperCase(), px + iconSize / 2, footerY + 14 * s)
+    }
+    px -= iconSize + iconGap
+  }
+}
+
+function drawHeadphoneIcon(ctx: CanvasRenderingContext2D, cx: number, cy: number, size: number, color: string) {
+  ctx.save()
+  ctx.strokeStyle = color
+  ctx.fillStyle = color
+  ctx.lineWidth = size * 0.12
+  ctx.lineCap = 'round'
+  // Arc band over the top
+  ctx.beginPath()
+  ctx.arc(cx, cy, size * 0.7, Math.PI, 0)
+  ctx.stroke()
+  // Two ear cups
+  ctx.beginPath()
+  roundRectPath(ctx, cx - size * 0.85, cy - size * 0.1, size * 0.35, size * 0.55, size * 0.15)
+  ctx.fill()
+  ctx.beginPath()
+  roundRectPath(ctx, cx + size * 0.5, cy - size * 0.1, size * 0.35, size * 0.55, size * 0.15)
+  ctx.fill()
+  ctx.restore()
+}
+
+function hexRgbStr(hex: string): string {
+  const m = /^#([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i.exec(hex)
+  if (!m) return '255, 255, 255'
+  return `${parseInt(m[1], 16)}, ${parseInt(m[2], 16)}, ${parseInt(m[3], 16)}`
 }
 
 // ============================================================
@@ -947,7 +1382,120 @@ export function sampleSoulAndScienceDeck(): SlideSpec[] {
       ],
       brandMark: { label: 'White Castle' },
     },
+    {
+      kind: 'brand-callout',
+      headline: 'Meet travelers WHERE THEY ALREADY ARE.',
+      accent: 'WHERE THEY',
+      accentSecondary: 'ALREADY ARE.',
+      bodyParagraphs: [
+        'For Tripadvisor, the answer is not just more media.',
+        'It’s meeting travelers where they already are.',
+        'Sometimes the future of search doesn’t start on your website.',
+      ],
+      finalLine: 'It starts in the feed.',
+      brandLabel: 'Tripadvisor',
+    },
+    {
+      kind: 'brand-callout',
+      headline: 'HERITAGE IS NOT SOMETHING TO HIDE. IT’S SOMETHING TO REFRAME.',
+      accent: 'SOMETHING TO HIDE.',
+      accentSecondary: 'TO REFRAME.',
+      bodyParagraphs: [
+        'A mistake became part of the brand.',
+        'A catalog became a modern channel.',
+        'A legacy became a personality.',
+      ],
+      brandLabel: 'Lands’ End',
+    },
+    {
+      kind: 'finale',
+      lessonHeadline: 'The Lesson:',
+      lessonBody:
+        'Legacy brands don’t stay relevant by living in the past. They stay modern by keeping what made them matter… and having the courage to evolve what comes next.',
+      tagline: 'Realness. Relevance. Resonance.',
+    },
   ]
+}
+
+// Adapter: take a flat server-shape slide (from Claude) and produce
+// the discriminated-union SlideSpec the renderer wants. Skips malformed
+// slides (returns null) — caller filters them out.
+export function adaptServerSlide(s: {
+  kind: string
+  title?: string; eyebrow?: string
+  headline?: string; accent?: string; accentSecondary?: string; body?: string; brandLabel?: string
+  diagramLayout?: string
+  diagramNodeAIcon?: string; diagramNodeALabel?: string; diagramNodeASub?: string
+  diagramNodeBIcon?: string; diagramNodeBLabel?: string; diagramNodeBSub?: string
+  diagramMidpointLabel?: string; diagramMidpointSub?: string
+  trait1Icon?: string; trait1Word?: string
+  trait2Icon?: string; trait2Word?: string
+  trait3Icon?: string; trait3Word?: string
+  bodyParagraphs?: string[]; finalLine?: string
+  lessonHeadline?: string; lessonBody?: string; tagline?: string
+  quoteText?: string; quoteSpeaker?: string
+}): SlideSpec | null {
+  switch (s.kind) {
+    case 'cover':
+      if (!s.title) return null
+      return { kind: 'cover', title: s.title, eyebrow: s.eyebrow }
+    case 'thesis': {
+      if (!s.headline || !s.accent) return null
+      const diagram: DiagramSpec | undefined =
+        s.diagramLayout && s.diagramLayout !== 'none' && s.diagramNodeAIcon && s.diagramNodeBIcon
+          ? {
+              layout: s.diagramLayout as DiagramSpec['layout'],
+              nodes: [
+                { icon: s.diagramNodeAIcon as ConceptIconKey, label: s.diagramNodeALabel ?? '', sub: s.diagramNodeASub, tone: 'primary' },
+                { icon: s.diagramNodeBIcon as ConceptIconKey, label: s.diagramNodeBLabel ?? '', sub: s.diagramNodeBSub, tone: 'secondary' },
+              ],
+              midpoint: s.diagramMidpointLabel ? { label: s.diagramMidpointLabel, sub: s.diagramMidpointSub } : undefined,
+            }
+          : undefined
+      return {
+        kind: 'thesis',
+        headline: s.headline, accent: s.accent, body: s.body, diagram,
+        brandMark: s.brandLabel ? { label: s.brandLabel } : undefined,
+      }
+    }
+    case 'callout': {
+      if (!s.headline || !s.accent) return null
+      const traits: Array<{ icon: ConceptIconKey; word: string }> = []
+      if (s.trait1Icon && s.trait1Word) traits.push({ icon: s.trait1Icon as ConceptIconKey, word: s.trait1Word })
+      if (s.trait2Icon && s.trait2Word) traits.push({ icon: s.trait2Icon as ConceptIconKey, word: s.trait2Word })
+      if (s.trait3Icon && s.trait3Word) traits.push({ icon: s.trait3Icon as ConceptIconKey, word: s.trait3Word })
+      return {
+        kind: 'callout',
+        headline: s.headline, accent: s.accent, accentSecondary: s.accentSecondary,
+        body: s.body, traits: traits.length > 0 ? traits : undefined,
+        brandMark: s.brandLabel ? { label: s.brandLabel } : undefined,
+      }
+    }
+    case 'brand-callout': {
+      if (!s.headline || !s.accent || !s.bodyParagraphs) return null
+      return {
+        kind: 'brand-callout',
+        headline: s.headline, accent: s.accent, accentSecondary: s.accentSecondary,
+        bodyParagraphs: s.bodyParagraphs, finalLine: s.finalLine,
+        brandLabel: s.brandLabel,
+      }
+    }
+    case 'finale': {
+      if (!s.lessonBody) return null
+      return {
+        kind: 'finale',
+        lessonHeadline: s.lessonHeadline,
+        lessonBody: s.lessonBody,
+        tagline: s.tagline,
+      }
+    }
+    case 'quote': {
+      if (!s.quoteText) return null
+      return { kind: 'quote', text: s.quoteText, speaker: s.quoteSpeaker }
+    }
+    default:
+      return null
+  }
 }
 
 export function canvasToBlob(canvas: HTMLCanvasElement, type: string = 'image/png'): Promise<Blob> {

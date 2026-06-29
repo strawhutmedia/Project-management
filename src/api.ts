@@ -492,6 +492,65 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   return res.json() as Promise<T>
 }
 
+// Server-shape mirror of the carousel deck Claude returns. The
+// renderer (src/lib/carouselDeckImage.ts) adapts these flat slide
+// objects into its discriminated-union SlideSpec[].
+export type ApiCarouselDeckSlide = {
+  kind: 'cover' | 'thesis' | 'callout' | 'brand-callout' | 'finale' | 'quote'
+  title?: string
+  eyebrow?: string
+  headline?: string
+  accent?: string
+  accentSecondary?: string
+  body?: string
+  brandLabel?: string
+  diagramLayout?: 'two-circle' | 'three-stage' | 'none'
+  diagramNodeAIcon?: string
+  diagramNodeALabel?: string
+  diagramNodeASub?: string
+  diagramNodeBIcon?: string
+  diagramNodeBLabel?: string
+  diagramNodeBSub?: string
+  diagramMidpointLabel?: string
+  diagramMidpointSub?: string
+  trait1Icon?: string
+  trait1Word?: string
+  trait2Icon?: string
+  trait2Word?: string
+  trait3Icon?: string
+  trait3Word?: string
+  bodyParagraphs?: string[]
+  finalLine?: string
+  lessonHeadline?: string
+  lessonBody?: string
+  tagline?: string
+  quoteText?: string
+  quoteSpeaker?: string
+  needsHostPhoto?: boolean
+  needsBrandLogo?: boolean
+  needsCollageImage?: boolean
+  assetHint?: string
+}
+
+export type ApiCarouselAssetRequest = {
+  slot: 'host_photo' | 'show_logo' | 'platform_icons' | 'brand_logo' | 'collage_image'
+  description: string
+  slide_index: number
+}
+
+export type ApiCarouselDeckResult = {
+  deck: {
+    slides: ApiCarouselDeckSlide[]
+    asset_requests: ApiCarouselAssetRequest[]
+  }
+  usage: {
+    inputTokens: number
+    outputTokens: number
+    cacheCreationInputTokens: number
+    cacheReadInputTokens: number
+  }
+}
+
 export const api = {
   me: () => request<{ user: ApiUser | null }>('/api/me'),
   updateMe: (patch: { name?: string; displayName?: string; timezone?: string }) =>
@@ -963,6 +1022,18 @@ export const api = {
     request<{ ok: true; item: ApiSocialItem }>(`/api/socials/${planId}/regenerate-stills`, {
       method: 'POST',
       body: JSON.stringify({ itemId, shiftSeconds }),
+    }),
+  generateCarouselDeck: (body: {
+    transcript: string
+    showName: string
+    hostName?: string
+    presetKey: string
+    episodeTitle?: string
+    episodeNumber?: number
+  }) =>
+    request<ApiCarouselDeckResult>('/api/carousel/preview', {
+      method: 'POST',
+      body: JSON.stringify(body),
     }),
   // The /api/integrations/dropbox/file proxy 302-redirects to a fresh
   // 4hr temp link. <img src> works directly with this.
