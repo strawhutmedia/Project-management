@@ -1,0 +1,86 @@
+{
+  "project": {
+    "id": "77d9b3b7-01a9-4856-8723-fa4bc9c6e21f",
+    "name": "Soul & Science",
+    "subtitle": "Soul & Science Podcast",
+    "kind": "podcast",
+    "filmPhase": "pre",
+    "dropboxFolder": "/Straw Hut Team Folder/1_PODCASTS/Soul and Science/S&S Internal Folder/Episodes",
+    "channelsSubfolder": "episodes",
+    "coverArtUrl": "https://megaphone.imgix.net/podcasts/fe21ccd6-bd50-11f0-9000-b7c6a52b6f0b/image/4822b60583a7186943e3e552268a8d61.png?ixlib=rails-4.3.1&amp;max-w=3000&amp;max-h=3000&amp;fit=crop&amp;auto=format,compress",
+    "brandAssetsFolder": null,
+    "socialsBrandVoice": "Marketing’s brightest minds reveal what it takes to build breakthrough brands. Hosted by Jason Harris, each episode explores the balance between brand building (Soul) and business performance (Science). From legacy brands to emerging disruptors, we delve into the insights, culture, and vision behind the most successful brand stories.",
+    "socialsVocabulary": null,
+    "rssFeedUrl": "https://feeds.megaphone.fm/SHML6765192273",
+    "createdAt": "2026-06-01T18:46:40.766Z"
+  },
+  "publishedAt": "2026-06-30T18:39:57.927Z",
+  "counts": {
+    "scenes": 0,
+    "lineItems": 0,
+    "sceneLevelItems": 0,
+    "projectLevelItems": 0,
+    "shootDays": 0,
+    "songs": 2,
+    "tasks": 0,
+    "comments": 0,
+    "links": 0,
+    "cuts": 0,
+    "cutNotes": 0,
+    "snapshots": 0,
+    "showChatMessages": 0
+  },
+  "members": [
+    {
+      "userId": "6a3c3e32-a32e-4101-994e-4d828fe53bd9",
+      "displayName": "Caroline",
+      "email": "caroline@strawhutmedia.com",
+      "role": "admin",
+      "projectRole": "admin"
+    },
+    {
+      "userId": "0e601315-c693-46b6-a27a-b69c2b474b0e",
+      "displayName": "Sully",
+      "email": "sullivan@strawhutmedia.com",
+      "role": "user",
+      "projectRole": "user"
+    }
+  ],
+  "shootDays": [],
+  "scenes": [],
+  "projectLevelItems": [],
+  "songs": [
+    {
+      "id": "0d0fac98-c2b5-4e27-81c9-5cdff8824035",
+      "title": "Episode 127   Rustom Dastoor   Cut 3",
+      "subtitle": null,
+      "stage": "writing",
+      "position": 1,
+      "dropboxFolder": null,
+      "releaseDate": null,
+      "processingState": "ready",
+      "createdAt": "2026-06-01T19:13:56.849Z",
+      "tasks": [],
+      "comments": [],
+      "links": [],
+      "cuts": []
+    },
+    {
+      "id": "6e0585b3-31e6-4274-a26a-bbf0baf5c33a",
+      "title": "Episode 127   Rustom Dastoor   Cut 3",
+      "subtitle": null,
+      "stage": "writing",
+      "position": 2,
+      "dropboxFolder": null,
+      "releaseDate": "2026-06-01T00:00:00.000Z",
+      "processingState": "ready",
+      "createdAt": "2026-06-01T19:14:40.156Z",
+      "tasks": [],
+      "comments": [],
+      "links": [],
+      "cuts": []
+    }
+  ],
+  "scheduleSnapshots": [],
+  "showChatRecent": []
+}
