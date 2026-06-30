@@ -213,5 +213,35 @@
     "outcome": "fixed",
     "summary": "Fixed Dropbox upload permission error handling to distinguish between OAuth token issues (401) and path-level write restrictions (409), providing clear actionable error messages for each case.",
     "iterations": 17
+  },
+  "stills: dropbox upload failed::{\"itemId\":\"4cb93416-bbfc-43a1-8a8c-e3f12371d537\",\"fileName\":\"v0-f3.jpg\",\"error\":": {
+    "attemptedAt": "2026-06-30T21:55:40.809Z",
+    "outcome": "no_tool_call",
+    "summary": "agent stopped without calling a terminal tool",
+    "iterations": 7
+  },
+  "stills: dropbox upload failed::{\"itemId\":\"cef6a316-8939-4721-b627-4584c841a421\",\"fileName\":\"v0-f0.jpg\",\"error\":": {
+    "attemptedAt": "2026-06-30T21:57:08.939Z",
+    "outcome": "no_tool_call",
+    "summary": "agent stopped without calling a terminal tool",
+    "iterations": 6
+  },
+  "stills: dropbox upload failed::{\"itemId\":\"cef6a316-8939-4721-b627-4584c841a421\",\"fileName\":\"v0-f2.jpg\",\"error\":": {
+    "attemptedAt": "2026-06-30T22:00:32.277Z",
+    "outcome": "gave_up",
+    "summary": "hit max iterations (20)",
+    "iterations": 20
+  },
+  "stills: dropbox upload failed::{\"itemId\":\"cef6a316-8939-4721-b627-4584c841a421\",\"fileName\":\"v0-f4.jpg\",\"error\":": {
+    "attemptedAt": "2026-06-30T22:02:03.846Z",
+    "outcome": "no_tool_call",
+    "summary": "agent stopped without calling a terminal tool",
+    "iterations": 9
+  },
+  "stills: dropbox upload failed::{\"itemId\":\"f34b0128-9376-469a-9468-0e7587eff7ad\",\"fileName\":\"v0-f0.jpg\",\"error\":": {
+    "attemptedAt": "2026-06-30T22:03:23.882Z",
+    "outcome": "fixed",
+    "summary": "Fixed Dropbox chunked upload permission error detection by adding case-insensitive checks for no_write_permission errors in all upload session stages (start/append/finish), ensuring users get clear reconnect instructions instead of generic error logs.",
+    "iterations": 14
   }
 }
