@@ -243,5 +243,35 @@
     "outcome": "fixed",
     "summary": "Fixed Dropbox chunked upload permission error detection by adding case-insensitive checks for no_write_permission errors in all upload session stages (start/append/finish), ensuring users get clear reconnect instructions instead of generic error logs.",
     "iterations": 14
+  },
+  "stills: dropbox upload failed::{\"itemId\":\"f34b0128-9376-469a-9468-0e7587eff7ad\",\"fileName\":\"v0-f3.jpg\",\"error\":": {
+    "attemptedAt": "2026-06-30T23:08:40.014Z",
+    "outcome": "no_tool_call",
+    "summary": "agent stopped without calling a terminal tool",
+    "iterations": 7
+  },
+  "stills: dropbox upload failed::{\"itemId\":\"df98f1ae-871e-4057-aa41-beda3bd52449\",\"fileName\":\"v0-f0.jpg\",\"error\":": {
+    "attemptedAt": "2026-06-30T23:10:47.995Z",
+    "outcome": "no_tool_call",
+    "summary": "agent stopped without calling a terminal tool",
+    "iterations": 8
+  },
+  "stills: dropbox upload failed::{\"itemId\":\"df98f1ae-871e-4057-aa41-beda3bd52449\",\"fileName\":\"v0-f1.jpg\",\"error\":": {
+    "attemptedAt": "2026-06-30T23:12:09.030Z",
+    "outcome": "no_tool_call",
+    "summary": "agent stopped without calling a terminal tool",
+    "iterations": 7
+  },
+  "stills: dropbox upload failed::{\"itemId\":\"df98f1ae-871e-4057-aa41-beda3bd52449\",\"fileName\":\"v0-f3.jpg\",\"error\":": {
+    "attemptedAt": "2026-06-30T23:13:38.632Z",
+    "outcome": "no_tool_call",
+    "summary": "agent stopped without calling a terminal tool",
+    "iterations": 8
+  },
+  "stills: dropbox upload failed::{\"itemId\":\"723e8b27-ddfe-4b7b-9efa-cdd88a3b45d4\",\"fileName\":\"v0-f0.jpg\",\"error\":": {
+    "attemptedAt": "2026-06-30T23:15:08.740Z",
+    "outcome": "no_tool_call",
+    "summary": "agent stopped without calling a terminal tool",
+    "iterations": 7
   }
 }
