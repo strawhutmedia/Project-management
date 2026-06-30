@@ -1044,7 +1044,10 @@ const DECK_SCHEMA = {
         additionalProperties: false,
         required: ['kind'],
         properties: {
-          kind: { enum: ['cover', 'thesis', 'callout', 'brand-callout', 'finale', 'quote'] },
+          // Every enum gets `type: 'string'` alongside — Anthropic's
+          // strict json_schema validator rejects bare enums on some
+          // model versions.
+          kind: { type: 'string', enum: ['cover', 'thesis', 'callout', 'brand-callout', 'finale', 'quote'] },
           title: { type: 'string' },
           eyebrow: { type: 'string' },
           headline: { type: 'string' },
@@ -1052,20 +1055,20 @@ const DECK_SCHEMA = {
           accentSecondary: { type: 'string' },
           body: { type: 'string' },
           brandLabel: { type: 'string' },
-          diagramLayout: { enum: ['two-circle', 'three-stage', 'none'] },
-          diagramNodeAIcon: { enum: [...CONCEPT_ICONS] },
+          diagramLayout: { type: 'string', enum: ['two-circle', 'three-stage', 'none'] },
+          diagramNodeAIcon: { type: 'string', enum: [...CONCEPT_ICONS] },
           diagramNodeALabel: { type: 'string' },
           diagramNodeASub: { type: 'string' },
-          diagramNodeBIcon: { enum: [...CONCEPT_ICONS] },
+          diagramNodeBIcon: { type: 'string', enum: [...CONCEPT_ICONS] },
           diagramNodeBLabel: { type: 'string' },
           diagramNodeBSub: { type: 'string' },
           diagramMidpointLabel: { type: 'string' },
           diagramMidpointSub: { type: 'string' },
-          trait1Icon: { enum: [...CONCEPT_ICONS] },
+          trait1Icon: { type: 'string', enum: [...CONCEPT_ICONS] },
           trait1Word: { type: 'string' },
-          trait2Icon: { enum: [...CONCEPT_ICONS] },
+          trait2Icon: { type: 'string', enum: [...CONCEPT_ICONS] },
           trait2Word: { type: 'string' },
-          trait3Icon: { enum: [...CONCEPT_ICONS] },
+          trait3Icon: { type: 'string', enum: [...CONCEPT_ICONS] },
           trait3Word: { type: 'string' },
           bodyParagraphs: { type: 'array', items: { type: 'string' } },
           finalLine: { type: 'string' },
@@ -1088,7 +1091,7 @@ const DECK_SCHEMA = {
         additionalProperties: false,
         required: ['slot', 'description', 'slide_index'],
         properties: {
-          slot: { enum: ['host_photo', 'show_logo', 'platform_icons', 'brand_logo', 'collage_image'] },
+          slot: { type: 'string', enum: ['host_photo', 'show_logo', 'platform_icons', 'brand_logo', 'collage_image'] },
           description: { type: 'string' },
           slide_index: { type: 'integer', minimum: 1, maximum: 7 },
         },
@@ -1220,7 +1223,12 @@ export async function generateCarouselDeck(input: CarouselGenerateInput): Promis
   try {
     response = await client.messages.create({
       model: MODEL,
-      max_tokens: 8000,
+      // Bumped from 8000 → 16000 to match the other generators. The
+      // deck JSON for a 7-slide carousel + asset_requests is ~3-4k
+      // tokens, but a verbose run can push past 8k and truncate the
+      // JSON mid-string — that surfaces as "Unexpected end of JSON
+      // input" further down. 16k gives plenty of headroom.
+      max_tokens: 16000,
       system: DECK_SYSTEM_PROMPT,
       messages: [
         {
