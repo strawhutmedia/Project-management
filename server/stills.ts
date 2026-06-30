@@ -99,6 +99,20 @@ export async function extractStillsForItem(input: StillExtractInput): Promise<St
       throw new Error(`dropbox_temp_link_failed: ${link.error || 'unknown'}`)
     }
 
+    // CRITICAL: stream the source file to local disk ONCE before running
+    // ffmpeg, instead of letting ffmpeg fetch over HTTP for every frame.
+    // Streaming + ffmpeg-decoding in parallel on a 1-2hr H.264 episode
+    // can spike memory hard enough that Railway's OOM-killer drops the
+    // ffmpeg process (manifests as `ffmpeg_exit_null` in error logs).
+    // Downloading first decouples the network from ffmpeg's memory
+    // profile entirely.
+    const sourcePath = path.join(workDir, 'source')
+    await downloadToLocalFile(link.url, sourcePath)
+    logInfo('stills: source downloaded', {
+      itemId: input.itemId,
+      bytes: fs.statSync(sourcePath).size,
+    })
+
     // Sample timestamps evenly across the window. For frames=5 and
     // window=2s, we get center -2, -1, 0, +1, +2.
     const stamps: number[] = []
@@ -109,9 +123,8 @@ export async function extractStillsForItem(input: StillExtractInput): Promise<St
       stamps.push(Math.max(0, t))
     }
 
-    // Run one ffmpeg invocation per timestamp. Slower than a single
-    // filtergraph call but each frame is independently retryable and
-    // we get cleaner errors when one timestamp is past the end of file.
+    // Run one ffmpeg invocation per timestamp against the LOCAL file.
+    // Way faster (no per-frame HTTP overhead) and OOM-safe.
     const localFiles: string[] = []
     for (let i = 0; i < stamps.length; i++) {
       const t = stamps[i]
@@ -119,7 +132,7 @@ export async function extractStillsForItem(input: StillExtractInput): Promise<St
       try {
         await runFfmpeg([
           '-ss', t.toFixed(3),
-          '-i', link.url,
+          '-i', sourcePath,
           '-frames:v', '1',
           '-q:v', '2',
           '-y',
@@ -213,6 +226,37 @@ function runFfmpeg(args: string[]): Promise<void> {
 // last few non-banner lines, so debugging finds the real message.
 function tail(stderr: string): string {
   return stderr.slice(-2000).trim()
+}
+
+// Stream a remote URL into a local file. Streaming is essential —
+// `await response.arrayBuffer()` would buffer a 2GB MP4 in memory and
+// re-trigger the exact OOM we're trying to escape. Resolves once the
+// write stream is fully drained.
+async function downloadToLocalFile(url: string, destPath: string): Promise<void> {
+  const res = await fetch(url)
+  if (!res.ok) {
+    throw new Error(`download_failed: HTTP ${res.status} ${res.statusText}`)
+  }
+  if (!res.body) {
+    throw new Error('download_failed: empty body')
+  }
+  const out = fs.createWriteStream(destPath)
+  const reader = res.body.getReader()
+  try {
+    // Pump chunks one at a time through the write stream and honor
+    // backpressure so we don't queue up GBs in memory if disk is slow.
+    while (true) {
+      const { done, value } = await reader.read()
+      if (done) break
+      if (!out.write(Buffer.from(value))) {
+        await new Promise<void>((resolve) => out.once('drain', resolve))
+      }
+    }
+  } finally {
+    await new Promise<void>((resolve, reject) => {
+      out.end((err?: Error | null) => (err ? reject(err) : resolve()))
+    })
+  }
 }
 
 // Probe the source file with ffprobe to confirm it has a video stream.
@@ -321,6 +365,16 @@ export async function extractClipForItem(input: ClipExtractInput): Promise<ClipE
     if (!link.ok || !link.url) {
       throw new Error(`dropbox_temp_link_failed: ${link.error || 'unknown'}`)
     }
+    // Stream source to local disk first (see same fix in
+    // extractStillsForItem). This is the difference between "ffmpeg
+    // runs reliably on H.264 episode MP4s" and "ffmpeg gets OOM-killed
+    // streaming a 2hr file from Dropbox."
+    const sourcePath = path.join(workDir, 'source')
+    await downloadToLocalFile(link.url, sourcePath)
+    logInfo('clips: source downloaded', {
+      itemId: input.itemId,
+      bytes: fs.statSync(sourcePath).size,
+    })
     const outPath = path.join(workDir, 'clip.mp4')
     // Use -ss BEFORE -i for fast seeking, then -t for duration. Use
     // -c copy to avoid re-encoding (fast, lossless). If the keyframes
@@ -328,7 +382,7 @@ export async function extractClipForItem(input: ClipExtractInput): Promise<ClipE
     // late — acceptable for a 30-60s social clip preview.
     await runFfmpeg([
       '-ss', input.startSeconds.toFixed(3),
-      '-i', link.url,
+      '-i', sourcePath,
       '-t', duration.toFixed(3),
       '-c', 'copy',
       '-movflags', '+faststart',
