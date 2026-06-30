@@ -211,12 +211,15 @@ function runFfmpeg(args: string[]): Promise<void> {
     proc.on('error', (err) => { clearTimeout(timer); reject(err) })
     proc.on('close', (code, signal) => {
       clearTimeout(timer)
-      if (code === 0) resolve()
-      // exit code null/undefined = process was killed by a signal (SIGKILL from
-      // OOM-killer, our timeout, etc.). Report the signal so the cause
-      // is visible instead of just "exit_null".
-      else if (code == null) reject(new Error(`ffmpeg_killed_${signal ?? 'unknown'}: ${tail(stderr)}`))
-      else reject(new Error(`ffmpeg_exit_${code}: ${tail(stderr)}`))
+      if (code === null || code === undefined) {
+        reject(new Error(`ffmpeg_killed_${signal ?? 'unknown'}: ${tail(stderr)}`))
+        return
+      }
+      if (code === 0) {
+        resolve()
+        return
+      }
+      reject(new Error(`ffmpeg_exit_${code}: ${tail(stderr)}`))
     })
   })
 }
