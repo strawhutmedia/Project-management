@@ -48,7 +48,11 @@ adminRouter.get('/users', async (_req, res) => {
 
 // List all projects (for the invite form), each with songs for per-channel access selection.
 adminRouter.get('/projects', async (_req, res) => {
-  const projRes = await pool.query(`SELECT id, name FROM projects ORDER BY name ASC`)
+  // `kind` is included so the invite UI can group projects by kind and
+  // default new invitees to the right access level per type (podcasts
+  // default to whole-project access since shows are shared content;
+  // films + albums default to no access since they're per-engagement).
+  const projRes = await pool.query(`SELECT id, name, kind FROM projects ORDER BY name ASC`)
   const songsRes = await pool.query(
     `SELECT id, project_id, title, subtitle, position
      FROM songs ORDER BY project_id, position ASC`,
@@ -59,9 +63,10 @@ adminRouter.get('/projects', async (_req, res) => {
     songsByProject[row.project_id].push({ id: row.id, title: row.title, subtitle: row.subtitle })
   }
   res.json({
-    projects: projRes.rows.map((p: { id: string; name: string }) => ({
+    projects: projRes.rows.map((p: { id: string; name: string; kind: string }) => ({
       id: p.id,
       name: p.name,
+      kind: p.kind,
       songs: songsByProject[p.id] ?? [],
     })),
   })

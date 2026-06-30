@@ -439,11 +439,20 @@ function InviteModal({
   const [displayName, setDisplayName] = useState('')
   const [role, setRole] = useState<'admin' | 'user' | 'viewer'>('user')
   const [timezone, setTimezone] = useState('America/Los_Angeles')
+  // Default access by project kind:
+  //   podcast → 'full'  (new teammates get every show by default —
+  //                       they're shared editorial content)
+  //   film    → 'none'  (per-engagement, locked down by default)
+  //   album   → 'none'  (artist projects, locked down by default)
+  // Admin can still override any project before sending the invite.
+  function defaultModeForKind(kind: ApiAdminProject['kind']): 'none' | 'full' {
+    return kind === 'podcast' ? 'full' : 'none'
+  }
   const [accessByProject, setAccessByProject] = useState<Record<string, { mode: 'none' | 'full' | 'songs'; songIds: Set<string> }>>(
     () => {
       const init: Record<string, { mode: 'none' | 'full' | 'songs'; songIds: Set<string> }> = {}
       for (const p of projects) {
-        init[p.id] = { mode: 'none', songIds: new Set() }
+        init[p.id] = { mode: defaultModeForKind(p.kind), songIds: new Set() }
       }
       return init
     },
@@ -571,52 +580,85 @@ function InviteModal({
                 Project access
               </label>
               <p className="text-[11px] text-muted mb-3">
-                Admins automatically see everything. For users, pick which projects (or specific channels — songs for albums, episodes for podcasts) they can see.
+                Admins automatically see everything. For users, podcasts default to <span className="text-text font-bold">Whole project</span> (shows are shared); films and music default to <span className="text-text font-bold">No access</span> (per-engagement). Override per project as needed.
               </p>
-              <div className="space-y-3">
-                {projects.map((p) => {
-                  const acc = accessByProject[p.id]
+              <div className="space-y-4">
+                {([
+                  { kind: 'podcast', label: 'Podcasts', accent: 'text-stage-mastering' },
+                  { kind: 'film',    label: 'Films',    accent: 'text-stage-overdubs'  },
+                  { kind: 'album',   label: 'Music',    accent: 'text-stage-producing' },
+                ] as const).map((group) => {
+                  const groupProjects = projects.filter((p) => p.kind === group.kind)
+                  if (groupProjects.length === 0) return null
                   return (
-                    <div key={p.id} className="rounded-xl border border-line bg-ink/30 p-3">
-                      <div className="flex items-center justify-between mb-2">
-                        <span className="text-sm font-bold">{p.name}</span>
-                        <select
-                          value={acc.mode}
-                          onChange={(e) => setMode(p.id, e.target.value as 'none' | 'full' | 'songs')}
-                          className="rounded-lg bg-ink/40 border border-line text-text px-2 py-1 text-xs outline-none"
+                    <div key={group.kind} className="space-y-2">
+                      <div className="flex items-baseline justify-between">
+                        <span className={`text-[10px] uppercase tracking-[0.2em] font-bold ${group.accent}`}>
+                          {group.label}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            // Bulk toggle for this kind — convenient when
+                            // adding someone to ALL podcasts at once, or
+                            // explicitly removing them from every film.
+                            const allFull = groupProjects.every((p) => accessByProject[p.id]?.mode === 'full')
+                            const next = allFull ? 'none' : 'full'
+                            for (const p of groupProjects) setMode(p.id, next)
+                          }}
+                          className="text-[10px] uppercase tracking-wider text-muted hover:text-text font-bold"
                         >
-                          <option value="none">No access</option>
-                          <option value="full">Whole project</option>
-                          <option value="songs">Specific channels</option>
-                        </select>
+                          {groupProjects.every((p) => accessByProject[p.id]?.mode === 'full')
+                            ? '↺ Remove all'
+                            : '⤓ Grant all'}
+                        </button>
                       </div>
-                      {acc.mode === 'songs' && (
-                        <div className="grid grid-cols-1 gap-1 max-h-40 overflow-y-auto pl-2 border-l border-line">
-                          {p.songs.length === 0 ? (
-                            <p className="text-xs text-muted">No channels in this project.</p>
-                          ) : (
-                            p.songs.map((s) => (
-                              <label
-                                key={s.id}
-                                className="flex items-center gap-2 text-xs cursor-pointer py-0.5"
+                      {groupProjects.map((p) => {
+                        const acc = accessByProject[p.id]
+                        return (
+                          <div key={p.id} className="rounded-xl border border-line bg-ink/30 p-3">
+                            <div className="flex items-center justify-between mb-2">
+                              <span className="text-sm font-bold">{p.name}</span>
+                              <select
+                                value={acc.mode}
+                                onChange={(e) => setMode(p.id, e.target.value as 'none' | 'full' | 'songs')}
+                                className="rounded-lg bg-ink/40 border border-line text-text px-2 py-1 text-xs outline-none"
                               >
-                                <input
-                                  type="checkbox"
-                                  checked={acc.songIds.has(s.id)}
-                                  onChange={() => toggleSong(p.id, s.id)}
-                                  className="accent-stage-mastering"
-                                />
-                                <span>
-                                  {s.title}
-                                  {s.subtitle && (
-                                    <span className="text-muted ml-1">({s.subtitle})</span>
-                                  )}
-                                </span>
-                              </label>
-                            ))
-                          )}
-                        </div>
-                      )}
+                                <option value="none">No access</option>
+                                <option value="full">Whole project</option>
+                                <option value="songs">Specific channels</option>
+                              </select>
+                            </div>
+                            {acc.mode === 'songs' && (
+                              <div className="grid grid-cols-1 gap-1 max-h-40 overflow-y-auto pl-2 border-l border-line">
+                                {p.songs.length === 0 ? (
+                                  <p className="text-xs text-muted">No channels in this project.</p>
+                                ) : (
+                                  p.songs.map((s) => (
+                                    <label
+                                      key={s.id}
+                                      className="flex items-center gap-2 text-xs cursor-pointer py-0.5"
+                                    >
+                                      <input
+                                        type="checkbox"
+                                        checked={acc.songIds.has(s.id)}
+                                        onChange={() => toggleSong(p.id, s.id)}
+                                        className="accent-stage-mastering"
+                                      />
+                                      <span>
+                                        {s.title}
+                                        {s.subtitle && (
+                                          <span className="text-muted ml-1">({s.subtitle})</span>
+                                        )}
+                                      </span>
+                                    </label>
+                                  ))
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        )
+                      })}
                     </div>
                   )
                 })}

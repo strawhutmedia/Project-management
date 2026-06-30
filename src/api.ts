@@ -159,6 +159,7 @@ export type ApiAdminUser = {
 export type ApiAdminProject = {
   id: string
   name: string
+  kind: 'album' | 'podcast' | 'film'
   songs: Array<{ id: string; title: string; subtitle: string | null }>
 }
 
