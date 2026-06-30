@@ -341,12 +341,19 @@ export async function triggerSocialPlanGeneration(args: {
                     touched = true
                   }
                 } catch (err) {
-                  // Per-item stills failure is recoverable (other items
-                  // may still succeed). Demoted from logError to logInfo
-                  // so we don't email-spam on every miss.
-                  logInfo('socials: stills for item skipped', {
-                    planId, itemId: it.id, error: err instanceof Error ? err.message : String(err),
-                  })
+                  const errMsg = err instanceof Error ? err.message : String(err)
+                  // Escalate permission errors to ERROR level so admins
+                  // get notified to reconnect Dropbox. Other failures
+                  // are recoverable and stay at INFO to avoid spam.
+                  if (errMsg.includes('no_write_permission')) {
+                    logError('socials: stills blocked by missing Dropbox permission', {
+                      planId, itemId: it.id, error: errMsg,
+                    })
+                  } else {
+                    logInfo('socials: stills for item skipped', {
+                      planId, itemId: it.id, error: errMsg,
+                    })
+                  }
                 }
               }
               // Video clip extraction — story (video medium) + reel
@@ -373,11 +380,19 @@ export async function triggerSocialPlanGeneration(args: {
                     ;(items[i] as unknown as Record<string, unknown>).clip_version = clip.version
                     touched = true
                   } catch (err) {
-                    // Same rationale as stills above — per-item clip
-                    // failure is recoverable, don't email-spam on it.
-                    logInfo('socials: clip for item skipped', {
-                      planId, itemId: it.id, error: err instanceof Error ? err.message : String(err),
-                    })
+                    const errMsg = err instanceof Error ? err.message : String(err)
+                    // Escalate permission errors to ERROR level so admins
+                    // get notified to reconnect Dropbox. Other failures
+                    // are recoverable and stay at INFO to avoid spam.
+                    if (errMsg.includes('no_write_permission')) {
+                      logError('socials: clip blocked by missing Dropbox permission', {
+                        planId, itemId: it.id, error: errMsg,
+                      })
+                    } else {
+                      logInfo('socials: clip for item skipped', {
+                        planId, itemId: it.id, error: errMsg,
+                      })
+                    }
                   }
                 }
               }
@@ -569,8 +584,11 @@ socialsRouter.post('/:planId/regenerate-stills', async (req, res) => {
     res.json({ ok: true, item: items[idx] })
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err)
+    // Return a more helpful status code for permission errors so the UI
+    // can display a reconnect prompt instead of a generic "Bad Gateway".
+    const status = msg.includes('no_write_permission') ? 403 : 502
     logError('socials: regenerate-stills failed', { planId: plan.id, itemId, error: msg })
-    res.status(502).json({ error: msg.slice(0, 400) })
+    res.status(status).json({ error: msg.slice(0, 400) })
   }
 })
 

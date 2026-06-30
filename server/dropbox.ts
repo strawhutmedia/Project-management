@@ -311,6 +311,13 @@ export async function uploadFile(folderPath: string, fileName: string, body: Buf
     })
     if (!res.ok) {
       const text = await res.text()
+      // Detect missing write permissions — happens when a user connected
+      // before files.content.write was added to DROPBOX_SCOPES. Log a
+      // clear error so admins know to disconnect + reconnect Dropbox.
+      if (res.status === 409 && text.includes('no_write_permission')) {
+        logError('dropbox: missing write permission — reconnect required', { path: fullPath })
+        return { ok: false, error: 'no_write_permission: Dropbox token lacks files.content.write scope. Disconnect and reconnect the integration.' }
+      }
       return { ok: false, error: `dropbox_${res.status}: ${text.slice(0, 200)}` }
     }
     const data = (await res.json()) as { path_display: string }
@@ -327,6 +334,11 @@ export async function uploadFile(folderPath: string, fileName: string, body: Buf
   })
   if (!startRes.ok) {
     const text = await startRes.text()
+    // Detect missing write permissions when starting upload session
+    if (startRes.status === 409 && text.includes('no_write_permission')) {
+      logError('dropbox: missing write permission — reconnect required', { path: fullPath })
+      return { ok: false, error: 'no_write_permission: Dropbox token lacks files.content.write scope. Disconnect and reconnect the integration.' }
+    }
     return { ok: false, error: `dropbox_session_start_${startRes.status}: ${text.slice(0, 200)}` }
   }
   const startData = (await startRes.json()) as { session_id: string }
@@ -350,6 +362,11 @@ export async function uploadFile(folderPath: string, fileName: string, body: Buf
     })
     if (!r.ok) {
       const text = await r.text()
+      // Detect missing write permissions in chunked uploads during append
+      if (r.status === 409 && text.includes('no_write_permission')) {
+        logError('dropbox: missing write permission — reconnect required', { path: fullPath })
+        return { ok: false, error: 'no_write_permission: Dropbox token lacks files.content.write scope. Disconnect and reconnect the integration.' }
+      }
       return { ok: false, error: `dropbox_session_append_${r.status}: ${text.slice(0, 200)}` }
     }
     offset += chunk.length
@@ -370,6 +387,11 @@ export async function uploadFile(folderPath: string, fileName: string, body: Buf
   })
   if (!finishRes.ok) {
     const text = await finishRes.text()
+    // Detect missing write permissions in chunked uploads too
+    if (finishRes.status === 409 && text.includes('no_write_permission')) {
+      logError('dropbox: missing write permission — reconnect required', { path: fullPath })
+      return { ok: false, error: 'no_write_permission: Dropbox token lacks files.content.write scope. Disconnect and reconnect the integration.' }
+    }
     return { ok: false, error: `dropbox_session_finish_${finishRes.status}: ${text.slice(0, 200)}` }
   }
   const finishData = (await finishRes.json()) as { path_display: string }

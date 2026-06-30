@@ -185,6 +185,11 @@ export async function extractStillsForItem(input: StillExtractInput): Promise<St
       if (res.ok && res.path) {
         uploadedPaths.push(res.path)
       } else {
+        // If we hit a permission error, throw immediately so the caller
+        // can surface it (rather than silently skipping all uploads).
+        if (res.error?.includes('no_write_permission')) {
+          throw new Error(res.error)
+        }
         logError('stills: dropbox upload failed', { itemId: input.itemId, fileName, error: res.error })
       }
     }
@@ -428,7 +433,9 @@ export async function extractClipForItem(input: ClipExtractInput): Promise<ClipE
     const fileName = `v${version}.mp4`
     const res = await uploadFile(dropboxFolder, fileName, buf)
     if (!res.ok || !res.path) {
-      throw new Error(`dropbox_upload_failed: ${res.error || 'unknown'}`)
+      // Surface the specific error from dropbox.ts (includes the helpful
+      // "reconnect required" message for no_write_permission)
+      throw new Error(res.error || 'dropbox_upload_failed: unknown')
     }
     logInfo('clips: extracted', {
       itemId: input.itemId,
