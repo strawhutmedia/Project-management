@@ -185,9 +185,10 @@ export async function extractStillsForItem(input: StillExtractInput): Promise<St
       if (res.ok && res.path) {
         uploadedPaths.push(res.path)
       } else {
-        // If we hit a permission error, throw immediately so the caller
-        // can surface it (rather than silently skipping all uploads).
-        if (res.error?.includes('no_write_permission')) {
+        // If we hit an auth or path permission error, throw immediately so
+        // the caller can surface it with a clear message (rather than
+        // silently skipping uploads and leaving the user confused).
+        if (res.error?.includes('dropbox_auth_failed') || res.error?.includes('dropbox_path_permission_denied')) {
           throw new Error(res.error)
         }
         logError('stills: dropbox upload failed', { itemId: input.itemId, fileName, error: res.error })
