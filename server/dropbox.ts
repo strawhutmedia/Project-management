@@ -316,11 +316,13 @@ export async function uploadFile(folderPath: string, fileName: string, body: Buf
         logError('dropbox: OAuth token invalid or insufficient scope — reconnect required', { path: fullPath })
         return { ok: false, error: 'dropbox_auth_failed: Dropbox token is invalid or lacks required scope. Disconnect and reconnect the integration.' }
       }
-      // Detect path-level permission errors (409 with path/no_write_permission)
-      // This means the token is valid but the specific folder has restricted permissions
-      if (res.status === 409 && text.includes('no_write_permission')) {
-        logError('dropbox: path permission denied', { path: fullPath, folderPath })
-        return { ok: false, error: `dropbox_path_permission_denied: The folder '${folderPath}' does not allow writes. Check folder permissions in Dropbox.` }
+      // Detect path-level permission errors (409 with path/no_write_permission or restricted_content).
+      // This typically means the OAuth token was granted before we added explicit write scopes,
+      // or the specific folder has restricted permissions. Check case-insensitively to be safe.
+      const lowerText = text.toLowerCase()
+      if (res.status === 409 && (lowerText.includes('no_write_permission') || lowerText.includes('restricted_content'))) {
+        logError('dropbox: path permission denied — reconnect may be required', { path: fullPath, folderPath })
+        return { ok: false, error: `dropbox_path_permission_denied: The folder '${folderPath}' does not allow writes. This usually means the Dropbox integration needs to be reconnected with updated permissions. Go to Settings > Integrations, disconnect Dropbox, then reconnect it.` }
       }
       return { ok: false, error: `dropbox_${res.status}: ${text.slice(0, 200)}` }
     }
@@ -338,15 +340,18 @@ export async function uploadFile(folderPath: string, fileName: string, body: Buf
   })
   if (!startRes.ok) {
     const text = await startRes.text()
+    const lowerText = text.toLowerCase()
     // Detect insufficient OAuth scope (401 unauthorized)
     if (startRes.status === 401) {
       logError('dropbox: OAuth token invalid or insufficient scope — reconnect required', { path: fullPath })
       return { ok: false, error: 'dropbox_auth_failed: Dropbox token is invalid or lacks required scope. Disconnect and reconnect the integration.' }
     }
-    // Detect path-level permission errors (409 with path/no_write_permission)
-    if (startRes.status === 409 && text.includes('no_write_permission')) {
-      logError('dropbox: path permission denied', { path: fullPath, folderPath })
-      return { ok: false, error: `dropbox_path_permission_denied: The folder '${folderPath}' does not allow writes. Check folder permissions in Dropbox.` }
+    // Detect path-level permission errors (409 with path/no_write_permission or restricted_content).
+    // This typically means the OAuth token was granted before we added explicit write scopes,
+    // or the specific folder has restricted permissions. Check case-insensitively to be safe.
+    if (startRes.status === 409 && (lowerText.includes('no_write_permission') || lowerText.includes('restricted_content'))) {
+      logError('dropbox: path permission denied — reconnect may be required', { path: fullPath, folderPath })
+      return { ok: false, error: `dropbox_path_permission_denied: The folder '${folderPath}' does not allow writes. This usually means the Dropbox integration needs to be reconnected with updated permissions. Go to Settings > Integrations, disconnect Dropbox, then reconnect it.` }
     }
     return { ok: false, error: `dropbox_session_start_${startRes.status}: ${text.slice(0, 200)}` }
   }
@@ -371,15 +376,18 @@ export async function uploadFile(folderPath: string, fileName: string, body: Buf
     })
     if (!r.ok) {
       const text = await r.text()
+      const lowerText = text.toLowerCase()
       // Detect insufficient OAuth scope (401 unauthorized)
       if (r.status === 401) {
         logError('dropbox: OAuth token invalid or insufficient scope — reconnect required', { path: fullPath })
         return { ok: false, error: 'dropbox_auth_failed: Dropbox token is invalid or lacks required scope. Disconnect and reconnect the integration.' }
       }
-      // Detect path-level permission errors (409 with path/no_write_permission)
-      if (r.status === 409 && text.includes('no_write_permission')) {
-        logError('dropbox: path permission denied', { path: fullPath, folderPath })
-        return { ok: false, error: `dropbox_path_permission_denied: The folder '${folderPath}' does not allow writes. Check folder permissions in Dropbox.` }
+      // Detect path-level permission errors (409 with path/no_write_permission or restricted_content).
+      // This typically means the OAuth token was granted before we added explicit write scopes,
+      // or the specific folder has restricted permissions.
+      if (r.status === 409 && (lowerText.includes('no_write_permission') || lowerText.includes('restricted_content'))) {
+        logError('dropbox: path permission denied — reconnect may be required', { path: fullPath, folderPath })
+        return { ok: false, error: `dropbox_path_permission_denied: The folder '${folderPath}' does not allow writes. This usually means the Dropbox integration needs to be reconnected with updated permissions. Go to Settings > Integrations, disconnect Dropbox, then reconnect it.` }
       }
       return { ok: false, error: `dropbox_session_append_${r.status}: ${text.slice(0, 200)}` }
     }
@@ -401,15 +409,18 @@ export async function uploadFile(folderPath: string, fileName: string, body: Buf
   })
   if (!finishRes.ok) {
     const text = await finishRes.text()
+    const lowerText = text.toLowerCase()
     // Detect insufficient OAuth scope (401 unauthorized)
     if (finishRes.status === 401) {
       logError('dropbox: OAuth token invalid or insufficient scope — reconnect required', { path: fullPath })
       return { ok: false, error: 'dropbox_auth_failed: Dropbox token is invalid or lacks required scope. Disconnect and reconnect the integration.' }
     }
-    // Detect path-level permission errors (409 with path/no_write_permission)
-    if (finishRes.status === 409 && text.includes('no_write_permission')) {
-      logError('dropbox: path permission denied', { path: fullPath, folderPath })
-      return { ok: false, error: `dropbox_path_permission_denied: The folder '${folderPath}' does not allow writes. Check folder permissions in Dropbox.` }
+    // Detect path-level permission errors (409 with path/no_write_permission or restricted_content).
+    // This typically means the OAuth token was granted before we added explicit write scopes,
+    // or the specific folder has restricted permissions.
+    if (finishRes.status === 409 && (lowerText.includes('no_write_permission') || lowerText.includes('restricted_content'))) {
+      logError('dropbox: path permission denied — reconnect may be required', { path: fullPath, folderPath })
+      return { ok: false, error: `dropbox_path_permission_denied: The folder '${folderPath}' does not allow writes. This usually means the Dropbox integration needs to be reconnected with updated permissions. Go to Settings > Integrations, disconnect Dropbox, then reconnect it.` }
     }
     return { ok: false, error: `dropbox_session_finish_${finishRes.status}: ${text.slice(0, 200)}` }
   }
