@@ -1034,9 +1034,11 @@ const DECK_SCHEMA = {
   required: ['slides', 'asset_requests'],
   properties: {
     slides: {
+      // Anthropic's strict json_schema validator only allows
+      // minItems values of 0 or 1 — we enforce the real 5–7 bound
+      // through the prompt text instead. Same story for the array
+      // size limits on bodyParagraphs and asset_requests below.
       type: 'array',
-      minItems: 5,
-      maxItems: 7,
       items: {
         type: 'object',
         additionalProperties: false,
@@ -1065,7 +1067,7 @@ const DECK_SCHEMA = {
           trait2Word: { type: 'string' },
           trait3Icon: { enum: [...CONCEPT_ICONS] },
           trait3Word: { type: 'string' },
-          bodyParagraphs: { type: 'array', items: { type: 'string' }, maxItems: 4 },
+          bodyParagraphs: { type: 'array', items: { type: 'string' } },
           finalLine: { type: 'string' },
           lessonHeadline: { type: 'string' },
           lessonBody: { type: 'string' },
@@ -1081,7 +1083,6 @@ const DECK_SCHEMA = {
     },
     asset_requests: {
       type: 'array',
-      maxItems: 12,
       items: {
         type: 'object',
         additionalProperties: false,

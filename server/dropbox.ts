@@ -18,12 +18,29 @@ export function getRedirectUri(): string {
   return `${base}/api/integrations/dropbox/callback`
 }
 
+// The scopes Slate needs from Dropbox. Listed explicitly so a Dropbox
+// admin can't accidentally grant a read-only token (which caused the
+// "path/no_write_permission" failures when uploading generated still
+// JPGs and clip MP4s). Anyone who connected before these were
+// requested will need to disconnect + reconnect once to mint a new
+// token with the right scopes.
+const DROPBOX_SCOPES = [
+  'files.metadata.read',
+  'files.metadata.write',
+  'files.content.read',
+  'files.content.write',
+  'sharing.read',
+  'sharing.write',
+  'account_info.read',
+].join(' ')
+
 export function buildAuthorizeUrl(state: string): string {
   const params = new URLSearchParams({
     client_id: getDropboxAppKey() || '',
     response_type: 'code',
     redirect_uri: getRedirectUri(),
     token_access_type: 'offline',
+    scope: DROPBOX_SCOPES,
     state,
   })
   return `${DROPBOX_OAUTH}?${params.toString()}`
