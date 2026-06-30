@@ -1,0 +1,48 @@
+{
+  "project": {
+    "id": "a54d52a7-8038-43f1-9768-d1278a65c90f",
+    "name": "Seen on the Screen",
+    "subtitle": "A Universal Pictures Podcast",
+    "kind": "podcast",
+    "filmPhase": "pre",
+    "dropboxFolder": "/Straw Hut Team Folder/1_PODCASTS/Seen On The Screen",
+    "channelsSubfolder": "episodes",
+    "coverArtUrl": "https://megaphone.imgix.net/podcasts/6ad333e8-bc29-11f0-8033-f39430503ac3/image/2f842c11ddf332ed3cff34711042d167.jpg?ixlib=rails-4.3.1&amp;max-w=3000&amp;max-h=3000&amp;fit=crop&amp;auto=format,compress",
+    "brandAssetsFolder": "/Straw Hut Team Folder/1_PODCASTS/SEEN ON THE SCREEN/Branding/2026 Branding",
+    "socialsBrandVoice": null,
+    "socialsVocabulary": null,
+    "rssFeedUrl": "https://feeds.megaphone.fm/SHML8158411190",
+    "createdAt": "2026-06-30T14:22:14.089Z"
+  },
+  "publishedAt": "2026-06-30T14:23:25.512Z",
+  "counts": {
+    "scenes": 0,
+    "lineItems": 0,
+    "sceneLevelItems": 0,
+    "projectLevelItems": 0,
+    "shootDays": 0,
+    "songs": 0,
+    "tasks": 0,
+    "comments": 0,
+    "links": 0,
+    "cuts": 0,
+    "cutNotes": 0,
+    "snapshots": 0,
+    "showChatMessages": 0
+  },
+  "members": [
+    {
+      "userId": "e0afa8af-ef91-41b5-ad28-afc3189712f6",
+      "displayName": "Ryan",
+      "email": "ryan@strawhutmedia.com",
+      "role": "admin",
+      "projectRole": "admin"
+    }
+  ],
+  "shootDays": [],
+  "scenes": [],
+  "projectLevelItems": [],
+  "songs": [],
+  "scheduleSnapshots": [],
+  "showChatRecent": []
+}
