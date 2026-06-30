@@ -183,5 +183,35 @@
     "outcome": "gave_up",
     "summary": "hit max iterations (20)",
     "iterations": 20
+  },
+  "stills: dropbox upload failed::{\"itemId\":\"e67f2dbe-ca72-4639-94bb-00f01b841ae5\",\"fileName\":\"v0-f0.jpg\",\"error\":": {
+    "attemptedAt": "2026-06-30T20:21:43.589Z",
+    "outcome": "gave_up",
+    "summary": "hit max iterations (20)",
+    "iterations": 20
+  },
+  "stills: dropbox upload failed::{\"itemId\":\"e67f2dbe-ca72-4639-94bb-00f01b841ae5\",\"fileName\":\"v0-f2.jpg\",\"error\":": {
+    "attemptedAt": "2026-06-30T20:23:21.714Z",
+    "outcome": "no_tool_call",
+    "summary": "agent stopped without calling a terminal tool",
+    "iterations": 11
+  },
+  "stills: dropbox upload failed::{\"itemId\":\"e67f2dbe-ca72-4639-94bb-00f01b841ae5\",\"fileName\":\"v0-f3.jpg\",\"error\":": {
+    "attemptedAt": "2026-06-30T20:24:58.031Z",
+    "outcome": "no_tool_call",
+    "summary": "agent stopped without calling a terminal tool",
+    "iterations": 7
+  },
+  "stills: dropbox upload failed::{\"itemId\":\"4cb93416-bbfc-43a1-8a8c-e3f12371d537\",\"fileName\":\"v0-f0.jpg\",\"error\":": {
+    "attemptedAt": "2026-06-30T20:25:44.376Z",
+    "outcome": "fixed",
+    "summary": "Added missing `no_write_permission` error detection to the chunked upload `start` and `append_v2` phases in dropbox.ts, ensuring all upload paths return a helpful \"reconnect required\" message when the Dropbox token lacks write permissions.",
+    "iterations": 11
+  },
+  "stills: dropbox upload failed::{\"itemId\":\"4cb93416-bbfc-43a1-8a8c-e3f12371d537\",\"fileName\":\"v0-f1.jpg\",\"error\":": {
+    "attemptedAt": "2026-06-30T20:27:56.166Z",
+    "outcome": "fixed",
+    "summary": "Fixed Dropbox upload permission error handling to distinguish between OAuth token issues (401) and path-level write restrictions (409), providing clear actionable error messages for each case.",
+    "iterations": 17
   }
 }
