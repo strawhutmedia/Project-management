@@ -291,10 +291,27 @@ export async function triggerSocialPlanGeneration(args: {
       if (ctx.source_file_path && !isAudioOnlySource) {
         ;(async () => {
           try {
-            const { extractStillsForItem, extractClipForItem, parseTimecode, parseTimecodeRange, isFfmpegAvailable } = await import('../stills')
+            const { extractStillsForItem, extractClipForItem, parseTimecode, parseTimecodeRange, isFfmpegAvailable, probeMediaStreams } = await import('../stills')
             if (!(await isFfmpegAvailable())) {
               logInfo('socials: skipping ffmpeg work (ffmpeg not available)', { planId })
               return
+            }
+            // Belt-and-suspenders for the audio-only case: even if the
+            // extension didn't tell us (e.g. an MP4 that's actually
+            // audio-only with album art baked in), ffprobe will. Skip
+            // the ENTIRE stills/clips pass with one log line instead of
+            // letting ffmpeg burn through every frame request and
+            // generate a stack of admin alerts.
+            const { getTemporaryLink } = await import('../dropbox')
+            const link = await getTemporaryLink(ctx.source_file_path!)
+            if (link.ok && link.url) {
+              const probe = await probeMediaStreams(link.url)
+              if (probe && !probe.hasVideo) {
+                logInfo('socials: source has no video stream — skipping stills/clips', {
+                  planId, source: ctx.source_file_path, probe,
+                })
+                return
+              }
             }
             let touched = false
             for (let i = 0; i < items.length; i++) {

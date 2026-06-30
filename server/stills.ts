@@ -178,16 +178,76 @@ export async function extractStillsForItem(input: StillExtractInput): Promise<St
   }
 }
 
-// Thin Promise-wrapper around child_process.spawn for ffmpeg.
+// Thin Promise-wrapper around child_process.spawn for ffmpeg. Adds
+// an explicit timeout so a hung ffmpeg can't sit forever waiting on a
+// dead network read, and captures a larger stderr tail so the actual
+// failure reason survives in error logs (was 400 chars, which only
+// caught the end of ffmpeg's startup banner — completely useless for
+// debugging).
+const FFMPEG_TIMEOUT_MS = 5 * 60 * 1000  // 5 minutes per invocation
+
 function runFfmpeg(args: string[]): Promise<void> {
   return new Promise((resolve, reject) => {
     const proc = spawn(FFMPEG_PATH, args, { stdio: ['ignore', 'ignore', 'pipe'] })
     let stderr = ''
     proc.stderr?.on('data', (d) => { stderr += String(d) })
-    proc.on('error', (err) => reject(err))
-    proc.on('close', (code) => {
+    const timer = setTimeout(() => {
+      proc.kill('SIGKILL')
+      reject(new Error(`ffmpeg_timeout_${FFMPEG_TIMEOUT_MS}ms: ${tail(stderr)}`))
+    }, FFMPEG_TIMEOUT_MS)
+    proc.on('error', (err) => { clearTimeout(timer); reject(err) })
+    proc.on('close', (code, signal) => {
+      clearTimeout(timer)
       if (code === 0) resolve()
-      else reject(new Error(`ffmpeg_exit_${code}: ${stderr.slice(-400)}`))
+      // exit code null = process was killed by a signal (SIGKILL from
+      // OOM-killer, our timeout, etc.). Report the signal so the cause
+      // is visible instead of just "exit_null".
+      else if (code === null) reject(new Error(`ffmpeg_killed_${signal ?? 'unknown'}: ${tail(stderr)}`))
+      else reject(new Error(`ffmpeg_exit_${code}: ${tail(stderr)}`))
+    })
+  })
+}
+
+// Capture enough stderr to include the actual error, but skip past
+// ffmpeg's verbose startup banner. We grab the last 2000 chars AND the
+// last few non-banner lines, so debugging finds the real message.
+function tail(stderr: string): string {
+  return stderr.slice(-2000).trim()
+}
+
+// Probe the source file with ffprobe to confirm it has a video stream.
+// Returns { hasVideo, hasAudio } so we can skip stills/clips on audio-
+// only sources cleanly (instead of letting ffmpeg try, fail, and email
+// a stack of errors). Resolves to nulls if the probe itself fails.
+export async function probeMediaStreams(url: string): Promise<{ hasVideo: boolean; hasAudio: boolean } | null> {
+  // ffprobe ships alongside the @ffmpeg-installer ffmpeg binary in
+  // some packages but not all. Best-effort: try the path next to ffmpeg.
+  const probePath = FFMPEG_PATH.replace(/ffmpeg$/, 'ffprobe')
+  return new Promise((resolve) => {
+    const proc = spawn(probePath, [
+      '-v', 'error',
+      '-print_format', 'json',
+      '-show_streams',
+      '-timeout', '10000000', // 10s socket timeout
+      url,
+    ], { stdio: ['ignore', 'pipe', 'pipe'] })
+    let stdout = ''
+    proc.stdout?.on('data', (d) => { stdout += String(d) })
+    const timer = setTimeout(() => { proc.kill('SIGKILL'); resolve(null) }, 20_000)
+    proc.on('error', () => { clearTimeout(timer); resolve(null) })
+    proc.on('close', (code) => {
+      clearTimeout(timer)
+      if (code !== 0) return resolve(null)
+      try {
+        const parsed = JSON.parse(stdout) as { streams?: Array<{ codec_type?: string }> }
+        const streams = parsed.streams ?? []
+        resolve({
+          hasVideo: streams.some((s) => s.codec_type === 'video'),
+          hasAudio: streams.some((s) => s.codec_type === 'audio'),
+        })
+      } catch {
+        resolve(null)
+      }
     })
   })
 }
