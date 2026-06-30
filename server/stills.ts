@@ -124,17 +124,25 @@ export async function extractStillsForItem(input: StillExtractInput): Promise<St
     }
 
     // Run one ffmpeg invocation per timestamp against the LOCAL file.
-    // Way faster (no per-frame HTTP overhead) and OOM-safe.
+    // Way faster (no per-frame HTTP overhead) and OOM-safe. Added memory
+    // constraints to prevent OOM kills on large files.
     const localFiles: string[] = []
     for (let i = 0; i < stamps.length; i++) {
       const t = stamps[i]
       const outPath = path.join(workDir, `frame-${i}.jpg`)
       try {
         await runFfmpeg([
+          // Seek before input for speed; accuracy isn't critical for preview frames
           '-ss', t.toFixed(3),
+          // Reduce probe size and duration to minimize memory on file open
+          '-probesize', '50M',
+          '-analyzeduration', '10M',
           '-i', sourcePath,
+          // Extract exactly one frame
           '-frames:v', '1',
+          // JPEG quality (2 = high quality, range is 2-31)
           '-q:v', '2',
+          // Overwrite output file without asking
           '-y',
           outPath,
         ])
@@ -146,9 +154,19 @@ export async function extractStillsForItem(input: StillExtractInput): Promise<St
         // extends past the end of the video). Log as INFO and continue
         // — these per-frame failures used to fire admin alerts, which
         // turned a single audio-source upload into 20+ emails.
+        const errMsg = err instanceof Error ? err.message : String(err)
         logInfo('stills: ffmpeg frame skipped', {
-          itemId: input.itemId, t, error: err instanceof Error ? err.message : String(err),
+          itemId: input.itemId, t, error: errMsg,
         })
+        // If ffmpeg was killed by signal (OOM, etc.), log additional context
+        if (errMsg.includes('killed_by_signal') || errMsg.includes('ffmpeg_exit_null')) {
+          logError('stills: ffmpeg killed (likely OOM)', {
+            itemId: input.itemId,
+            t,
+            sourceSize: fs.existsSync(sourcePath) ? fs.statSync(sourcePath).size : 'unknown',
+            error: errMsg,
+          })
+        }
       }
     }
     if (localFiles.length === 0) {
@@ -211,15 +229,17 @@ function runFfmpeg(args: string[]): Promise<void> {
     proc.on('error', (err) => { clearTimeout(timer); reject(err) })
     proc.on('close', (code, signal) => {
       clearTimeout(timer)
-      if (code === null || code === undefined) {
-        reject(new Error(`ffmpeg_killed_${signal ?? 'unknown'}: ${tail(stderr)}`))
+      // Null code means the process was killed by a signal (often OOM on
+      // Railway). Explicitly check for this and provide a better error.
+      if (code === null || code === undefined || typeof code !== 'number') {
+        reject(new Error(`ffmpeg_killed_by_signal_${signal ?? 'unknown'}: ${tail(stderr)}`))
         return
       }
       if (code === 0) {
         resolve()
         return
       }
-      reject(new Error(`ffmpeg_exit_${code}: ${tail(stderr)}`))
+      reject(new Error(`ffmpeg_exit_code_${code}: ${tail(stderr)}`))
     })
   })
 }
@@ -384,11 +404,19 @@ export async function extractClipForItem(input: ClipExtractInput): Promise<ClipE
     // don't line up exactly, the cut may start a fraction of a second
     // late — acceptable for a 30-60s social clip preview.
     await runFfmpeg([
+      // Fast seek to start position
       '-ss', input.startSeconds.toFixed(3),
+      // Reduce probe size and duration to minimize memory on file open
+      '-probesize', '50M',
+      '-analyzeduration', '10M',
       '-i', sourcePath,
+      // Duration to extract
       '-t', duration.toFixed(3),
+      // Copy codec (no re-encoding) for speed and quality
       '-c', 'copy',
+      // Optimize for web playback
       '-movflags', '+faststart',
+      // Overwrite output
       '-y',
       outPath,
     ])
