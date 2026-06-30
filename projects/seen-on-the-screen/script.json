@@ -14,14 +14,14 @@
     "rssFeedUrl": "https://feeds.megaphone.fm/SHML8158411190",
     "createdAt": "2026-06-30T14:22:14.089Z"
   },
-  "publishedAt": "2026-06-30T14:23:25.512Z",
+  "publishedAt": "2026-06-30T14:25:16.764Z",
   "counts": {
     "scenes": 0,
     "lineItems": 0,
     "sceneLevelItems": 0,
     "projectLevelItems": 0,
     "shootDays": 0,
-    "songs": 0,
+    "songs": 1,
     "tasks": 0,
     "comments": 0,
     "links": 0,
@@ -42,7 +42,23 @@
   "shootDays": [],
   "scenes": [],
   "projectLevelItems": [],
-  "songs": [],
+  "songs": [
+    {
+      "id": "6c568b18-3463-4502-b54b-86b385698ee8",
+      "title": "BRIE LARSON",
+      "subtitle": null,
+      "stage": "writing",
+      "position": 1,
+      "dropboxFolder": null,
+      "releaseDate": "2026-07-20T00:00:00.000Z",
+      "processingState": "processing",
+      "createdAt": "2026-06-30T14:24:16.197Z",
+      "tasks": [],
+      "comments": [],
+      "links": [],
+      "cuts": []
+    }
+  ],
   "scheduleSnapshots": [],
   "showChatRecent": []
 }
