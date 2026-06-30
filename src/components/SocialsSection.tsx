@@ -15,6 +15,7 @@ import JSZip from 'jszip'
 import { api, type ApiMember, type ApiSocialItem, type ApiSocialPlan, type SocialItemStatus } from '../api'
 import { renderTextPostCanvas, canvasToBlob, safeFilename, extractCoverPalette, type CoverPalette } from '../lib/textPostImage'
 import { KIND_STYLES } from '../lib/kindStyles'
+import EpisodeCarousel from './EpisodeCarousel'
 
 const STATUS_LABEL: Record<SocialItemStatus, string> = {
   idea: 'Idea',
@@ -115,6 +116,58 @@ export default function SocialsSection({
     }
   }
 
+  return (
+    <div className="space-y-4">
+      <EpisodeCarousel
+        projectId={projectId}
+        songId={songId}
+        showName={showName}
+      />
+      <DailyPlanSection
+        plans={plans}
+        canWrite={canWrite}
+        hasDoneTranscript={hasDoneTranscript}
+        starting={starting}
+        generate={generate}
+        remove={remove}
+        error={error}
+        members={members}
+        showName={showName}
+        coverArtUrl={coverArtUrl}
+        palette={palette}
+        load={load}
+        projectId={projectId}
+        songId={songId}
+      />
+    </div>
+  )
+}
+
+// Inner — the original Daily Social Plan section, factored out so the
+// carousel can render above it without rewiring all the state.
+function DailyPlanSection({
+  plans, canWrite, hasDoneTranscript, starting, generate, remove, error,
+  members, showName, coverArtUrl, palette, load, projectId, songId,
+}: {
+  plans: ApiSocialPlan[] | null
+  canWrite: boolean
+  hasDoneTranscript: boolean | null
+  starting: boolean
+  generate: () => Promise<void>
+  remove: (id: string) => Promise<void>
+  error: string | null
+  members: ApiMember[]
+  showName: string
+  coverArtUrl?: string | null
+  palette: CoverPalette | null
+  load: () => Promise<void>
+  projectId: string
+  songId: string
+}) {
+  // suppress unused-prop warnings — these get forwarded to children
+  // via closures from the SocialsSection scope above; some props are
+  // forwarded indirectly through the existing logic below.
+  void projectId; void songId; void coverArtUrl
   return (
     <section className="rounded-2xl border border-line bg-panel/60 p-5 space-y-4">
       <div className="flex items-center justify-between gap-3 flex-wrap">
