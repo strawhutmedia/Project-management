@@ -159,5 +159,29 @@
     "outcome": "fixed",
     "summary": "Wrapped express.static middleware to catch and silently suppress URI decoding errors from malformed requests (e.g., /%c0/) that were being logged as unhandled errors.",
     "iterations": 13
+  },
+  "stills: ffmpeg frame failed::{\"itemId\":\"6b0e4484-3a88-4c6c-9117-69dfaca8f42f\",\"t\":0,\"error\":\"ffmpeg_exit_null": {
+    "attemptedAt": "2026-06-30T18:14:37.609Z",
+    "outcome": "fixed",
+    "summary": "Fixed ffmpeg error handling to properly detect killed processes by changing strict equality check (code === null) to loose equality (code == null), which catches both null and undefined exit codes and reports the actual signal instead of \"ffmpeg_exit_null\".",
+    "iterations": 10
+  },
+  "stills: ffmpeg frame failed::{\"itemId\":\"4d1ac919-f36a-4310-b5c4-6d3e6af5aa44\",\"t\":1404,\"error\":\"ffmpeg_exit_n": {
+    "attemptedAt": "2026-06-30T18:17:17.281Z",
+    "outcome": "fixed",
+    "summary": "Fixed ffmpeg error handling in stills.ts by checking for null/undefined exit codes first and adding explicit return statements to prevent fall-through that was causing \"ffmpeg_exit_null\" errors instead of properly reporting \"ffmpeg_killed_\" with the signal.",
+    "iterations": 12
+  },
+  "stills: ffmpeg frame failed::{\"itemId\":\"f183c1ac-d026-49ff-a8e1-f0dc7dfe9d9f\",\"t\":501,\"error\":\"ffmpeg_exit_nu": {
+    "attemptedAt": "2026-06-30T18:20:14.049Z",
+    "outcome": "fixed",
+    "summary": "Fixed ffmpeg OOM kills during frame extraction by adding memory-limiting flags (-probesize, -analyzeduration) and improving error handling to clearly indicate when processes are killed by signals.",
+    "iterations": 19
+  },
+  "socials: stills for item failed::{\"planId\":\"429209fa-514b-4bd5-aa31-5006b3927f65\",\"itemId\":\"80415a79-7ae2-4ed1-a2": {
+    "attemptedAt": "2026-06-30T18:21:25.047Z",
+    "outcome": "gave_up",
+    "summary": "hit max iterations (20)",
+    "iterations": 20
   }
 }
