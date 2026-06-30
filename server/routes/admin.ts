@@ -221,6 +221,45 @@ adminRouter.patch('/users/:id', async (req, res) => {
   res.json({ ok: true })
 })
 
+// Replace a user's project + song access in one transactional call.
+// Body: { projectIds: string[], songIds: string[] }. Anything not in
+// the new list gets revoked. Used by the "Edit access" modal so the
+// admin can drag a user from "podcasts only" to "podcasts + Maggie
+// Glass" in one save instead of one click per project.
+adminRouter.put('/users/:id/access', async (req, res) => {
+  const userId = req.params.id
+  const projectIds: string[] = Array.isArray(req.body?.projectIds) ? req.body.projectIds : []
+  const songIds: string[] = Array.isArray(req.body?.songIds) ? req.body.songIds : []
+  const client = await pool.connect()
+  try {
+    await client.query('BEGIN')
+    await client.query(`DELETE FROM project_members WHERE user_id = $1`, [userId])
+    await client.query(`DELETE FROM song_members WHERE user_id = $1`, [userId])
+    for (const pid of projectIds) {
+      await client.query(
+        `INSERT INTO project_members (project_id, user_id) VALUES ($1, $2)
+         ON CONFLICT DO NOTHING`,
+        [pid, userId],
+      )
+    }
+    for (const sid of songIds) {
+      await client.query(
+        `INSERT INTO song_members (song_id, user_id) VALUES ($1, $2)
+         ON CONFLICT DO NOTHING`,
+        [sid, userId],
+      )
+    }
+    await client.query('COMMIT')
+    res.json({ ok: true })
+  } catch (err) {
+    await client.query('ROLLBACK')
+    logError('admin: user access update failed', { userId, error: err instanceof Error ? err.message : String(err) })
+    res.status(500).json({ error: 'update_failed' })
+  } finally {
+    client.release()
+  }
+})
+
 adminRouter.delete('/users/:id', async (req, res) => {
   const admin = (req as typeof req & { user: SessionUser }).user
   const userId = req.params.id

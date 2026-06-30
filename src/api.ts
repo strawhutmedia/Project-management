@@ -685,6 +685,11 @@ export const api = {
   }) => request<{ user: ApiAdminUser }>('/api/admin/users', { method: 'POST', body: JSON.stringify(body) }),
   adminDeleteUser: (id: string) =>
     request<{ ok: true }>(`/api/admin/users/${id}`, { method: 'DELETE' }),
+  adminUpdateUserAccess: (id: string, body: { projectIds: string[]; songIds: string[] }) =>
+    request<{ ok: true }>(`/api/admin/users/${id}/access`, {
+      method: 'PUT',
+      body: JSON.stringify(body),
+    }),
   adminUpdateUser: (id: string, patch: { displayName?: string; name?: string; role?: 'admin' | 'user' | 'viewer'; timezone?: string; email?: string }) =>
     request<{ ok: true }>(`/api/admin/users/${id}`, { method: 'PATCH', body: JSON.stringify(patch) }),
   adminGrantProject: (userId: string, projectId: string) =>

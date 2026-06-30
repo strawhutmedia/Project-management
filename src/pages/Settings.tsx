@@ -126,6 +126,7 @@ function UsersSection({ currentUserId }: { currentUserId: string }) {
   const [users, setUsers] = useState<ApiAdminUser[] | null>(null)
   const [projects, setProjects] = useState<ApiAdminProject[] | null>(null)
   const [showInvite, setShowInvite] = useState(false)
+  const [editingAccessFor, setEditingAccessFor] = useState<ApiAdminUser | null>(null)
   const [error, setError] = useState<string | null>(null)
 
   async function load() {
@@ -231,12 +232,22 @@ function UsersSection({ currentUserId }: { currentUserId: string }) {
                   </div>
                 </div>
                 {u.id !== currentUserId && (
-                  <button
-                    onClick={() => void remove(u)}
-                    className="opacity-0 group-hover:opacity-100 text-xs text-muted hover:text-urgent transition shrink-0"
-                  >
-                    Remove
-                  </button>
+                  <div className="flex items-center gap-2 shrink-0">
+                    {u.role !== 'admin' && (
+                      <button
+                        onClick={() => setEditingAccessFor(u)}
+                        className="text-[10px] uppercase tracking-wider text-stage-mastering border border-stage-mastering/40 rounded-full px-2.5 py-1 hover:bg-stage-mastering/10 font-bold"
+                      >
+                        ✎ Edit access
+                      </button>
+                    )}
+                    <button
+                      onClick={() => void remove(u)}
+                      className="opacity-0 group-hover:opacity-100 text-xs text-muted hover:text-urgent transition"
+                    >
+                      Remove
+                    </button>
+                  </div>
                 )}
               </div>
             </li>
@@ -250,6 +261,18 @@ function UsersSection({ currentUserId }: { currentUserId: string }) {
           onClose={() => setShowInvite(false)}
           onAdded={() => {
             setShowInvite(false)
+            void load()
+          }}
+        />
+      )}
+
+      {editingAccessFor && projects && (
+        <EditAccessModal
+          user={editingAccessFor}
+          projects={projects}
+          onClose={() => setEditingAccessFor(null)}
+          onSaved={() => {
+            setEditingAccessFor(null)
             void load()
           }}
         />
@@ -460,19 +483,6 @@ function InviteModal({
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  function setMode(projectId: string, mode: 'none' | 'full' | 'songs') {
-    setAccessByProject((prev) => ({ ...prev, [projectId]: { ...prev[projectId], mode } }))
-  }
-
-  function toggleSong(projectId: string, songId: string) {
-    setAccessByProject((prev) => {
-      const songIds = new Set(prev[projectId].songIds)
-      if (songIds.has(songId)) songIds.delete(songId)
-      else songIds.add(songId)
-      return { ...prev, [projectId]: { ...prev[projectId], songIds } }
-    })
-  }
-
   async function submit() {
     setSubmitting(true)
     setError(null)
@@ -582,87 +592,11 @@ function InviteModal({
               <p className="text-[11px] text-muted mb-3">
                 Admins automatically see everything. For users, podcasts default to <span className="text-text font-bold">Whole project</span> (shows are shared); films and music default to <span className="text-text font-bold">No access</span> (per-engagement). Override per project as needed.
               </p>
-              <div className="space-y-4">
-                {([
-                  { kind: 'podcast', label: 'Podcasts', accent: 'text-stage-mastering' },
-                  { kind: 'film',    label: 'Films',    accent: 'text-stage-overdubs'  },
-                  { kind: 'album',   label: 'Music',    accent: 'text-stage-producing' },
-                ] as const).map((group) => {
-                  const groupProjects = projects.filter((p) => p.kind === group.kind)
-                  if (groupProjects.length === 0) return null
-                  return (
-                    <div key={group.kind} className="space-y-2">
-                      <div className="flex items-baseline justify-between">
-                        <span className={`text-[10px] uppercase tracking-[0.2em] font-bold ${group.accent}`}>
-                          {group.label}
-                        </span>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            // Bulk toggle for this kind — convenient when
-                            // adding someone to ALL podcasts at once, or
-                            // explicitly removing them from every film.
-                            const allFull = groupProjects.every((p) => accessByProject[p.id]?.mode === 'full')
-                            const next = allFull ? 'none' : 'full'
-                            for (const p of groupProjects) setMode(p.id, next)
-                          }}
-                          className="text-[10px] uppercase tracking-wider text-muted hover:text-text font-bold"
-                        >
-                          {groupProjects.every((p) => accessByProject[p.id]?.mode === 'full')
-                            ? '↺ Remove all'
-                            : '⤓ Grant all'}
-                        </button>
-                      </div>
-                      {groupProjects.map((p) => {
-                        const acc = accessByProject[p.id]
-                        return (
-                          <div key={p.id} className="rounded-xl border border-line bg-ink/30 p-3">
-                            <div className="flex items-center justify-between mb-2">
-                              <span className="text-sm font-bold">{p.name}</span>
-                              <select
-                                value={acc.mode}
-                                onChange={(e) => setMode(p.id, e.target.value as 'none' | 'full' | 'songs')}
-                                className="rounded-lg bg-ink/40 border border-line text-text px-2 py-1 text-xs outline-none"
-                              >
-                                <option value="none">No access</option>
-                                <option value="full">Whole project</option>
-                                <option value="songs">Specific channels</option>
-                              </select>
-                            </div>
-                            {acc.mode === 'songs' && (
-                              <div className="grid grid-cols-1 gap-1 max-h-40 overflow-y-auto pl-2 border-l border-line">
-                                {p.songs.length === 0 ? (
-                                  <p className="text-xs text-muted">No channels in this project.</p>
-                                ) : (
-                                  p.songs.map((s) => (
-                                    <label
-                                      key={s.id}
-                                      className="flex items-center gap-2 text-xs cursor-pointer py-0.5"
-                                    >
-                                      <input
-                                        type="checkbox"
-                                        checked={acc.songIds.has(s.id)}
-                                        onChange={() => toggleSong(p.id, s.id)}
-                                        className="accent-stage-mastering"
-                                      />
-                                      <span>
-                                        {s.title}
-                                        {s.subtitle && (
-                                          <span className="text-muted ml-1">({s.subtitle})</span>
-                                        )}
-                                      </span>
-                                    </label>
-                                  ))
-                                )}
-                              </div>
-                            )}
-                          </div>
-                        )
-                      })}
-                    </div>
-                  )
-                })}
-              </div>
+              <AccessGrid
+                projects={projects}
+                value={accessByProject}
+                onChange={setAccessByProject}
+              />
             </div>
           )}
 
@@ -744,6 +678,210 @@ function PickerStartPathControl({ current, onSaved }: { current: string; onSaved
         </button>
       </div>
       {err && <p className="text-urgent text-xs">{err}</p>}
+    </div>
+  )
+}
+
+// ============================================================
+// AccessGrid — kind-grouped project access editor.
+// Shared by InviteModal (new user) and EditAccessModal (existing user).
+// Renders three sections (Podcasts / Films / Music), each with a
+// "Grant all / Remove all" bulk toggle and per-project access mode
+// (No access / Whole project / Specific channels).
+// ============================================================
+type AccessMap = Record<string, { mode: 'none' | 'full' | 'songs'; songIds: Set<string> }>
+
+function AccessGrid({
+  projects, value, onChange,
+}: {
+  projects: ApiAdminProject[]
+  value: AccessMap
+  onChange: (next: AccessMap) => void
+}) {
+  function setMode(projectId: string, mode: 'none' | 'full' | 'songs') {
+    onChange({ ...value, [projectId]: { ...value[projectId], mode } })
+  }
+  function toggleSong(projectId: string, songId: string) {
+    const cur = value[projectId]
+    const songIds = new Set(cur.songIds)
+    if (songIds.has(songId)) songIds.delete(songId)
+    else songIds.add(songId)
+    onChange({ ...value, [projectId]: { ...cur, songIds } })
+  }
+  function bulk(groupProjects: ApiAdminProject[], mode: 'none' | 'full') {
+    const next = { ...value }
+    for (const p of groupProjects) next[p.id] = { ...next[p.id], mode }
+    onChange(next)
+  }
+  return (
+    <div className="space-y-4">
+      {([
+        { kind: 'podcast', label: 'Podcasts', accent: 'text-stage-mastering' },
+        { kind: 'film',    label: 'Films',    accent: 'text-stage-overdubs'  },
+        { kind: 'album',   label: 'Music',    accent: 'text-stage-producing' },
+      ] as const).map((group) => {
+        const groupProjects = projects.filter((p) => p.kind === group.kind)
+        if (groupProjects.length === 0) return null
+        const allFull = groupProjects.every((p) => value[p.id]?.mode === 'full')
+        return (
+          <div key={group.kind} className="space-y-2">
+            <div className="flex items-baseline justify-between">
+              <span className={`text-[10px] uppercase tracking-[0.2em] font-bold ${group.accent}`}>
+                {group.label}
+              </span>
+              <button
+                type="button"
+                onClick={() => bulk(groupProjects, allFull ? 'none' : 'full')}
+                className="text-[10px] uppercase tracking-wider text-muted hover:text-text font-bold"
+              >
+                {allFull ? '↺ Remove all' : '⤓ Grant all'}
+              </button>
+            </div>
+            {groupProjects.map((p) => {
+              const acc = value[p.id] ?? { mode: 'none' as const, songIds: new Set<string>() }
+              return (
+                <div key={p.id} className="rounded-xl border border-line bg-ink/30 p-3">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-sm font-bold">{p.name}</span>
+                    <select
+                      value={acc.mode}
+                      onChange={(e) => setMode(p.id, e.target.value as 'none' | 'full' | 'songs')}
+                      className="rounded-lg bg-ink/40 border border-line text-text px-2 py-1 text-xs outline-none"
+                    >
+                      <option value="none">No access</option>
+                      <option value="full">Whole project</option>
+                      <option value="songs">Specific channels</option>
+                    </select>
+                  </div>
+                  {acc.mode === 'songs' && (
+                    <div className="grid grid-cols-1 gap-1 max-h-40 overflow-y-auto pl-2 border-l border-line">
+                      {p.songs.length === 0 ? (
+                        <p className="text-xs text-muted">No channels in this project.</p>
+                      ) : (
+                        p.songs.map((s) => (
+                          <label
+                            key={s.id}
+                            className="flex items-center gap-2 text-xs cursor-pointer py-0.5"
+                          >
+                            <input
+                              type="checkbox"
+                              checked={acc.songIds.has(s.id)}
+                              onChange={() => toggleSong(p.id, s.id)}
+                              className="accent-stage-mastering"
+                            />
+                            <span>
+                              {s.title}
+                              {s.subtitle && <span className="text-muted ml-1">({s.subtitle})</span>}
+                            </span>
+                          </label>
+                        ))
+                      )}
+                    </div>
+                  )}
+                </div>
+              )
+            })}
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
+// ============================================================
+// EditAccessModal — edit an existing user's project access.
+// Pre-populates from the user's current projects + songs and
+// shows the same kind-grouped AccessGrid as the invite flow.
+// ============================================================
+function EditAccessModal({
+  user, projects, onClose, onSaved,
+}: {
+  user: ApiAdminUser
+  projects: ApiAdminProject[]
+  onClose: () => void
+  onSaved: () => void | Promise<void>
+}) {
+  // Compute the user's CURRENT access into an AccessMap:
+  //   - in user.projects               → 'full'
+  //   - has any songs in user.songs    → 'songs' (with those songIds)
+  //   - neither                        → 'none'
+  const initial: AccessMap = (() => {
+    const fullProjectIds = new Set(user.projects.map((p) => p.id))
+    const songsByProject = new Map<string, Set<string>>()
+    for (const s of user.songs) {
+      const set = songsByProject.get(s.projectId) ?? new Set<string>()
+      set.add(s.id)
+      songsByProject.set(s.projectId, set)
+    }
+    const out: AccessMap = {}
+    for (const p of projects) {
+      if (fullProjectIds.has(p.id)) {
+        out[p.id] = { mode: 'full', songIds: new Set() }
+      } else if (songsByProject.has(p.id)) {
+        out[p.id] = { mode: 'songs', songIds: songsByProject.get(p.id)! }
+      } else {
+        out[p.id] = { mode: 'none', songIds: new Set() }
+      }
+    }
+    return out
+  })()
+  const [accessByProject, setAccessByProject] = useState<AccessMap>(initial)
+  const [submitting, setSubmitting] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  async function save() {
+    setSubmitting(true)
+    setError(null)
+    try {
+      const projectIds: string[] = []
+      const songIds: string[] = []
+      for (const [pid, access] of Object.entries(accessByProject)) {
+        if (access.mode === 'full') projectIds.push(pid)
+        else if (access.mode === 'songs') songIds.push(...Array.from(access.songIds))
+      }
+      await api.adminUpdateUserAccess(user.id, { projectIds, songIds })
+      await onSaved()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'failed')
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 bg-black/70 flex items-start justify-center p-4 sm:p-8 z-50 overflow-y-auto">
+      <div className="w-full max-w-2xl rounded-2xl bg-card border border-line shadow-2xl">
+        <div className="p-5 border-b border-line">
+          <div className="text-[10px] uppercase tracking-wider text-muted font-bold">Edit access</div>
+          <h2 className="text-lg font-bold text-text mt-0.5">{user.display_name || user.name}</h2>
+          <p className="text-[11px] text-muted mt-1">
+            {user.role === 'admin'
+              ? 'This user is a Super Admin — they automatically see every project regardless of these settings.'
+              : 'Update which projects this user can see. Same defaults as new invites — podcasts shared, films + music locked down.'}
+          </p>
+        </div>
+        <div className="p-5 space-y-3 max-h-[60vh] overflow-y-auto">
+          {user.role !== 'admin' && (
+            <AccessGrid projects={projects} value={accessByProject} onChange={setAccessByProject} />
+          )}
+          {error && <p className="text-urgent text-sm">{error}</p>}
+        </div>
+        <div className="flex gap-2 p-5 border-t border-line">
+          <button
+            onClick={onClose}
+            className="flex-1 rounded-xl border border-line text-muted hover:text-text font-bold uppercase tracking-wider text-xs px-4 py-2.5"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={() => void save()}
+            disabled={submitting || user.role === 'admin'}
+            className="flex-1 rounded-xl bg-gradient-to-r from-stage-producing to-stage-mastering text-white font-bold uppercase tracking-wider text-xs px-4 py-2.5 disabled:opacity-50"
+          >
+            {submitting ? 'Saving…' : 'Save access'}
+          </button>
+        </div>
+      </div>
     </div>
   )
 }
