@@ -271,11 +271,24 @@ export async function triggerSocialPlanGeneration(args: {
       )
       logInfo('socials: plan done', { planId, items: items.length })
 
-      // ----- Still extraction -----
-      // Pull frames from the source MP4 for every item with a
-      // [HH:MM:SS] timecode in its suggested_clip / image_direction.
-      // Fire-and-forget: failures are logged but never block plan use.
-      if (ctx.source_file_path) {
+      // ----- Still + clip extraction -----
+      // Pull frames + cut clips from the source MP4 for every item with
+      // a [HH:MM:SS] timecode. Fire-and-forget: failures are logged but
+      // never block plan use.
+      //
+      // Audio-only podcasts have no video stream to sample — skip the
+      // entire ffmpeg pass with a single info log instead of letting
+      // ffmpeg fail per-frame and spam the admin inbox.
+      const isAudioOnlySource = (() => {
+        const p = (ctx.source_file_path ?? '').toLowerCase()
+        return /\.(mp3|wav|m4a|aac|flac|ogg|opus|aiff?|wma)$/.test(p)
+      })()
+      if (ctx.source_file_path && isAudioOnlySource) {
+        logInfo('socials: audio-only source — skipping stills/clips', {
+          planId, source: ctx.source_file_path,
+        })
+      }
+      if (ctx.source_file_path && !isAudioOnlySource) {
         ;(async () => {
           try {
             const { extractStillsForItem, extractClipForItem, parseTimecode, parseTimecodeRange, isFfmpegAvailable } = await import('../stills')
@@ -311,7 +324,10 @@ export async function triggerSocialPlanGeneration(args: {
                     touched = true
                   }
                 } catch (err) {
-                  logError('socials: stills for item failed', {
+                  // Per-item stills failure is recoverable (other items
+                  // may still succeed). Demoted from logError to logInfo
+                  // so we don't email-spam on every miss.
+                  logInfo('socials: stills for item skipped', {
                     planId, itemId: it.id, error: err instanceof Error ? err.message : String(err),
                   })
                 }
@@ -340,7 +356,9 @@ export async function triggerSocialPlanGeneration(args: {
                     ;(items[i] as unknown as Record<string, unknown>).clip_version = clip.version
                     touched = true
                   } catch (err) {
-                    logError('socials: clip for item failed', {
+                    // Same rationale as stills above — per-item clip
+                    // failure is recoverable, don't email-spam on it.
+                    logInfo('socials: clip for item skipped', {
                       planId, itemId: it.id, error: err instanceof Error ? err.message : String(err),
                     })
                   }

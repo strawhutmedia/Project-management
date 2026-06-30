@@ -130,13 +130,17 @@ export async function extractStillsForItem(input: StillExtractInput): Promise<St
         }
       } catch (err) {
         // One bad timestamp shouldn't kill the whole batch (e.g. window
-        // extends past the end of the video). Log and continue.
-        logError('stills: ffmpeg frame failed', {
+        // extends past the end of the video). Log as INFO and continue
+        // — these per-frame failures used to fire admin alerts, which
+        // turned a single audio-source upload into 20+ emails.
+        logInfo('stills: ffmpeg frame skipped', {
           itemId: input.itemId, t, error: err instanceof Error ? err.message : String(err),
         })
       }
     }
     if (localFiles.length === 0) {
+      // ALL frames failed → escalate ONCE. The caller (socials route)
+      // catches this and decides whether to email.
       throw new Error('stills_no_frames_extracted')
     }
 
