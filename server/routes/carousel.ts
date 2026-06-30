@@ -70,9 +70,12 @@ carouselRouter.post('/preview', async (req, res) => {
     )
     res.json(result)
   } catch (err) {
-    logError('carousel route: generation failed', {
-      error: err instanceof Error ? err.message : String(err),
-    })
-    res.status(500).json({ error: 'generation_failed' })
+    const msg = err instanceof Error ? err.message : String(err)
+    logError('carousel route: generation failed', { error: msg, transcriptChars: transcript.length })
+    // Surface the actual reason so the UI can show "claude returned no
+    // text block" / "invalid JSON" / "anthropic 400 ..." instead of an
+    // opaque "generation_failed". Truncate so we never leak a 50KB
+    // stack trace into the JSON response.
+    res.status(500).json({ error: 'generation_failed', detail: msg.slice(0, 600) })
   }
 })

@@ -488,7 +488,13 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   })
   if (!res.ok) {
     const body = await res.json().catch(() => ({ error: 'unknown' }))
-    throw new Error(body.error ?? `HTTP ${res.status}`)
+    // When the server includes a `detail` field, fold it into the
+    // thrown message so the UI shows the real reason (e.g. an Anthropic
+    // 400 validation message) instead of an opaque code like
+    // "generation_failed".
+    const code = body.error ?? `HTTP ${res.status}`
+    const msg = body.detail ? `${code}: ${body.detail}` : code
+    throw new Error(msg)
   }
   return res.json() as Promise<T>
 }
