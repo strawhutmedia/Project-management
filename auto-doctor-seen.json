@@ -381,5 +381,23 @@
     "outcome": "no_tool_call",
     "summary": "agent stopped without calling a terminal tool",
     "iterations": 9
+  },
+  "stills: dropbox upload failed::{\"itemId\":\"f8e26c0f-1f7a-48c4-93cd-492b8ff66bcd\",\"fileName\":\"v0-f0.jpg\",\"error\":": {
+    "attemptedAt": "2026-07-01T14:49:49.186Z",
+    "outcome": "no_tool_call",
+    "summary": "agent stopped without calling a terminal tool",
+    "iterations": 11
+  },
+  "stills: dropbox upload failed::{\"itemId\":\"f8e26c0f-1f7a-48c4-93cd-492b8ff66bcd\",\"fileName\":\"v0-f1.jpg\",\"error\":": {
+    "attemptedAt": "2026-07-01T14:51:18.270Z",
+    "outcome": "no_tool_call",
+    "summary": "agent stopped without calling a terminal tool",
+    "iterations": 7
+  },
+  "stills: dropbox upload failed::{\"itemId\":\"f8e26c0f-1f7a-48c4-93cd-492b8ff66bcd\",\"fileName\":\"v0-f3.jpg\",\"error\":": {
+    "attemptedAt": "2026-07-01T14:52:45.223Z",
+    "outcome": "no_tool_call",
+    "summary": "agent stopped without calling a terminal tool",
+    "iterations": 6
   }
 }
