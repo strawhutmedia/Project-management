@@ -303,5 +303,35 @@
     "outcome": "no_tool_call",
     "summary": "agent stopped without calling a terminal tool",
     "iterations": 10
+  },
+  "stills: dropbox upload failed::{\"itemId\":\"4e15b0c2-4fc8-4fca-843e-096fe644695a\",\"fileName\":\"v0-f2.jpg\",\"error\":": {
+    "attemptedAt": "2026-07-01T05:05:37.690Z",
+    "outcome": "fixed",
+    "summary": "Added check for raw 'no_write_permission' string in Dropbox upload error handling in stills.ts, ensuring permission errors are properly thrown and surfaced to users with reconnect instructions.",
+    "iterations": 16
+  },
+  "stills: dropbox upload failed::{\"itemId\":\"4e15b0c2-4fc8-4fca-843e-096fe644695a\",\"fileName\":\"v0-f3.jpg\",\"error\":": {
+    "attemptedAt": "2026-07-01T05:07:51.163Z",
+    "outcome": "no_tool_call",
+    "summary": "agent stopped without calling a terminal tool",
+    "iterations": 9
+  },
+  "stills: dropbox upload failed::{\"itemId\":\"3d9aa2a1-de1c-4c88-995c-ac9b54f280f6\",\"fileName\":\"v0-f0.jpg\",\"error\":": {
+    "attemptedAt": "2026-07-01T05:10:07.738Z",
+    "outcome": "no_tool_call",
+    "summary": "agent stopped without calling a terminal tool",
+    "iterations": 9
+  },
+  "stills: dropbox upload failed::{\"itemId\":\"3d9aa2a1-de1c-4c88-995c-ac9b54f280f6\",\"fileName\":\"v0-f2.jpg\",\"error\":": {
+    "attemptedAt": "2026-07-01T05:11:36.740Z",
+    "outcome": "no_tool_call",
+    "summary": "agent stopped without calling a terminal tool",
+    "iterations": 10
+  },
+  "stills: dropbox upload failed::{\"itemId\":\"3d9aa2a1-de1c-4c88-995c-ac9b54f280f6\",\"fileName\":\"v0-f4.jpg\",\"error\":": {
+    "attemptedAt": "2026-07-01T05:13:09.482Z",
+    "outcome": "no_tool_call",
+    "summary": "agent stopped without calling a terminal tool",
+    "iterations": 10
   }
 }
