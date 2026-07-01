@@ -357,5 +357,29 @@
     "outcome": "no_tool_call",
     "summary": "agent stopped without calling a terminal tool",
     "iterations": 6
+  },
+  "carousel: claude call failed::{\"error\":\"400 {\\\"type\\\":\\\"error\\\",\\\"error\\\":{\\\"type\\\":\\\"invalid_request_error\\\",": {
+    "attemptedAt": "2026-07-01T11:59:55.852Z",
+    "outcome": "fixed",
+    "summary": "Changed slide_index type from 'integer' to 'number' in carousel deck schema to avoid Claude API's unsupported integer validation properties.",
+    "iterations": 10
+  },
+  "stills: dropbox upload failed::{\"itemId\":\"b04fa50b-bbc7-4738-88a7-db357e1a89c9\",\"fileName\":\"v0-f0.jpg\",\"error\":": {
+    "attemptedAt": "2026-07-01T12:01:29.559Z",
+    "outcome": "no_tool_call",
+    "summary": "agent stopped without calling a terminal tool",
+    "iterations": 9
+  },
+  "stills: dropbox upload failed::{\"itemId\":\"b04fa50b-bbc7-4738-88a7-db357e1a89c9\",\"fileName\":\"v0-f2.jpg\",\"error\":": {
+    "attemptedAt": "2026-07-01T12:03:53.431Z",
+    "outcome": "no_tool_call",
+    "summary": "agent stopped without calling a terminal tool",
+    "iterations": 11
+  },
+  "stills: dropbox upload failed::{\"itemId\":\"b04fa50b-bbc7-4738-88a7-db357e1a89c9\",\"fileName\":\"v0-f4.jpg\",\"error\":": {
+    "attemptedAt": "2026-07-01T12:05:28.188Z",
+    "outcome": "no_tool_call",
+    "summary": "agent stopped without calling a terminal tool",
+    "iterations": 9
   }
 }
