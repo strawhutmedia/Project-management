@@ -1093,7 +1093,7 @@ const DECK_SCHEMA = {
         properties: {
           slot: { type: 'string', enum: ['host_photo', 'show_logo', 'platform_icons', 'brand_logo', 'collage_image'] },
           description: { type: 'string' },
-          slide_index: { type: 'integer', minimum: 1, maximum: 7 },
+          slide_index: { type: 'integer' },
         },
       },
     },
