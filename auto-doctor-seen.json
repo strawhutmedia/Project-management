@@ -333,5 +333,29 @@
     "outcome": "no_tool_call",
     "summary": "agent stopped without calling a terminal tool",
     "iterations": 10
+  },
+  "carousel route: generation failed::{\"error\":\"400 {\\\"type\\\":\\\"error\\\",\\\"error\\\":{\\\"type\\\":\\\"invalid_request_error\\\",": {
+    "attemptedAt": "2026-07-01T09:06:00.355Z",
+    "outcome": "gave_up",
+    "summary": "hit max iterations (20)",
+    "iterations": 20
+  },
+  "stills: dropbox upload failed::{\"itemId\":\"16f60744-19cb-46c4-bc47-c4173d2e5563\",\"fileName\":\"v0-f0.jpg\",\"error\":": {
+    "attemptedAt": "2026-07-01T08:59:17.046Z",
+    "outcome": "no_tool_call",
+    "summary": "agent stopped without calling a terminal tool",
+    "iterations": 9
+  },
+  "stills: dropbox upload failed::{\"itemId\":\"16f60744-19cb-46c4-bc47-c4173d2e5563\",\"fileName\":\"v0-f2.jpg\",\"error\":": {
+    "attemptedAt": "2026-07-01T09:00:46.593Z",
+    "outcome": "no_tool_call",
+    "summary": "agent stopped without calling a terminal tool",
+    "iterations": 9
+  },
+  "stills: dropbox upload failed::{\"itemId\":\"16f60744-19cb-46c4-bc47-c4173d2e5563\",\"fileName\":\"v0-f4.jpg\",\"error\":": {
+    "attemptedAt": "2026-07-01T09:02:06.418Z",
+    "outcome": "no_tool_call",
+    "summary": "agent stopped without calling a terminal tool",
+    "iterations": 6
   }
 }
