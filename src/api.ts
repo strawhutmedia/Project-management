@@ -156,6 +156,24 @@ export type ApiAdminUser = {
   songs: Array<{ id: string; title: string; subtitle: string | null; projectId: string; projectName: string }>
 }
 
+export type StrategyKind =
+  | 'strategy' | 'audience' | 'authority' | 'pillars'
+  | 'calendar' | 'post' | 'monetization'
+
+export type ApiStrategyDocument = {
+  id: string
+  kind: StrategyKind
+  content: Record<string, unknown>
+  input_context: string | null
+  status: 'generating' | 'generated' | 'failed'
+  error: string | null
+  input_tokens: number
+  output_tokens: number
+  created_by: string | null
+  created_at: string
+  updated_at: string
+}
+
 export type ApiAdminProject = {
   id: string
   name: string
@@ -1035,6 +1053,25 @@ export const api = {
       method: 'POST',
       body: JSON.stringify({ itemId, shiftSeconds }),
     }),
+  socialStrategyDocs: (projectId: string) =>
+    request<{ documents: Record<string, ApiStrategyDocument | undefined> }>(
+      `/api/social-strategy/projects/${projectId}`,
+    ),
+  generateSocialStrategyDoc: (projectId: string, kind: StrategyKind, inputContext?: string) =>
+    request<{ document: ApiStrategyDocument }>(
+      `/api/social-strategy/projects/${projectId}/${kind}`,
+      { method: 'POST', body: JSON.stringify({ inputContext }) },
+    ),
+  updateSocialStrategyDoc: (projectId: string, kind: StrategyKind, content: unknown) =>
+    request<{ ok: true }>(
+      `/api/social-strategy/projects/${projectId}/${kind}`,
+      { method: 'PATCH', body: JSON.stringify({ content }) },
+    ),
+  deleteSocialStrategyDoc: (projectId: string, kind: StrategyKind) =>
+    request<{ ok: true }>(
+      `/api/social-strategy/projects/${projectId}/${kind}`,
+      { method: 'DELETE' },
+    ),
   generateCarouselDeck: (body: {
     transcript: string
     showName: string

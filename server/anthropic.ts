@@ -1278,3 +1278,369 @@ export async function generateCarouselDeck(input: CarouselGenerateInput): Promis
     },
   }
 }
+
+// ============================================================
+// SOCIAL STRATEGY TOOLS (7 per-show strategy documents)
+// ============================================================
+// One entry point — generateSocialStrategyDocument({projectContext,
+// kind, inputContext}) — that dispatches to the right prompt +
+// json_schema per document kind. Everything the operator would want
+// to hand a strategist ("here's my niche, target audience, current
+// numbers") comes in via projectContext (auto-derived from the show
+// row in Slate) and inputContext (freeform text they type into the
+// [paste] fields).
+
+export type StrategyKind =
+  | 'strategy'      // Full Social Media Strategy
+  | 'audience'      // Audience Psychology Breakdown
+  | 'authority'     // Authority Positioning Plan
+  | 'pillars'       // Content Pillars That Convert
+  | 'calendar'      // 30-Day Content Plan
+  | 'post'          // Posts That Stop the Scroll (one-off)
+  | 'monetization'  // Audience Monetization Strategy
+
+export type StrategyProjectContext = {
+  showName: string
+  showKind: 'album' | 'podcast' | 'film'
+  showSubtitle?: string | null
+  brandVoice?: string | null
+  vocabulary?: string | null
+  // Recent episode titles + one-line summaries — gives Claude
+  // grounding on what the show actually talks about.
+  recentEpisodes?: Array<{ title: string; subtitle?: string | null; summary?: string | null }>
+  // Existing sibling docs Claude can reference when generating a new
+  // one (e.g. the pillars generator should read the strategy doc so
+  // pillars align with the brand positioning).
+  siblingDocs?: Partial<Record<StrategyKind, unknown>>
+}
+
+export type StrategyGenerateInput = {
+  kind: StrategyKind
+  projectContext: StrategyProjectContext
+  inputContext?: string  // whatever the operator pasted into [paste]
+}
+
+export type StrategyGenerateResult = {
+  content: unknown  // shape depends on kind — validated against per-kind schema
+  usage: {
+    inputTokens: number
+    outputTokens: number
+    cacheCreationInputTokens: number
+    cacheReadInputTokens: number
+  }
+}
+
+// Per-kind schema + prompt. Each prompt is drafted to output a rich,
+// actionable document (not a bullet-point summary). Every schema
+// enforces additionalProperties: false so we can render the output
+// with predictable field names in the UI.
+
+const STRATEGY_SCHEMAS: Record<StrategyKind, object> = {
+  strategy: {
+    type: 'object',
+    additionalProperties: false,
+    required: ['brand_positioning', 'content_direction', 'audience_targeting', 'monetization_plan', 'growth_north_star'],
+    properties: {
+      brand_positioning: {
+        type: 'object', additionalProperties: false,
+        required: ['one_sentence', 'differentiators', 'category', 'tagline_options'],
+        properties: {
+          one_sentence: { type: 'string' },
+          category: { type: 'string' },
+          differentiators: { type: 'array', items: { type: 'string' } },
+          tagline_options: { type: 'array', items: { type: 'string' } },
+        },
+      },
+      content_direction: {
+        type: 'object', additionalProperties: false,
+        required: ['themes', 'tone', 'formats_to_prioritize'],
+        properties: {
+          themes: { type: 'array', items: { type: 'string' } },
+          tone: { type: 'string' },
+          formats_to_prioritize: { type: 'array', items: { type: 'string' } },
+        },
+      },
+      audience_targeting: {
+        type: 'object', additionalProperties: false,
+        required: ['primary_persona', 'where_they_hang_out', 'what_gets_them_to_follow'],
+        properties: {
+          primary_persona: { type: 'string' },
+          where_they_hang_out: { type: 'array', items: { type: 'string' } },
+          what_gets_them_to_follow: { type: 'array', items: { type: 'string' } },
+        },
+      },
+      monetization_plan: {
+        type: 'object', additionalProperties: false,
+        required: ['near_term', 'medium_term', 'long_term'],
+        properties: {
+          near_term: { type: 'array', items: { type: 'string' } },
+          medium_term: { type: 'array', items: { type: 'string' } },
+          long_term: { type: 'array', items: { type: 'string' } },
+        },
+      },
+      growth_north_star: { type: 'string' },
+    },
+  },
+  audience: {
+    type: 'object',
+    additionalProperties: false,
+    required: ['persona_snapshot', 'frustrations', 'desires', 'fears', 'daily_content_habits', 'messaging_angles', 'topic_ideas'],
+    properties: {
+      persona_snapshot: { type: 'string' },
+      frustrations: { type: 'array', items: { type: 'string' } },
+      desires: { type: 'array', items: { type: 'string' } },
+      fears: { type: 'array', items: { type: 'string' } },
+      daily_content_habits: { type: 'array', items: { type: 'string' } },
+      messaging_angles: {
+        type: 'array',
+        items: {
+          type: 'object', additionalProperties: false,
+          required: ['angle', 'why_it_works'],
+          properties: {
+            angle: { type: 'string' },
+            why_it_works: { type: 'string' },
+          },
+        },
+      },
+      topic_ideas: { type: 'array', items: { type: 'string' } },
+    },
+  },
+  authority: {
+    type: 'object',
+    additionalProperties: false,
+    required: ['positioning_statement', 'differentiators', 'proof_points_to_build', 'signature_content_moves', 'competitors_to_watch'],
+    properties: {
+      positioning_statement: { type: 'string' },
+      differentiators: { type: 'array', items: { type: 'string' } },
+      proof_points_to_build: { type: 'array', items: { type: 'string' } },
+      signature_content_moves: { type: 'array', items: { type: 'string' } },
+      competitors_to_watch: {
+        type: 'array',
+        items: {
+          type: 'object', additionalProperties: false,
+          required: ['name', 'why_they_matter', 'how_you_are_different'],
+          properties: {
+            name: { type: 'string' },
+            why_they_matter: { type: 'string' },
+            how_you_are_different: { type: 'string' },
+          },
+        },
+      },
+    },
+  },
+  pillars: {
+    type: 'object',
+    additionalProperties: false,
+    required: ['pillars'],
+    properties: {
+      pillars: {
+        type: 'array',
+        items: {
+          type: 'object', additionalProperties: false,
+          required: ['name', 'purpose', 'why_it_connects', 'example_post_topics', 'suggested_frequency'],
+          properties: {
+            name: { type: 'string' },
+            purpose: { type: 'string' },
+            why_it_connects: { type: 'string' },
+            example_post_topics: { type: 'array', items: { type: 'string' } },
+            suggested_frequency: { type: 'string' },
+          },
+        },
+      },
+    },
+  },
+  calendar: {
+    type: 'object',
+    additionalProperties: false,
+    required: ['start_date_hint', 'days'],
+    properties: {
+      start_date_hint: { type: 'string' },
+      days: {
+        type: 'array',
+        items: {
+          type: 'object', additionalProperties: false,
+          required: ['day', 'idea', 'format', 'core_message', 'goal', 'pillar'],
+          properties: {
+            day: { type: 'integer' },
+            idea: { type: 'string' },
+            format: { type: 'string' },
+            core_message: { type: 'string' },
+            goal: { type: 'string', enum: ['reach', 'trust', 'buy'] },
+            pillar: { type: 'string' },
+          },
+        },
+      },
+    },
+  },
+  post: {
+    type: 'object',
+    additionalProperties: false,
+    required: ['hook', 'body', 'cta', 'why_it_stops_the_scroll'],
+    properties: {
+      hook: { type: 'string' },
+      body: { type: 'string' },
+      cta: { type: 'string' },
+      why_it_stops_the_scroll: { type: 'string' },
+    },
+  },
+  monetization: {
+    type: 'object',
+    additionalProperties: false,
+    required: ['offer_ideas', 'pricing_structure', 'content_angles_that_convert', 'funnel_stages'],
+    properties: {
+      offer_ideas: {
+        type: 'array',
+        items: {
+          type: 'object', additionalProperties: false,
+          required: ['name', 'description', 'audience_fit'],
+          properties: {
+            name: { type: 'string' },
+            description: { type: 'string' },
+            audience_fit: { type: 'string' },
+          },
+        },
+      },
+      pricing_structure: { type: 'string' },
+      content_angles_that_convert: { type: 'array', items: { type: 'string' } },
+      funnel_stages: {
+        type: 'array',
+        items: {
+          type: 'object', additionalProperties: false,
+          required: ['stage', 'goal', 'content_examples'],
+          properties: {
+            stage: { type: 'string' },
+            goal: { type: 'string' },
+            content_examples: { type: 'array', items: { type: 'string' } },
+          },
+        },
+      },
+    },
+  },
+}
+
+const STRATEGY_SYSTEM_PROMPTS: Record<StrategyKind, string> = {
+  strategy: `You are a senior social media strategist who has built brands from zero to millions of followers.
+Review the show's business, niche, target audience, competitors, and growth goals.
+Build a COMPLETE strategy covering brand positioning, content direction, audience targeting,
+and monetization. Be specific to THIS show (not generic advice). Ground every recommendation
+in what the show actually is and what its audience actually cares about.
+Return the JSON matching the schema.`,
+  audience: `You are an audience psychologist who studies how people consume media online.
+Break down the target audience in detail — frustrations, desires, fears, and daily habits
+around content. Turn that research into specific messaging angles and content topics that
+will stop their scroll and build real trust over time. Be concrete and observational, not
+generic. Return the JSON matching the schema.`,
+  authority: `You are a personal / brand-positioning expert.
+Build a positioning strategy that separates this show from everyone else in its space and
+makes it the go-to name in its industry. Identify the specific competitors, why they matter,
+and how to be different from each. Recommend signature content moves (patterns of content
+that ONLY this show does) that build authority over time. Return the JSON matching the schema.`,
+  pillars: `You are a content strategist for creators.
+Build 5 content pillars for this show's social presence — durable topic categories the show
+posts about consistently. Each pillar should either attract new followers, establish credibility,
+or drive leads / sales — say which. For each pillar, include 3-5 example post topics and
+explain exactly why it connects with the audience. Return the JSON matching the schema.`,
+  calendar: `You are a social media planner.
+Build a full 30-day content calendar for this show. Include a daily content idea, post format,
+core message angle, and the goal (reach / trust / buy). Where the show has content pillars in
+sibling_docs, map each day to a pillar. Balance the mix — don't post the same format five days
+in a row. Return the JSON matching the schema.`,
+  post: `You are a copywriter for high-engagement social posts.
+Write ONE high-engagement social post on the topic the operator provided (input_context).
+Open with a hook that makes someone stop scrolling, deliver a clear and useful insight in the
+body, and close with a call to action that drives comments, saves, or clicks. Also explain
+briefly why the hook stops the scroll. Return the JSON matching the schema.`,
+  monetization: `You are a business strategist focused on turning social followers into paying customers.
+Review the show's current business model (inferred from projectContext.brand_voice and recent
+episodes) and build a monetization plan that includes concrete offer ideas, pricing structure,
+content angles that naturally move people from follower to buyer, and a funnel of content
+stages. Be specific — don't say "sell a course" without saying WHAT course and to WHOM.
+Return the JSON matching the schema.`,
+}
+
+function strategyProjectBlock(ctx: StrategyProjectContext): string {
+  const parts: string[] = []
+  parts.push(`SHOW: ${ctx.showName}`)
+  parts.push(`TYPE: ${ctx.showKind}`)
+  if (ctx.showSubtitle) parts.push(`SUBTITLE: ${ctx.showSubtitle}`)
+  if (ctx.brandVoice) parts.push(`BRAND VOICE:\n${ctx.brandVoice}`)
+  if (ctx.vocabulary) parts.push(`VOCABULARY:\n${ctx.vocabulary}`)
+  if (ctx.recentEpisodes && ctx.recentEpisodes.length > 0) {
+    parts.push(
+      'RECENT EPISODES:\n' +
+      ctx.recentEpisodes.map((e, i) =>
+        `  ${i + 1}. ${e.title}${e.subtitle ? ` — ${e.subtitle}` : ''}${e.summary ? `\n     ${e.summary}` : ''}`,
+      ).join('\n'),
+    )
+  }
+  if (ctx.siblingDocs && Object.keys(ctx.siblingDocs).length > 0) {
+    parts.push(
+      'EXISTING STRATEGY DOCS (reference these to stay aligned):\n' +
+      JSON.stringify(ctx.siblingDocs, null, 2),
+    )
+  }
+  return parts.join('\n\n')
+}
+
+export async function generateSocialStrategyDocument(
+  input: StrategyGenerateInput,
+): Promise<StrategyGenerateResult> {
+  logInfo('strategy: generating', {
+    showName: input.projectContext.showName,
+    kind: input.kind,
+    inputContextChars: input.inputContext?.length ?? 0,
+  })
+  const schema = STRATEGY_SCHEMAS[input.kind]
+  const system = STRATEGY_SYSTEM_PROMPTS[input.kind]
+  const userBlocks: Array<{ type: 'text'; text: string; cache_control?: { type: 'ephemeral' } }> = [
+    {
+      type: 'text',
+      text: strategyProjectBlock(input.projectContext),
+      cache_control: { type: 'ephemeral' },
+    },
+  ]
+  if (input.inputContext && input.inputContext.trim().length > 0) {
+    userBlocks.push({
+      type: 'text',
+      text: `OPERATOR INPUT (paste field):\n${input.inputContext.trim()}`,
+    })
+  }
+  let response
+  try {
+    response = await client.messages.create({
+      model: MODEL,
+      max_tokens: 16000,
+      system,
+      messages: [{ role: 'user', content: userBlocks }],
+      output_config: { format: { type: 'json_schema', schema } },
+    })
+  } catch (err) {
+    logError('strategy: claude call failed', { kind: input.kind, error: err instanceof Error ? err.message : String(err) })
+    throw err
+  }
+  const textBlock = response.content.find((b) => b.type === 'text')
+  if (!textBlock || textBlock.type !== 'text') {
+    throw new Error('strategy: claude returned no text block')
+  }
+  let content: unknown
+  try {
+    content = JSON.parse(textBlock.text)
+  } catch (err) {
+    logError('strategy: invalid JSON from claude', { kind: input.kind, body: textBlock.text.slice(0, 500) })
+    throw new Error(`strategy: invalid JSON: ${err instanceof Error ? err.message : String(err)}`)
+  }
+  logInfo('strategy: generated', {
+    kind: input.kind,
+    inputTokens: response.usage.input_tokens,
+    outputTokens: response.usage.output_tokens,
+  })
+  return {
+    content,
+    usage: {
+      inputTokens: response.usage.input_tokens,
+      outputTokens: response.usage.output_tokens,
+      cacheCreationInputTokens: response.usage.cache_creation_input_tokens ?? 0,
+      cacheReadInputTokens: response.usage.cache_read_input_tokens ?? 0,
+    },
+  }
+}

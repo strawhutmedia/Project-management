@@ -15,6 +15,7 @@ import { transcriptsRouter } from './routes/transcripts'
 import { clipsRouter } from './routes/clips'
 import { socialsRouter } from './routes/socials'
 import { carouselRouter } from './routes/carousel'
+import { socialStrategyRouter } from './routes/social_strategy'
 import { podcastsRouter } from './routes/podcasts'
 import { schedulerRouter as socialSchedulerRouter } from './routes/scheduler'
 import { showChatRouter } from './routes/show_chat'
@@ -75,6 +76,7 @@ app.use('/api/transcripts', transcriptsRouter)
 app.use('/api/clips', clipsRouter)
 app.use('/api/socials', socialsRouter)
 app.use('/api/carousel', carouselRouter)
+app.use('/api/social-strategy', socialStrategyRouter)
 app.use('/api/podcasts', podcastsRouter)
 app.use('/api/scheduler', socialSchedulerRouter)
 // show_chat mounts on /api directly because its routes are
