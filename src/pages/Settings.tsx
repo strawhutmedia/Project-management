@@ -79,32 +79,13 @@ export default function Settings() {
               .
             </p>
 
-            {/* Reconnect banner — Slate now requests `files.content.write`
-                and other scopes explicitly. Any token minted before that
-                change is missing write scope, which surfaces as
-                path/no_write_permission errors when uploading stills or
-                clips. There's no way to upgrade a token in place, so an
-                admin needs to disconnect + reconnect once. */}
-            {isAdmin && (
-              <div className="rounded-xl border border-stage-mastering/40 bg-stage-mastering/5 p-3 space-y-2">
-                <p className="text-[10px] uppercase tracking-wider text-stage-mastering font-bold">
-                  ↻ New permissions available
-                </p>
-                <p className="text-xs text-muted">
-                  Slate now needs write access on Dropbox for uploading
-                  generated stills, clips, and social assets. Tokens
-                  minted before this update are read-only and will 409
-                  on upload. Disconnecting + reconnecting mints a new
-                  token with the full scope set (~30 sec, one OAuth
-                  round-trip).
-                </p>
-                <a
-                  href="/api/integrations/dropbox/connect"
-                  className="inline-block text-[10px] uppercase tracking-wider font-bold text-white bg-stage-mastering rounded-full px-3 py-1.5 hover:opacity-90"
-                >
-                  ↻ Reconnect Dropbox
-                </a>
-              </div>
+            {/* Reconnect banner — Only shown when the current token was
+                minted with an older scope set (server marks scope_version
+                on save). Once the admin reconnects, the fresh token is
+                stamped with CURRENT_SCOPE_VERSION and this banner
+                disappears. */}
+            {isAdmin && status.needsReconnect && (
+              <ReconnectDropboxBanner onVerified={load} />
             )}
 
             {isAdmin && (
@@ -660,6 +641,64 @@ function Field({ label, hint, children }: { label: string; hint?: string; childr
       </label>
       {children}
       {hint && <p className="text-[11px] text-muted/70 mt-1">{hint}</p>}
+    </div>
+  )
+}
+
+// Banner shown when the Dropbox token was minted before we started
+// requesting the full scope set. Two exits:
+//   1. Reconnect Dropbox — runs the full OAuth again. Guaranteed
+//      correct outcome; ~30 seconds.
+//   2. Verify permissions — attempts a benign write against the
+//      current token. If it succeeds (because the admin already
+//      reconnected after our scope-URL change but before we started
+//      tracking scope_version), the server auto-stamps the current
+//      version and the banner disappears on reload.
+function ReconnectDropboxBanner({ onVerified }: { onVerified: () => void | Promise<void> }) {
+  const [busy, setBusy] = useState(false)
+  const [msg, setMsg] = useState<string | null>(null)
+  async function verify() {
+    setBusy(true); setMsg(null)
+    try {
+      const r = await api.dropboxVerifyScopes()
+      if (r.hasWrite) {
+        setMsg('✓ Token already has write access — banner will clear.')
+        await onVerified()
+      } else {
+        setMsg('This token doesn’t have write access. Use Reconnect below.')
+      }
+    } catch (err) {
+      setMsg(err instanceof Error ? err.message : 'verification failed')
+    } finally {
+      setBusy(false)
+    }
+  }
+  return (
+    <div className="rounded-xl border border-stage-mastering/40 bg-stage-mastering/5 p-3 space-y-2">
+      <p className="text-[10px] uppercase tracking-wider text-stage-mastering font-bold">
+        ↻ New permissions available
+      </p>
+      <p className="text-xs text-muted">
+        Slate now needs write access on Dropbox for uploading generated stills,
+        clips, and social assets. If you already reconnected recently, hit
+        Verify — otherwise reconnect for a fresh token (~30 sec).
+      </p>
+      <div className="flex items-center gap-2 flex-wrap">
+        <button
+          onClick={() => void verify()}
+          disabled={busy}
+          className="text-[10px] uppercase tracking-wider font-bold text-stage-mastering border border-stage-mastering/40 rounded-full px-3 py-1.5 hover:bg-stage-mastering/10 disabled:opacity-50"
+        >
+          {busy ? 'Verifying…' : '✓ Verify permissions'}
+        </button>
+        <a
+          href="/api/integrations/dropbox/connect"
+          className="inline-block text-[10px] uppercase tracking-wider font-bold text-white bg-stage-mastering rounded-full px-3 py-1.5 hover:opacity-90"
+        >
+          ↻ Reconnect Dropbox
+        </a>
+      </div>
+      {msg && <p className="text-[10px] text-muted mt-1">{msg}</p>}
     </div>
   )
 }

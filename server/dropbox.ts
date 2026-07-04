@@ -95,6 +95,13 @@ async function refreshAccessToken(refreshToken: string): Promise<DropboxTokenDat
   return { ...data, refresh_token: refreshToken }
 }
 
+// Bumped whenever the OAuth scope set changes. Tokens minted with a
+// scope_version < CURRENT_SCOPE_VERSION are known to be missing at
+// least one scope Slate now needs — the UI surfaces a reconnect
+// banner in that case. Tokens minted with the current version are
+// good until the next scope change.
+export const CURRENT_SCOPE_VERSION = 2
+
 export type StoredIntegration = {
   access_token: string
   refresh_token?: string
@@ -108,6 +115,10 @@ export type StoredIntegration = {
   // Lets the admin point Slate at the team folder so picker dialogs
   // never expose anyone's personal Dropbox tree.
   picker_start_path?: string
+  // Which scope set the current token was minted with. Missing = 1
+  // (pre-write-scope, legacy). New reconnects always stamp
+  // CURRENT_SCOPE_VERSION so the reconnect banner disappears.
+  scope_version?: number
 }
 
 export async function saveIntegration(token: DropboxTokenData, accountName?: string, rootNamespaceId?: string): Promise<void> {
@@ -121,6 +132,9 @@ export async function saveIntegration(token: DropboxTokenData, accountName?: str
     account_id: token.account_id,
     account_name: accountName ?? existing?.account_name,
     root_namespace_id: rootNamespaceId ?? existing?.root_namespace_id,
+    // Stamp the current scope version. Anyone who reconnects now has
+    // the full scope set including files.content.write.
+    scope_version: CURRENT_SCOPE_VERSION,
   }
   await pool.query(
     `INSERT INTO integrations (kind, data, updated_at) VALUES ('dropbox', $1::jsonb, now())

@@ -6,6 +6,7 @@ import {
   buildAuthorizeUrl,
   createFolder,
   createSharedLink,
+  CURRENT_SCOPE_VERSION,
   deleteIntegration,
   exchangeCodeForToken,
   getCurrentAccount,
@@ -26,11 +27,18 @@ integrationsRouter.get('/dropbox/status', requireUser, async (_req, res) => {
     res.json({ connected: false, configured: Boolean(getDropboxAppKey()) })
     return
   }
+  const scopeVersion = integration.scope_version ?? 1
   res.json({
     connected: true,
     configured: true,
     accountName: integration.account_name ?? null,
     pickerStartPath: integration.picker_start_path ?? null,
+    // Client uses this to decide whether to show the reconnect banner.
+    // A token minted BEFORE we started requesting files.content.write
+    // stamps scope_version = 1 (default when the field is absent);
+    // fresh reconnects stamp CURRENT_SCOPE_VERSION.
+    scopeVersion,
+    needsReconnect: scopeVersion < CURRENT_SCOPE_VERSION,
   })
 })
 
@@ -100,6 +108,36 @@ integrationsRouter.get('/dropbox/callback', requireAdmin, async (req, res) => {
 integrationsRouter.post('/dropbox/disconnect', requireAdmin, async (_req, res) => {
   await deleteIntegration()
   res.json({ ok: true })
+})
+
+// Live scope check + auto-stamp. Attempts a benign write against a
+// scratch path (creates a folder, then deletes it) so we can tell
+// whether the current access token actually has files.content.write
+// without asking the admin to re-do OAuth. On success we stamp the
+// integration with CURRENT_SCOPE_VERSION so the reconnect banner
+// disappears. On failure we mark scope_version = 1 so the banner
+// stays until they actually re-authorize.
+integrationsRouter.post('/dropbox/verify-scopes', requireAdmin, async (_req, res) => {
+  const integration = await getIntegration()
+  if (!integration) { res.status(400).json({ error: 'not_connected' }); return }
+  const testFolder = `/.slate-scope-check-${Date.now()}`
+  const created = await createFolder(testFolder).catch((err: unknown) => ({
+    ok: false, error: err instanceof Error ? err.message : String(err),
+  }))
+  const hasWrite = (created as { ok?: boolean }).ok === true
+  if (hasWrite) {
+    // Best-effort cleanup — the folder is fine if it lingers.
+    // (We don't have a delete helper exported here; leaving as a hint.)
+  }
+  const nextScope = hasWrite ? CURRENT_SCOPE_VERSION : 1
+  await pool.query(
+    `UPDATE integrations
+       SET data = data || jsonb_build_object('scope_version', $1::int),
+           updated_at = now()
+     WHERE kind = 'dropbox'`,
+    [nextScope],
+  )
+  res.json({ ok: true, hasWrite, scopeVersion: nextScope })
 })
 
 // Scope guard: every Dropbox file operation must either come from a

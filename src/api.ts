@@ -134,6 +134,11 @@ export type ApiDropboxStatus = {
   accountName?: string | null
   // Workspace default starting folder for file/folder pickers.
   pickerStartPath?: string | null
+  // Scope-set version the current token was minted with. When
+  // needsReconnect is true, the UI shows a "reconnect to grant new
+  // permissions" banner.
+  scopeVersion?: number
+  needsReconnect?: boolean
 }
 
 export type ApiDropboxEntry = {
@@ -646,6 +651,10 @@ export const api = {
   deleteComment: (commentId: string) =>
     request<{ ok: true }>(`/api/songs/comments/${commentId}`, { method: 'DELETE' }),
   dropboxStatus: () => request<ApiDropboxStatus>('/api/integrations/dropbox/status'),
+  dropboxVerifyScopes: () =>
+    request<{ ok: true; hasWrite: boolean; scopeVersion: number }>(
+      '/api/integrations/dropbox/verify-scopes', { method: 'POST' },
+    ),
   setDropboxPickerStart: (path: string) =>
     request<{ ok: true; pickerStartPath: string }>('/api/integrations/dropbox/picker-start', {
       method: 'POST',
