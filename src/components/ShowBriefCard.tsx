@@ -92,46 +92,67 @@ export default function ShowBriefCard({
   const [savedAt, setSavedAt] = useState<number | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [expanded, setExpanded] = useState<boolean | null>(null)
-  // Auto-save uses a debounce so N quick tab-throughs don't fire N
-  // racing fetches. A seq counter ensures late responses can't
-  // overwrite a fresher save's result.
-  const initialLoadDone = useRef(false)
+  const [loadFailed, setLoadFailed] = useState(false)
+  // lastSavedSnapshot is what the SERVER has. We compare current
+  // `brief` to it before saving, so:
+  //   - the initial load doesn't POST the freshly-loaded brief back
+  //   - re-editing back to the saved state doesn't fire a wasted save
+  //   - swapping projectIds doesn't leak the previous project's state
+  const lastSavedSnapshot = useRef<string | null>(null)
   const saveSeq = useRef(0)
   const debounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   useEffect(() => {
     let cancelled = false
+    // Reset local state on projectId change so we don't briefly show
+    // the old brief while the new one loads, and so the save effect
+    // won't fire with the wrong project's content.
+    if (debounceTimer.current) { clearTimeout(debounceTimer.current); debounceTimer.current = null }
+    setLoading(true)
+    setError(null)
+    setSavedAt(null)
+    setLoadFailed(false)
+    setBrief({})
+    lastSavedSnapshot.current = null
     api.showBrief(projectId).then((r) => {
       if (cancelled) return
       const b = r.brief ?? {}
+      // Prime the snapshot BEFORE calling setBrief so when the save
+      // effect fires after re-render, current === snapshot → skipped.
+      lastSavedSnapshot.current = JSON.stringify(b)
       setBrief(b)
-      // Collapsed by default IF at least one field is filled; expanded
-      // when the brief is fresh so a new show gets prompted to fill it.
       const anyFilled = Object.values(b).some((v) => typeof v === 'string' && v.trim())
       setExpanded(!anyFilled)
       setLoading(false)
-      // Guard against the initial setBrief triggering the save effect
-      // below — we don't want to POST the freshly-loaded brief back.
-      initialLoadDone.current = true
     }).catch((err) => {
-      if (!cancelled) { setError(err instanceof Error ? err.message : 'failed'); setLoading(false) }
+      if (!cancelled) {
+        setError(err instanceof Error ? err.message : 'failed to load')
+        setLoading(false)
+        setLoadFailed(true)
+      }
     })
     return () => { cancelled = true }
   }, [projectId])
 
   // Auto-save on brief change with debounce + sequence guard. Waits
   // 700ms of quiet, then fires one request with the latest brief.
+  // Skipped when the load hasn't succeeded (no snapshot to diff
+  // against) or when the current brief matches the last saved state.
   useEffect(() => {
-    if (!initialLoadDone.current || !canWrite) return
+    if (!canWrite || loadFailed) return
+    if (lastSavedSnapshot.current === null) return
+    const current = JSON.stringify(brief)
+    if (current === lastSavedSnapshot.current) return
     if (debounceTimer.current) clearTimeout(debounceTimer.current)
     debounceTimer.current = setTimeout(() => {
       const mySeq = ++saveSeq.current
       setSaving(true)
       setError(null)
       const snapshot = brief
+      const snapshotJson = current
       api.saveShowBrief(projectId, snapshot).then(() => {
-        // Only reflect success if we're still the latest save in flight.
         if (mySeq === saveSeq.current) {
+          lastSavedSnapshot.current = snapshotJson
           setSavedAt(Date.now())
           setSaving(false)
         }
@@ -145,7 +166,7 @@ export default function ShowBriefCard({
     return () => {
       if (debounceTimer.current) clearTimeout(debounceTimer.current)
     }
-  }, [brief, canWrite, projectId])
+  }, [brief, canWrite, projectId, loadFailed])
 
   const filledCount = Object.values(brief).filter((v) => typeof v === 'string' && v.trim()).length
   const totalCount = FIELDS.length
@@ -174,7 +195,15 @@ export default function ShowBriefCard({
       </div>
 
       {loading && <p className="text-xs text-muted italic">Loading…</p>}
-      {error && <p className="text-urgent text-xs">{error}</p>}
+      {loadFailed && (
+        <div className="rounded-lg border border-urgent/40 bg-urgent/5 p-3 space-y-2">
+          <p className="text-xs text-urgent font-bold">Couldn’t load the Show Brief.</p>
+          <p className="text-[10px] text-muted">
+            Autosave is paused so you don’t overwrite whatever’s on the server. Reload the page to try again.
+          </p>
+        </div>
+      )}
+      {error && !loadFailed && <p className="text-urgent text-xs">{error}</p>}
 
       {!loading && expanded && (
         <div className="space-y-4 pt-2">

@@ -80,11 +80,14 @@ async function loadProjectContext(projectId: string): Promise<StrategyProjectCon
 
 // Load previously-generated sibling docs so a later doc can reference
 // earlier ones (pillars references the master strategy; the calendar
-// references pillars; etc.).
+// references pillars; etc.). Accepts an optional client so the caller
+// can pass their in-flight transaction — otherwise reads on the pool
+// (which is fine for read-only callers like the strategy prompt block).
 async function loadSiblingDocs(
   projectId: string, excludeKind: StrategyKind,
+  client: { query: typeof pool.query } = pool,
 ): Promise<Partial<Record<StrategyKind, unknown>>> {
-  const { rows } = await pool.query<{ kind: StrategyKind; content: unknown }>(
+  const { rows } = await client.query<{ kind: StrategyKind; content: unknown }>(
     `SELECT kind, content FROM social_strategy_documents
        WHERE project_id = $1 AND status = 'generated' AND kind <> $2`,
     [projectId, excludeKind],
@@ -127,6 +130,12 @@ socialStrategyRouter.post('/projects/:projectId/:kind', async (req, res) => {
   const inputContext = typeof req.body?.inputContext === 'string' ? req.body.inputContext : undefined
   const projectContext = await loadProjectContext(projectId)
   if (!projectContext) { res.status(404).json({ error: 'project_not_found' }); return }
+  // Sibling docs are loaded outside the write transaction — the Claude
+  // call takes ~30s and we don't want to hold a row lock that long.
+  // Trade-off: if user A regenerates pillars while user B is mid-
+  // generating a calendar, B's calendar might reference the OLD pillars.
+  // Acceptable — B can just regenerate. Serializing generation
+  // per-project would be a nicer fix but adds a queue.
   projectContext.siblingDocs = await loadSiblingDocs(projectId, kind)
   // Load the Show Brief so every strategy tool starts from the same
   // structured facts the operator filled in once.

@@ -223,6 +223,14 @@ export type StrategyDocsInput = Partial<Record<
   Record<string, unknown> | null
 >>
 
+// Trim any single value to a bounded char count so a runaway
+// long-form answer can't inflate the prompt beyond the cache-friendly
+// prefix. Ellipsis added when we cut.
+function truncate(s: unknown, max: number): string {
+  const str = typeof s === 'string' ? s : String(s ?? '')
+  return str.length <= max ? str : str.slice(0, max).trimEnd() + '…'
+}
+
 export function strategyDocsBlock(docs?: StrategyDocsInput): string {
   if (!docs) return ''
   const parts: string[] = []
@@ -231,30 +239,30 @@ export function strategyDocsBlock(docs?: StrategyDocsInput): string {
     const bp = (s.brand_positioning ?? {}) as Record<string, unknown>
     const cd = (s.content_direction ?? {}) as Record<string, unknown>
     parts.push('STRATEGY DOC:')
-    if (bp.one_sentence) parts.push(`  Brand position: ${String(bp.one_sentence)}`)
-    if (Array.isArray(bp.differentiators)) parts.push(`  Differentiators: ${bp.differentiators.join(' · ')}`)
-    if (cd.tone) parts.push(`  Tone: ${String(cd.tone)}`)
-    if (Array.isArray(cd.themes)) parts.push(`  Themes: ${cd.themes.join(' · ')}`)
-    if (s.growth_north_star) parts.push(`  North star: ${String(s.growth_north_star)}`)
+    if (bp.one_sentence) parts.push(`  Brand position: ${truncate(bp.one_sentence, 240)}`)
+    if (Array.isArray(bp.differentiators)) parts.push(`  Differentiators: ${bp.differentiators.slice(0, 4).map((x) => truncate(x, 120)).join(' · ')}`)
+    if (cd.tone) parts.push(`  Tone: ${truncate(cd.tone, 200)}`)
+    if (Array.isArray(cd.themes)) parts.push(`  Themes: ${cd.themes.slice(0, 6).map((x) => truncate(x, 80)).join(' · ')}`)
+    if (s.growth_north_star) parts.push(`  North star: ${truncate(s.growth_north_star, 200)}`)
   }
   const a = docs.audience as Record<string, unknown> | undefined
   if (a) {
     parts.push('AUDIENCE:')
-    if (a.persona_snapshot) parts.push(`  Persona: ${String(a.persona_snapshot)}`)
-    if (Array.isArray(a.frustrations)) parts.push(`  Frustrations: ${a.frustrations.slice(0, 4).join(' · ')}`)
-    if (Array.isArray(a.desires)) parts.push(`  Desires: ${a.desires.slice(0, 4).join(' · ')}`)
+    if (a.persona_snapshot) parts.push(`  Persona: ${truncate(a.persona_snapshot, 320)}`)
+    if (Array.isArray(a.frustrations)) parts.push(`  Frustrations: ${a.frustrations.slice(0, 4).map((x) => truncate(x, 100)).join(' · ')}`)
+    if (Array.isArray(a.desires)) parts.push(`  Desires: ${a.desires.slice(0, 4).map((x) => truncate(x, 100)).join(' · ')}`)
     const angles = Array.isArray(a.messaging_angles) ? a.messaging_angles as Array<Record<string, unknown>> : []
     if (angles.length > 0) {
       parts.push('  Messaging angles:')
-      for (const ang of angles.slice(0, 6)) parts.push(`    · ${String(ang.angle)}`)
+      for (const ang of angles.slice(0, 6)) parts.push(`    · ${truncate(ang.angle, 140)}`)
     }
   }
   const au = docs.authority as Record<string, unknown> | undefined
   if (au) {
     parts.push('AUTHORITY POSITIONING:')
-    if (au.positioning_statement) parts.push(`  Positioning: ${String(au.positioning_statement)}`)
+    if (au.positioning_statement) parts.push(`  Positioning: ${truncate(au.positioning_statement, 240)}`)
     if (Array.isArray(au.signature_content_moves)) {
-      parts.push(`  Signature moves: ${au.signature_content_moves.slice(0, 4).join(' · ')}`)
+      parts.push(`  Signature moves: ${au.signature_content_moves.slice(0, 4).map((x) => truncate(x, 120)).join(' · ')}`)
     }
   }
   const p = docs.pillars as Record<string, unknown> | undefined
@@ -262,8 +270,8 @@ export function strategyDocsBlock(docs?: StrategyDocsInput): string {
     const pillars = Array.isArray(p.pillars) ? p.pillars as Array<Record<string, unknown>> : []
     if (pillars.length > 0) {
       parts.push('CONTENT PILLARS (posts should map to one of these):')
-      for (const pl of pillars) {
-        parts.push(`  · ${String(pl.name)} — ${String(pl.purpose ?? '')}`)
+      for (const pl of pillars.slice(0, 6)) {
+        parts.push(`  · ${truncate(pl.name, 60)} — ${truncate(pl.purpose ?? '', 160)}`)
       }
     }
   }
@@ -272,17 +280,22 @@ export function strategyDocsBlock(docs?: StrategyDocsInput): string {
     const offers = Array.isArray(m.offer_ideas) ? m.offer_ideas as Array<Record<string, unknown>> : []
     if (offers.length > 0) {
       parts.push('MONETIZATION OFFERS (referenceable in "buy"-stage content):')
-      for (const o of offers.slice(0, 4)) parts.push(`  · ${String(o.name)}: ${String(o.description ?? '')}`)
+      for (const o of offers.slice(0, 4)) parts.push(`  · ${truncate(o.name, 80)}: ${truncate(o.description ?? '', 160)}`)
     }
   }
   if (parts.length === 0) return ''
-  return [
+  const block = [
     '',
     '=== SHOW STRATEGY (align every choice below to this) ===',
     ...parts,
     '=== END STRATEGY ===',
     '',
   ].join('\n')
+  // Final safety net: if per-field truncation still leaves us above
+  // 6KB total, cut the block. Cache-friendly prefix budgets are
+  // model-dependent; 6KB is well under Anthropic's ephemeral limit.
+  const HARD_CAP = 6000
+  return block.length > HARD_CAP ? block.slice(0, HARD_CAP).trimEnd() + '\n… (truncated)\n=== END STRATEGY ===\n' : block
 }
 
 export type GenerateInput = {
@@ -1361,6 +1374,13 @@ export async function generateCarouselDeck(input: CarouselGenerateInput): Promis
   } catch (err) {
     logError('carousel: invalid JSON from claude', { body: textBlock.text.slice(0, 500) })
     throw new Error(`carousel: invalid JSON: ${err instanceof Error ? err.message : String(err)}`)
+  }
+  // The strict schema no longer enforces minItems (Anthropic rejects
+  // that for arrays), so Claude could technically return an empty or
+  // sub-usable slide list on a bad transcript. Reject upstream so the
+  // client shows a clean error instead of "No renderable slides."
+  if (!Array.isArray(deck.slides) || deck.slides.length < 3) {
+    throw new Error(`carousel: too few slides returned (got ${deck.slides?.length ?? 0}, need at least 3)`)
   }
   logInfo('carousel: deck generated', {
     slides: deck.slides.length,
