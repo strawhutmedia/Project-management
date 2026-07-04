@@ -209,6 +209,21 @@ function RunModal({ tool, projectId, onClose, onDone }: {
   const [input, setInput] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  // Detect whether the show's brief is filled in — if not, warn that
+  // output quality will be significantly weaker. Users can still
+  // proceed, but they see the tradeoff.
+  const [briefStatus, setBriefStatus] = useState<'unknown' | 'empty' | 'partial' | 'filled'>('unknown')
+  useEffect(() => {
+    let cancelled = false
+    api.showBrief(projectId).then((r) => {
+      if (cancelled) return
+      const b = r.brief ?? {}
+      const filledCount = Object.values(b).filter((v) => typeof v === 'string' && v.trim()).length
+      setBriefStatus(filledCount === 0 ? 'empty' : filledCount < 4 ? 'partial' : 'filled')
+    }).catch(() => { if (!cancelled) setBriefStatus('unknown') })
+    return () => { cancelled = true }
+  }, [projectId])
+
   async function run() {
     setBusy(true)
     setError(null)
@@ -230,6 +245,25 @@ function RunModal({ tool, projectId, onClose, onDone }: {
           <p className="text-xs text-muted mt-1">{tool.purpose}</p>
         </header>
         <div className="p-5 space-y-3">
+          {briefStatus === 'empty' && (
+            <div className="rounded-lg border border-urgent/40 bg-urgent/5 p-3 space-y-1">
+              <p className="text-[10px] uppercase tracking-wider text-urgent font-bold">⚠ Show Brief is empty</p>
+              <p className="text-xs text-muted">
+                Output quality will be significantly weaker without a brief. Consider filling out the Show Brief
+                (above this section) first — Claude will have real facts to work from instead of guessing from
+                the show name.
+              </p>
+            </div>
+          )}
+          {briefStatus === 'partial' && (
+            <div className="rounded-lg border border-stage-tracking/40 bg-stage-tracking/5 p-3 space-y-1">
+              <p className="text-[10px] uppercase tracking-wider text-stage-tracking font-bold">↑ Show Brief is partial</p>
+              <p className="text-xs text-muted">
+                A few questions in the Show Brief are still blank. Filling more of them before running this tool
+                usually meaningfully improves the output.
+              </p>
+            </div>
+          )}
           {tool.needsPaste ? (
             <label className="space-y-1 block">
               <span className="text-[10px] uppercase tracking-wider text-muted font-bold">
@@ -245,7 +279,8 @@ function RunModal({ tool, projectId, onClose, onDone }: {
             </label>
           ) : (
             <p className="text-[11px] text-muted italic">
-              No extra input needed — Claude pulls context from the show record and any strategy docs already generated.
+              No extra input needed — Claude pulls from the Show Brief, the show record, and any strategy docs
+              already generated.
             </p>
           )}
           {error && <p className="text-urgent text-sm">{error}</p>}

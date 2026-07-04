@@ -20,6 +20,7 @@ import {
   type StrategyKind,
   type StrategyProjectContext,
 } from '../anthropic'
+import { assertWriter } from '../permissions'
 import { loadShowBrief } from './show_brief'
 import { logError } from '../diag'
 
@@ -119,10 +120,9 @@ socialStrategyRouter.post('/projects/:projectId/:kind', async (req, res) => {
   const projectId = req.params.projectId
   const kind = req.params.kind
   if (!isKind(kind)) { res.status(400).json({ error: 'invalid_kind' }); return }
-  if (!(await assertProjectAccess(user.id, user.role, projectId))) {
-    res.status(403).json({ error: 'forbidden' })
-    return
-  }
+  // Writer role required — generation burns Claude tokens, viewers
+  // shouldn't be able to trigger it.
+  if (!(await assertWriter(user, projectId, res))) return
   if (!hasAnthropicKey()) { res.status(503).json({ error: 'anthropic_key_missing' }); return }
   const inputContext = typeof req.body?.inputContext === 'string' ? req.body.inputContext : undefined
   const projectContext = await loadProjectContext(projectId)
@@ -135,36 +135,50 @@ socialStrategyRouter.post('/projects/:projectId/:kind', async (req, res) => {
 
   try {
     const result = await generateSocialStrategyDocument({ kind, projectContext, inputContext })
-    // Archive the previous version if one exists, then upsert.
-    const prev = await pool.query(
-      `SELECT id, content, input_context FROM social_strategy_documents
-        WHERE project_id = $1 AND kind = $2`,
-      [projectId, kind],
-    )
-    if (prev.rows.length > 0) {
-      await pool.query(
-        `INSERT INTO social_strategy_versions (document_id, content, input_context, created_by)
-         VALUES ($1, $2::jsonb, $3, $4)`,
-        [prev.rows[0].id, JSON.stringify(prev.rows[0].content), prev.rows[0].input_context, user.id],
+    // Archive + upsert in one transaction. Row-level lock (FOR UPDATE)
+    // on the existing doc prevents two concurrent regenerations from
+    // interleaving — otherwise both would archive the same prior
+    // version and race the UPDATE, corrupting version history.
+    const client = await pool.connect()
+    try {
+      await client.query('BEGIN')
+      const prev = await client.query(
+        `SELECT id, content, input_context FROM social_strategy_documents
+          WHERE project_id = $1 AND kind = $2
+          FOR UPDATE`,
+        [projectId, kind],
       )
-      await pool.query(
-        `UPDATE social_strategy_documents
-            SET content = $2::jsonb, input_context = $3, status = 'generated',
-                error = NULL, input_tokens = $4, output_tokens = $5,
-                created_by = $6, updated_at = now()
-          WHERE project_id = $1 AND kind = $7`,
-        [projectId, JSON.stringify(result.content), inputContext ?? null,
-         result.usage.inputTokens, result.usage.outputTokens, user.id, kind],
-      )
-    } else {
-      await pool.query(
-        `INSERT INTO social_strategy_documents
-           (project_id, kind, content, input_context, status,
-            input_tokens, output_tokens, created_by)
-         VALUES ($1, $2, $3::jsonb, $4, 'generated', $5, $6, $7)`,
-        [projectId, kind, JSON.stringify(result.content), inputContext ?? null,
-         result.usage.inputTokens, result.usage.outputTokens, user.id],
-      )
+      if (prev.rows.length > 0) {
+        await client.query(
+          `INSERT INTO social_strategy_versions (document_id, content, input_context, created_by)
+           VALUES ($1, $2::jsonb, $3, $4)`,
+          [prev.rows[0].id, JSON.stringify(prev.rows[0].content), prev.rows[0].input_context, user.id],
+        )
+        await client.query(
+          `UPDATE social_strategy_documents
+              SET content = $2::jsonb, input_context = $3, status = 'generated',
+                  error = NULL, input_tokens = $4, output_tokens = $5,
+                  created_by = $6, updated_at = now()
+            WHERE project_id = $1 AND kind = $7`,
+          [projectId, JSON.stringify(result.content), inputContext ?? null,
+           result.usage.inputTokens, result.usage.outputTokens, user.id, kind],
+        )
+      } else {
+        await client.query(
+          `INSERT INTO social_strategy_documents
+             (project_id, kind, content, input_context, status,
+              input_tokens, output_tokens, created_by)
+           VALUES ($1, $2, $3::jsonb, $4, 'generated', $5, $6, $7)`,
+          [projectId, kind, JSON.stringify(result.content), inputContext ?? null,
+           result.usage.inputTokens, result.usage.outputTokens, user.id],
+        )
+      }
+      await client.query('COMMIT')
+    } catch (err) {
+      await client.query('ROLLBACK').catch(() => {})
+      throw err
+    } finally {
+      client.release()
     }
     const doc = await pool.query(
       `SELECT id, kind, content, input_context, status, error,
@@ -186,34 +200,49 @@ socialStrategyRouter.patch('/projects/:projectId/:kind', async (req, res) => {
   const projectId = req.params.projectId
   const kind = req.params.kind
   if (!isKind(kind)) { res.status(400).json({ error: 'invalid_kind' }); return }
-  if (!(await assertProjectAccess(user.id, user.role, projectId))) {
-    res.status(403).json({ error: 'forbidden' })
-    return
-  }
+  // Writer role required for hand-edits too.
+  if (!(await assertWriter(user, projectId, res))) return
   const content = req.body?.content
   if (typeof content !== 'object' || content === null) {
     res.status(400).json({ error: 'content_required' })
     return
   }
-  // Archive the prior version and update.
-  const prev = await pool.query(
-    `SELECT id, content, input_context FROM social_strategy_documents
-      WHERE project_id = $1 AND kind = $2`,
-    [projectId, kind],
-  )
-  if (prev.rows.length === 0) { res.status(404).json({ error: 'not_found' }); return }
-  await pool.query(
-    `INSERT INTO social_strategy_versions (document_id, content, input_context, created_by)
-     VALUES ($1, $2::jsonb, $3, $4)`,
-    [prev.rows[0].id, JSON.stringify(prev.rows[0].content), prev.rows[0].input_context, user.id],
-  )
-  await pool.query(
-    `UPDATE social_strategy_documents
-       SET content = $2::jsonb, updated_at = now()
-     WHERE project_id = $1 AND kind = $3`,
-    [projectId, JSON.stringify(content), kind],
-  )
-  res.json({ ok: true })
+  // Archive the prior version and update in one transaction with a
+  // row-level lock — same rationale as the POST handler.
+  const client = await pool.connect()
+  try {
+    await client.query('BEGIN')
+    const prev = await client.query(
+      `SELECT id, content, input_context FROM social_strategy_documents
+        WHERE project_id = $1 AND kind = $2
+        FOR UPDATE`,
+      [projectId, kind],
+    )
+    if (prev.rows.length === 0) {
+      await client.query('ROLLBACK')
+      res.status(404).json({ error: 'not_found' })
+      return
+    }
+    await client.query(
+      `INSERT INTO social_strategy_versions (document_id, content, input_context, created_by)
+       VALUES ($1, $2::jsonb, $3, $4)`,
+      [prev.rows[0].id, JSON.stringify(prev.rows[0].content), prev.rows[0].input_context, user.id],
+    )
+    await client.query(
+      `UPDATE social_strategy_documents
+         SET content = $2::jsonb, updated_at = now()
+       WHERE project_id = $1 AND kind = $3`,
+      [projectId, JSON.stringify(content), kind],
+    )
+    await client.query('COMMIT')
+    res.json({ ok: true })
+  } catch (err) {
+    await client.query('ROLLBACK').catch(() => {})
+    logError('social-strategy: patch failed', { projectId, kind, error: err instanceof Error ? err.message : String(err) })
+    res.status(500).json({ error: 'patch_failed' })
+  } finally {
+    client.release()
+  }
 })
 
 socialStrategyRouter.delete('/projects/:projectId/:kind', async (req, res) => {
@@ -221,10 +250,7 @@ socialStrategyRouter.delete('/projects/:projectId/:kind', async (req, res) => {
   const projectId = req.params.projectId
   const kind = req.params.kind
   if (!isKind(kind)) { res.status(400).json({ error: 'invalid_kind' }); return }
-  if (!(await assertProjectAccess(user.id, user.role, projectId))) {
-    res.status(403).json({ error: 'forbidden' })
-    return
-  }
+  if (!(await assertWriter(user, projectId, res))) return
   await pool.query(
     `DELETE FROM social_strategy_documents WHERE project_id = $1 AND kind = $2`,
     [projectId, kind],

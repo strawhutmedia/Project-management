@@ -11,6 +11,7 @@
 import { Router } from 'express'
 import { pool } from '../db'
 import { requireUser, type SessionUser } from '../auth'
+import { assertWriter } from '../permissions'
 
 export const showBriefRouter = Router()
 showBriefRouter.use(requireUser)
@@ -53,10 +54,9 @@ showBriefRouter.get('/projects/:projectId', async (req, res) => {
 showBriefRouter.put('/projects/:projectId', async (req, res) => {
   const user = (req as typeof req & { user: SessionUser }).user
   const projectId = req.params.projectId
-  if (!(await assertProjectAccess(user.id, user.role, projectId))) {
-    res.status(403).json({ error: 'forbidden' })
-    return
-  }
+  // Writer role required — viewers can READ the brief (via the GET
+  // above's membership check) but can't overwrite it.
+  if (!(await assertWriter(user, projectId, res))) return
   const body = (req.body ?? {}) as Record<string, unknown>
   const values: Array<string | null> = []
   for (const f of FIELDS) {

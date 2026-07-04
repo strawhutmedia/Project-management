@@ -1,7 +1,7 @@
 // Show Brief — the questionnaire the operator fills out once per show.
 // Every social strategy tool reads from this automatically, so the
 // answers are captured here and never re-typed. Editable at any time.
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { api, type ApiShowBrief } from '../api'
 
 type Field = {
@@ -92,6 +92,12 @@ export default function ShowBriefCard({
   const [savedAt, setSavedAt] = useState<number | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [expanded, setExpanded] = useState<boolean | null>(null)
+  // Auto-save uses a debounce so N quick tab-throughs don't fire N
+  // racing fetches. A seq counter ensures late responses can't
+  // overwrite a fresher save's result.
+  const initialLoadDone = useRef(false)
+  const saveSeq = useRef(0)
+  const debounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   useEffect(() => {
     let cancelled = false
@@ -104,24 +110,42 @@ export default function ShowBriefCard({
       const anyFilled = Object.values(b).some((v) => typeof v === 'string' && v.trim())
       setExpanded(!anyFilled)
       setLoading(false)
+      // Guard against the initial setBrief triggering the save effect
+      // below — we don't want to POST the freshly-loaded brief back.
+      initialLoadDone.current = true
     }).catch((err) => {
       if (!cancelled) { setError(err instanceof Error ? err.message : 'failed'); setLoading(false) }
     })
     return () => { cancelled = true }
   }, [projectId])
 
-  async function save(next: ApiShowBrief) {
-    setSaving(true)
-    setError(null)
-    try {
-      await api.saveShowBrief(projectId, next)
-      setSavedAt(Date.now())
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'save failed')
-    } finally {
-      setSaving(false)
+  // Auto-save on brief change with debounce + sequence guard. Waits
+  // 700ms of quiet, then fires one request with the latest brief.
+  useEffect(() => {
+    if (!initialLoadDone.current || !canWrite) return
+    if (debounceTimer.current) clearTimeout(debounceTimer.current)
+    debounceTimer.current = setTimeout(() => {
+      const mySeq = ++saveSeq.current
+      setSaving(true)
+      setError(null)
+      const snapshot = brief
+      api.saveShowBrief(projectId, snapshot).then(() => {
+        // Only reflect success if we're still the latest save in flight.
+        if (mySeq === saveSeq.current) {
+          setSavedAt(Date.now())
+          setSaving(false)
+        }
+      }).catch((err) => {
+        if (mySeq === saveSeq.current) {
+          setError(err instanceof Error ? err.message : 'save failed')
+          setSaving(false)
+        }
+      })
+    }, 700)
+    return () => {
+      if (debounceTimer.current) clearTimeout(debounceTimer.current)
     }
-  }
+  }, [brief, canWrite, projectId])
 
   const filledCount = Object.values(brief).filter((v) => typeof v === 'string' && v.trim()).length
   const totalCount = FIELDS.length
@@ -161,7 +185,6 @@ export default function ShowBriefCard({
               value={brief[field.key] ?? ''}
               disabled={!canWrite}
               onChange={(next) => setBrief((b) => ({ ...b, [field.key]: next }))}
-              onBlur={() => { if (canWrite) void save(brief) }}
             />
           ))}
           <div className="flex items-center gap-2 pt-1 text-[10px] text-muted">
@@ -169,7 +192,7 @@ export default function ShowBriefCard({
               ? <span className="text-stage-mastering">Saving…</span>
               : savedAt
                 ? <span>✓ Saved {new Date(savedAt).toLocaleTimeString()}</span>
-                : <span className="italic">Changes save automatically when you tab out of a field.</span>}
+                : <span className="italic">Changes save automatically ~1 sec after you stop typing.</span>}
           </div>
         </div>
       )}
@@ -178,13 +201,12 @@ export default function ShowBriefCard({
 }
 
 function BriefField({
-  field, value, disabled, onChange, onBlur,
+  field, value, disabled, onChange,
 }: {
   field: Field
   value: string
   disabled: boolean
   onChange: (v: string) => void
-  onBlur: () => void
 }) {
   return (
     <label className="block space-y-1">
@@ -197,7 +219,6 @@ function BriefField({
         value={value}
         disabled={disabled}
         onChange={(e) => onChange(e.target.value)}
-        onBlur={onBlur}
         className="w-full bg-ink/40 border border-line rounded p-2 text-xs text-text leading-relaxed focus:border-stage-mastering outline-none disabled:opacity-70"
         placeholder={field.placeholder}
       />

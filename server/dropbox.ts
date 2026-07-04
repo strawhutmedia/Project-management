@@ -300,6 +300,23 @@ export async function createFolder(folderPath: string): Promise<{ ok: boolean; e
   return { ok: false, error: `dropbox_${res.status}: ${text.slice(0, 200)}` }
 }
 
+// Delete a Dropbox path (file or folder). Used to clean up after
+// scope-verification test folders — anything that isn't the specific
+// scratch folder should probably use uploadFile / listFolder instead.
+export async function deletePath(path: string): Promise<{ ok: boolean; error?: string }> {
+  await ensureRootNamespace()
+  const headers = await buildHeaders({ 'Content-Type': 'application/json' })
+  if (!headers) return { ok: false, error: 'not_connected' }
+  const res = await fetch(`${DROPBOX_API}/files/delete_v2`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({ path }),
+  })
+  if (res.ok) return { ok: true }
+  const text = await res.text()
+  return { ok: false, error: `dropbox_${res.status}: ${text.slice(0, 200)}` }
+}
+
 const SINGLE_SHOT_LIMIT = 140 * 1024 * 1024 // 140 MB — under Dropbox's 150 MB cap
 const CHUNK_SIZE = 8 * 1024 * 1024 // 8 MB chunks for upload sessions
 

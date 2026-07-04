@@ -8,6 +8,7 @@
 // page for now; the production flow will move this to a fire-and-
 // forget job once we wire it into SocialsSection.
 import { Router } from 'express'
+import { pool } from '../db'
 import { requireUser, type SessionUser } from '../auth'
 import { hasAnthropicKey, generateCarouselDeck } from '../anthropic'
 import { loadShowStrategyDocs } from './socials'
@@ -54,14 +55,26 @@ carouselRouter.post('/preview', async (req, res) => {
   }
 
   try {
-    // If the caller passed a projectId, load the show's strategy docs
-    // so the deck's headlines and lesson wrap-up align with the show's
-    // brand positioning, pillars, and audience psychology instead of
-    // reading the transcript in isolation. Safe if the show hasn't
-    // generated any strategy docs yet — helper returns an empty bag.
-    const strategyDocs = typeof projectId === 'string' && projectId.trim()
-      ? await loadShowStrategyDocs(projectId.trim())
-      : undefined
+    // If the caller passed a projectId, verify they can access that
+    // project BEFORE we load its strategy docs — otherwise any logged-in
+    // user could pass a projectId they don't belong to and have that
+    // project's brand positioning baked into a deck. If access is
+    // denied, ignore the projectId silently and generate from the
+    // transcript alone (deck still returns, just without strategy
+    // context).
+    let strategyDocs
+    if (typeof projectId === 'string' && projectId.trim()) {
+      const projRes = await pool.query(
+        `SELECT 1 FROM projects p
+           LEFT JOIN project_members m ON m.project_id = p.id AND m.user_id = $1
+          WHERE p.id = $2 AND ($3 = 'admin' OR p.created_by = $1 OR m.user_id IS NOT NULL)
+          LIMIT 1`,
+        [user.id, projectId.trim(), user.role],
+      )
+      if (projRes.rows.length > 0) {
+        strategyDocs = await loadShowStrategyDocs(projectId.trim())
+      }
+    }
     const result = await generateCarouselDeck({
       showName: showName.trim(),
       hostName: typeof hostName === 'string' && hostName.trim() ? hostName.trim() : undefined,

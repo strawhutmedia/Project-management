@@ -8,6 +8,7 @@ import {
   createSharedLink,
   CURRENT_SCOPE_VERSION,
   deleteIntegration,
+  deletePath,
   exchangeCodeForToken,
   getCurrentAccount,
   getDropboxAppKey,
@@ -110,13 +111,16 @@ integrationsRouter.post('/dropbox/disconnect', requireAdmin, async (_req, res) =
   res.json({ ok: true })
 })
 
-// Live scope check + auto-stamp. Attempts a benign write against a
-// scratch path (creates a folder, then deletes it) so we can tell
-// whether the current access token actually has files.content.write
-// without asking the admin to re-do OAuth. On success we stamp the
-// integration with CURRENT_SCOPE_VERSION so the reconnect banner
-// disappears. On failure we mark scope_version = 1 so the banner
-// stays until they actually re-authorize.
+// Live scope check + auto-stamp. Attempts a benign write (create
+// then delete a scratch folder) so we can tell whether the current
+// token actually has files.content.write without making the admin
+// re-do OAuth. Three outcomes:
+//   1. Write succeeds  → stamp scope_version = CURRENT, banner clears.
+//   2. Explicit no_write_permission (Dropbox 403 with that reason) →
+//      stamp scope_version = 1, banner stays.
+//   3. Anything else (network flake, 5xx, unexpected error) → don't
+//      touch the DB; surface the error so the admin knows to retry
+//      rather than being silently downgraded.
 integrationsRouter.post('/dropbox/verify-scopes', requireAdmin, async (_req, res) => {
   const integration = await getIntegration()
   if (!integration) { res.status(400).json({ error: 'not_connected' }); return }
@@ -124,20 +128,39 @@ integrationsRouter.post('/dropbox/verify-scopes', requireAdmin, async (_req, res
   const created = await createFolder(testFolder).catch((err: unknown) => ({
     ok: false, error: err instanceof Error ? err.message : String(err),
   }))
-  const hasWrite = (created as { ok?: boolean }).ok === true
-  if (hasWrite) {
-    // Best-effort cleanup — the folder is fine if it lingers.
-    // (We don't have a delete helper exported here; leaving as a hint.)
+  if (created.ok) {
+    // Clean up the scratch folder so /.slate-scope-check-* doesn't
+    // pile up in Dropbox. Non-fatal if delete fails — the folder is
+    // hidden by the dot-prefix and harmless.
+    await deletePath(testFolder).catch(() => { /* ignore */ })
+    await pool.query(
+      `UPDATE integrations
+         SET data = data || jsonb_build_object('scope_version', $1::int),
+             updated_at = now()
+       WHERE kind = 'dropbox'`,
+      [CURRENT_SCOPE_VERSION],
+    )
+    res.json({ ok: true, hasWrite: true, scopeVersion: CURRENT_SCOPE_VERSION })
+    return
   }
-  const nextScope = hasWrite ? CURRENT_SCOPE_VERSION : 1
-  await pool.query(
-    `UPDATE integrations
-       SET data = data || jsonb_build_object('scope_version', $1::int),
-           updated_at = now()
-     WHERE kind = 'dropbox'`,
-    [nextScope],
-  )
-  res.json({ ok: true, hasWrite, scopeVersion: nextScope })
+  // Distinguish a genuine scope failure from any other error. Dropbox
+  // returns `path/no_write_permission` inside the error body when the
+  // token lacks files.content.write.
+  const errMsg = created.error ?? ''
+  if (errMsg.includes('no_write_permission') || errMsg.startsWith('dropbox_403')) {
+    await pool.query(
+      `UPDATE integrations
+         SET data = data || jsonb_build_object('scope_version', 1),
+             updated_at = now()
+       WHERE kind = 'dropbox'`,
+    )
+    res.json({ ok: true, hasWrite: false, scopeVersion: 1, error: errMsg })
+    return
+  }
+  // Unknown failure — don't guess. Leave scope_version alone so a
+  // network flake doesn't downgrade a healthy token; return the raw
+  // error so the admin can decide to retry or reconnect.
+  res.status(502).json({ ok: false, error: errMsg || 'unknown_error' })
 })
 
 // Scope guard: every Dropbox file operation must either come from a
