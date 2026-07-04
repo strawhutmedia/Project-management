@@ -1335,7 +1335,7 @@ export type StrategyGenerateResult = {
 // enforces additionalProperties: false so we can render the output
 // with predictable field names in the UI.
 
-const STRATEGY_SCHEMAS: Record<StrategyKind, object> = {
+const STRATEGY_SCHEMAS: Record<StrategyKind, Record<string, unknown>> = {
   strategy: {
     type: 'object',
     additionalProperties: false,
