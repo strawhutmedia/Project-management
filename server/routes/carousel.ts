@@ -10,6 +10,7 @@
 import { Router } from 'express'
 import { requireUser, type SessionUser } from '../auth'
 import { hasAnthropicKey, generateCarouselDeck } from '../anthropic'
+import { loadShowStrategyDocs } from './socials'
 import { logError } from '../diag'
 
 export const carouselRouter = Router()
@@ -28,7 +29,7 @@ carouselRouter.post('/preview', async (req, res) => {
   }
   const {
     transcript, showName, hostName, presetKey,
-    episodeTitle, episodeNumber,
+    episodeTitle, episodeNumber, projectId,
   } = (req.body ?? {}) as Record<string, unknown>
 
   if (typeof transcript !== 'string' || transcript.trim().length === 0) {
@@ -53,6 +54,14 @@ carouselRouter.post('/preview', async (req, res) => {
   }
 
   try {
+    // If the caller passed a projectId, load the show's strategy docs
+    // so the deck's headlines and lesson wrap-up align with the show's
+    // brand positioning, pillars, and audience psychology instead of
+    // reading the transcript in isolation. Safe if the show hasn't
+    // generated any strategy docs yet — helper returns an empty bag.
+    const strategyDocs = typeof projectId === 'string' && projectId.trim()
+      ? await loadShowStrategyDocs(projectId.trim())
+      : undefined
     const result = await generateCarouselDeck({
       showName: showName.trim(),
       hostName: typeof hostName === 'string' && hostName.trim() ? hostName.trim() : undefined,
@@ -60,6 +69,7 @@ carouselRouter.post('/preview', async (req, res) => {
       episodeTitle: typeof episodeTitle === 'string' && episodeTitle.trim() ? episodeTitle.trim() : null,
       episodeNumber: typeof episodeNumber === 'number' ? episodeNumber : null,
       episodeTranscript: transcript,
+      strategyDocs,
     })
     // Audit trail so we know who's burning tokens.
     // eslint-disable-next-line no-console

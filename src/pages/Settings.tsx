@@ -78,6 +78,35 @@ export default function Settings() {
               </span>
               .
             </p>
+
+            {/* Reconnect banner — Slate now requests `files.content.write`
+                and other scopes explicitly. Any token minted before that
+                change is missing write scope, which surfaces as
+                path/no_write_permission errors when uploading stills or
+                clips. There's no way to upgrade a token in place, so an
+                admin needs to disconnect + reconnect once. */}
+            {isAdmin && (
+              <div className="rounded-xl border border-stage-mastering/40 bg-stage-mastering/5 p-3 space-y-2">
+                <p className="text-[10px] uppercase tracking-wider text-stage-mastering font-bold">
+                  ↻ New permissions available
+                </p>
+                <p className="text-xs text-muted">
+                  Slate now needs write access on Dropbox for uploading
+                  generated stills, clips, and social assets. Tokens
+                  minted before this update are read-only and will 409
+                  on upload. Disconnecting + reconnecting mints a new
+                  token with the full scope set (~30 sec, one OAuth
+                  round-trip).
+                </p>
+                <a
+                  href="/api/integrations/dropbox/connect"
+                  className="inline-block text-[10px] uppercase tracking-wider font-bold text-white bg-stage-mastering rounded-full px-3 py-1.5 hover:opacity-90"
+                >
+                  ↻ Reconnect Dropbox
+                </a>
+              </div>
+            )}
+
             {isAdmin && (
               <PickerStartPathControl
                 current={status.pickerStartPath ?? ''}

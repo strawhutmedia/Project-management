@@ -86,6 +86,10 @@ export default function EpisodeCarousel({
         showName,
         presetKey: preset.key,
         episodeTitle,
+        // Pass projectId so the server pulls the show's strategy docs
+        // and Claude writes headlines aligned with the brand positioning
+        // and content pillars.
+        projectId,
       })
       setRawSlides(result.deck.slides)
       setAssetRequests(result.deck.asset_requests)

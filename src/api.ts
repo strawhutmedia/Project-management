@@ -1079,6 +1079,9 @@ export const api = {
     presetKey: string
     episodeTitle?: string
     episodeNumber?: number
+    // When present, the server loads the show's strategy docs and
+    // feeds them to Claude so the deck aligns with the strategy.
+    projectId?: string
   }) =>
     request<ApiCarouselDeckResult>('/api/carousel/preview', {
       method: 'POST',

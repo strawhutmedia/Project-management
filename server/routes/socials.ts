@@ -14,13 +14,32 @@ import crypto from 'crypto'
 import { pool } from '../db'
 import { requireUser, type SessionUser } from '../auth'
 import { assertWriter } from '../permissions'
-import { hasAnthropicKey, generateSocialPlan, regenerateSocialItem, type RawSocialPlan } from '../anthropic'
+import { hasAnthropicKey, generateSocialPlan, regenerateSocialItem, type RawSocialPlan, type StrategyDocsInput } from '../anthropic'
 import { logError, logInfo } from '../diag'
 
 export const socialsRouter = Router()
 socialsRouter.use(requireUser)
 
 const MAX_TRANSCRIPT_CHARS = 200_000
+
+// Load the strategy docs Slate has generated for this show, packaged
+// into the shape Claude's prompt block expects. Returns an empty
+// object if nothing has been generated yet — the block is a no-op in
+// that case, so generators keep working for shows that haven't done
+// the strategy pass.
+export async function loadShowStrategyDocs(projectId: string): Promise<StrategyDocsInput> {
+  const { rows } = await pool.query<{ kind: string; content: Record<string, unknown> }>(
+    `SELECT kind, content FROM social_strategy_documents
+       WHERE project_id = $1 AND status = 'generated'
+         AND kind IN ('strategy', 'audience', 'authority', 'pillars', 'monetization')`,
+    [projectId],
+  )
+  const out: StrategyDocsInput = {}
+  for (const r of rows) {
+    (out as Record<string, unknown>)[r.kind] = r.content
+  }
+  return out
+}
 
 async function userCanAccessProject(userId: string, role: string, projectId: string): Promise<boolean> {
   if (role === 'admin') return true
@@ -237,6 +256,10 @@ export async function triggerSocialPlanGeneration(args: {
       const examplePosts = Array.isArray(ctx.example_posts)
         ? ctx.example_posts.filter((e): e is string => typeof e === 'string')
         : []
+      // Pull the show's strategy docs so Claude aligns the plan with
+      // the actual brand positioning, pillars, and audience psychology
+      // instead of drifting into generic podcast promo territory.
+      const strategyDocs = await loadShowStrategyDocs(ctx.project_id)
       const result = await generateSocialPlan({
         showName: ctx.project_name,
         showSubtitle: ctx.project_subtitle,
@@ -244,6 +267,7 @@ export async function triggerSocialPlanGeneration(args: {
         examplePosts,
         vocabulary: ctx.vocabulary ?? '',
         brandAssets,
+        strategyDocs,
         episodeTitle: ctx.song_title,
         episodeSubtitle: ctx.song_subtitle,
         episodeTranscript: transcriptText,

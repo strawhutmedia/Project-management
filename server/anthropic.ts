@@ -33,6 +33,15 @@ const SYSTEM_PROMPT = `You are a senior social-media producer for podcasts.
 Given an episode transcript, you produce a single day's social content plan
 the team can act on immediately.
 
+If the user block includes a "=== SHOW STRATEGY ===" section, that is the
+authoritative brief for this show — every post you generate must serve one
+of the listed content pillars, land on the audience's actual desires or
+frustrations, and match the tone. When you can, tag which pillar each text
+post is executing (in-line, not as metadata). Prefer messaging angles that
+appear in the strategy over ones you invent. If the strategy names offers
+under monetization, the small handful of "buy"-goal posts should tee those
+up naturally, not sell hard.
+
 The plan has the following structure and counts:
 
   - 10 text_posts  : ready-to-publish Instagram captions. These are
@@ -204,11 +213,87 @@ export type RawSocialPlan = {
   photo_concepts: Array<{ image_direction: string; caption: string; vibe: string }>
 }
 
+// Compact prompt block summarizing the show's strategy documents so
+// downstream generators (daily plan, carousel, etc.) can align their
+// output with the strategy instead of just riffing off the transcript.
+// Each doc is condensed to the fields the generator actually needs —
+// full JSON blowout would blow past the cache-friendly prefix budget.
+export type StrategyDocsInput = Partial<Record<
+  'strategy' | 'audience' | 'authority' | 'pillars' | 'monetization',
+  Record<string, unknown> | null
+>>
+
+export function strategyDocsBlock(docs?: StrategyDocsInput): string {
+  if (!docs) return ''
+  const parts: string[] = []
+  const s = docs.strategy as Record<string, unknown> | undefined
+  if (s) {
+    const bp = (s.brand_positioning ?? {}) as Record<string, unknown>
+    const cd = (s.content_direction ?? {}) as Record<string, unknown>
+    parts.push('STRATEGY DOC:')
+    if (bp.one_sentence) parts.push(`  Brand position: ${String(bp.one_sentence)}`)
+    if (Array.isArray(bp.differentiators)) parts.push(`  Differentiators: ${bp.differentiators.join(' · ')}`)
+    if (cd.tone) parts.push(`  Tone: ${String(cd.tone)}`)
+    if (Array.isArray(cd.themes)) parts.push(`  Themes: ${cd.themes.join(' · ')}`)
+    if (s.growth_north_star) parts.push(`  North star: ${String(s.growth_north_star)}`)
+  }
+  const a = docs.audience as Record<string, unknown> | undefined
+  if (a) {
+    parts.push('AUDIENCE:')
+    if (a.persona_snapshot) parts.push(`  Persona: ${String(a.persona_snapshot)}`)
+    if (Array.isArray(a.frustrations)) parts.push(`  Frustrations: ${a.frustrations.slice(0, 4).join(' · ')}`)
+    if (Array.isArray(a.desires)) parts.push(`  Desires: ${a.desires.slice(0, 4).join(' · ')}`)
+    const angles = Array.isArray(a.messaging_angles) ? a.messaging_angles as Array<Record<string, unknown>> : []
+    if (angles.length > 0) {
+      parts.push('  Messaging angles:')
+      for (const ang of angles.slice(0, 6)) parts.push(`    · ${String(ang.angle)}`)
+    }
+  }
+  const au = docs.authority as Record<string, unknown> | undefined
+  if (au) {
+    parts.push('AUTHORITY POSITIONING:')
+    if (au.positioning_statement) parts.push(`  Positioning: ${String(au.positioning_statement)}`)
+    if (Array.isArray(au.signature_content_moves)) {
+      parts.push(`  Signature moves: ${au.signature_content_moves.slice(0, 4).join(' · ')}`)
+    }
+  }
+  const p = docs.pillars as Record<string, unknown> | undefined
+  if (p) {
+    const pillars = Array.isArray(p.pillars) ? p.pillars as Array<Record<string, unknown>> : []
+    if (pillars.length > 0) {
+      parts.push('CONTENT PILLARS (posts should map to one of these):')
+      for (const pl of pillars) {
+        parts.push(`  · ${String(pl.name)} — ${String(pl.purpose ?? '')}`)
+      }
+    }
+  }
+  const m = docs.monetization as Record<string, unknown> | undefined
+  if (m) {
+    const offers = Array.isArray(m.offer_ideas) ? m.offer_ideas as Array<Record<string, unknown>> : []
+    if (offers.length > 0) {
+      parts.push('MONETIZATION OFFERS (referenceable in "buy"-stage content):')
+      for (const o of offers.slice(0, 4)) parts.push(`  · ${String(o.name)}: ${String(o.description ?? '')}`)
+    }
+  }
+  if (parts.length === 0) return ''
+  return [
+    '',
+    '=== SHOW STRATEGY (align every choice below to this) ===',
+    ...parts,
+    '=== END STRATEGY ===',
+    '',
+  ].join('\n')
+}
+
 export type GenerateInput = {
   showName: string
   showSubtitle?: string | null
   brandVoice: string
   examplePosts: string[]
+  // Optional strategy docs — when present, the generator references the
+  // show's brand positioning, audience, pillars, and monetization plan
+  // so posts align with the strategy instead of drifting.
+  strategyDocs?: StrategyDocsInput
   // Per-show "must spell these correctly" list. Free-form text; the
   // team types one name/term per line (e.g. "Cheri Oteri" not "Sherri
   // O'Teri") so phonetic transcripts can't corrupt the spelling of
@@ -240,6 +325,8 @@ function showMetadataBlock(input: GenerateInput): string {
   const lines: string[] = []
   lines.push(`SHOW: ${input.showName}`)
   if (input.showSubtitle) lines.push(`SHOW DESCRIPTION: ${input.showSubtitle}`)
+  const strategy = strategyDocsBlock(input.strategyDocs)
+  if (strategy) lines.push(strategy)
   lines.push('')
   lines.push('BRAND VOICE:')
   lines.push(input.brandVoice.trim() || '(none specified — infer from show name and examples)')
@@ -958,6 +1045,10 @@ export type CarouselGenerateInput = {
   episodeTitle?: string | null
   episodeNumber?: number | null
   episodeTranscript: string
+  // Optional strategy docs — when present, the carousel headlines,
+  // accent words, and lesson wrap-up align with the show's brand
+  // positioning, pillars, and audience psychology.
+  strategyDocs?: StrategyDocsInput
 }
 
 export type RawDeckSlide = {
@@ -1191,6 +1282,14 @@ Tone:
   Science is one): confident, declarative, no jargon, no hedging.
   Big claims in clean type.
 
+Strategy alignment:
+  If a "=== SHOW STRATEGY ===" section is included in the show block,
+  it's the authoritative brief. Every slide's headline should serve
+  one of the listed content pillars, land on the audience's actual
+  desires or frustrations, and echo the tone. The finale's lesson +
+  tagline should slot into the show's growth north star. If the
+  strategy is missing, work from the transcript alone.
+
 Return EXACTLY this JSON shape — no commentary.`
 
 function carouselShowBlock(input: CarouselGenerateInput): string {
@@ -1198,6 +1297,7 @@ function carouselShowBlock(input: CarouselGenerateInput): string {
     `SHOW: ${input.showName}`,
     input.hostName ? `HOST: ${input.hostName}` : '',
     `PRESET: ${input.presetKey}`,
+    strategyDocsBlock(input.strategyDocs),
   ].filter(Boolean).join('\n')
 }
 
