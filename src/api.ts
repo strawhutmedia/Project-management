@@ -156,6 +156,18 @@ export type ApiAdminUser = {
   songs: Array<{ id: string; title: string; subtitle: string | null; projectId: string; projectName: string }>
 }
 
+export type ApiShowBrief = {
+  business_description?: string | null
+  niche?: string | null
+  target_audience?: string | null
+  competitors?: string | null
+  growth_goals?: string | null
+  current_metrics?: string | null
+  monetization_current?: string | null
+  constraints?: string | null
+  notes?: string | null
+}
+
 export type StrategyKind =
   | 'strategy' | 'audience' | 'authority' | 'pillars'
   | 'calendar' | 'post' | 'monetization'
@@ -1052,6 +1064,13 @@ export const api = {
     request<{ ok: true; item: ApiSocialItem }>(`/api/socials/${planId}/regenerate-stills`, {
       method: 'POST',
       body: JSON.stringify({ itemId, shiftSeconds }),
+    }),
+  showBrief: (projectId: string) =>
+    request<{ brief: ApiShowBrief | null }>(`/api/show-brief/projects/${projectId}`),
+  saveShowBrief: (projectId: string, brief: ApiShowBrief) =>
+    request<{ ok: true }>(`/api/show-brief/projects/${projectId}`, {
+      method: 'PUT',
+      body: JSON.stringify(brief),
     }),
   socialStrategyDocs: (projectId: string) =>
     request<{ documents: Record<string, ApiStrategyDocument | undefined> }>(

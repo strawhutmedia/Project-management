@@ -20,6 +20,7 @@ import {
   type StrategyKind,
   type StrategyProjectContext,
 } from '../anthropic'
+import { loadShowBrief } from './show_brief'
 import { logError } from '../diag'
 
 export const socialStrategyRouter = Router()
@@ -127,6 +128,10 @@ socialStrategyRouter.post('/projects/:projectId/:kind', async (req, res) => {
   const projectContext = await loadProjectContext(projectId)
   if (!projectContext) { res.status(404).json({ error: 'project_not_found' }); return }
   projectContext.siblingDocs = await loadSiblingDocs(projectId, kind)
+  // Load the Show Brief so every strategy tool starts from the same
+  // structured facts the operator filled in once.
+  const brief = await loadShowBrief(projectId)
+  if (brief) projectContext.brief = brief
 
   try {
     const result = await generateSocialStrategyDocument({ kind, projectContext, inputContext })

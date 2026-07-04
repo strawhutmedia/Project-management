@@ -1408,6 +1408,21 @@ export type StrategyProjectContext = {
   // Recent episode titles + one-line summaries — gives Claude
   // grounding on what the show actually talks about.
   recentEpisodes?: Array<{ title: string; subtitle?: string | null; summary?: string | null }>
+  // Structured brief the operator filled out for the show — business
+  // description, niche, target audience, competitors, growth goals,
+  // current metrics, monetization model, constraints, notes. Read by
+  // every strategy tool as the authoritative starting point.
+  brief?: {
+    business_description?: string
+    niche?: string
+    target_audience?: string
+    competitors?: string
+    growth_goals?: string
+    current_metrics?: string
+    monetization_current?: string
+    constraints?: string
+    notes?: string
+  }
   // Existing sibling docs Claude can reference when generating a new
   // one (e.g. the pillars generator should read the strategy doc so
   // pillars align with the brand positioning).
@@ -1665,6 +1680,28 @@ function strategyProjectBlock(ctx: StrategyProjectContext): string {
   if (ctx.showSubtitle) parts.push(`SUBTITLE: ${ctx.showSubtitle}`)
   if (ctx.brandVoice) parts.push(`BRAND VOICE:\n${ctx.brandVoice}`)
   if (ctx.vocabulary) parts.push(`VOCABULARY:\n${ctx.vocabulary}`)
+  // The Show Brief is the authoritative starting point when present —
+  // the operator answered a structured questionnaire once, and every
+  // strategy tool reads it here. Only emit fields that were answered.
+  if (ctx.brief) {
+    const briefLines: string[] = ['SHOW BRIEF (authoritative — start here):']
+    const labels: Array<[keyof NonNullable<StrategyProjectContext['brief']>, string]> = [
+      ['business_description', 'What the show does + business model'],
+      ['niche', 'Specific niche'],
+      ['target_audience', 'Target audience'],
+      ['competitors', 'Named competitors'],
+      ['growth_goals', 'Growth goals (next 12 months)'],
+      ['current_metrics', 'Current metrics / state'],
+      ['monetization_current', 'Current monetization'],
+      ['constraints', 'Constraints (team, legal, brand, cadence)'],
+      ['notes', 'Additional notes'],
+    ]
+    for (const [key, label] of labels) {
+      const v = ctx.brief[key]
+      if (v) briefLines.push(`  ${label}:\n    ${v.replace(/\n/g, '\n    ')}`)
+    }
+    if (briefLines.length > 1) parts.push(briefLines.join('\n'))
+  }
   if (ctx.recentEpisodes && ctx.recentEpisodes.length > 0) {
     parts.push(
       'RECENT EPISODES:\n' +
