@@ -487,30 +487,47 @@ export async function applyBackInYourArmsSchedule(projectId: string): Promise<{ 
   const dayByNumber = new Map<number, string>()
   for (const d of days.rows) dayByNumber.set(d.number, d.id)
 
-  const scenes = await pool.query<{ id: string; number: string }>(
-    `SELECT id, number FROM scenes WHERE project_id = $1`,
+  // Include shoot_day_id in the SELECT so we can SKIP scenes that are
+  // already on the correct day. Previously the seed would re-write
+  // day_position for EVERY scene in BIYA_SCHEDULE on every boot,
+  // appending them to the day's tail in dictionary-iteration order —
+  // silently randomizing whatever manual ordering the producer had
+  // set. Now we only touch scenes whose current shoot_day_id doesn't
+  // match the target.
+  const scenes = await pool.query<{ id: string; number: string; shoot_day_id: string | null }>(
+    `SELECT id, number, shoot_day_id FROM scenes WHERE project_id = $1`,
     [projectId],
   )
-  const sceneByNumber = new Map<string, string>()
-  for (const s of scenes.rows) sceneByNumber.set(s.number, s.id)
+  const sceneRowByNumber = new Map<string, { id: string; shootDayId: string | null }>()
+  for (const s of scenes.rows) {
+    sceneRowByNumber.set(s.number, { id: s.id, shootDayId: s.shoot_day_id })
+  }
 
   let assigned = 0
+  let skipped = 0
   const missing: string[] = []
   for (const [sceneNum, dayNum] of Object.entries(BIYA_SCHEDULE)) {
-    const sceneId = sceneByNumber.get(sceneNum)
+    const scene = sceneRowByNumber.get(sceneNum)
     const dayId = dayByNumber.get(dayNum)
-    if (!sceneId) {
+    if (!scene) {
       missing.push(sceneNum)
       continue
     }
     if (!dayId) continue
+    if (scene.shootDayId === dayId) {
+      // Already on the right day — leave day_position alone so we don't
+      // clobber the producer's manual ordering.
+      skipped += 1
+      continue
+    }
     await pool.query(
       `UPDATE scenes SET shoot_day_id = $1, day_position = (
          SELECT COALESCE(MAX(day_position), 0) + 1 FROM scenes WHERE shoot_day_id = $1
        ) WHERE id = $2`,
-      [dayId, sceneId],
+      [dayId, scene.id],
     )
     assigned += 1
   }
+  logInfo('BIYA schedule apply', { assigned, skipped, missing: missing.length })
   return { assigned, missing }
 }

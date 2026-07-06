@@ -3,6 +3,18 @@ import { api, type ApiScene, type ApiShootDay, type ApiStripboard } from '../api
 import SceneDetailModal from './SceneDetailModal'
 import ScriptChangelogCard from './ScriptChangelogCard'
 import AutoScheduleModal from './AutoScheduleModal'
+import SceneMoveConfirm, { type SceneMoveContext } from './SceneMoveConfirm'
+
+// When a scene gets dragged to a different day, we surface a
+// SceneMoveConfirm modal listing the cost implications before the
+// server-side move applies. Intra-day reorders bypass the modal.
+type PendingMove = {
+  ctx: SceneMoveContext
+  applyToDayId: string | null
+  applyToPosition: number | null // null → route through reorderScene
+  reorderTargetSceneId: string | null
+  reorderInsertion: 'before' | 'after' | null
+}
 
 type ScriptArchive = {
   id: string
@@ -86,7 +98,11 @@ function fmtEighths(eighths: number): string {
   return `${whole} ${frac}/8`
 }
 
-type UndoEntry = { sceneId: string; shootDayId: string | null; dayPosition: number; sceneNumber: string }
+// A single scene's prior position. A reorder can renumber several scenes
+// at once, so an UndoEntry is a *batch* of these — one ⌘Z restores every
+// scene the reorder touched, not just the dragged card.
+type SceneSnapshot = { sceneId: string; shootDayId: string | null; dayPosition: number; sceneNumber: string }
+type UndoEntry = { snapshots: SceneSnapshot[] }
 
 export default function Stripboard({ projectId, isAdmin, projectName }: { projectId: string; isAdmin: boolean; projectName?: string }) {
   const [board, setBoard] = useState<ApiStripboard | null>(null)
@@ -94,6 +110,7 @@ export default function Stripboard({ projectId, isAdmin, projectName }: { projec
   const [importing, setImporting] = useState(false)
   const [busy, setBusy] = useState(false)
   const [undoStack, setUndoStack] = useState<UndoEntry[]>([])
+  const [pendingMove, setPendingMove] = useState<PendingMove | null>(null)
   const [openSceneId, setOpenSceneId] = useState<string | null>(null)
   const [autoScheduleOpen, setAutoScheduleOpen] = useState(false)
   const [archive, setArchive] = useState<ScriptArchive | null>(null)
@@ -202,23 +219,50 @@ export default function Stripboard({ projectId, isAdmin, projectName }: { projec
 
   // Capture-and-apply scene move. Records the prior position to the undo
   // stack BEFORE applying so an undo can restore it. Cap at 50 entries.
+  //
+  // Cross-day moves route through the SceneMoveConfirm modal so the
+  // producer sees the cost implications (call-day delta for cast, new
+  // location on the destination day, page count, etc.) before the move
+  // commits. Intra-day moves and moves to Unscheduled apply directly.
   async function moveScene(sceneId: string, toDayId: string | null, toPosition: number) {
+    const cur = boardRef.current?.scenes.find((s) => s.id === sceneId)
+    const board = boardRef.current
+    if (!cur || !board) return
+    const isCrossDay = cur.shootDayId !== toDayId
+    // Route cross-day moves TO a specific shoot day through the modal.
+    // (Moves to Unscheduled don't need cost implications — the scene is
+    // just leaving the schedule, no new day is being loaded up.)
+    if (isCrossDay && toDayId !== null) {
+      const fromDay = board.days.find((d) => d.id === cur.shootDayId) ?? null
+      const toDay = board.days.find((d) => d.id === toDayId) ?? null
+      setPendingMove({
+        ctx: { scene: cur, fromDay, toDay, allScenes: board.scenes },
+        applyToDayId: toDayId,
+        applyToPosition: toPosition,
+        reorderTargetSceneId: null,
+        reorderInsertion: null,
+      })
+      return
+    }
+    await applyMoveDirect(sceneId, toDayId, toPosition)
+  }
+
+  async function applyMoveDirect(sceneId: string, toDayId: string | null, toPosition: number) {
     const cur = boardRef.current?.scenes.find((s) => s.id === sceneId)
     if (!cur) return
     const entry: UndoEntry = {
-      sceneId,
-      shootDayId: cur.shootDayId,
-      dayPosition: cur.dayPosition,
-      sceneNumber: cur.number,
+      snapshots: [{
+        sceneId,
+        shootDayId: cur.shootDayId,
+        dayPosition: cur.dayPosition,
+        sceneNumber: cur.number,
+      }],
     }
     try {
       await api.updateScene(sceneId, { shootDayId: toDayId, dayPosition: toPosition })
       setUndoStack((stack) => [...stack.slice(-49), entry])
       await load()
     } catch (err) {
-      // Surface the failure — silently console.error'ing left the user
-      // staring at a scene that appears to have moved (optimistic UI)
-      // but is actually still in its old position server-side.
       console.error('move failed', err)
       setError(`Move failed: ${err instanceof Error ? err.message : 'unknown error'}. Refresh to see the current state.`)
       await load()
@@ -247,18 +291,34 @@ export default function Stripboard({ projectId, isAdmin, projectName }: { projec
     const target = board.scenes.find((s) => s.id === targetSceneId)
     if (!dragged || !target) return
     const targetDayId = target.shootDayId
+    // Cross-day drops go through the SceneMoveConfirm modal so the
+    // producer sees the cost implications before the reorder applies.
+    if (dragged.shootDayId !== targetDayId && targetDayId !== null) {
+      const fromDay = board.days.find((d) => d.id === dragged.shootDayId) ?? null
+      const toDay = board.days.find((d) => d.id === targetDayId) ?? null
+      setPendingMove({
+        ctx: { scene: dragged, fromDay, toDay, allScenes: board.scenes },
+        applyToDayId: null,
+        applyToPosition: null,
+        reorderTargetSceneId: targetSceneId,
+        reorderInsertion: insertion,
+      })
+      return
+    }
+    await applyReorderDirect(draggedSceneId, targetSceneId, insertion)
+  }
 
-    // Record undo BEFORE the renumber so a single ⌘Z restores the
-    // dragged scene's previous position.
-    setUndoStack((stack) => [
-      ...stack.slice(-49),
-      {
-        sceneId: draggedSceneId,
-        shootDayId: dragged.shootDayId,
-        dayPosition: dragged.dayPosition,
-        sceneNumber: dragged.number,
-      },
-    ])
+  async function applyReorderDirect(
+    draggedSceneId: string,
+    targetSceneId: string,
+    insertion: 'before' | 'after',
+  ) {
+    const board = boardRef.current
+    if (!board) return
+    const dragged = board.scenes.find((s) => s.id === draggedSceneId)
+    const target = board.scenes.find((s) => s.id === targetSceneId)
+    if (!dragged || !target) return
+    const targetDayId = target.shootDayId
 
     // Build the target day's ordered list (excluding the dragged scene),
     // then insert dragged at target's index ± 1.
@@ -279,12 +339,24 @@ export default function Stripboard({ projectId, isAdmin, projectName }: { projec
     // leaving the day half-migrated (some scenes at new positions,
     // others at old) with no user-visible signal. Now we tally failures
     // and surface a clear error so the user knows to reload.
+    //
+    // Snapshot every scene whose position we're about to change so a
+    // single ⌘Z restores ALL of them. Previously we only snapshotted the
+    // dragged scene, leaving the other renumbered scenes stranded at
+    // their new positions after undo.
+    const snapshots: SceneSnapshot[] = []
     const patches: Array<Promise<{ ok: boolean; err?: unknown }>> = []
     for (let i = 0; i < newOrder.length; i++) {
       const s = newOrder[i]
       const newPos = (i + 1) * 10
       const dayChanged = s.id === draggedSceneId && s.shootDayId !== targetDayId
       if (s.dayPosition === newPos && !dayChanged) continue
+      snapshots.push({
+        sceneId: s.id,
+        shootDayId: s.shootDayId,
+        dayPosition: s.dayPosition,
+        sceneNumber: s.number,
+      })
       const patch: { shootDayId?: string | null; dayPosition: number } = { dayPosition: newPos }
       if (dayChanged) patch.shootDayId = targetDayId
       patches.push(
@@ -292,6 +364,9 @@ export default function Stripboard({ projectId, isAdmin, projectName }: { projec
           .then(() => ({ ok: true }))
           .catch((err) => ({ ok: false, err })),
       )
+    }
+    if (snapshots.length > 0) {
+      setUndoStack((stack) => [...stack.slice(-49), { snapshots }])
     }
     const results = await Promise.all(patches)
     const failed = results.filter((r) => !r.ok)
@@ -309,17 +384,29 @@ export default function Stripboard({ projectId, isAdmin, projectName }: { projec
     setUndoStack((stack) => {
       const last = stack[stack.length - 1]
       if (!last) return stack
-      // Apply async without awaiting inside the setter
+      // Apply async without awaiting inside the setter. Restore every
+      // scene in the batch — a reorder can renumber many scenes at once
+      // and undo needs to walk them all back.
       void (async () => {
-        try {
-          await api.updateScene(last.sceneId, {
-            shootDayId: last.shootDayId,
-            dayPosition: last.dayPosition,
-          })
-          await load()
-        } catch (err) {
-          console.error('undo failed', err)
+        const results = await Promise.all(
+          last.snapshots.map((snap) =>
+            api.updateScene(snap.sceneId, {
+              shootDayId: snap.shootDayId,
+              dayPosition: snap.dayPosition,
+            })
+              .then(() => ({ ok: true as const }))
+              .catch((err: unknown) => ({ ok: false as const, err })),
+          ),
+        )
+        const failed = results.filter((r) => !r.ok)
+        if (failed.length > 0) {
+          console.error('undo failed', failed)
+          setError(
+            `Undo couldn't restore ${failed.length} of ${results.length} scene positions. ` +
+            `Refresh to see the current state.`,
+          )
         }
+        await load()
       })()
       return stack.slice(0, -1)
     })
@@ -756,6 +843,22 @@ export default function Stripboard({ projectId, isAdmin, projectName }: { projec
           onApplied={() => {
             void load()
             void loadSnapshots()
+          }}
+        />
+      )}
+
+      {pendingMove && (
+        <SceneMoveConfirm
+          ctx={pendingMove.ctx}
+          onCancel={() => setPendingMove(null)}
+          onConfirm={() => {
+            const p = pendingMove
+            setPendingMove(null)
+            if (p.reorderTargetSceneId && p.reorderInsertion) {
+              void applyReorderDirect(p.ctx.scene.id, p.reorderTargetSceneId, p.reorderInsertion)
+            } else if (p.applyToPosition != null) {
+              void applyMoveDirect(p.ctx.scene.id, p.applyToDayId, p.applyToPosition)
+            }
           }}
         />
       )}

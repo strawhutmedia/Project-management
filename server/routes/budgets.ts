@@ -254,6 +254,24 @@ budgetsRouter.post('/accounts/:accountId/items', async (req, res) => {
   if (typeof description !== 'string' || description.trim().length === 0) {
     res.status(400).json({ error: 'description_required' }); return
   }
+  // Verify sceneId + shootDayId (if provided) belong to the same
+  // project as the account. Without this, a writer on Project A could
+  // attach a line item to a scene in Project B — accidentally OR
+  // maliciously — silently corrupting the other project's cost view.
+  if (typeof sceneId === 'string' && sceneId) {
+    const check = await pool.query(
+      `SELECT 1 FROM scenes WHERE id = $1 AND project_id = $2 LIMIT 1`,
+      [sceneId, lookup.rows[0].project_id],
+    )
+    if (check.rows.length === 0) { res.status(400).json({ error: 'scene_not_in_project' }); return }
+  }
+  if (typeof shootDayId === 'string' && shootDayId) {
+    const check = await pool.query(
+      `SELECT 1 FROM shoot_days WHERE id = $1 AND project_id = $2 LIMIT 1`,
+      [shootDayId, lookup.rows[0].project_id],
+    )
+    if (check.rows.length === 0) { res.status(400).json({ error: 'shoot_day_not_in_project' }); return }
+  }
   const posRes = await pool.query(
     `SELECT COALESCE(MAX(position), 0) + 10 AS next FROM budget_line_items WHERE account_id = $1`,
     [accountId],
