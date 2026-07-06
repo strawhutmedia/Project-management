@@ -216,7 +216,12 @@ export default function Stripboard({ projectId, isAdmin, projectName }: { projec
       setUndoStack((stack) => [...stack.slice(-49), entry])
       await load()
     } catch (err) {
+      // Surface the failure — silently console.error'ing left the user
+      // staring at a scene that appears to have moved (optimistic UI)
+      // but is actually still in its old position server-side.
       console.error('move failed', err)
+      setError(`Move failed: ${err instanceof Error ? err.message : 'unknown error'}. Refresh to see the current state.`)
+      await load()
     }
   }
 
@@ -269,7 +274,12 @@ export default function Stripboard({ projectId, isAdmin, projectName }: { projec
     // Renumber to clean multiples of 10 and PATCH only the scenes whose
     // (shootDayId, dayPosition) actually changed. The dragged scene may
     // also be changing shootDayId if this was a cross-day drop.
-    const patches: Array<Promise<unknown>> = []
+    //
+    // Per-patch failures used to be swallowed with a console.error,
+    // leaving the day half-migrated (some scenes at new positions,
+    // others at old) with no user-visible signal. Now we tally failures
+    // and surface a clear error so the user knows to reload.
+    const patches: Array<Promise<{ ok: boolean; err?: unknown }>> = []
     for (let i = 0; i < newOrder.length; i++) {
       const s = newOrder[i]
       const newPos = (i + 1) * 10
@@ -277,9 +287,21 @@ export default function Stripboard({ projectId, isAdmin, projectName }: { projec
       if (s.dayPosition === newPos && !dayChanged) continue
       const patch: { shootDayId?: string | null; dayPosition: number } = { dayPosition: newPos }
       if (dayChanged) patch.shootDayId = targetDayId
-      patches.push(api.updateScene(s.id, patch).catch((e) => console.error('reorder patch failed', e)))
+      patches.push(
+        api.updateScene(s.id, patch)
+          .then(() => ({ ok: true }))
+          .catch((err) => ({ ok: false, err })),
+      )
     }
-    await Promise.all(patches)
+    const results = await Promise.all(patches)
+    const failed = results.filter((r) => !r.ok)
+    if (failed.length > 0) {
+      console.error('reorder patches failed', failed)
+      setError(
+        `${failed.length} of ${results.length} scene positions couldn't be saved. ` +
+        `Some scenes may be in wrong slots — refresh to see the current state.`,
+      )
+    }
     await load()
   }
 
