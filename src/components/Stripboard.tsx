@@ -110,7 +110,13 @@ export default function Stripboard({ projectId, isAdmin, projectName }: { projec
   const [importing, setImporting] = useState(false)
   const [busy, setBusy] = useState(false)
   const [undoStack, setUndoStack] = useState<UndoEntry[]>([])
+  // Redo stack captures the state we undid FROM so ⌘Shift+Z re-applies
+  // it. Any fresh move (drag, drop, reorder) clears redo — otherwise you
+  // could redo sideways into a branch that no longer makes sense.
+  const [redoStack, setRedoStack] = useState<UndoEntry[]>([])
   const [pendingMove, setPendingMove] = useState<PendingMove | null>(null)
+  const [jumpQuery, setJumpQuery] = useState('')
+  const jumpInputRef = useRef<HTMLInputElement | null>(null)
   const [openSceneId, setOpenSceneId] = useState<string | null>(null)
   const [autoScheduleOpen, setAutoScheduleOpen] = useState(false)
   const [archive, setArchive] = useState<ScriptArchive | null>(null)
@@ -261,6 +267,7 @@ export default function Stripboard({ projectId, isAdmin, projectName }: { projec
     try {
       await api.updateScene(sceneId, { shootDayId: toDayId, dayPosition: toPosition })
       setUndoStack((stack) => [...stack.slice(-49), entry])
+      setRedoStack([])
       await load()
     } catch (err) {
       console.error('move failed', err)
@@ -367,6 +374,7 @@ export default function Stripboard({ projectId, isAdmin, projectName }: { projec
     }
     if (snapshots.length > 0) {
       setUndoStack((stack) => [...stack.slice(-49), { snapshots }])
+      setRedoStack([])
     }
     const results = await Promise.all(patches)
     const failed = results.filter((r) => !r.ok)
@@ -380,52 +388,142 @@ export default function Stripboard({ projectId, isAdmin, projectName }: { projec
     await load()
   }
 
-  async function undo() {
-    setUndoStack((stack) => {
-      const last = stack[stack.length - 1]
-      if (!last) return stack
-      // Apply async without awaiting inside the setter. Restore every
-      // scene in the batch — a reorder can renumber many scenes at once
-      // and undo needs to walk them all back.
-      void (async () => {
-        const results = await Promise.all(
-          last.snapshots.map((snap) =>
-            api.updateScene(snap.sceneId, {
-              shootDayId: snap.shootDayId,
-              dayPosition: snap.dayPosition,
-            })
-              .then(() => ({ ok: true as const }))
-              .catch((err: unknown) => ({ ok: false as const, err })),
-          ),
-        )
-        const failed = results.filter((r) => !r.ok)
-        if (failed.length > 0) {
-          console.error('undo failed', failed)
-          setError(
-            `Undo couldn't restore ${failed.length} of ${results.length} scene positions. ` +
-            `Refresh to see the current state.`,
-          )
-        }
-        await load()
-      })()
-      return stack.slice(0, -1)
+  // Capture the CURRENT position of each scene in a snapshot list so we
+  // can build the "opposite" entry: undo saves this as its redo counterpart,
+  // redo saves this as its undo counterpart. If a scene is somehow gone
+  // from the board (e.g., deleted between the move and the undo), we
+  // fall back to the snapshot itself — nothing to redo to, but nothing
+  // crashes either.
+  function captureCurrent(snapshots: SceneSnapshot[]): SceneSnapshot[] {
+    const cur = boardRef.current
+    return snapshots.map((snap) => {
+      const s = cur?.scenes.find((x) => x.id === snap.sceneId)
+      return {
+        sceneId: snap.sceneId,
+        shootDayId: s?.shootDayId ?? snap.shootDayId,
+        dayPosition: s?.dayPosition ?? snap.dayPosition,
+        sceneNumber: s?.number ?? snap.sceneNumber,
+      }
     })
   }
 
-  // Cmd/Ctrl-Z keyboard shortcut for desktop.
+  async function applySnapshots(snapshots: SceneSnapshot[], label: 'undo' | 'redo') {
+    const results = await Promise.all(
+      snapshots.map((snap) =>
+        api.updateScene(snap.sceneId, {
+          shootDayId: snap.shootDayId,
+          dayPosition: snap.dayPosition,
+        })
+          .then(() => ({ ok: true as const }))
+          .catch((err: unknown) => ({ ok: false as const, err })),
+      ),
+    )
+    const failed = results.filter((r) => !r.ok)
+    if (failed.length > 0) {
+      console.error(`${label} failed`, failed)
+      setError(
+        `${label === 'undo' ? 'Undo' : 'Redo'} couldn't restore ${failed.length} of ${results.length} scene positions. ` +
+        `Refresh to see the current state.`,
+      )
+    }
+    await load()
+  }
+
+  async function undo() {
+    const last = undoStack[undoStack.length - 1]
+    if (!last) return
+    const redoEntry: UndoEntry = { snapshots: captureCurrent(last.snapshots) }
+    setUndoStack((s) => s.slice(0, -1))
+    setRedoStack((s) => [...s.slice(-49), redoEntry])
+    await applySnapshots(last.snapshots, 'undo')
+  }
+
+  async function redo() {
+    const last = redoStack[redoStack.length - 1]
+    if (!last) return
+    const undoEntry: UndoEntry = { snapshots: captureCurrent(last.snapshots) }
+    setRedoStack((s) => s.slice(0, -1))
+    setUndoStack((s) => [...s.slice(-49), undoEntry])
+    await applySnapshots(last.snapshots, 'redo')
+  }
+
+  // Jump-to-scene handler — the `/` shortcut focuses the input; typing a
+  // number + Enter opens that scene's detail modal.
+  function jumpToScene(query: string) {
+    const q = query.trim().toUpperCase()
+    if (!q) return
+    const board = boardRef.current
+    if (!board) return
+    // Exact match first, then prefix match. Scene numbers are strings
+    // like "12", "12A", "PROLOGUE" — user just types what they see.
+    const exact = board.scenes.find((s) => s.number.toUpperCase() === q)
+    const match = exact ?? board.scenes.find((s) => s.number.toUpperCase().startsWith(q))
+    if (match) {
+      setOpenSceneId(match.id)
+      setJumpQuery('')
+      jumpInputRef.current?.blur()
+    } else {
+      setError(`No scene matches "${query}".`)
+    }
+  }
+
+  // Keyboard shortcuts. See ShortcutKey at the bottom of the section
+  // for the on-screen legend.
   useEffect(() => {
-    if (!isAdmin) return
     function onKey(e: KeyboardEvent) {
-      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'z' && !e.shiftKey) {
-        const target = e.target as HTMLElement | null
-        if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable)) return
+      const target = e.target as HTMLElement | null
+      const inField = !!target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable)
+
+      // Esc always works — closes open scene modal or cancels a pending
+      // move confirm. Doesn't need admin rights or an unfocused field.
+      if (e.key === 'Escape') {
+        if (openSceneId) { e.preventDefault(); setOpenSceneId(null); return }
+        if (pendingMove) { e.preventDefault(); setPendingMove(null); return }
+        if (autoScheduleOpen) { e.preventDefault(); setAutoScheduleOpen(false); return }
+        if (document.activeElement === jumpInputRef.current) {
+          e.preventDefault()
+          setJumpQuery('')
+          jumpInputRef.current?.blur()
+          return
+        }
+      }
+
+      // Modifier-based shortcuts stay active in inputs (⌘Z inside a
+      // text field means "undo my typing," which the browser handles —
+      // we only intercept when the focus is NOT in a field).
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'z') {
+        if (inField) return
+        if (!isAdmin) return
         e.preventDefault()
-        void undo()
+        if (e.shiftKey) void redo()
+        else void undo()
+        return
+      }
+
+      // Single-letter shortcuts must not fire while the user is typing.
+      if (inField) return
+
+      if (e.key === '/') {
+        e.preventDefault()
+        jumpInputRef.current?.focus()
+        jumpInputRef.current?.select()
+        return
+      }
+      if (!isAdmin) return
+      if (e.key === 'n' || e.key === 'N') {
+        e.preventDefault()
+        void addDay(false)
+        return
+      }
+      if (e.key === 'b' || e.key === 'B') {
+        e.preventDefault()
+        void addDay(true)
+        return
       }
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [isAdmin])
+  }, [isAdmin, openSceneId, pendingMove, autoScheduleOpen, undoStack, redoStack])
 
   async function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
@@ -772,6 +870,7 @@ export default function Stripboard({ projectId, isAdmin, projectName }: { projec
               onClick={() => void addDay(false)}
               disabled={busy}
               className="text-[10px] uppercase tracking-wider text-stage-mastering border border-stage-mastering/40 rounded-full px-3 py-1.5 hover:bg-stage-mastering/10 disabled:opacity-50"
+              title="Add a shoot day (N)"
             >
               + Day
             </button>
@@ -779,11 +878,26 @@ export default function Stripboard({ projectId, isAdmin, projectName }: { projec
               onClick={() => void addDay(true)}
               disabled={busy}
               className="text-[10px] uppercase tracking-wider text-muted border border-line rounded-full px-3 py-1.5 hover:bg-ink/40 disabled:opacity-50"
+              title="Add a break day (B)"
             >
               + Break
             </button>
           </div>
         )}
+        <div className="flex items-center gap-1.5 shrink-0">
+          <span className="text-[10px] uppercase tracking-wider text-muted">Jump to scene:</span>
+          <input
+            ref={jumpInputRef}
+            value={jumpQuery}
+            onChange={(e) => setJumpQuery(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') { e.preventDefault(); jumpToScene(jumpQuery) }
+            }}
+            placeholder="/  #"
+            className="w-24 bg-ink/40 border border-line rounded-full px-3 py-1 text-[11px] font-mono focus:outline-none focus:border-stage-mastering placeholder:text-muted/50"
+            title="Press / anywhere to focus. Enter to open the scene."
+          />
+        </div>
       </div>
 
       {error && <p className="text-urgent text-sm">{error}</p>}
@@ -880,12 +994,17 @@ function ShortcutKey({ isAdmin }: { isAdmin: boolean }) {
   }, [])
   type Shortcut = { keys: string; label: string; adminOnly?: boolean }
   const shortcuts: Shortcut[] = [
+    { keys: '/', label: 'Jump to scene #' },
+    { keys: 'Click scene', label: 'Open details' },
+    { keys: 'Esc', label: 'Close modal / cancel drag confirm' },
     { keys: `${mod}+Z`, label: 'Undo last move', adminOnly: true },
+    { keys: `${mod}+Shift+Z`, label: 'Redo', adminOnly: true },
+    { keys: 'N', label: 'Add shoot day', adminOnly: true },
+    { keys: 'B', label: 'Add break day', adminOnly: true },
     { keys: 'Drag scene', label: 'Move between days (cross-day shows cost preview)', adminOnly: true },
     { keys: 'Drop L half', label: 'Insert before target scene', adminOnly: true },
     { keys: 'Drop R half', label: 'Insert after target scene', adminOnly: true },
     { keys: 'Drop on day header', label: 'Append to end of that day', adminOnly: true },
-    { keys: 'Click scene', label: 'Open details' },
   ]
   const visible = shortcuts.filter((s) => !s.adminOnly || isAdmin)
   return (
