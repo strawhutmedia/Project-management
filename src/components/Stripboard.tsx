@@ -862,7 +862,58 @@ export default function Stripboard({ projectId, isAdmin, projectName }: { projec
           }}
         />
       )}
+      <ShortcutKey isAdmin={isAdmin} />
     </section>
+  )
+}
+
+// Docked bar at the bottom of the viewport that lists every Stripboard
+// keyboard shortcut and drag-gesture. Always visible while the
+// Stripboard is on screen so anyone using it — Ryan, the team, a new
+// hire — can see what's available without asking. Collapsible if it's
+// in the way.
+function ShortcutKey({ isAdmin }: { isAdmin: boolean }) {
+  const [collapsed, setCollapsed] = useState(false)
+  const mod = useMemo(() => {
+    if (typeof navigator === 'undefined') return 'Ctrl'
+    return /Mac|iPhone|iPad|iPod/.test(navigator.platform) ? '⌘' : 'Ctrl'
+  }, [])
+  type Shortcut = { keys: string; label: string; adminOnly?: boolean }
+  const shortcuts: Shortcut[] = [
+    { keys: `${mod}+Z`, label: 'Undo last move', adminOnly: true },
+    { keys: 'Drag scene', label: 'Move between days (cross-day shows cost preview)', adminOnly: true },
+    { keys: 'Drop L half', label: 'Insert before target scene', adminOnly: true },
+    { keys: 'Drop R half', label: 'Insert after target scene', adminOnly: true },
+    { keys: 'Drop on day header', label: 'Append to end of that day', adminOnly: true },
+    { keys: 'Click scene', label: 'Open details' },
+  ]
+  const visible = shortcuts.filter((s) => !s.adminOnly || isAdmin)
+  return (
+    <div className="sticky bottom-2 left-0 right-0 z-30 mt-4 -mx-2 sm:mx-0">
+      <div className="rounded-xl border border-line bg-panel/95 backdrop-blur-sm shadow-lg px-3 py-2">
+        <div className="flex items-center gap-3 flex-wrap">
+          <button
+            onClick={() => setCollapsed((v) => !v)}
+            className="text-[10px] uppercase tracking-[0.2em] text-muted font-bold hover:text-text shrink-0"
+            title={collapsed ? 'Show keyboard shortcuts' : 'Hide keyboard shortcuts'}
+          >
+            ⌨ Shortcuts {collapsed ? '▸' : '▾'}
+          </button>
+          {!collapsed && (
+            <div className="flex items-center gap-x-4 gap-y-1 flex-wrap text-[11px] min-w-0">
+              {visible.map((s) => (
+                <span key={s.keys} className="flex items-center gap-1.5 shrink-0">
+                  <kbd className="font-mono text-[10px] px-1.5 py-0.5 rounded bg-ink/60 border border-line/60 text-text">
+                    {s.keys}
+                  </kbd>
+                  <span className="text-muted">{s.label}</span>
+                </span>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
   )
 }
 
