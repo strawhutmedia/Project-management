@@ -1,0 +1,48 @@
+{
+  "project": {
+    "id": "c3227529-8bc9-43d9-995f-5d65a7bdbf9c",
+    "name": "Private Talk",
+    "subtitle": "'Private Talk With Alexis Texas' is an alternative lifestyle interview talk show and podcast series hosted by the infamous former Adult movie star, Alexis Texas. \nThis podcast is covering topics ranging from life, health, career - to relationships, money and of course sex. It is considered the “safest place to be yourself”. Guests include international celebrities, athletes, media personalities, entertainers and influencers from diverse industries, and their intimate conversations will  stream to her audience of over 13 million fans.\n\nEvery Wednesday 7PM PST",
+    "kind": "podcast",
+    "filmPhase": "pre",
+    "dropboxFolder": "/Straw Hut Team Folder/1_PODCASTS/Private Talk with Alexis Texas",
+    "channelsSubfolder": "episodes",
+    "coverArtUrl": "https://megaphone.imgix.net/podcasts/3f77d190-30b4-11f1-9870-3bb0f3631011/image/c99b5f4fe7325a1880e907e16451190b.jpg?ixlib=rails-4.3.1&amp;max-w=3000&amp;max-h=3000&amp;fit=crop&amp;auto=format,compress",
+    "brandAssetsFolder": "/Straw Hut Team Folder/1_PODCASTS/Private Talk with Alexis Texas/Branding",
+    "socialsBrandVoice": null,
+    "socialsVocabulary": null,
+    "rssFeedUrl": "https://feeds.megaphone.fm/SHML1364632298",
+    "createdAt": "2026-07-07T22:55:37.143Z"
+  },
+  "publishedAt": "2026-07-07T22:56:44.749Z",
+  "counts": {
+    "scenes": 0,
+    "lineItems": 0,
+    "sceneLevelItems": 0,
+    "projectLevelItems": 0,
+    "shootDays": 0,
+    "songs": 0,
+    "tasks": 0,
+    "comments": 0,
+    "links": 0,
+    "cuts": 0,
+    "cutNotes": 0,
+    "snapshots": 0,
+    "showChatMessages": 0
+  },
+  "members": [
+    {
+      "userId": "e0afa8af-ef91-41b5-ad28-afc3189712f6",
+      "displayName": "Ryan",
+      "email": "ryan@strawhutmedia.com",
+      "role": "admin",
+      "projectRole": "admin"
+    }
+  ],
+  "shootDays": [],
+  "scenes": [],
+  "projectLevelItems": [],
+  "songs": [],
+  "scheduleSnapshots": [],
+  "showChatRecent": []
+}
