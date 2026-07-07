@@ -22,6 +22,7 @@ import { schedulerRouter as socialSchedulerRouter } from './routes/scheduler'
 import { showChatRouter } from './routes/show_chat'
 import { episodeCutsRouter } from './routes/episode_cuts'
 import { exportsRouter } from './routes/exports'
+import { showPageRouter } from './routes/show_page'
 import { seedBackInYourArms } from './seeds/back_in_your_arms'
 import { ensureRyanIsPodcastEp } from './routes/projects'
 import { startScheduler } from './scheduler'
@@ -86,6 +87,11 @@ app.use('/api/scheduler', socialSchedulerRouter)
 app.use('/api', showChatRouter)
 app.use('/api', episodeCutsRouter)
 app.use('/api/exports', exportsRouter)
+
+// Public per-show one-sheet page (guest outreach). Mounted at the root
+// so URLs are /shows/<slug>, and BEFORE the SPA fallback so requests
+// don't fall through to the React app.
+app.use(showPageRouter)
 
 const clientDir = path.resolve(process.cwd(), 'dist')
 logInfo('serving client from', { clientDir })
