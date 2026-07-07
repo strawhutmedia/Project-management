@@ -9,6 +9,7 @@ import { Link, useParams } from 'react-router-dom'
 import { api, type ApiProject } from '../api'
 import { useAuth } from '../auth'
 import OutreachSection from '../components/OutreachSection'
+import OneSheetCard from '../components/OneSheetCard'
 
 export default function OutreachShowPage() {
   const { projectId } = useParams()
@@ -71,6 +72,14 @@ export default function OutreachShowPage() {
         <h1 className="text-3xl font-bold">{project.name}</h1>
         {project.subtitle && <p className="text-sm text-muted mt-1">{project.subtitle}</p>}
       </div>
+
+      <OneSheetCard
+        project={project}
+        onSaved={() => {
+          if (!projectId) return
+          void api.project(projectId).then((r) => setProject(r.project)).catch(() => {})
+        }}
+      />
 
       <OutreachSection projectId={project.id} />
     </div>

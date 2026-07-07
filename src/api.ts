@@ -512,6 +512,14 @@ export type ApiProject = {
   brandAssetsFolder?: string | null
   brandProfile?: ApiBrandProfile | null
   brandProfileAt?: string | null
+  // Guest-outreach one-sheet fields.
+  slug?: string | null
+  heroTagline?: string | null
+  guestPitch?: string | null
+  contactEmail?: string | null
+  brandHex?: string | null
+  oneSheetPublished?: boolean
+  notableGuests?: string | null
   songs: ApiSong[]
 }
 

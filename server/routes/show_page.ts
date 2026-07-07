@@ -22,6 +22,8 @@ type ShowRow = {
   guest_pitch: string | null
   contact_email: string | null
   brand_hex: string | null
+  cover_art_url: string | null
+  notable_guests: string | null
 }
 
 type BriefRow = {
@@ -43,7 +45,8 @@ showPageRouter.get('/shows/:slug', async (req: Request, res: Response) => {
     return
   }
   const showRes = await pool.query<ShowRow>(
-    `SELECT id, name, subtitle, hero_tagline, guest_pitch, contact_email, brand_hex
+    `SELECT id, name, subtitle, hero_tagline, guest_pitch, contact_email, brand_hex,
+            cover_art_url, notable_guests
        FROM projects
       WHERE slug = $1 AND kind = 'podcast' AND one_sheet_published = TRUE
       LIMIT 1`,
@@ -95,13 +98,21 @@ function renderShowPage(args: {
   const about = brief?.business_description ?? ''
   const audience = brief?.target_audience ?? ''
   const metrics = brief?.current_metrics ?? ''
-  const guestPitch =
-    show.guest_pitch ||
-    'We record remotely, run about 45 minutes, and edit for a polished final cut. ' +
-    'Guests get the audio to promote wherever they like.'
+  const guests = (show.notable_guests ?? '')
+    .split(/[,\n]/)
+    .map((s) => s.trim())
+    .filter(Boolean)
+    .slice(0, 12)
+  const guestPitch = show.guest_pitch || 'Guests get the finished audio + a highlight clip package to share wherever they like.'
   const mailto = show.contact_email
     ? `mailto:${encodeURIComponent(show.contact_email)}?subject=${encodeURIComponent(`Guest pitch — ${show.name}`)}`
     : null
+  // Cover art — validated as a URL. If missing or looks suspect,
+  // fall back to a monogram tile so the hero never breaks.
+  const coverUrl = typeof show.cover_art_url === 'string' && /^https?:\/\//.test(show.cover_art_url)
+    ? show.cover_art_url
+    : null
+  const monogram = show.name.split(/\s+/).map((w) => w[0]).join('').slice(0, 2).toUpperCase() || '?'
 
   return `<!DOCTYPE html>
 <html lang="en">
@@ -112,40 +123,78 @@ function renderShowPage(args: {
 <meta name="description" content="${escHtml(tagline || show.name)}">
 <meta property="og:title" content="${escHtml(show.name)}">
 <meta property="og:description" content="${escHtml(tagline || about.slice(0, 200))}">
+${coverUrl ? `<meta property="og:image" content="${escHtml(coverUrl)}">` : ''}
 <meta property="og:type" content="website">
 <style>
-  :root { --accent: ${accent}; --ink: #0b0f14; --panel: #12181f; --line: #232b34; --text: #e6edf3; --muted: #94a3b8; }
-  * { box-sizing: border-box }
-  body { margin: 0; background: var(--ink); color: var(--text); font: 16px/1.55 -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif; -webkit-font-smoothing: antialiased; }
-  main { max-width: 780px; margin: 0 auto; padding: 40px 24px 96px }
-  .hero { padding: 64px 0 40px; border-bottom: 1px solid var(--line) }
-  .brand { display: inline-block; font: 700 11px/1 -apple-system, sans-serif; letter-spacing: .28em; text-transform: uppercase; color: var(--muted); }
-  h1 { font: 800 44px/1.1 -apple-system, sans-serif; letter-spacing: -.02em; margin: 16px 0 12px; }
-  .tagline { font: 500 20px/1.4 -apple-system, sans-serif; color: var(--muted); margin: 0 0 32px; max-width: 620px; }
-  .cta { display: inline-flex; align-items: center; gap: 8px; background: var(--accent); color: #0b0f14; font-weight: 700; padding: 14px 22px; border-radius: 999px; text-decoration: none; font-size: 15px; letter-spacing: .01em; transition: transform .12s ease; }
-  .cta:hover { transform: translateY(-1px) }
-  section { padding: 40px 0; border-bottom: 1px solid var(--line) }
-  section:last-child { border-bottom: 0 }
-  h2 { font: 700 12px/1 -apple-system, sans-serif; letter-spacing: .28em; text-transform: uppercase; color: var(--muted); margin: 0 0 20px }
-  p { margin: 0 0 14px }
-  .lead { font-size: 18px; line-height: 1.6 }
-  ul.episodes { list-style: none; padding: 0; margin: 0 }
-  ul.episodes li { padding: 14px 0; border-bottom: 1px solid var(--line) }
-  ul.episodes li:last-child { border-bottom: 0 }
-  ul.episodes .title { font-weight: 600; color: var(--text) }
-  ul.episodes .sub { color: var(--muted); font-size: 14px; margin-top: 2px }
-  .stats { display: grid; grid-template-columns: 1fr; gap: 16px; margin-top: 8px }
-  .stat { padding: 16px 20px; background: var(--panel); border: 1px solid var(--line); border-radius: 12px }
-  .stat .label { font: 700 10px/1 -apple-system, sans-serif; letter-spacing: .24em; text-transform: uppercase; color: var(--muted); margin-bottom: 8px }
-  footer { margin-top: 48px; padding-top: 24px; border-top: 1px solid var(--line); color: var(--muted); font-size: 13px }
-  footer a { color: var(--muted); text-decoration: none; border-bottom: 1px dotted var(--muted) }
-  @media (max-width: 600px) { h1 { font-size: 34px } .tagline { font-size: 17px } main { padding: 24px 18px 72px } .hero { padding: 32px 0 24px } }
+  :root { --accent: ${accent}; --ink: #08090c; --panel: #12141a; --line: #1e2129; --text: #f4f6fa; --muted: #8a94a6; }
+  * { box-sizing: border-box; margin: 0; padding: 0 }
+  body { background: var(--ink); color: var(--text); font: 16px/1.55 -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif; -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility; }
+  a { color: inherit }
+  main { max-width: 860px; margin: 0 auto; padding: 0 24px 96px }
+
+  /* Ambient brand-color glow behind the hero. Subtle. */
+  .glow { position: absolute; top: -280px; left: 50%; transform: translateX(-50%); width: 900px; height: 600px; background: radial-gradient(closest-side, ${accent}22, transparent 70%); z-index: -1; pointer-events: none; }
+  header.top { max-width: 860px; margin: 0 auto; padding: 32px 24px 0; display: flex; align-items: center; gap: 14px; }
+  header.top .mark { font: 700 10px/1 -apple-system, sans-serif; letter-spacing: .32em; text-transform: uppercase; color: var(--muted); }
+  header.top .dot { width: 5px; height: 5px; background: var(--accent); border-radius: 50% }
+
+  /* Hero — cover art tile + name + tagline + CTA */
+  .hero { padding: 64px 0 56px; text-align: center; position: relative; }
+  .cover { width: 200px; height: 200px; margin: 0 auto 32px; border-radius: 28px; overflow: hidden; box-shadow: 0 30px 80px -20px ${accent}55, 0 20px 40px -10px #000; position: relative; }
+  .cover img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .cover.monogram { display: grid; place-items: center; font: 800 88px/1 -apple-system, sans-serif; color: #08090c; background: linear-gradient(135deg, ${accent}, ${accent}88); letter-spacing: -.04em; }
+
+  h1 { font: 800 clamp(38px, 6vw, 56px)/1.05 -apple-system, sans-serif; letter-spacing: -.03em; margin-bottom: 18px; background: linear-gradient(180deg, #fff, #d0d5e0); -webkit-background-clip: text; background-clip: text; color: transparent; }
+  .tagline { font: 500 clamp(17px, 2.2vw, 21px)/1.5 -apple-system, sans-serif; color: var(--muted); max-width: 640px; margin: 0 auto 40px; }
+  .cta { display: inline-flex; align-items: center; gap: 10px; background: var(--accent); color: #08090c; font-weight: 700; padding: 15px 26px; border-radius: 999px; text-decoration: none; font-size: 15px; letter-spacing: .01em; transition: transform .12s ease, box-shadow .2s ease; box-shadow: 0 10px 30px -8px ${accent}88; }
+  .cta:hover { transform: translateY(-2px); box-shadow: 0 14px 34px -6px ${accent}aa; }
+
+  section { padding: 56px 0; border-top: 1px solid var(--line); }
+  h2 { font: 700 11px/1 -apple-system, sans-serif; letter-spacing: .3em; text-transform: uppercase; color: var(--muted); margin: 0 0 22px }
+  .lead { font-size: 18px; line-height: 1.65; color: var(--text); max-width: 680px; }
+
+  /* Stats grid */
+  .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 14px; }
+  .stat { padding: 22px 22px; background: var(--panel); border: 1px solid var(--line); border-radius: 16px; }
+  .stat .label { font: 700 10px/1 -apple-system, sans-serif; letter-spacing: .26em; text-transform: uppercase; color: ${accent}; margin-bottom: 10px }
+  .stat .value { font-size: 15px; line-height: 1.55; color: var(--text) }
+
+  /* Notable guests — social proof */
+  .guest-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 10px }
+  .guest-tag { padding: 12px 16px; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; font-weight: 600; font-size: 14px; text-align: center; }
+
+  /* Episodes list */
+  ul.episodes { list-style: none; display: grid; gap: 2px; }
+  ul.episodes li { padding: 18px 22px; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; }
+  ul.episodes .title { font-weight: 600; font-size: 15px; }
+  ul.episodes .sub { color: var(--muted); font-size: 13px; margin-top: 4px }
+
+  .closing { text-align: center; padding: 72px 0 32px }
+  .closing p { font-size: 17px; color: var(--text); max-width: 620px; margin: 0 auto 28px; line-height: 1.6; }
+
+  footer { padding: 40px 0 0; border-top: 1px solid var(--line); text-align: center; color: var(--muted); font-size: 13px }
+  footer a { border-bottom: 1px dotted var(--muted); text-decoration: none }
+
+  @media (max-width: 600px) {
+    .cover { width: 160px; height: 160px; border-radius: 24px; }
+    .cover.monogram { font-size: 68px; }
+    main { padding: 0 18px 72px }
+    .hero { padding: 40px 0 40px }
+    section { padding: 40px 0 }
+  }
 </style>
 </head>
 <body>
+<div class="glow"></div>
+<header class="top">
+  <span class="dot"></span>
+  <span class="mark">Straw Hut Media · Guest pitch</span>
+</header>
 <main>
   <section class="hero">
-    <span class="brand">Straw Hut Media · Guest pitch</span>
+    ${coverUrl
+      ? `<div class="cover"><img src="${escHtml(coverUrl)}" alt="${escHtml(show.name)} cover art"></div>`
+      : `<div class="cover monogram">${escHtml(monogram)}</div>`}
     <h1>${escHtml(show.name)}</h1>
     ${tagline ? `<p class="tagline">${escHtml(tagline)}</p>` : ''}
     ${mailto ? `<a class="cta" href="${mailto}">Pitch us as a guest →</a>` : ''}
@@ -159,13 +208,20 @@ function renderShowPage(args: {
   ${(audience || metrics) ? `<section>
     <h2>Who listens</h2>
     <div class="stats">
-      ${audience ? `<div class="stat"><div class="label">Audience</div><div>${escHtml(audience)}</div></div>` : ''}
-      ${metrics ? `<div class="stat"><div class="label">Reach</div><div>${escHtml(metrics)}</div></div>` : ''}
+      ${metrics ? `<div class="stat"><div class="label">Reach</div><div class="value">${escHtml(metrics)}</div></div>` : ''}
+      ${audience ? `<div class="stat"><div class="label">Audience</div><div class="value">${escHtml(audience)}</div></div>` : ''}
+    </div>
+  </section>` : ''}
+
+  ${guests.length > 0 ? `<section>
+    <h2>Recent notable guests</h2>
+    <div class="guest-grid">
+      ${guests.map((g) => `<div class="guest-tag">${escHtml(g)}</div>`).join('')}
     </div>
   </section>` : ''}
 
   ${episodes.length > 0 ? `<section>
-    <h2>Recent episodes</h2>
+    <h2>Latest episodes</h2>
     <ul class="episodes">
       ${episodes.map((e) => `<li>
         <div class="title">${escHtml(e.title)}</div>
@@ -174,11 +230,10 @@ function renderShowPage(args: {
     </ul>
   </section>` : ''}
 
-  <section>
-    <h2>What guesting is like</h2>
+  <div class="closing">
     <p>${escHtml(guestPitch)}</p>
-    ${mailto ? `<p><a class="cta" href="${mailto}">Pitch us as a guest →</a></p>` : ''}
-  </section>
+    ${mailto ? `<a class="cta" href="${mailto}">Pitch us as a guest →</a>` : ''}
+  </div>
 
   <footer>
     Produced by <a href="https://strawhutmedia.com">Straw Hut Media</a>.

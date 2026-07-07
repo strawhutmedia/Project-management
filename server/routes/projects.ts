@@ -463,6 +463,40 @@ projectsRouter.patch('/:id', async (req, res) => {
       values.push(phase)
     }
   }
+  // One-sheet fields — populate the public /shows/<slug> page for
+  // guest outreach. Every field is optional; unfilled ones just don't
+  // render on the public page.
+  if ('heroTagline' in (req.body ?? {})) {
+    const v = req.body.heroTagline
+    updates.push(`hero_tagline = $${i++}`)
+    values.push(typeof v === 'string' && v.trim() ? v.trim().slice(0, 500) : null)
+  }
+  if ('guestPitch' in (req.body ?? {})) {
+    const v = req.body.guestPitch
+    updates.push(`guest_pitch = $${i++}`)
+    values.push(typeof v === 'string' && v.trim() ? v.trim().slice(0, 2000) : null)
+  }
+  if ('contactEmail' in (req.body ?? {})) {
+    const v = req.body.contactEmail
+    updates.push(`contact_email = $${i++}`)
+    values.push(typeof v === 'string' && v.trim() ? v.trim().slice(0, 200) : null)
+  }
+  if ('brandHex' in (req.body ?? {})) {
+    const v = req.body.brandHex
+    // Only accept valid 6-digit hex; anything else falls back to NULL
+    // (public page uses a default accent). Prevents CSS injection.
+    updates.push(`brand_hex = $${i++}`)
+    values.push(typeof v === 'string' && /^#[0-9a-fA-F]{6}$/.test(v.trim()) ? v.trim() : null)
+  }
+  if (typeof req.body?.oneSheetPublished === 'boolean') {
+    updates.push(`one_sheet_published = $${i++}`)
+    values.push(req.body.oneSheetPublished)
+  }
+  if ('notableGuests' in (req.body ?? {})) {
+    const v = req.body.notableGuests
+    updates.push(`notable_guests = $${i++}`)
+    values.push(typeof v === 'string' && v.trim() ? v.trim().slice(0, 2000) : null)
+  }
   if (updates.length === 0) {
     res.status(400).json({ error: 'no_fields' })
     return
@@ -480,7 +514,9 @@ projectsRouter.get('/:id', async (req, res) => {
     `SELECT id, name, subtitle, kind, dropbox_folder, default_owners, stage_labels, channels_subfolder, film_phase,
             socials_brand_voice, socials_example_posts, socials_default_assignees, socials_vocabulary,
             rss_feed_url, cover_art_url, brand_assets_folder,
-            socials_brand_profile, socials_brand_profile_at
+            socials_brand_profile, socials_brand_profile_at,
+            slug, hero_tagline, guest_pitch, contact_email, brand_hex,
+            one_sheet_published, notable_guests
        FROM projects WHERE id = $1`,
     [projectId],
   )
@@ -590,6 +626,13 @@ projectsRouter.get('/:id', async (req, res) => {
       brandAssetsFolder: project.brand_assets_folder ?? null,
       brandProfile: project.socials_brand_profile ?? null,
       brandProfileAt: project.socials_brand_profile_at ?? null,
+      slug: project.slug ?? null,
+      heroTagline: project.hero_tagline ?? null,
+      guestPitch: project.guest_pitch ?? null,
+      contactEmail: project.contact_email ?? null,
+      brandHex: project.brand_hex ?? null,
+      oneSheetPublished: !!project.one_sheet_published,
+      notableGuests: project.notable_guests ?? null,
       songs: songs.rows.map((s: { id: string; title: string; subtitle: string | null; stage: string; release_date: string | Date | null; processing_state: string | null; autopipeline_error: string | null }) => ({
         id: s.id,
         title: s.title,
