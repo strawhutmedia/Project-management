@@ -127,7 +127,7 @@ export default function OutreachHubPage() {
             {shows.map((s) => (
               <Link
                 key={s.project.id}
-                to={`/projects/${s.project.id}#outreach`}
+                to={`/admin/outreach/shows/${s.project.id}`}
                 className="block rounded-2xl border border-line bg-panel/60 p-4 hover:border-stage-mastering/40 transition group"
               >
                 <div className="flex items-center gap-3 flex-wrap">
