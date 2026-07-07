@@ -361,9 +361,14 @@ export default function OutreachSection({ projectId }: { projectId: string }) {
                       <span className={`text-[9px] uppercase tracking-wider font-bold px-2 py-0.5 rounded-full border ${style.bg}`}>
                         {style.label}
                       </span>
-                      {!hasSentence && (
+                      {!hasSentence && !p.context && (
+                        <span className="text-[9px] uppercase tracking-wider font-bold px-2 py-0.5 rounded-full border border-urgent/50 bg-urgent/10 text-urgent">
+                          Add context to generate
+                        </span>
+                      )}
+                      {!hasSentence && p.context && (
                         <span className="text-[9px] uppercase tracking-wider font-bold px-2 py-0.5 rounded-full border border-amber-500/40 bg-amber-500/10 text-amber-300">
-                          No sentence
+                          Ready to generate
                         </span>
                       )}
                       <div className="flex-1" />
