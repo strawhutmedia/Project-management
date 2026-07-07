@@ -1305,6 +1305,15 @@ export const api = {
     request<{ prospect: ApiOutreachProspect }>(`/api/outreach/projects/${projectId}/prospects`, {
       method: 'POST', body: JSON.stringify(body),
     }),
+  bulkImportProspects: (projectId: string, rows: Array<{
+    name: string; fullName?: string; email?: string;
+    recipientType?: 'person' | 'agent' | 'manager' | 'other';
+    clientName?: string; context?: string;
+  }>) =>
+    request<{ imported: number; failed: number; results: Array<{ row: number; ok: boolean; error?: string; id?: string }> }>(
+      `/api/outreach/projects/${projectId}/prospects/bulk`,
+      { method: 'POST', body: JSON.stringify({ rows }) },
+    ),
   updateOutreachProspect: (id: string, patch: Partial<{
     name: string; fullName: string | null; email: string | null;
     recipientType: 'person' | 'agent' | 'manager' | 'other';

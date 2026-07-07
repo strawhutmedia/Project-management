@@ -74,6 +74,63 @@ outreachRouter.get('/projects/:projectId/prospects', async (req, res) => {
   res.json({ prospects: rows })
 })
 
+// Bulk import — paste a spreadsheet, get N prospects. Each row is
+// validated + inserted in one transaction. Returns per-row status so
+// the UI can show what got imported vs skipped.
+outreachRouter.post('/projects/:projectId/prospects/bulk', async (req, res) => {
+  const user = (req as typeof req & { user: SessionUser }).user
+  const projectId = req.params.projectId
+  const rows: unknown = req.body?.rows
+  if (!Array.isArray(rows) || rows.length === 0) {
+    res.status(400).json({ error: 'rows_required' })
+    return
+  }
+  if (rows.length > 500) {
+    res.status(400).json({ error: 'too_many_rows', detail: 'max 500 per bulk import' })
+    return
+  }
+  type Result = { row: number; ok: boolean; error?: string; id?: string }
+  const results: Result[] = []
+  const client = await pool.connect()
+  try {
+    await client.query('BEGIN')
+    for (let i = 0; i < rows.length; i++) {
+      const raw = rows[i] as Record<string, unknown> | undefined
+      const name = typeof raw?.name === 'string' ? raw.name.trim() : ''
+      if (!name) {
+        results.push({ row: i, ok: false, error: 'name_required' })
+        continue
+      }
+      const fullName = typeof raw?.fullName === 'string' && raw.fullName.trim() ? raw.fullName.trim() : null
+      const email = typeof raw?.email === 'string' && raw.email.trim() ? raw.email.trim().toLowerCase() : null
+      const recipientType = typeof raw?.recipientType === 'string' && RECIPIENT_TYPES.has(raw.recipientType)
+        ? raw.recipientType : 'person'
+      const clientName = typeof raw?.clientName === 'string' && raw.clientName.trim() ? raw.clientName.trim() : null
+      const context = typeof raw?.context === 'string' && raw.context.trim() ? raw.context.trim() : null
+      const initialStatus = email ? 'ready' : 'needs_email'
+      const insertRes = await client.query<{ id: string }>(
+        `INSERT INTO outreach_prospects
+           (project_id, name, full_name, email, recipient_type, client_name,
+            context, status, created_by)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+         RETURNING id`,
+        [projectId, name, fullName, email, recipientType, clientName, context, initialStatus, user.id],
+      )
+      results.push({ row: i, ok: true, id: insertRes.rows[0].id })
+    }
+    await client.query('COMMIT')
+  } catch (err) {
+    await client.query('ROLLBACK').catch(() => {})
+    res.status(500).json({ error: 'bulk_import_failed', detail: err instanceof Error ? err.message : String(err) })
+    return
+  } finally {
+    client.release()
+  }
+  const imported = results.filter((r) => r.ok).length
+  const failed = results.filter((r) => !r.ok).length
+  res.json({ imported, failed, results })
+})
+
 outreachRouter.post('/projects/:projectId/prospects', async (req, res) => {
   const user = (req as typeof req & { user: SessionUser }).user
   const projectId = req.params.projectId

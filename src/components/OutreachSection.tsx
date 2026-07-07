@@ -27,13 +27,17 @@ const STATUS_STYLE: Record<ApiOutreachProspect['status'], { bg: string; label: s
   failed:      { bg: 'bg-urgent/15 text-urgent border-urgent/30', label: 'Failed' },
 }
 
+// Deliberately generic — no mention of Riverside, video, or format
+// specifics because those differ per show (Soul & Science is remote
+// on Riverside; Private Talk is in-studio; etc.). Every show's editor
+// customizes this to fit its actual format.
 const DEFAULT_TEMPLATE_BODY = `Hi [name],
 
 I'm producing a podcast at Straw Hut Media and we'd love to have you on.
 
 [unique_sentence]
 
-The show is a 45-minute conversation, recorded remotely on Riverside (video optional), edited into a polished cut. You'd get the audio + a clip package to share.
+Our episodes run about 45 minutes and are edited into a polished cut. Guests get the audio + a highlight clip package to share wherever they'd like.
 
 Would you have 30 minutes this month or next to jump on a call and see if it's a fit?
 
@@ -50,6 +54,7 @@ export default function OutreachSection({ projectId }: { projectId: string }) {
   const [prospects, setProspects] = useState<ApiOutreachProspect[] | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [addOpen, setAddOpen] = useState(false)
+  const [bulkOpen, setBulkOpen] = useState(false)
 
   async function loadTemplate() {
     try {
@@ -195,15 +200,38 @@ export default function OutreachSection({ projectId }: { projectId: string }) {
 
         {/* ─── Prospects list ──────────────────────────────────── */}
         <div className="space-y-3">
-          <div className="flex items-baseline justify-between">
+          <div className="flex items-baseline justify-between gap-2 flex-wrap">
             <h3 className="text-[10px] uppercase tracking-[0.2em] text-muted font-bold">Prospects</h3>
-            <button
-              onClick={() => setAddOpen((v) => !v)}
-              className="text-[10px] uppercase tracking-wider text-stage-mastering border border-stage-mastering/40 rounded-full px-3 py-1 hover:bg-stage-mastering/10 font-bold"
-            >
-              {addOpen ? 'Cancel' : '+ Add prospect'}
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => { setBulkOpen((v) => !v); if (!bulkOpen) setAddOpen(false) }}
+                className={`text-[10px] uppercase tracking-wider border rounded-full px-3 py-1 font-bold ${
+                  bulkOpen
+                    ? 'text-muted border-line'
+                    : 'text-stage-tracking border-stage-tracking/40 hover:bg-stage-tracking/10'
+                }`}
+              >
+                {bulkOpen ? 'Cancel' : '📋 Bulk import'}
+              </button>
+              <button
+                onClick={() => { setAddOpen((v) => !v); if (!addOpen) setBulkOpen(false) }}
+                className={`text-[10px] uppercase tracking-wider border rounded-full px-3 py-1 font-bold ${
+                  addOpen
+                    ? 'text-muted border-line'
+                    : 'text-stage-mastering border-stage-mastering/40 hover:bg-stage-mastering/10'
+                }`}
+              >
+                {addOpen ? 'Cancel' : '+ Add one'}
+              </button>
+            </div>
           </div>
+
+          {bulkOpen && (
+            <BulkImportPanel
+              projectId={projectId}
+              onImported={() => { setBulkOpen(false); void loadProspects() }}
+            />
+          )}
 
           {addOpen && (
             <AddProspectForm
@@ -262,6 +290,183 @@ export default function OutreachSection({ projectId }: { projectId: string }) {
         </div>
       </div>
     </section>
+  )
+}
+
+// Bulk import — paste rows from a spreadsheet or a plain list.
+// Parses tab-separated (from Sheets/Excel copy) OR comma-separated OR
+// pipe-separated. Also handles "just emails, one per line" as the
+// dead-simplest case.
+//
+// Column format (order matters when using multi-column paste):
+//   name | email | full_name | recipient_type | client_name | context
+//
+// For an email-only paste, name is auto-derived from the email's
+// local part (alex@company.com → "Alex") so you can start with just a
+// list of addresses and edit names later.
+type ParsedRow = {
+  name: string
+  fullName?: string
+  email?: string
+  recipientType?: 'person' | 'agent' | 'manager' | 'other'
+  clientName?: string
+  context?: string
+  error?: string
+}
+
+function parseBulk(text: string): ParsedRow[] {
+  const lines = text.split(/\r?\n/).map((l) => l.trim()).filter(Boolean)
+  return lines.map((line) => {
+    // Detect delimiter — prefer tab (spreadsheet paste), then pipe,
+    // then comma. Splitting on the first one we find keeps commas
+    // inside a context field intact.
+    let parts: string[]
+    if (line.includes('\t')) parts = line.split('\t').map((p) => p.trim())
+    else if (line.includes('|')) parts = line.split('|').map((p) => p.trim())
+    else if (line.includes(',')) parts = line.split(',').map((p) => p.trim())
+    else parts = [line.trim()]
+
+    const [c0, c1, c2, c3, c4, c5] = parts
+
+    // Email-only paste — single field looks like an email. Derive name.
+    if (parts.length === 1 && /@/.test(c0)) {
+      const local = c0.split('@')[0]
+      const name = local.split(/[._-]/)[0]
+      return {
+        name: name.charAt(0).toUpperCase() + name.slice(1),
+        email: c0,
+      }
+    }
+
+    // Multi-column paste. If c1 looks like an email, standard order is
+    // name, email, ...; otherwise assume the user pasted just names.
+    if (c1 && /@/.test(c1)) {
+      const type = normalizeType(c3)
+      return {
+        name: c0 || '(unknown)',
+        email: c1,
+        fullName: c2 || undefined,
+        recipientType: type,
+        clientName: c4 || undefined,
+        context: c5 || undefined,
+        error: c0 ? undefined : 'name_required',
+      }
+    }
+
+    // Only a name, no email. That's fine — status will be needs_email.
+    return {
+      name: c0 || '(unknown)',
+      error: c0 ? undefined : 'name_required',
+    }
+  })
+}
+
+function normalizeType(s: string | undefined): ParsedRow['recipientType'] {
+  const lc = (s || '').trim().toLowerCase()
+  if (lc.startsWith('person') || lc === 'guest' || lc === 'them') return 'person'
+  if (lc.startsWith('agent')) return 'agent'
+  if (lc.startsWith('manager') || lc.startsWith('mgr')) return 'manager'
+  if (lc) return 'other'
+  return 'person'
+}
+
+function BulkImportPanel({
+  projectId, onImported,
+}: {
+  projectId: string
+  onImported: () => void
+}) {
+  const [text, setText] = useState('')
+  const [importing, setImporting] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const parsed = text.trim() ? parseBulk(text) : []
+  const validCount = parsed.filter((r) => !r.error).length
+  const invalidCount = parsed.length - validCount
+
+  async function submit() {
+    if (validCount === 0) return
+    setImporting(true)
+    setError(null)
+    try {
+      const rows = parsed
+        .filter((r) => !r.error)
+        .map((r) => ({
+          name: r.name,
+          fullName: r.fullName,
+          email: r.email,
+          recipientType: r.recipientType,
+          clientName: r.clientName,
+          context: r.context,
+        }))
+      const result = await api.bulkImportProspects(projectId, rows)
+      if (result.failed > 0) {
+        setError(`Imported ${result.imported}, ${result.failed} failed. Reload to see what stuck.`)
+      }
+      onImported()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'bulk import failed')
+    } finally {
+      setImporting(false)
+    }
+  }
+
+  return (
+    <div className="rounded-lg border border-stage-tracking/40 bg-stage-tracking/5 p-3 space-y-3">
+      <div className="text-[11px] text-muted space-y-1">
+        <p><strong className="text-text">Paste from anywhere</strong> — spreadsheet, plain list, one per line.</p>
+        <p>Supported formats (Slate detects automatically):</p>
+        <ul className="list-disc list-inside pl-2 space-y-0.5 text-[10px]">
+          <li><code>alex@company.com</code> — email only, name auto-derived</li>
+          <li><code>Alex, alex@company.com</code> — name, email</li>
+          <li><code>Alex, alex@company.com, Alex Rodriguez, agent, Sarah Kim, founder of X — just did Diary of a CEO</code> — full: name, email, full name, type (person/agent/manager/other), client, context</li>
+          <li>Or tab-separated (copy from Google Sheets)</li>
+        </ul>
+      </div>
+      <textarea
+        value={text}
+        onChange={(e) => setText(e.target.value)}
+        rows={10}
+        placeholder={'Alex, alex@company.com, Alex Rodriguez, person, , founder of X\nsarah@agency.com\nTom, tom@bigfilm.com, , agent, Emily Blunt, Emily Blunt\'s booking agent'}
+        className="w-full bg-ink/40 border border-line rounded-lg px-3 py-2 text-sm font-mono focus:outline-none focus:border-stage-tracking"
+      />
+      <div className="flex items-center justify-between gap-2 flex-wrap">
+        <div className="text-[11px] text-muted">
+          {parsed.length === 0 ? (
+            <span className="italic">Paste to see a preview…</span>
+          ) : (
+            <>
+              <span className="text-emerald-300 font-bold">{validCount} valid</span>
+              {invalidCount > 0 && (
+                <> · <span className="text-urgent font-bold">{invalidCount} invalid</span></>
+              )}
+            </>
+          )}
+        </div>
+        <button
+          onClick={() => void submit()}
+          disabled={importing || validCount === 0}
+          className="text-[10px] uppercase tracking-wider text-stage-tracking border border-stage-tracking/40 rounded-full px-3 py-1.5 hover:bg-stage-tracking/10 disabled:opacity-40 font-bold"
+        >
+          {importing ? 'Importing…' : `Import ${validCount} prospect${validCount === 1 ? '' : 's'}`}
+        </button>
+      </div>
+      {parsed.length > 0 && parsed.length <= 20 && (
+        <div className="text-[10px] font-mono text-muted space-y-0.5 max-h-40 overflow-y-auto pt-2 border-t border-line/40">
+          {parsed.map((r, i) => (
+            <div key={i} className={r.error ? 'text-urgent' : 'text-text/80'}>
+              <span className="text-muted/50 mr-2">{i + 1}.</span>
+              {r.error ? `✕ ${r.error}` : `${r.name}${r.email ? ` <${r.email}>` : ' (no email yet)'}${r.recipientType && r.recipientType !== 'person' ? ` [${r.recipientType}]` : ''}`}
+            </div>
+          ))}
+        </div>
+      )}
+      {parsed.length > 20 && (
+        <div className="text-[10px] text-muted italic">
+          Preview hidden for {parsed.length} rows. Import to see them all.
+        </div>
+      )}
+      {error && <p className="text-xs text-urgent">{error}</p>}
+    </div>
   )
 }
 
