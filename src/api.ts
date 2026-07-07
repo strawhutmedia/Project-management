@@ -1313,6 +1313,15 @@ export const api = {
     request<{ prospect: ApiOutreachProspect }>(`/api/outreach/projects/${projectId}/prospects`, {
       method: 'POST', body: JSON.stringify(body),
     }),
+  generateUniqueSentence: (prospectId: string) =>
+    request<{ ok: true; sentence: string }>(`/api/outreach/prospects/${prospectId}/generate-sentence`, {
+      method: 'POST', body: JSON.stringify({}),
+    }),
+  generateAllUniqueSentences: (projectId: string) =>
+    request<{ ok: true; generated: number; failed: number; insufficientContext: number }>(
+      `/api/outreach/projects/${projectId}/generate-all-sentences`,
+      { method: 'POST', body: JSON.stringify({}) },
+    ),
   testSendOutreach: (projectId: string, to: string) =>
     request<{ ok: true; from: string; to: string; subject: string; previewName: string }>(
       `/api/outreach/projects/${projectId}/test-send`,

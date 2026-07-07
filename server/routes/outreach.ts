@@ -17,6 +17,8 @@ import { Resend } from 'resend'
 import { pool } from '../db'
 import { requireAdmin, type SessionUser } from '../auth'
 import { logError, logInfo } from '../diag'
+import { generateUniqueSentence, hasAnthropicKey, type UniqueSentenceInput } from '../anthropic'
+import { loadShowBrief } from './show_brief'
 
 const resendKey = process.env.RESEND_API_KEY
 const resend = resendKey ? new Resend(resendKey) : null
@@ -242,6 +244,154 @@ outreachRouter.delete('/prospects/:id', async (req, res) => {
   )
   if (rowCount === 0) { res.status(404).json({ error: 'not_found' }); return }
   res.json({ ok: true })
+})
+
+// ─── Unique-sentence generator (Claude) ─────────────────────────────
+//
+// Builds the input for anthropic.generateUniqueSentence from the show
+// (project + Show Brief + recent episodes) and the prospect row, calls
+// Claude, saves the returned sentence back on the row.
+
+async function buildSentenceInput(prospectId: string): Promise<{ input: UniqueSentenceInput; projectId: string; prospectName: string } | { error: string }> {
+  const prospectRes = await pool.query<{
+    id: string; project_id: string; name: string; full_name: string | null;
+    recipient_type: 'person' | 'agent' | 'manager' | 'other';
+    client_name: string | null; context: string | null;
+  }>(
+    `SELECT id, project_id, name, full_name, recipient_type, client_name, context
+       FROM outreach_prospects WHERE id = $1`,
+    [prospectId],
+  )
+  const prospect = prospectRes.rows[0]
+  if (!prospect) return { error: 'prospect_not_found' }
+  const projRes = await pool.query<{
+    name: string; hero_tagline: string | null; socials_brand_voice: string | null;
+    notable_guests: string | null;
+  }>(
+    `SELECT name, hero_tagline, socials_brand_voice, notable_guests
+       FROM projects WHERE id = $1`,
+    [prospect.project_id],
+  )
+  const proj = projRes.rows[0]
+  if (!proj) return { error: 'project_not_found' }
+  const brief = await loadShowBrief(prospect.project_id)
+  const epRes = await pool.query<{ title: string; subtitle: string | null }>(
+    `SELECT title, subtitle FROM songs WHERE project_id = $1
+      ORDER BY position DESC NULLS LAST, created_at DESC LIMIT 6`,
+    [prospect.project_id],
+  )
+  return {
+    projectId: prospect.project_id,
+    prospectName: prospect.name,
+    input: {
+      show: {
+        name: proj.name,
+        tagline: proj.hero_tagline,
+        about: brief?.business_description ?? null,
+        audience: brief?.target_audience ?? null,
+        niche: brief?.niche ?? null,
+        brandVoice: proj.socials_brand_voice,
+        notableGuests: proj.notable_guests,
+        recentEpisodes: epRes.rows,
+      },
+      prospect: {
+        name: prospect.name,
+        fullName: prospect.full_name,
+        recipientType: prospect.recipient_type,
+        clientName: prospect.client_name,
+        context: prospect.context,
+      },
+    },
+  }
+}
+
+outreachRouter.post('/prospects/:id/generate-sentence', async (req, res) => {
+  if (!hasAnthropicKey()) {
+    res.status(503).json({ error: 'anthropic_key_missing' })
+    return
+  }
+  const built = await buildSentenceInput(req.params.id)
+  if ('error' in built) {
+    res.status(built.error.includes('not_found') ? 404 : 400).json({ error: built.error })
+    return
+  }
+  try {
+    const result = await generateUniqueSentence(built.input)
+    await pool.query(
+      `UPDATE outreach_prospects
+          SET unique_sentence = $1,
+              unique_sentence_generated_at = now(),
+              updated_at = now()
+        WHERE id = $2`,
+      [result.sentence, req.params.id],
+    )
+    res.json({ ok: true, sentence: result.sentence })
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err)
+    if (msg === 'insufficient_context') {
+      res.status(422).json({
+        error: 'insufficient_context',
+        detail: 'Not enough context on this prospect to write a specific sentence. Add a line about who they are + something recent they did, then try again.',
+      })
+      return
+    }
+    logError('outreach: unique sentence failed', { id: req.params.id, error: msg })
+    res.status(500).json({ error: 'generation_failed', detail: msg.slice(0, 300) })
+  }
+})
+
+// Generate for every prospect in a show that doesn't have a sentence
+// yet. Rate-limited by the shape of the request — we run 4 at a time
+// so Anthropic isn't hammered and the operator sees progress quickly.
+outreachRouter.post('/projects/:projectId/generate-all-sentences', async (req, res) => {
+  if (!hasAnthropicKey()) {
+    res.status(503).json({ error: 'anthropic_key_missing' })
+    return
+  }
+  const projectId = req.params.projectId
+  const targets = await pool.query<{ id: string }>(
+    `SELECT id FROM outreach_prospects
+      WHERE project_id = $1
+        AND unique_sentence IS NULL
+      ORDER BY created_at ASC`,
+    [projectId],
+  )
+  const ids = targets.rows.map((r) => r.id)
+  if (ids.length === 0) {
+    res.json({ ok: true, generated: 0, failed: 0, insufficientContext: 0 })
+    return
+  }
+  let generated = 0
+  let failed = 0
+  let insufficient = 0
+  const CONCURRENCY = 4
+  const queue = [...ids]
+  await Promise.all(Array.from({ length: CONCURRENCY }, async () => {
+    while (queue.length > 0) {
+      const id = queue.shift()
+      if (!id) break
+      const built = await buildSentenceInput(id)
+      if ('error' in built) { failed += 1; continue }
+      try {
+        const result = await generateUniqueSentence(built.input)
+        await pool.query(
+          `UPDATE outreach_prospects
+              SET unique_sentence = $1, unique_sentence_generated_at = now(), updated_at = now()
+            WHERE id = $2`,
+          [result.sentence, id],
+        )
+        generated += 1
+      } catch (err) {
+        if (err instanceof Error && err.message === 'insufficient_context') {
+          insufficient += 1
+        } else {
+          failed += 1
+          logError('outreach: bulk sentence failed', { id, error: err instanceof Error ? err.message : String(err) })
+        }
+      }
+    }
+  }))
+  res.json({ ok: true, generated, failed, insufficientContext: insufficient })
 })
 
 // ─── Test send ──────────────────────────────────────────────────────

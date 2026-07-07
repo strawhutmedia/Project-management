@@ -1739,6 +1739,132 @@ function strategyProjectBlock(ctx: StrategyProjectContext): string {
   return parts.join('\n\n')
 }
 
+// ─────────────────────────────────────────────────────────────────────
+// Guest-outreach: unique-sentence generator per prospect
+// ─────────────────────────────────────────────────────────────────────
+//
+// The one sentence that gets swapped in for [unique_sentence] in the
+// outreach template. Reads the show's brand + audience + last few
+// episodes + notable-guests list AND the prospect's own context so
+// the line is specifically about them, tied specifically to this show.
+//
+// The recipient_type flag is the biggest signal — a note to an agent
+// reads differently ("we'd love to have your client Alex on") than a
+// note to the guest themselves ("your recent piece on X caught our eye").
+
+export type UniqueSentenceInput = {
+  show: {
+    name: string
+    tagline: string | null
+    about: string | null           // Show Brief business_description
+    audience: string | null        // Show Brief target_audience
+    niche: string | null           // Show Brief niche
+    brandVoice: string | null
+    notableGuests: string | null   // Free-form list from projects.notable_guests
+    recentEpisodes: Array<{ title: string; subtitle: string | null }>
+  }
+  prospect: {
+    name: string
+    fullName: string | null
+    recipientType: 'person' | 'agent' | 'manager' | 'other'
+    clientName: string | null
+    context: string | null         // Free-form facts about the prospect
+  }
+}
+
+export type UniqueSentenceResult = {
+  sentence: string
+  usage: {
+    inputTokens: number
+    outputTokens: number
+  }
+}
+
+const UNIQUE_SENTENCE_SYSTEM = `You write ONE sentence — exactly one — that goes in a cold-outreach email to a potential podcast guest. That sentence is the *reason we're reaching out to THIS person for THIS show*, and nothing else. No greeting, no signature, no lead-in, no "I hope this finds you well." Just the one specific sentence.
+
+Rules:
+- Reference something concrete about the recipient (their work, a talk, a piece, a role, a founding, a recent appearance) — NEVER generic praise.
+- Tie it to what THIS show actually is (its niche, its audience, its brand voice) — NOT a generic podcast pitch.
+- If the recipient is an agent or manager, the sentence pitches WHY WE WANT THEIR CLIENT ON — not the agent themselves. Address the agent as the sender, but the reason is about the client.
+- If the recipient is the person themselves, address the reason to them directly.
+- Do not name-drop notable past guests unless it's a natural fit ("You'd be in good company alongside X" only if the pitch fits).
+- Keep it to a single sentence, ideally under 40 words. No em-dashes if you can avoid them; write conversationally.
+- If the operator context is thin and you'd have to invent facts, return the literal string "INSUFFICIENT_CONTEXT" — do NOT fabricate.
+
+Return ONLY the sentence (or the exact string INSUFFICIENT_CONTEXT). No wrapping quotes, no commentary.`
+
+function uniqueSentenceUserBlock(input: UniqueSentenceInput): string {
+  const s = input.show
+  const p = input.prospect
+  const lines: string[] = []
+  lines.push('=== THE SHOW ===')
+  lines.push(`Name: ${s.name}`)
+  if (s.tagline) lines.push(`Tagline: ${s.tagline}`)
+  if (s.niche) lines.push(`Niche: ${s.niche}`)
+  if (s.about) lines.push(`What it is: ${s.about}`)
+  if (s.audience) lines.push(`Audience: ${s.audience}`)
+  if (s.brandVoice) lines.push(`Brand voice: ${s.brandVoice.slice(0, 400)}`)
+  if (s.notableGuests) lines.push(`Notable past guests: ${s.notableGuests}`)
+  if (s.recentEpisodes.length > 0) {
+    lines.push('Recent episodes:')
+    for (const e of s.recentEpisodes.slice(0, 6)) {
+      lines.push(`  - ${e.title}${e.subtitle ? ` — ${e.subtitle}` : ''}`)
+    }
+  }
+  lines.push('')
+  lines.push('=== THE RECIPIENT ===')
+  lines.push(`First name (for greeting): ${p.name}`)
+  if (p.fullName) lines.push(`Full name: ${p.fullName}`)
+  lines.push(`Who they are: ${p.recipientType}${p.clientName ? ` for ${p.clientName}` : ''}`)
+  if (p.context) lines.push(`Context on them: ${p.context}`)
+  else lines.push(`Context on them: (none provided)`)
+  lines.push('')
+  lines.push('Write the one sentence now.')
+  return lines.join('\n')
+}
+
+export async function generateUniqueSentence(input: UniqueSentenceInput): Promise<UniqueSentenceResult> {
+  logInfo('outreach: generating unique sentence', {
+    show: input.show.name,
+    prospect: input.prospect.fullName || input.prospect.name,
+    recipientType: input.prospect.recipientType,
+    contextChars: input.prospect.context?.length ?? 0,
+  })
+  const response = await client.messages.create({
+    model: MODEL,
+    max_tokens: 300,
+    system: UNIQUE_SENTENCE_SYSTEM,
+    messages: [{
+      role: 'user',
+      content: [{
+        type: 'text',
+        text: uniqueSentenceUserBlock(input),
+        cache_control: { type: 'ephemeral' },
+      }],
+    }],
+  })
+  const textBlock = response.content.find((b) => b.type === 'text')
+  if (!textBlock || textBlock.type !== 'text') {
+    throw new Error('outreach: claude returned no text block')
+  }
+  // Strip common junk: leading/trailing quotes, "Sentence:" prefix,
+  // trailing period trimming, etc. Keep it tight.
+  const raw = textBlock.text.trim()
+    .replace(/^["'`]|["'`]$/g, '')
+    .replace(/^(sentence|response):\s*/i, '')
+    .trim()
+  if (raw === 'INSUFFICIENT_CONTEXT') {
+    throw new Error('insufficient_context')
+  }
+  return {
+    sentence: raw,
+    usage: {
+      inputTokens: response.usage.input_tokens,
+      outputTokens: response.usage.output_tokens,
+    },
+  }
+}
+
 export async function generateSocialStrategyDocument(
   input: StrategyGenerateInput,
 ): Promise<StrategyGenerateResult> {

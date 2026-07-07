@@ -9,6 +9,7 @@
 import { useEffect, useState } from 'react'
 import { api, type ApiOutreachProspect, type ApiOutreachTemplate } from '../api'
 import { useAuth } from '../auth'
+import ProspectDetailModal from './ProspectDetailModal'
 
 const RECIPIENT_LABEL: Record<ApiOutreachProspect['recipient_type'], string> = {
   person: 'The guest',
@@ -57,6 +58,8 @@ export default function OutreachSection({ projectId }: { projectId: string }) {
   const [error, setError] = useState<string | null>(null)
   const [addOpen, setAddOpen] = useState(false)
   const [bulkOpen, setBulkOpen] = useState(false)
+  const [openProspect, setOpenProspect] = useState<ApiOutreachProspect | null>(null)
+  const [generatingAll, setGeneratingAll] = useState(false)
   // Test-send bar
   const [testTo, setTestTo] = useState(user?.email ?? 'ryan@strawhutmedia.com')
   const [testSending, setTestSending] = useState(false)
@@ -132,6 +135,25 @@ export default function OutreachSection({ projectId }: { projectId: string }) {
       await loadProspects()
     } catch (err) {
       setError(err instanceof Error ? err.message : 'delete failed')
+    }
+  }
+
+  async function generateAllSentences() {
+    if (!confirm('Generate a unique sentence for every prospect that doesn\'t already have one? Uses Claude and takes ~10s per 5 prospects.')) return
+    setGeneratingAll(true)
+    setError(null)
+    try {
+      const r = await api.generateAllUniqueSentences(projectId)
+      setError(
+        `✓ Generated ${r.generated} sentence${r.generated === 1 ? '' : 's'}. ` +
+        (r.insufficientContext > 0 ? `${r.insufficientContext} skipped (not enough context — add a line to each and retry). ` : '') +
+        (r.failed > 0 ? `${r.failed} failed. ` : ''),
+      )
+      await loadProspects()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'generate failed')
+    } finally {
+      setGeneratingAll(false)
     }
   }
 
@@ -265,7 +287,17 @@ export default function OutreachSection({ projectId }: { projectId: string }) {
         <div className="space-y-3">
           <div className="flex items-baseline justify-between gap-2 flex-wrap">
             <h3 className="text-[10px] uppercase tracking-[0.2em] text-muted font-bold">Prospects</h3>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
+              {prospects && prospects.some((p) => !p.unique_sentence) && (
+                <button
+                  onClick={() => void generateAllSentences()}
+                  disabled={generatingAll}
+                  className="text-[10px] uppercase tracking-wider text-emerald-950 bg-emerald-400 rounded-full px-3 py-1 hover:bg-emerald-300 disabled:opacity-40 font-bold"
+                  title="Generate a Claude-written sentence for every prospect that's missing one."
+                >
+                  {generatingAll ? 'Generating…' : `✨ Generate all sentences (${prospects.filter((p) => !p.unique_sentence).length})`}
+                </button>
+              )}
               <button
                 onClick={() => { setBulkOpen((v) => !v); if (!bulkOpen) setAddOpen(false) }}
                 className={`text-[10px] uppercase tracking-wider border rounded-full px-3 py-1 font-bold ${
@@ -313,45 +345,65 @@ export default function OutreachSection({ projectId }: { projectId: string }) {
             <div className="space-y-2 max-h-[600px] overflow-y-auto pr-1">
               {prospects.map((p) => {
                 const style = STATUS_STYLE[p.status]
+                const hasSentence = !!p.unique_sentence?.trim()
                 return (
-                  <div key={p.id} className="rounded-lg border border-line bg-ink/30 p-3 space-y-1">
+                  <button
+                    key={p.id}
+                    type="button"
+                    onClick={() => setOpenProspect(p)}
+                    className="w-full text-left rounded-lg border border-line bg-ink/30 hover:border-stage-mastering/60 hover:bg-ink/50 transition p-3 space-y-1 cursor-pointer group"
+                  >
                     <div className="flex items-center gap-2 flex-wrap">
-                      <span className="font-bold text-sm">{p.name}</span>
+                      <span className="font-bold text-sm group-hover:text-stage-mastering transition">{p.name}</span>
                       {p.full_name && p.full_name !== p.name && (
                         <span className="text-xs text-muted">({p.full_name})</span>
                       )}
                       <span className={`text-[9px] uppercase tracking-wider font-bold px-2 py-0.5 rounded-full border ${style.bg}`}>
                         {style.label}
                       </span>
+                      {!hasSentence && (
+                        <span className="text-[9px] uppercase tracking-wider font-bold px-2 py-0.5 rounded-full border border-amber-500/40 bg-amber-500/10 text-amber-300">
+                          No sentence
+                        </span>
+                      )}
                       <div className="flex-1" />
-                      <button
-                        onClick={() => void removeProspect(p)}
-                        className="text-[10px] text-muted hover:text-urgent"
+                      <span
+                        onClick={(e) => { e.stopPropagation(); void removeProspect(p) }}
+                        role="button"
+                        className="text-[10px] text-muted hover:text-urgent cursor-pointer opacity-0 group-hover:opacity-100"
                         title="Remove prospect"
                       >
                         ✕
-                      </button>
+                      </span>
                     </div>
                     <div className="text-[11px] text-muted space-y-0.5">
                       {p.email
                         ? <div>📧 <code>{p.email}</code></div>
-                        : <div className="italic text-amber-300/80">📧 email not found yet — paste it when you have it</div>}
+                        : <div className="italic text-amber-300/80">📧 email not found yet — click to add</div>}
                       <div>👤 {RECIPIENT_LABEL[p.recipient_type]}{p.client_name ? ` · ${p.client_name}` : ''}</div>
-                      {p.context && <div className="text-muted/80 italic">💬 {p.context}</div>}
-                      {p.unique_sentence && (
+                      {p.context && <div className="text-muted/80 italic truncate">💬 {p.context}</div>}
+                      {hasSentence && (
                         <div className="mt-1 pt-1 border-t border-line/40">
                           <span className="text-[9px] uppercase tracking-wider text-emerald-400 font-bold">Unique sentence:</span>
                           <div className="text-emerald-100/80 italic">"{p.unique_sentence}"</div>
                         </div>
                       )}
                     </div>
-                  </div>
+                  </button>
                 )
               })}
             </div>
           )}
         </div>
       </div>
+
+      {openProspect && (
+        <ProspectDetailModal
+          prospect={openProspect}
+          onClose={() => setOpenProspect(null)}
+          onChanged={() => { void loadProspects() }}
+        />
+      )}
     </section>
   )
 }
