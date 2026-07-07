@@ -13,11 +13,25 @@
 // and shouldn't be exposed to producers/editors.
 
 import { Router } from 'express'
+import { Resend } from 'resend'
 import { pool } from '../db'
 import { requireAdmin, type SessionUser } from '../auth'
+import { logError, logInfo } from '../diag'
+
+const resendKey = process.env.RESEND_API_KEY
+const resend = resendKey ? new Resend(resendKey) : null
 
 export const outreachRouter = Router()
 outreachRouter.use(requireAdmin)
+
+// Merge [name] and [unique_sentence] tokens in a template. Used by the
+// test-send preview + (later) the real sender. Kept minimal — the
+// template writer controls which tokens exist; anything else stays.
+function mergeTemplate(text: string, tokens: { name: string; uniqueSentence: string }): string {
+  return text
+    .replace(/\[name\]/gi, tokens.name)
+    .replace(/\[unique_sentence\]/gi, tokens.uniqueSentence)
+}
 
 // ─── Templates ──────────────────────────────────────────────────────
 outreachRouter.get('/projects/:projectId/template', async (req, res) => {
@@ -228,4 +242,96 @@ outreachRouter.delete('/prospects/:id', async (req, res) => {
   )
   if (rowCount === 0) { res.status(404).json({ error: 'not_found' }); return }
   res.json({ ok: true })
+})
+
+// ─── Test send ──────────────────────────────────────────────────────
+// Fires a REAL email to `to` using the show's template merged with a
+// preview prospect (or fake stand-in if the list is empty). Uses the
+// first verified sending domain in the pool. Zero effect on real
+// prospects — this is purely so the operator can see what recipients
+// will actually get.
+outreachRouter.post('/projects/:projectId/test-send', async (req, res) => {
+  const projectId = req.params.projectId
+  const to = String(req.body?.to || '').trim().toLowerCase()
+  if (!/^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$/.test(to)) {
+    res.status(400).json({ error: 'invalid_to_email' })
+    return
+  }
+  if (!resend) {
+    res.status(503).json({ error: 'resend_not_configured' })
+    return
+  }
+
+  // Load template
+  const tplRes = await pool.query<{
+    subject: string; body: string; reply_to: string | null; from_name: string | null;
+  }>(
+    `SELECT subject, body, reply_to, from_name FROM outreach_templates WHERE project_id = $1`,
+    [projectId],
+  )
+  const tpl = tplRes.rows[0]
+  if (!tpl || !tpl.subject.trim() || !tpl.body.trim()) {
+    res.status(400).json({ error: 'template_empty', detail: 'Save the template first.' })
+    return
+  }
+
+  // Load a preview prospect — first ready one, else any prospect,
+  // else fabricate. Priority: prospect with a unique_sentence, then
+  // any with an email, then any at all, then fake.
+  const previewRes = await pool.query<{ name: string; unique_sentence: string | null }>(
+    `SELECT name, unique_sentence FROM outreach_prospects
+      WHERE project_id = $1
+      ORDER BY (unique_sentence IS NOT NULL) DESC, (email IS NOT NULL) DESC, created_at DESC
+      LIMIT 1`,
+    [projectId],
+  )
+  const preview = previewRes.rows[0]
+  const previewName = preview?.name || 'Alex'
+  const previewSentence = preview?.unique_sentence
+    || 'Your recent work jumped out to me — the way you framed it in your last piece is exactly the angle we chase on the show.'
+
+  const subject = mergeTemplate(tpl.subject, { name: previewName, uniqueSentence: previewSentence })
+  const body = mergeTemplate(tpl.body, { name: previewName, uniqueSentence: previewSentence })
+
+  // Pick a sending domain — first verified + active one in the pool.
+  // Prefer the domain pinned to this show if one is set.
+  const domRes = await pool.query<{ name: string }>(
+    `SELECT name FROM sending_domains
+      WHERE status = 'verified' AND active = TRUE
+      ORDER BY (primary_show_id = $1) DESC, created_at ASC
+      LIMIT 1`,
+    [projectId],
+  )
+  const domain = domRes.rows[0]?.name
+  if (!domain) {
+    res.status(400).json({ error: 'no_verified_domain', detail: 'Add + verify a sending domain first.' })
+    return
+  }
+  const showNameRes = await pool.query<{ name: string }>(
+    `SELECT name FROM projects WHERE id = $1`, [projectId],
+  )
+  const showName = showNameRes.rows[0]?.name || 'Straw Hut Media'
+  const fromName = tpl.from_name?.trim() || showName
+  const from = `${fromName} <booking@${domain}>`
+  const replyTo = tpl.reply_to?.trim() || 'booking@strawhutmedia.com'
+
+  try {
+    const send = await resend.emails.send({
+      from,
+      to,
+      subject: `[TEST] ${subject}`,
+      text: body,
+      replyTo,
+    })
+    if (send.error) {
+      logError('outreach test-send failed', { projectId, error: send.error })
+      res.status(502).json({ error: 'send_failed', detail: send.error.message ?? String(send.error) })
+      return
+    }
+    logInfo('outreach test-send ok', { projectId, to, domain })
+    res.json({ ok: true, from, to, subject: `[TEST] ${subject}`, previewName })
+  } catch (err) {
+    logError('outreach test-send threw', { projectId, error: err instanceof Error ? err.message : String(err) })
+    res.status(500).json({ error: 'send_threw', detail: err instanceof Error ? err.message : String(err) })
+  }
 })

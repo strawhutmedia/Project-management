@@ -8,6 +8,7 @@
 // Generating unique sentences + sending the campaign land next.
 import { useEffect, useState } from 'react'
 import { api, type ApiOutreachProspect, type ApiOutreachTemplate } from '../api'
+import { useAuth } from '../auth'
 
 const RECIPIENT_LABEL: Record<ApiOutreachProspect['recipient_type'], string> = {
   person: 'The guest',
@@ -45,6 +46,7 @@ Best,
 Ryan`
 
 export default function OutreachSection({ projectId }: { projectId: string }) {
+  const { user } = useAuth()
   const [template, setTemplate] = useState<ApiOutreachTemplate | null>(null)
   const [subject, setSubject] = useState('Guesting on our podcast — [name]')
   const [body, setBody] = useState(DEFAULT_TEMPLATE_BODY)
@@ -55,6 +57,31 @@ export default function OutreachSection({ projectId }: { projectId: string }) {
   const [error, setError] = useState<string | null>(null)
   const [addOpen, setAddOpen] = useState(false)
   const [bulkOpen, setBulkOpen] = useState(false)
+  // Test-send bar
+  const [testTo, setTestTo] = useState(user?.email ?? 'ryan@strawhutmedia.com')
+  const [testSending, setTestSending] = useState(false)
+  const [testResult, setTestResult] = useState<string | null>(null)
+
+  // Keep the default test target in sync once the user loads.
+  useEffect(() => {
+    if (user?.email) setTestTo(user.email)
+  }, [user?.email])
+
+  async function sendTest() {
+    if (!testTo.trim()) return
+    setTestSending(true)
+    setTestResult(null)
+    setError(null)
+    try {
+      const r = await api.testSendOutreach(projectId, testTo.trim())
+      setTestResult(`✓ Sent to ${r.to} · using preview name "${r.previewName}" · check your inbox in a moment.`)
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'test send failed'
+      setTestResult(`✕ ${msg}`)
+    } finally {
+      setTestSending(false)
+    }
+  }
 
   async function loadTemplate() {
     try {
@@ -195,6 +222,42 @@ export default function OutreachSection({ projectId }: { projectId: string }) {
             >
               {saving ? 'Saving…' : template ? '💾 Update template' : '💾 Save template'}
             </button>
+
+            {/* Yellow test-send bar — always visible so it's obvious how
+                to preview a real send. Fires a merged email through
+                Resend to whatever address is in the box. */}
+            <div className="rounded-xl border-2 border-amber-400/50 bg-amber-400/10 p-3 space-y-2">
+              <div className="flex items-center gap-2">
+                <span className="text-lg">🧪</span>
+                <div className="flex-1">
+                  <div className="text-[10px] uppercase tracking-wider text-amber-300 font-bold">Send test</div>
+                  <div className="text-[10px] text-amber-100/70">
+                    Fires a real email so you can see exactly what recipients will get. Uses the first prospect's context (or a stand-in if none).
+                  </div>
+                </div>
+              </div>
+              <div className="flex items-center gap-2 flex-wrap">
+                <input
+                  type="email"
+                  value={testTo}
+                  onChange={(e) => setTestTo(e.target.value)}
+                  placeholder="you@strawhutmedia.com"
+                  className="flex-1 min-w-[220px] bg-ink/40 border border-amber-400/40 rounded-full px-3 py-1.5 text-sm focus:outline-none focus:border-amber-300"
+                />
+                <button
+                  onClick={() => void sendTest()}
+                  disabled={testSending || !testTo.trim()}
+                  className="text-[10px] uppercase tracking-wider text-amber-950 bg-amber-400 rounded-full px-3 py-1.5 hover:bg-amber-300 disabled:opacity-40 font-bold"
+                >
+                  {testSending ? 'Sending…' : '✉ Send test'}
+                </button>
+              </div>
+              {testResult && (
+                <div className={`text-[11px] ${testResult.startsWith('✓') ? 'text-emerald-300' : 'text-urgent'}`}>
+                  {testResult}
+                </div>
+              )}
+            </div>
           </div>
         </div>
 

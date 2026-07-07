@@ -1313,6 +1313,11 @@ export const api = {
     request<{ prospect: ApiOutreachProspect }>(`/api/outreach/projects/${projectId}/prospects`, {
       method: 'POST', body: JSON.stringify(body),
     }),
+  testSendOutreach: (projectId: string, to: string) =>
+    request<{ ok: true; from: string; to: string; subject: string; previewName: string }>(
+      `/api/outreach/projects/${projectId}/test-send`,
+      { method: 'POST', body: JSON.stringify({ to }) },
+    ),
   bulkImportProspects: (projectId: string, rows: Array<{
     name: string; fullName?: string; email?: string;
     recipientType?: 'person' | 'agent' | 'manager' | 'other';
