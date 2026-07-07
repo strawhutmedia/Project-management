@@ -23,6 +23,7 @@ import { showChatRouter } from './routes/show_chat'
 import { episodeCutsRouter } from './routes/episode_cuts'
 import { exportsRouter } from './routes/exports'
 import { showPageRouter } from './routes/show_page'
+import { outreachDomainsRouter } from './routes/outreach_domains'
 import { seedBackInYourArms } from './seeds/back_in_your_arms'
 import { ensureRyanIsPodcastEp } from './routes/projects'
 import { startScheduler } from './scheduler'
@@ -87,6 +88,7 @@ app.use('/api/scheduler', socialSchedulerRouter)
 app.use('/api', showChatRouter)
 app.use('/api', episodeCutsRouter)
 app.use('/api/exports', exportsRouter)
+app.use('/api/admin/outreach/domains', outreachDomainsRouter)
 
 // Public per-show one-sheet page (guest outreach). Mounted at the root
 // so URLs are /shows/<slug>, and BEFORE the SPA fallback so requests

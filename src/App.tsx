@@ -8,6 +8,7 @@ import TranscriptPage from './pages/TranscriptPage'
 import TranscriptsLibraryPage from './pages/TranscriptsLibraryPage'
 import SchedulerPage from './pages/SchedulerPage'
 import CarouselPreviewPage from './pages/CarouselPreviewPage'
+import OutreachDomainsPage from './pages/OutreachDomainsPage'
 import Login from './pages/Login'
 import Verify from './pages/Verify'
 import Profile from './pages/Profile'
@@ -48,6 +49,7 @@ export default function App() {
           <Route path="projects/:projectId/songs/:songId" element={<SongPage />} />
           <Route path="scheduler" element={<SchedulerPage />} />
           <Route path="carousel-preview" element={<CarouselPreviewPage />} />
+          <Route path="admin/outreach/domains" element={<OutreachDomainsPage />} />
         </Route>
       </Routes>
     </AuthProvider>

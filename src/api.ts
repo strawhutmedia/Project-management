@@ -593,6 +593,25 @@ export type ApiCarouselDeckResult = {
   }
 }
 
+export type ApiSendingDomain = {
+  id: string
+  name: string
+  status: 'pending' | 'verifying' | 'verified' | 'failed' | 'paused'
+  active: boolean
+  resend_id: string | null
+  primary_show_id: string | null
+  primary_show_name: string | null
+  warmup_start_date: string | null
+  health_score: number | null
+  bounce_rate: number | null
+  complaint_rate: number | null
+  reply_rate: number | null
+  last_computed_at: string | null
+  notes: string | null
+  created_at: string
+  updated_at: string
+}
+
 export const api = {
   me: () => request<{ user: ApiUser | null }>('/api/me'),
   updateMe: (patch: { name?: string; displayName?: string; timezone?: string }) =>
@@ -1239,6 +1258,23 @@ export const api = {
     request<{ ok: true }>(`/api/notes/${noteId}`, { method: 'PATCH', body: JSON.stringify(patch) }),
   deleteCutNote: (noteId: string) =>
     request<{ ok: true }>(`/api/notes/${noteId}`, { method: 'DELETE' }),
+
+  // Guest outreach — sending-domain pool
+  outreachDomains: () =>
+    request<{ domains: ApiSendingDomain[] }>('/api/admin/outreach/domains'),
+  addOutreachDomain: (body: { name: string; notes?: string; primaryShowId?: string }) =>
+    request<{ domain: ApiSendingDomain }>('/api/admin/outreach/domains', {
+      method: 'POST', body: JSON.stringify(body),
+    }),
+  updateOutreachDomain: (id: string, patch: {
+    active?: boolean; status?: string; notes?: string | null;
+    primaryShowId?: string | null; resendId?: string | null;
+  }) =>
+    request<{ ok: true }>(`/api/admin/outreach/domains/${id}`, {
+      method: 'PATCH', body: JSON.stringify(patch),
+    }),
+  deleteOutreachDomain: (id: string) =>
+    request<{ ok: true }>(`/api/admin/outreach/domains/${id}`, { method: 'DELETE' }),
 
   // Notifications
   notifications: () => request<{ notifications: ApiNotification[]; unreadCount: number }>('/api/notifications'),
