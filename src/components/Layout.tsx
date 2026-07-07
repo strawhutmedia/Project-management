@@ -49,6 +49,20 @@ export default function Layout() {
               📅 Scheduler
             </NavLink>
 
+            {user?.role === 'admin' && (
+              <NavLink
+                to="/admin/outreach"
+                className={({ isActive }) =>
+                  `hidden sm:inline-flex items-center gap-1 text-[11px] uppercase tracking-wider font-bold px-2.5 py-1 rounded-full border transition ${
+                    isActive
+                      ? 'text-stage-mastering bg-stage-mastering/10 border-stage-mastering/40'
+                      : 'text-muted border-line hover:text-text hover:border-line'
+                  }`
+                }
+              >
+                ✉ Outreach
+              </NavLink>
+            )}
 
             {user?.role === 'admin' && (
               <span className="hidden sm:inline-flex items-center gap-1.5 text-[11px] uppercase tracking-wider text-stage-mastering bg-stage-mastering/10 border border-stage-mastering/40 rounded-full px-2.5 py-1 font-bold">
