@@ -138,16 +138,24 @@ outreachRouter.post('/projects/:projectId/prospects', async (req, res) => {
   if (!name) { res.status(400).json({ error: 'name_required' }); return }
   const fullName = typeof req.body?.fullName === 'string' && req.body.fullName.trim()
     ? req.body.fullName.trim() : null
-  const email = typeof req.body?.email === 'string' && req.body.email.trim()
-    ? req.body.email.trim().toLowerCase() : null
+  const rawEmail = typeof req.body?.email === 'string' ? req.body.email.trim() : ''
+  // Reject strings with multiple email addresses so we never end up
+  // with a `to` field like "alice@x.com bob@y.com". The bulk importer
+  // splits these into separate prospects; the single-add form should
+  // too, but at least surface the error rather than silently corrupt.
+  const emailMatches = rawEmail.match(/[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/g) ?? []
+  if (emailMatches.length > 1) {
+    res.status(400).json({ error: 'multiple_emails', detail: 'This cell has more than one email address — add each as its own prospect.' })
+    return
+  }
+  const email = emailMatches[0] ? emailMatches[0].toLowerCase() : null
   const recipientType = typeof req.body?.recipientType === 'string' && RECIPIENT_TYPES.has(req.body.recipientType)
     ? req.body.recipientType : 'person'
   const clientName = typeof req.body?.clientName === 'string' && req.body.clientName.trim()
     ? req.body.clientName.trim() : null
   const context = typeof req.body?.context === 'string' && req.body.context.trim()
     ? req.body.context.trim() : null
-  // Prospects with email start in `needs_email` if nothing set;
-  // status transitions later once the unique sentence is generated.
+  // Prospects with email start in `ready`; without email → needs_email.
   const initialStatus = email ? 'ready' : 'needs_email'
   const { rows } = await pool.query(
     `INSERT INTO outreach_prospects

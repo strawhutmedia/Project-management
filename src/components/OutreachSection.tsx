@@ -314,9 +314,28 @@ type ParsedRow = {
   error?: string
 }
 
+// Extract every email address from a string. Handles a cell like
+// "sgrossman@untitledent.com info@theapex-pr.com" (two agents in one
+// cell) by pulling BOTH so we can create two prospect rows — one per
+// address — instead of stuffing them together as one send target.
+function extractEmails(s: string | undefined): string[] {
+  if (!s) return []
+  const matches = s.match(/[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/g)
+  if (!matches) return []
+  // Dedup case-insensitively while preserving order.
+  const seen = new Set<string>()
+  const out: string[] = []
+  for (const m of matches) {
+    const lc = m.toLowerCase()
+    if (!seen.has(lc)) { seen.add(lc); out.push(lc) }
+  }
+  return out
+}
+
 function parseBulk(text: string): ParsedRow[] {
   const lines = text.split(/\r?\n/).map((l) => l.trim()).filter(Boolean)
-  return lines.map((line) => {
+  const rows: ParsedRow[] = []
+  for (const line of lines) {
     // Detect delimiter — prefer tab (spreadsheet paste), then pipe,
     // then comma. Splitting on the first one we find keeps commas
     // inside a context field intact.
@@ -328,37 +347,56 @@ function parseBulk(text: string): ParsedRow[] {
 
     const [c0, c1, c2, c3, c4, c5] = parts
 
-    // Email-only paste — single field looks like an email. Derive name.
+    // Email-only paste — single field with one or more emails. Derive
+    // a name from each address and emit one prospect per email.
     if (parts.length === 1 && /@/.test(c0)) {
-      const local = c0.split('@')[0]
-      const name = local.split(/[._-]/)[0]
-      return {
-        name: name.charAt(0).toUpperCase() + name.slice(1),
-        email: c0,
+      const emails = extractEmails(c0)
+      for (const email of emails) {
+        const local = email.split('@')[0]
+        const name = local.split(/[._-]/)[0]
+        rows.push({
+          name: name.charAt(0).toUpperCase() + name.slice(1),
+          email,
+        })
       }
+      continue
     }
 
     // Multi-column paste. If c1 looks like an email, standard order is
-    // name, email, ...; otherwise assume the user pasted just names.
+    // name, email(s), full_name, type, client, context. A cell can hold
+    // multiple emails (person + manager + agent inline) — we split and
+    // emit one prospect per email so each has its own send target.
     if (c1 && /@/.test(c1)) {
+      const emails = extractEmails(c1)
       const type = normalizeType(c3)
-      return {
-        name: c0 || '(unknown)',
-        email: c1,
-        fullName: c2 || undefined,
-        recipientType: type,
-        clientName: c4 || undefined,
-        context: c5 || undefined,
-        error: c0 ? undefined : 'name_required',
+      if (emails.length === 0) {
+        rows.push({
+          name: c0 || '(unknown)',
+          error: c0 ? 'bad_email' : 'name_required',
+        })
+        continue
       }
+      for (const email of emails) {
+        rows.push({
+          name: c0 || '(unknown)',
+          email,
+          fullName: c2 || undefined,
+          recipientType: type,
+          clientName: c4 || undefined,
+          context: c5 || undefined,
+          error: c0 ? undefined : 'name_required',
+        })
+      }
+      continue
     }
 
     // Only a name, no email. That's fine — status will be needs_email.
-    return {
+    rows.push({
       name: c0 || '(unknown)',
       error: c0 ? undefined : 'name_required',
-    }
-  })
+    })
+  }
+  return rows
 }
 
 function normalizeType(s: string | undefined): ParsedRow['recipientType'] {
@@ -421,6 +459,9 @@ function BulkImportPanel({
           <li><code>Alex, alex@company.com, Alex Rodriguez, agent, Sarah Kim, founder of X — just did Diary of a CEO</code> — full: name, email, full name, type (person/agent/manager/other), client, context</li>
           <li>Or tab-separated (copy from Google Sheets)</li>
         </ul>
+        <p className="text-amber-300/80 pt-1">
+          <strong>Multiple emails in one cell?</strong> Slate splits them into separate prospects (one send per address) — you get one row per email, not a joined mess.
+        </p>
       </div>
       <textarea
         value={text}
