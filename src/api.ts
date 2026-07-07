@@ -593,6 +593,35 @@ export type ApiCarouselDeckResult = {
   }
 }
 
+export type ApiOutreachTemplate = {
+  project_id: string
+  subject: string
+  body: string
+  from_name: string | null
+  reply_to: string | null
+  updated_at: string
+}
+
+export type ApiOutreachProspect = {
+  id: string
+  project_id: string
+  name: string
+  full_name: string | null
+  email: string | null
+  recipient_type: 'person' | 'agent' | 'manager' | 'other'
+  client_name: string | null
+  context: string | null
+  unique_sentence: string | null
+  unique_sentence_generated_at: string | null
+  status: 'needs_email' | 'ready' | 'queued' | 'sent' | 'replied' | 'bounced' | 'opted_out' | 'failed'
+  sent_at: string | null
+  replied_at: string | null
+  bounced_at: string | null
+  sending_domain_id: string | null
+  created_at: string
+  updated_at: string
+}
+
 export type ApiSendingDomain = {
   id: string
   name: string
@@ -1258,6 +1287,35 @@ export const api = {
     request<{ ok: true }>(`/api/notes/${noteId}`, { method: 'PATCH', body: JSON.stringify(patch) }),
   deleteCutNote: (noteId: string) =>
     request<{ ok: true }>(`/api/notes/${noteId}`, { method: 'DELETE' }),
+
+  // Guest outreach — per-show template + prospects
+  outreachTemplate: (projectId: string) =>
+    request<{ template: ApiOutreachTemplate | null }>(`/api/outreach/projects/${projectId}/template`),
+  saveOutreachTemplate: (projectId: string, body: { subject: string; body: string; fromName?: string; replyTo?: string }) =>
+    request<{ ok: true }>(`/api/outreach/projects/${projectId}/template`, {
+      method: 'PUT', body: JSON.stringify(body),
+    }),
+  outreachProspects: (projectId: string) =>
+    request<{ prospects: ApiOutreachProspect[] }>(`/api/outreach/projects/${projectId}/prospects`),
+  addOutreachProspect: (projectId: string, body: {
+    name: string; fullName?: string; email?: string;
+    recipientType?: 'person' | 'agent' | 'manager' | 'other';
+    clientName?: string; context?: string;
+  }) =>
+    request<{ prospect: ApiOutreachProspect }>(`/api/outreach/projects/${projectId}/prospects`, {
+      method: 'POST', body: JSON.stringify(body),
+    }),
+  updateOutreachProspect: (id: string, patch: Partial<{
+    name: string; fullName: string | null; email: string | null;
+    recipientType: 'person' | 'agent' | 'manager' | 'other';
+    clientName: string | null; context: string | null;
+    uniqueSentence: string | null; status: string;
+  }>) =>
+    request<{ ok: true }>(`/api/outreach/prospects/${id}`, {
+      method: 'PATCH', body: JSON.stringify(patch),
+    }),
+  deleteOutreachProspect: (id: string) =>
+    request<{ ok: true }>(`/api/outreach/prospects/${id}`, { method: 'DELETE' }),
 
   // Guest outreach — sending-domain pool
   outreachDomains: () =>

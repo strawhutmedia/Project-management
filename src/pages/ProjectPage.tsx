@@ -15,6 +15,7 @@ import BrandProfileCard from '../components/BrandProfileCard'
 import BrandAssetsCard from '../components/BrandAssetsCard'
 import SocialStrategySection from '../components/SocialStrategySection'
 import ShowBriefCard from '../components/ShowBriefCard'
+import OutreachSection from '../components/OutreachSection'
 import ShowChatCard from '../components/ShowChatCard'
 import ScriptOverviewCard from '../components/ScriptOverviewCard'
 import PresenceBar from '../components/PresenceBar'
@@ -255,6 +256,7 @@ export default function ProjectPage() {
       {isAdmin && project.kind === 'podcast' && <BrandProfileCard project={project} members={members} onSaved={reload} />}
       {isAdmin && project.kind === 'podcast' && <ShowBriefCard projectId={project.id} canWrite={isAdmin} />}
       {isAdmin && project.kind === 'podcast' && <SocialStrategySection projectId={project.id} canWrite={isAdmin} />}
+      {isAdmin && project.kind === 'podcast' && <OutreachSection projectId={project.id} />}
       {isAdmin && project.kind === 'podcast' && <PodcastSocialsConfig project={project} members={members} onSaved={reload} />}
 
       {/* Members section — NON-FILM. Film projects fold this into the
