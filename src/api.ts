@@ -885,7 +885,10 @@ export const api = {
       }>
     }>(`/api/projects/${projectId}/presence`),
   dayBudgetItems: (shootDayId: string) =>
-    request<{ items: Array<{ id: string; accountId: string; code: string | null; description: string; amt: number; units: string | null; x: number; rate: number; vendor: string | null; datedAt: string | null; notes: string | null; position: number; total: number; spansAllShootDays: boolean; isSource: boolean; sourceShootDayId: string | null }> }>(
+    request<{
+      items: Array<{ id: string; accountId: string; code: string | null; description: string; amt: number; units: string | null; x: number; rate: number; vendor: string | null; datedAt: string | null; notes: string | null; position: number; total: number; spansAllShootDays: boolean; isSource: boolean; sourceShootDayId: string | null }>
+      scenes: Array<{ id: string; number: string; slug: string | null; itemCount: number; total: number }>
+    }>(
       `/api/budgets/shoot-days/${shootDayId}/items`,
     ),
   quickAddDayCost: (shootDayId: string, body: { description: string; cost: number; code?: string; vendor?: string }) =>

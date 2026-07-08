@@ -1156,7 +1156,13 @@ function DayRow({
               ))}
             </div>
           )}
-          {day && !day.isBreak && <DayCostsSection shootDayId={day.id} isAdmin={isAdmin} />}
+          {day && !day.isBreak && (
+            <DayCostsSection
+              shootDayId={day.id}
+              isAdmin={isAdmin}
+              onOpenScene={onOpenScene}
+            />
+          )}
         </div>
       )}
     </div>
@@ -1302,15 +1308,20 @@ const DAY_BUCKETS: Array<{ code: string; label: string; icon: string }> = [
   { code: 'OTHER',     label: 'Other',         icon: '🚐' },
 ]
 
+type SceneRollup = { id: string; number: string; slug: string | null; itemCount: number; total: number }
+
 function DayCostsSection({
   shootDayId,
   isAdmin,
+  onOpenScene,
 }: {
   shootDayId: string
   isAdmin: boolean
+  onOpenScene?: (sceneId: string) => void
 }) {
   const [expanded, setExpanded] = useState(false)
   const [items, setItems] = useState<DayCostItem[] | null>(null)
+  const [scenes, setScenes] = useState<SceneRollup[]>([])
   const [busy, setBusy] = useState(false)
 
   async function load() {
@@ -1323,8 +1334,10 @@ function DayCostsSection({
         isSource: it.isSource,
         sourceShootDayId: it.sourceShootDayId,
       })))
+      setScenes(r.scenes ?? [])
     } catch {
       setItems([])
+      setScenes([])
     }
   }
 
@@ -1370,7 +1383,9 @@ function DayCostsSection({
     await load()
   }
 
-  const total = (items ?? []).reduce((s, i) => s + i.total, 0)
+  const dayItemsTotal = (items ?? []).reduce((s, i) => s + i.total, 0)
+  const sceneItemsTotal = scenes.reduce((s, r) => s + r.total, 0)
+  const total = dayItemsTotal + sceneItemsTotal
 
   return (
     <div className="border-t border-line/40 mt-2 pt-2 px-1">
@@ -1382,7 +1397,8 @@ function DayCostsSection({
           <span>{expanded ? '▾' : '▸'}</span>
           <span className="font-bold">💰 Day budget</span>
           <span className="text-muted/70">
-            ({(items ?? []).length} item{(items ?? []).length === 1 ? '' : 's'})
+            ({(items ?? []).length} day item{(items ?? []).length === 1 ? '' : 's'}
+            {scenes.length > 0 && ` + ${scenes.length} scene${scenes.length === 1 ? '' : 's'}`})
           </span>
         </span>
         <span className="font-mono text-text font-bold">
@@ -1395,22 +1411,60 @@ function DayCostsSection({
           {items === null ? (
             <p className="text-[11px] text-muted italic">Loading…</p>
           ) : (
-            DAY_BUCKETS.map((bucket) => (
-              <DayBucket
-                key={bucket.code}
-                code={bucket.code}
-                label={bucket.label}
-                icon={bucket.icon}
-                items={items.filter((i) => (i.code ?? 'OTHER') === bucket.code)}
-                isAdmin={isAdmin}
-                onAdd={(desc, vendor, cost) => add(bucket.code, desc, vendor, cost)}
-                onUpdate={updateCost}
-                onDelete={remove}
-                onToggleRunOfShoot={toggleRunOfShoot}
-                onAutoAddCast={bucket.code === 'CAST' ? autoAddCast : undefined}
-                busyAutoAdd={busy}
-              />
-            ))
+            <>
+              {/* Scene rollup — each scene on this day with its budget
+                  total. Click a chip to open the scene modal and edit
+                  its items. Costs live on the scene, so dragging the
+                  scene to another day moves the cost with it. */}
+              {scenes.length > 0 && (
+                <div className="rounded-lg border border-line/60 bg-ink/20 p-2 space-y-2">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-[10px] uppercase tracking-wider text-muted font-bold flex items-center gap-1.5">
+                      <span>🎬</span>
+                      <span>Scenes on this day</span>
+                    </span>
+                    <span className="text-[10px] font-mono text-text/80">
+                      ${Math.round(sceneItemsTotal).toLocaleString()}
+                    </span>
+                  </div>
+                  <div className="flex flex-wrap gap-1.5">
+                    {scenes.map((s) => {
+                      const priced = s.total > 0
+                      return (
+                        <button
+                          key={s.id}
+                          onClick={() => onOpenScene?.(s.id)}
+                          className={`text-[10px] font-mono rounded-full border px-2 py-1 transition ${
+                            priced
+                              ? 'text-emerald-300 border-emerald-500/40 bg-emerald-500/10 hover:bg-emerald-500/20'
+                              : 'text-muted border-line hover:border-stage-mastering/40 hover:text-text'
+                          }`}
+                          title={`Scene ${s.number}${s.slug ? ` — ${s.slug}` : ''} · ${s.itemCount} item${s.itemCount === 1 ? '' : 's'} · click to edit`}
+                        >
+                          #{s.number} {priced ? `$${Math.round(s.total).toLocaleString()}` : 'price me'}
+                        </button>
+                      )
+                    })}
+                  </div>
+                </div>
+              )}
+              {DAY_BUCKETS.map((bucket) => (
+                <DayBucket
+                  key={bucket.code}
+                  code={bucket.code}
+                  label={bucket.label}
+                  icon={bucket.icon}
+                  items={items.filter((i) => (i.code ?? 'OTHER') === bucket.code)}
+                  isAdmin={isAdmin}
+                  onAdd={(desc, vendor, cost) => add(bucket.code, desc, vendor, cost)}
+                  onUpdate={updateCost}
+                  onDelete={remove}
+                  onToggleRunOfShoot={toggleRunOfShoot}
+                  onAutoAddCast={bucket.code === 'CAST' ? autoAddCast : undefined}
+                  busyAutoAdd={busy}
+                />
+              ))}
+            </>
           )}
         </div>
       )}

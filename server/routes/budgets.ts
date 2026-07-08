@@ -433,6 +433,24 @@ budgetsRouter.get('/shoot-days/:shootDayId/items', async (req, res) => {
      ORDER BY li.spans_all_shoot_days DESC, li.position ASC, li.created_at ASC`,
     [shootDayId, lookup.rows[0].project_id],
   )
+  // Scene-attached rollup for this day. Each scene owns its own
+  // priced line items (wardrobe, props, VFX, etc.); when a scene is
+  // scheduled here, its budgeted total should be visible + editable
+  // from the day view too. Producer clicks a scene chip → scene modal
+  // opens → edits items → returns here.
+  const scenesRes = await pool.query<{
+    id: string; number: string; slug: string | null; item_count: string; total: string;
+  }>(
+    `SELECT s.id, s.number, s.slug,
+            COUNT(li.id)::int AS item_count,
+            COALESCE(SUM(li.amt * li.x * li.rate), 0)::numeric AS total
+       FROM scenes s
+       LEFT JOIN budget_line_items li ON li.scene_id = s.id
+      WHERE s.shoot_day_id = $1
+   GROUP BY s.id, s.number, s.slug, s.day_position, s.script_position
+   ORDER BY s.day_position ASC, s.script_position ASC`,
+    [shootDayId],
+  )
   res.json({
     items: rows.map((r) => ({
       id: r.id,
@@ -451,6 +469,13 @@ budgetsRouter.get('/shoot-days/:shootDayId/items', async (req, res) => {
       spansAllShootDays: r.spans_all_shoot_days,
       isSource: r.is_source,
       sourceShootDayId: r.source_shoot_day_id,
+    })),
+    scenes: scenesRes.rows.map((r) => ({
+      id: r.id,
+      number: r.number,
+      slug: r.slug,
+      itemCount: Number(r.item_count),
+      total: Number(r.total),
     })),
   })
 })
