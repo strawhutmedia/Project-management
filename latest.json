@@ -1,9 +1,9 @@
 {
   "version": "0.2.2",
-  "now": "2026-07-08T18:02:31.207Z",
+  "now": "2026-07-08T18:11:52.546Z",
   "boot": {
-    "startedAt": "2026-07-08T18:02:30.774Z",
-    "completedAt": "2026-07-08T18:02:31.196Z",
+    "startedAt": "2026-07-08T18:11:52.221Z",
+    "completedAt": "2026-07-08T18:11:52.527Z",
     "error": null
   },
   "env": {
@@ -100,12 +100,12 @@
       "064_flagship_show.sql"
     ],
     "userCount": 12,
-    "projectCount": 15
+    "projectCount": 16
   },
   "recentLog": [
     {
       "level": "info",
-      "ts": "2026-07-08T18:02:30.772Z",
+      "ts": "2026-07-08T18:11:52.220Z",
       "msg": "serving client from",
       "data": {
         "clientDir": "/app/dist"
@@ -113,7 +113,7 @@
     },
     {
       "level": "info",
-      "ts": "2026-07-08T18:02:30.774Z",
+      "ts": "2026-07-08T18:11:52.221Z",
       "msg": "boot starting",
       "data": {
         "cwd": "/app",
@@ -124,12 +124,12 @@
     },
     {
       "level": "info",
-      "ts": "2026-07-08T18:02:31.018Z",
+      "ts": "2026-07-08T18:11:52.407Z",
       "msg": "migrations complete"
     },
     {
       "level": "info",
-      "ts": "2026-07-08T18:02:31.188Z",
+      "ts": "2026-07-08T18:11:52.505Z",
       "msg": "BIYA seed: project already exists, ensured shoot days",
       "data": {
         "projectId": "12f53ed1-c6c7-4c11-8d7b-06d91744c9af"
@@ -137,12 +137,20 @@
     },
     {
       "level": "info",
-      "ts": "2026-07-08T18:02:31.196Z",
+      "ts": "2026-07-08T18:11:52.526Z",
+      "msg": "podcast: backfilled executive_producer = admin",
+      "data": {
+        "projectId": "f4680d92-624d-449e-b9c5-37ae2174d34c"
+      }
+    },
+    {
+      "level": "info",
+      "ts": "2026-07-08T18:11:52.527Z",
       "msg": "listening on :8080"
     },
     {
       "level": "info",
-      "ts": "2026-07-08T18:02:31.197Z",
+      "ts": "2026-07-08T18:11:52.528Z",
       "msg": "scheduler started (every 5 min)"
     }
   ]
