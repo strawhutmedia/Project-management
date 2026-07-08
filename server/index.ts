@@ -29,6 +29,7 @@ import { seedBackInYourArms } from './seeds/back_in_your_arms'
 import { ensureRyanIsPodcastEp } from './routes/projects'
 import { startScheduler } from './scheduler'
 import { scheduleBootTimeCoverSync, syncMissingCoversFromRss } from './rss_cover_sync'
+import { scheduleFlagshipSeed } from './seeds/flagship_podcasts'
 import {
   diagRouter,
   logError,
@@ -181,6 +182,7 @@ async function start() {
   app.listen(PORT, '0.0.0.0', () => {
     markBootComplete()
     logInfo(`listening on :${PORT}`)
+    scheduleFlagshipSeed()
     scheduleBootTimeCoverSync()
     void reportStatus()
     startScheduler()
