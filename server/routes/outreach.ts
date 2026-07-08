@@ -52,6 +52,24 @@ async function getOneSheetUrl(projectId: string): Promise<string> {
   return `${base}/shows/${r.slug}`
 }
 
+// ─── CSV template download ──────────────────────────────────────────
+// Ryan's team fills this out in Excel/Sheets, then copy-pastes the
+// whole block into the Bulk import textarea. Columns mirror the
+// parseBulk() order in OutreachSection so what you see is what you get.
+outreachRouter.get('/template.csv', (_req, res) => {
+  const header = 'name,email,full_name,recipient_type,client_name,context'
+  const rows = [
+    'Alex,alex@company.com,Alex Rodriguez,person,,founder of X — just did Diary of a CEO',
+    'Sarah,sarah@agency.com,Sarah Kim,agent,Emily Blunt,Emily Blunt\'s booking agent',
+    'Tom,tom@bigfilm.com,Tom Hayes,manager,Pedro Pascal,Pedro Pascal\'s longtime manager',
+    'Jamie,jamie@studio.com,Jamie Ortiz,other,,PR contact at A24',
+  ]
+  const csv = [header, ...rows].join('\r\n') + '\r\n'
+  res.setHeader('Content-Type', 'text/csv; charset=utf-8')
+  res.setHeader('Content-Disposition', 'attachment; filename="slate-outreach-template.csv"')
+  res.send(csv)
+})
+
 // ─── Templates ──────────────────────────────────────────────────────
 outreachRouter.get('/projects/:projectId/template', async (req, res) => {
   const { rows } = await pool.query(
@@ -578,6 +596,27 @@ outreachRouter.post('/projects/:projectId/auto-populate-one-sheet', async (req, 
     })
     res.status(500).json({ error: 'auto_populate_failed', detail: err instanceof Error ? err.message.slice(0, 300) : String(err) })
   }
+})
+
+// Wipe every prospect on a show. Useful when the operator wants to
+// start over with a fresh list — deleting one at a time is tedious.
+// The optional `keep=sent` query preserves rows that already fired
+// so history isn't destroyed by an accidental click.
+outreachRouter.delete('/projects/:projectId/prospects', async (req, res) => {
+  const projectId = req.params.projectId
+  const keepSent = req.query.keep === 'sent'
+  const q = keepSent
+    ? await pool.query(
+        `DELETE FROM outreach_prospects
+          WHERE project_id = $1
+            AND status NOT IN ('sent', 'replied')`,
+        [projectId],
+      )
+    : await pool.query(
+        `DELETE FROM outreach_prospects WHERE project_id = $1`,
+        [projectId],
+      )
+  res.json({ ok: true, deleted: q.rowCount ?? 0 })
 })
 
 outreachRouter.delete('/prospects/:id', async (req, res) => {

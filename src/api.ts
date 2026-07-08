@@ -1405,6 +1405,11 @@ export const api = {
     }),
   deleteOutreachProspect: (id: string) =>
     request<{ ok: true }>(`/api/outreach/prospects/${id}`, { method: 'DELETE' }),
+  clearAllOutreachProspects: (projectId: string, keepSent = false) =>
+    request<{ ok: true; deleted: number }>(
+      `/api/outreach/projects/${projectId}/prospects${keepSent ? '?keep=sent' : ''}`,
+      { method: 'DELETE' },
+    ),
 
   // Guest outreach — sending-domain pool
   outreachDomains: () =>

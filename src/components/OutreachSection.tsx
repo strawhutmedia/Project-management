@@ -142,6 +142,26 @@ export default function OutreachSection({ projectId }: { projectId: string }) {
     }
   }
 
+  async function clearAll() {
+    const total = prospects?.length ?? 0
+    const sentOrReplied = (prospects ?? []).filter((p) => p.status === 'sent' || p.status === 'replied').length
+    const message =
+      sentOrReplied > 0
+        ? `Delete all ${total} prospects?\n\n${sentOrReplied} have already been sent or replied — keep those and only delete the rest?`
+        : `Delete all ${total} prospects? This can't be undone.`
+    if (!confirm(message)) return
+    // If any are sent, offer to keep them.
+    const keepSent = sentOrReplied > 0 && confirm(`Keep the ${sentOrReplied} sent/replied prospects and only delete the other ${total - sentOrReplied}?`)
+    try {
+      const r = await api.clearAllOutreachProspects(projectId, keepSent)
+      setError(null)
+      setCampaignResult(`✓ Cleared ${r.deleted} prospect${r.deleted === 1 ? '' : 's'}.`)
+      await loadProspects()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'clear all failed')
+    }
+  }
+
   async function sendCampaign() {
     const readyList = (prospects ?? []).filter(
       (p) => p.status === 'ready' && p.email && p.unique_sentence?.trim(),
@@ -374,6 +394,15 @@ export default function OutreachSection({ projectId }: { projectId: string }) {
               >
                 {addOpen ? 'Cancel' : '+ Add one'}
               </button>
+              {prospects && prospects.length > 0 && (
+                <button
+                  onClick={() => void clearAll()}
+                  className="text-[10px] uppercase tracking-wider text-urgent border border-urgent/40 rounded-full px-3 py-1 hover:bg-urgent/10 font-bold"
+                  title={`Delete all ${prospects.length} prospects (with confirmation).`}
+                >
+                  🗑 Clear all ({prospects.length})
+                </button>
+              )}
             </div>
           </div>
 
@@ -637,6 +666,16 @@ function BulkImportPanel({
         </ul>
         <p className="text-amber-300/80 pt-1">
           <strong>Multiple emails in one cell?</strong> Slate splits them into separate prospects (one send per address) — you get one row per email, not a joined mess.
+        </p>
+        <p className="pt-1">
+          <a
+            href="/api/outreach/template.csv"
+            download="slate-outreach-template.csv"
+            className="text-stage-tracking underline hover:text-stage-tracking/80 font-bold"
+          >
+            📥 Download CSV template
+          </a>
+          <span className="text-muted/70"> — open in Excel or Google Sheets, fill in the rows, then paste the whole thing above.</span>
         </p>
       </div>
       <textarea
