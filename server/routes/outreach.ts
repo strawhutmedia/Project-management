@@ -483,6 +483,28 @@ outreachRouter.post('/projects/:projectId/auto-populate-one-sheet', async (req, 
   )
   const proj = projRes.rows[0]
   if (!proj) { res.status(404).json({ error: 'project_not_found' }); return }
+
+  // Some podcast projects were created before migration 053 or via a
+  // path that didn't set slug — auto-generate + persist so the public
+  // one-sheet URL works. Dedupe by appending short suffix if taken.
+  let slug = proj.slug
+  if (!slug) {
+    const base = proj.name.toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/(^-|-$)/g, '')
+      .slice(0, 100) || 'show'
+    let candidate = base
+    for (let i = 2; i < 100; i++) {
+      const clash = await pool.query(
+        `SELECT 1 FROM projects WHERE slug = $1 AND id <> $2 LIMIT 1`,
+        [candidate, projectId],
+      )
+      if (clash.rows.length === 0) break
+      candidate = `${base}-${i}`
+    }
+    slug = candidate
+    await pool.query(`UPDATE projects SET slug = $1 WHERE id = $2`, [slug, projectId])
+  }
   const brief = await loadShowBrief(projectId)
   const epRes = await pool.query<{ title: string; subtitle: string | null }>(
     `SELECT title, subtitle FROM songs WHERE project_id = $1
@@ -513,10 +535,11 @@ outreachRouter.post('/projects/:projectId/auto-populate-one-sheet', async (req, 
        'booking@strawhutmedia.com', projectId],
     )
     const base = process.env.APP_BASE_URL || 'https://slate.strawhutmedia.com'
-    const url = proj.slug ? `${base}/shows/${proj.slug}` : null
+    const url = `${base}/shows/${slug}`
     res.json({
       ok: true,
       url,
+      slug,
       heroTagline: result.heroTagline,
       guestPitch: result.guestPitch,
       notableGuests: result.notableGuests,

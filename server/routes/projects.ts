@@ -139,11 +139,28 @@ projectsRouter.post('/', async (req, res) => {
     if (ryanId && user.id !== ryanId) defaultOwners.project_manager = user.id
   }
 
+  // Podcast projects get an auto-generated slug so their public
+  // one-sheet URL works from the moment the outreach page loads.
+  // Dedupe by appending a numeric suffix on collision.
+  let slug: string | null = null
+  if (kind === 'podcast') {
+    const base = name.toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/(^-|-$)/g, '')
+      .slice(0, 100) || 'show'
+    let candidate = base
+    for (let i = 2; i < 100; i++) {
+      const clash = await pool.query(`SELECT 1 FROM projects WHERE slug = $1 LIMIT 1`, [candidate])
+      if (clash.rows.length === 0) break
+      candidate = `${base}-${i}`
+    }
+    slug = candidate
+  }
   const { rows } = await pool.query(
-    `INSERT INTO projects (name, subtitle, kind, created_by, dropbox_folder, stage_labels, channels_subfolder, default_owners)
-     VALUES ($1, $2, $3, $4, $5, $6::jsonb, $7, $8::jsonb)
+    `INSERT INTO projects (name, subtitle, kind, created_by, dropbox_folder, stage_labels, channels_subfolder, default_owners, slug)
+     VALUES ($1, $2, $3, $4, $5, $6::jsonb, $7, $8::jsonb, $9)
      RETURNING id, name, subtitle, kind, dropbox_folder, stage_labels, channels_subfolder`,
-    [name.slice(0, 200), subtitle, kind, user.id, dropboxFolder, JSON.stringify(stageLabels), channelsSubfolder, JSON.stringify(defaultOwners)],
+    [name.slice(0, 200), subtitle, kind, user.id, dropboxFolder, JSON.stringify(stageLabels), channelsSubfolder, JSON.stringify(defaultOwners), slug],
   )
   const project = rows[0]
   await pool.query(
