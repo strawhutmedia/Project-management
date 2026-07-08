@@ -31,6 +31,10 @@ export default function OneSheetCard({ project, onSaved }: { project: ApiProject
   const [savedAt, setSavedAt] = useState<number | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [autoPopulating, setAutoPopulating] = useState(false)
+  // URL returned from auto-populate response — takes precedence over
+  // the project.slug-derived URL so producers see the View button the
+  // instant the API returns, not after a separate refetch round-trip.
+  const [overrideUrl, setOverrideUrl] = useState<string | null>(null)
 
   async function autoPopulate() {
     const ok = confirm(
@@ -50,6 +54,7 @@ export default function OneSheetCard({ project, onSaved }: { project: ApiProject
         notableGuests: r.notableGuests,
         oneSheetPublished: true,
       })
+      if (r.url) setOverrideUrl(r.url)
       setSavedAt(Date.now())
       onSaved()
     } catch (err) {
@@ -63,9 +68,9 @@ export default function OneSheetCard({ project, onSaved }: { project: ApiProject
     setFields(fromProject(project))
   }, [project.id])
 
-  const url = project.slug
+  const url = overrideUrl ?? (project.slug
     ? `${window.location.origin}/shows/${project.slug}`
-    : null
+    : null)
 
   async function save(patch: Partial<Fields>) {
     setSaving(true)
@@ -114,15 +119,21 @@ export default function OneSheetCard({ project, onSaved }: { project: ApiProject
           {/* When published, primary CTA is "View" — an actual link
               that opens the live one-sheet. Producer can unpublish
               from the URL panel below. */}
-          {fields.oneSheetPublished && url ? (
-            <a
-              href={url}
-              target="_blank"
-              rel="noreferrer"
-              className="inline-flex items-center gap-1.5 text-[10px] uppercase tracking-wider font-bold text-emerald-950 bg-emerald-400 rounded-full px-3 py-1.5 hover:bg-emerald-300"
-            >
-              ↗ View one-sheet
-            </a>
+          {fields.oneSheetPublished ? (
+            url ? (
+              <a
+                href={url}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex items-center gap-1.5 text-[10px] uppercase tracking-wider font-bold text-emerald-950 bg-emerald-400 rounded-full px-3 py-1.5 hover:bg-emerald-300"
+              >
+                ↗ View one-sheet
+              </a>
+            ) : (
+              <span className="text-[10px] uppercase tracking-wider text-emerald-300 border border-emerald-500/40 rounded-full px-3 py-1.5 font-bold">
+                ✓ Published (URL loading…)
+              </span>
+            )
           ) : (
             <button
               onClick={() => void togglePublish()}
