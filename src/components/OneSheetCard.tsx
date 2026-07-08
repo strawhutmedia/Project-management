@@ -30,6 +30,34 @@ export default function OneSheetCard({ project, onSaved }: { project: ApiProject
   const [saving, setSaving] = useState(false)
   const [savedAt, setSavedAt] = useState<number | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [autoPopulating, setAutoPopulating] = useState(false)
+
+  async function autoPopulate() {
+    const ok = confirm(
+      'Read this show\'s episodes + Show Brief and draft the one-sheet copy (hero tagline, notable guests, guesting pitch, brand color)?\n\n' +
+      'Overwrites any existing copy. Publishes the one-sheet automatically so you can preview the URL immediately.',
+    )
+    if (!ok) return
+    setAutoPopulating(true)
+    setError(null)
+    try {
+      const r = await api.autoPopulateOneSheet(project.id)
+      setFields({
+        heroTagline: r.heroTagline,
+        guestPitch: r.guestPitch,
+        contactEmail: fields.contactEmail || 'booking@strawhutmedia.com',
+        brandHex: r.brandHex,
+        notableGuests: r.notableGuests,
+        oneSheetPublished: true,
+      })
+      setSavedAt(Date.now())
+      onSaved()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'auto-populate failed')
+    } finally {
+      setAutoPopulating(false)
+    }
+  }
 
   useEffect(() => {
     setFields(fromProject(project))
@@ -74,17 +102,27 @@ export default function OneSheetCard({ project, onSaved }: { project: ApiProject
             anywhere. Elegant, mobile-friendly, uses the show's cover art.
           </p>
         </div>
-        <button
-          onClick={() => void togglePublish()}
-          disabled={saving}
-          className={`text-[10px] uppercase tracking-wider font-bold border rounded-full px-3 py-1.5 disabled:opacity-40 ${
-            fields.oneSheetPublished
-              ? 'text-emerald-300 border-emerald-500/40 hover:bg-emerald-500/10'
-              : 'text-muted border-line hover:bg-ink/40'
-          }`}
-        >
-          {fields.oneSheetPublished ? '✓ Published' : 'Publish one-sheet'}
-        </button>
+        <div className="flex items-center gap-2 flex-wrap">
+          <button
+            onClick={() => void autoPopulate()}
+            disabled={saving || autoPopulating}
+            className="text-[10px] uppercase tracking-wider text-emerald-950 bg-emerald-400 rounded-full px-3 py-1.5 hover:bg-emerald-300 disabled:opacity-40 font-bold"
+            title="Read the show's episodes and Show Brief, then draft hero tagline, notable guests, guesting pitch, and brand color. Overwrites current fields."
+          >
+            {autoPopulating ? 'Drafting…' : '✨ Auto-populate from episodes'}
+          </button>
+          <button
+            onClick={() => void togglePublish()}
+            disabled={saving}
+            className={`text-[10px] uppercase tracking-wider font-bold border rounded-full px-3 py-1.5 disabled:opacity-40 ${
+              fields.oneSheetPublished
+                ? 'text-emerald-300 border-emerald-500/40 hover:bg-emerald-500/10'
+                : 'text-muted border-line hover:bg-ink/40'
+            }`}
+          >
+            {fields.oneSheetPublished ? '✓ Published' : 'Publish one-sheet'}
+          </button>
+        </div>
       </div>
 
       {error && <p className="text-xs text-urgent">{error}</p>}

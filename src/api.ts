@@ -1365,6 +1365,11 @@ export const api = {
       `/api/outreach/projects/${projectId}/generate-all-sentences`,
       { method: 'POST', body: JSON.stringify({}) },
     ),
+  autoPopulateOneSheet: (projectId: string) =>
+    request<{ ok: true; url: string | null; heroTagline: string; guestPitch: string; notableGuests: string; brandHex: string }>(
+      `/api/outreach/projects/${projectId}/auto-populate-one-sheet`,
+      { method: 'POST', body: JSON.stringify({}) },
+    ),
   sendOutreachCampaign: (projectId: string, prospectIds?: string[]) =>
     request<{ ok: true; queued: number; estimatedMinutes: number; firstAt: string; lastAt: string }>(
       `/api/outreach/projects/${projectId}/send-campaign`,

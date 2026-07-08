@@ -1865,6 +1865,112 @@ export async function generateUniqueSentence(input: UniqueSentenceInput): Promis
   }
 }
 
+// ─────────────────────────────────────────────────────────────────────
+// Auto-populate a show's one-sheet from its episode list
+// ─────────────────────────────────────────────────────────────────────
+//
+// Producers point Slate at a show and get back: hero tagline, guest
+// pitch (what recording looks like), notable past guests, and a brand
+// color. Everything's just a starting point — the operator edits after.
+
+export type OneSheetAutoInput = {
+  showName: string
+  showSubtitle: string | null
+  brandVoice: string | null
+  briefDescription: string | null      // from Show Brief business_description
+  briefAudience: string | null
+  briefMetrics: string | null
+  episodes: Array<{ title: string; subtitle: string | null }>
+}
+
+export type OneSheetAutoResult = {
+  heroTagline: string
+  guestPitch: string
+  notableGuests: string       // comma-separated
+  brandHex: string            // 6-char hex including #
+  usage: { inputTokens: number; outputTokens: number }
+}
+
+const ONE_SHEET_AUTO_SCHEMA = {
+  type: 'object',
+  additionalProperties: false,
+  required: ['hero_tagline', 'guest_pitch', 'notable_guests', 'brand_hex'],
+  properties: {
+    hero_tagline: {
+      type: 'string',
+      description: 'One-sentence show description for the hero. Concrete, specific to this show, not generic. Under 200 chars.',
+    },
+    guest_pitch: {
+      type: 'string',
+      description: 'What guesting on this show is like — recording format, length, what guests get. 2-3 sentences.',
+    },
+    notable_guests: {
+      type: 'string',
+      description: 'Comma-separated list of the most name-recognizable past guests extracted from episode titles/subtitles. Up to 12 names. If you can\'t identify any guest names, return "".',
+    },
+    brand_hex: {
+      type: 'string',
+      description: 'A 6-digit hex color starting with # that matches the show\'s vibe. Adult/alt shows lean pink/red; business shows lean navy/gold; comedy shows lean yellow/orange; interview shows lean deep amber.',
+    },
+  },
+} as const
+
+const ONE_SHEET_AUTO_SYSTEM = `You draft the copy for a show's public "one-sheet" pitch page — the URL guests land on when we email them. Your output goes to the show's producer to edit; treat it as a first draft, not a final publish.
+
+Rules:
+- Hero tagline: One sentence that tells a stranger what this show actually is. Concrete. No "join us as we explore" nonsense.
+- Guest pitch: Describe what recording is like based on the show's format (remote/in-studio, video/audio-only, length, edit). If the format isn't obvious from the metadata, write a reasonable default AND flag it as such.
+- Notable guests: Extract from episode titles/subtitles. Look for patterns like "w/ NAME", "with NAME", "feat. NAME", or a name in the title itself. Only include names you're confident about. If you can't find guest names, return "" — don't invent.
+- Brand hex: Match the show's actual vibe. Adult/lifestyle → hot pink or magenta. Business/interview → deep amber or navy. Comedy → gold/orange. Serious/documentary → dark red or deep blue.
+
+Return ONLY the JSON.`
+
+export async function generateOneSheetAuto(input: OneSheetAutoInput): Promise<OneSheetAutoResult> {
+  const lines: string[] = []
+  lines.push(`Show: ${input.showName}`)
+  if (input.showSubtitle) lines.push(`Subtitle: ${input.showSubtitle}`)
+  if (input.brandVoice) lines.push(`Brand voice notes: ${input.brandVoice.slice(0, 500)}`)
+  if (input.briefDescription) lines.push(`\nWhat it is: ${input.briefDescription}`)
+  if (input.briefAudience) lines.push(`Audience: ${input.briefAudience}`)
+  if (input.briefMetrics) lines.push(`Reach: ${input.briefMetrics}`)
+  if (input.episodes.length > 0) {
+    lines.push('\nEpisodes (use titles + subtitles to extract guest names):')
+    for (const e of input.episodes.slice(0, 40)) {
+      lines.push(`  - ${e.title}${e.subtitle ? ` — ${e.subtitle}` : ''}`)
+    }
+  }
+  logInfo('one-sheet auto: generating', { show: input.showName, episodes: input.episodes.length })
+  const response = await client.messages.create({
+    model: MODEL,
+    max_tokens: 2000,
+    system: ONE_SHEET_AUTO_SYSTEM,
+    messages: [{
+      role: 'user',
+      content: [{
+        type: 'text',
+        text: lines.join('\n'),
+        cache_control: { type: 'ephemeral' },
+      }],
+    }],
+    output_config: { format: { type: 'json_schema', schema: ONE_SHEET_AUTO_SCHEMA } },
+  })
+  const textBlock = response.content.find((b) => b.type === 'text')
+  if (!textBlock || textBlock.type !== 'text') throw new Error('one-sheet auto: no text block')
+  const parsed = JSON.parse(textBlock.text) as {
+    hero_tagline: string; guest_pitch: string; notable_guests: string; brand_hex: string
+  }
+  return {
+    heroTagline: parsed.hero_tagline,
+    guestPitch: parsed.guest_pitch,
+    notableGuests: parsed.notable_guests,
+    brandHex: parsed.brand_hex,
+    usage: {
+      inputTokens: response.usage.input_tokens,
+      outputTokens: response.usage.output_tokens,
+    },
+  }
+}
+
 export async function generateSocialStrategyDocument(
   input: StrategyGenerateInput,
 ): Promise<StrategyGenerateResult> {

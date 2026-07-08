@@ -17,7 +17,7 @@ import { Resend } from 'resend'
 import { pool } from '../db'
 import { requireAdmin, type SessionUser } from '../auth'
 import { logError, logInfo } from '../diag'
-import { generateUniqueSentence, hasAnthropicKey, type UniqueSentenceInput } from '../anthropic'
+import { generateUniqueSentence, generateOneSheetAuto, hasAnthropicKey, type UniqueSentenceInput } from '../anthropic'
 import { loadShowBrief } from './show_brief'
 
 const resendKey = process.env.RESEND_API_KEY
@@ -462,6 +462,73 @@ outreachRouter.post('/projects/:projectId/send-campaign', async (req, res) => {
     logError('outreach: boot reset failed', { error: err instanceof Error ? err.message : String(err) })
   }
 })()
+
+// Auto-populate a show's one-sheet from its episode list + Show Brief.
+// Producer clicks the button, Claude reads the metadata and drafts:
+// hero tagline, guest pitch, notable guests, brand color. Everything
+// is saved to projects and publish flag is flipped on so the URL is
+// live immediately for review.
+outreachRouter.post('/projects/:projectId/auto-populate-one-sheet', async (req, res) => {
+  if (!hasAnthropicKey()) {
+    res.status(503).json({ error: 'anthropic_key_missing' })
+    return
+  }
+  const projectId = req.params.projectId
+  const projRes = await pool.query<{
+    name: string; subtitle: string | null; socials_brand_voice: string | null; slug: string | null;
+  }>(
+    `SELECT name, subtitle, socials_brand_voice, slug
+       FROM projects WHERE id = $1 AND kind = 'podcast'`,
+    [projectId],
+  )
+  const proj = projRes.rows[0]
+  if (!proj) { res.status(404).json({ error: 'project_not_found' }); return }
+  const brief = await loadShowBrief(projectId)
+  const epRes = await pool.query<{ title: string; subtitle: string | null }>(
+    `SELECT title, subtitle FROM songs WHERE project_id = $1
+      ORDER BY position DESC NULLS LAST, created_at DESC LIMIT 40`,
+    [projectId],
+  )
+  try {
+    const result = await generateOneSheetAuto({
+      showName: proj.name,
+      showSubtitle: proj.subtitle,
+      brandVoice: proj.socials_brand_voice,
+      briefDescription: brief?.business_description ?? null,
+      briefAudience: brief?.target_audience ?? null,
+      briefMetrics: brief?.current_metrics ?? null,
+      episodes: epRes.rows,
+    })
+    // Save + auto-publish. Slug already backfilled by migration 053.
+    await pool.query(
+      `UPDATE projects
+          SET hero_tagline = $1,
+              guest_pitch = $2,
+              notable_guests = $3,
+              brand_hex = $4,
+              contact_email = COALESCE(contact_email, $5),
+              one_sheet_published = TRUE
+        WHERE id = $6`,
+      [result.heroTagline, result.guestPitch, result.notableGuests, result.brandHex,
+       'booking@strawhutmedia.com', projectId],
+    )
+    const base = process.env.APP_BASE_URL || 'https://slate.strawhutmedia.com'
+    const url = proj.slug ? `${base}/shows/${proj.slug}` : null
+    res.json({
+      ok: true,
+      url,
+      heroTagline: result.heroTagline,
+      guestPitch: result.guestPitch,
+      notableGuests: result.notableGuests,
+      brandHex: result.brandHex,
+    })
+  } catch (err) {
+    logError('outreach: one-sheet auto-populate failed', {
+      projectId, error: err instanceof Error ? err.message : String(err),
+    })
+    res.status(500).json({ error: 'auto_populate_failed', detail: err instanceof Error ? err.message.slice(0, 300) : String(err) })
+  }
+})
 
 outreachRouter.delete('/prospects/:id', async (req, res) => {
   const { rowCount } = await pool.query(
