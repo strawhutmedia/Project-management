@@ -14,7 +14,7 @@
     "rssFeedUrl": null,
     "createdAt": "2026-04-29T22:31:46.421Z"
   },
-  "publishedAt": "2026-07-08T02:37:44.252Z",
+  "publishedAt": "2026-07-08T03:00:20.162Z",
   "counts": {
     "scenes": 157,
     "lineItems": 1766,
@@ -28227,8 +28227,8 @@
       "description": "Insurance",
       "amt": 1,
       "x": 1,
-      "rate": 5000,
-      "total": 5000,
+      "rate": 300,
+      "total": 300,
       "notes": null,
       "vendor": "Film Emporium",
       "datedAt": null,
