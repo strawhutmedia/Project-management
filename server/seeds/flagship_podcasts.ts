@@ -9,6 +9,7 @@
 
 import { pool } from '../db'
 import { logError, logInfo } from '../diag'
+import { syncMissingCoversFromRss } from '../rss_cover_sync'
 
 // Ryan's flagship set. Add or remove IDs here; the seed is idempotent.
 const FLAGSHIP_ITUNES_IDS = [
@@ -89,13 +90,19 @@ export async function seedFlagshipPodcasts(): Promise<void> {
 
       const existingId = await findExistingProject(name, feedUrl)
       if (existingId) {
-        // Just make sure the flagship flag is on. Don't overwrite the
-        // producer's manual tweaks to name / cover / rss.
+        // Make sure the flagship flag is on + fill in any missing
+        // cover art (some earlier rows didn't get artwork because
+        // iTunes lookup came back thin). Don't overwrite anything
+        // the producer set manually.
         await pool.query(
-          `UPDATE projects SET is_flagship = TRUE WHERE id = $1`,
-          [existingId],
+          `UPDATE projects
+              SET is_flagship = TRUE,
+                  cover_art_url = COALESCE(NULLIF(cover_art_url, ''), $2),
+                  rss_feed_url  = COALESCE(NULLIF(rss_feed_url, ''), $3)
+            WHERE id = $1`,
+          [existingId, artwork || null, feedUrl],
         )
-        logInfo('flagship seed: existing show flagged', { id, name, projectId: existingId })
+        logInfo('flagship seed: existing show flagged', { id, name, projectId: existingId, hadArtwork: Boolean(artwork) })
         continue
       }
 
@@ -106,12 +113,21 @@ export async function seedFlagshipPodcasts(): Promise<void> {
          RETURNING id`,
         [name, feedUrl, artwork || null, slug],
       )
-      logInfo('flagship seed: created show', { id, name, projectId: insertRes.rows[0].id })
+      logInfo('flagship seed: created show', { id, name, projectId: insertRes.rows[0].id, hadArtwork: Boolean(artwork) })
     } catch (err) {
       logError('flagship seed: failed for id', {
         id, error: err instanceof Error ? err.message : String(err),
       })
     }
+  }
+  // Fallback: any flagship show still missing artwork gets its cover
+  // pulled from the RSS feed (itunes:image tag). Catches shows where
+  // the iTunes lookup returned empty artworkUrl fields.
+  try {
+    const { synced } = await syncMissingCoversFromRss()
+    if (synced > 0) logInfo('flagship seed: RSS cover fallback filled', { synced })
+  } catch (err) {
+    logError('flagship seed: RSS fallback failed', { error: err instanceof Error ? err.message : String(err) })
   }
 }
 

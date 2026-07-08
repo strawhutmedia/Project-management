@@ -75,16 +75,21 @@ showPageRouter.get('/shows/:slug', async (req: Request, res: Response) => {
     // section. Flagship shows (is_flagship=TRUE) surface first — those
     // are the ones a guest would recognize. Fall back to other shows
     // with cover art if we don't hit the limit. Cap at 8.
+    //
+    // Exclude the current show BY ID *and* BY NAME so a duplicate row
+    // (e.g. two "Private Talk" entries from a seed collision) doesn't
+    // slip in. Belt-and-suspenders.
     pool.query<SisterShowRow>(
       `SELECT name, slug, cover_art_url, subtitle
          FROM projects
         WHERE kind = 'podcast'
           AND id <> $1
+          AND LOWER(name) <> LOWER($2)
           AND cover_art_url IS NOT NULL
           AND cover_art_url <> ''
         ORDER BY is_flagship DESC, created_at ASC
         LIMIT 8`,
-      [show.id],
+      [show.id, show.name],
     ),
   ])
   const brief = briefRes.rows[0] ?? null
