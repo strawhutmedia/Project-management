@@ -182,9 +182,13 @@ export default function OutreachSection({ projectId }: { projectId: string }) {
     setCampaignResult(null)
     try {
       const r = await api.sendOutreachCampaign(projectId)
+      const split = r.perDomain.length > 1
+        ? ` Rotating across ${r.domainsUsed} domains (~${r.perDomain.join('/')} sends each) to protect reputation.`
+        : ` Sending from ${r.domainsUsed} verified domain. Add more in Sending domains to spread load.`
       setCampaignResult(
         `✓ Campaign queued: ${r.queued} emails will send over the next ~${r.estimatedMinutes} min. ` +
-        `First fires around ${new Date(r.firstAt).toLocaleTimeString()}, last around ${new Date(r.lastAt).toLocaleTimeString()}.`,
+        `First fires around ${new Date(r.firstAt).toLocaleTimeString()}, last around ${new Date(r.lastAt).toLocaleTimeString()}.` +
+        split,
       )
       await loadProspects()
     } catch (err) {

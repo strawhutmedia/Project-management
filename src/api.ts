@@ -1376,7 +1376,11 @@ export const api = {
       { method: 'POST', body: JSON.stringify({}) },
     ),
   sendOutreachCampaign: (projectId: string, prospectIds?: string[]) =>
-    request<{ ok: true; queued: number; estimatedMinutes: number; firstAt: string; lastAt: string }>(
+    request<{
+      ok: true; queued: number; estimatedMinutes: number;
+      firstAt: string; lastAt: string;
+      domainsUsed: number; perDomain: number[];
+    }>(
       `/api/outreach/projects/${projectId}/send-campaign`,
       { method: 'POST', body: JSON.stringify({ prospectIds: prospectIds ?? null }) },
     ),

@@ -310,15 +310,31 @@ async function sendOneProspect(prospectId: string): Promise<void> {
   const tpl = tplRes.rows[0]
   if (!tpl || !tpl.subject.trim() || !tpl.body.trim()) throw new Error('template_empty')
 
-  // Pick sending domain — prefer show's pinned, else first verified + active.
-  const domRes = await pool.query<{ id: string; name: string }>(
-    `SELECT id, name FROM sending_domains
-      WHERE status = 'verified' AND active = TRUE
-      ORDER BY (primary_show_id = $1) DESC, created_at ASC
-      LIMIT 1`,
-    [p.project_id],
+  // Pick sending domain. If the prospect was pre-assigned a domain at
+  // queue time (round-robin distribution across the pool — see
+  // send-campaign below), honor it as long as that domain is still
+  // verified + active. If it's been disabled since queueing, or if
+  // there's no pre-assignment, fall back to the healthiest available
+  // domain in the pool.
+  const assignedRes = await pool.query<{ id: string; name: string }>(
+    `SELECT sd.id, sd.name
+       FROM outreach_prospects op
+       JOIN sending_domains sd ON sd.id = op.sending_domain_id
+      WHERE op.id = $1
+        AND sd.status = 'verified' AND sd.active = TRUE`,
+    [prospectId],
   )
-  const domain = domRes.rows[0]
+  let domain = assignedRes.rows[0]
+  if (!domain) {
+    const domRes = await pool.query<{ id: string; name: string }>(
+      `SELECT id, name FROM sending_domains
+        WHERE status = 'verified' AND active = TRUE
+        ORDER BY (primary_show_id = $1) DESC, created_at ASC
+        LIMIT 1`,
+      [p.project_id],
+    )
+    domain = domRes.rows[0]
+  }
   if (!domain) throw new Error('no_verified_domain')
 
   const showRes = await pool.query<{ name: string }>(
@@ -438,33 +454,77 @@ outreachRouter.post('/projects/:projectId/send-campaign', async (req, res) => {
     return
   }
 
-  // Verify at least one sending domain exists.
-  const dc = await pool.query<{ n: string }>(
-    `SELECT COUNT(*)::int AS n FROM sending_domains WHERE status = 'verified' AND active = TRUE`,
+  // Load the full pool of verified + active domains. Pinned domain
+  // (if any) comes first, then oldest-created — that keeps show-owned
+  // domains as the "anchor" of the rotation without giving them 100%
+  // of the volume. If the show has 4 domains in the pool and 40
+  // prospects, each domain gets ~10 sends — no single domain gets
+  // burned by campaign volume.
+  const domRes = await pool.query<{ id: string; name: string }>(
+    `SELECT id, name FROM sending_domains
+      WHERE status = 'verified' AND active = TRUE
+      ORDER BY (primary_show_id = $1) DESC, created_at ASC`,
+    [projectId],
   )
-  if (Number(dc.rows[0]?.n ?? 0) === 0) {
+  const domains = domRes.rows
+  if (domains.length === 0) {
     res.status(400).json({ error: 'no_verified_domain' })
     return
   }
 
-  // Mark all as queued immediately so the UI reflects the campaign
-  // state, and schedule each one 90-180s apart. Small jitter also
-  // between adjacent sends via Math.random so the pattern isn't
-  // exactly deterministic.
-  await pool.query(
-    `UPDATE outreach_prospects SET status = 'queued', updated_at = now() WHERE id = ANY($1::uuid[])`,
-    [ids],
-  )
+  // Shuffle prospect order so consecutive sends (which the outside
+  // world might correlate via time-of-day) don't hit domains in a
+  // predictable A,B,C,D,A,B,C,D pattern. Round-robin over shuffled
+  // ids gives us even distribution + unpredictable per-domain timing.
+  const shuffled = [...ids]
+  for (let i = shuffled.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1))
+    ;[shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]]
+  }
+
+  // Assign each prospect a domain BEFORE queuing so a Railway restart
+  // mid-campaign doesn't re-shuffle assignments. Also gives us an
+  // audit trail: "prospect X was queued to send from domain Y".
+  const assignments = shuffled.map((id, i) => ({
+    id, domainId: domains[i % domains.length].id,
+  }))
+  // One round-trip per domain, not per prospect — batch by domain.
+  const byDomain = new Map<string, string[]>()
+  for (const a of assignments) {
+    const arr = byDomain.get(a.domainId) ?? []
+    arr.push(a.id)
+    byDomain.set(a.domainId, arr)
+  }
+  for (const [domainId, prospectIds] of byDomain) {
+    await pool.query(
+      `UPDATE outreach_prospects
+          SET status = 'queued', sending_domain_id = $1, updated_at = now()
+        WHERE id = ANY($2::uuid[])`,
+      [domainId, prospectIds],
+    )
+  }
+
+  // Schedule each send 90-180s apart. Cursor advances by a fresh
+  // random jitter for each prospect so the pattern isn't deterministic.
   let cursorMs = 0
-  for (const id of ids) {
+  for (const { id } of assignments) {
     const jitter = 90_000 + Math.floor(Math.random() * 90_000) // 90-180s
     cursorMs += jitter
     scheduleSend(id, cursorMs)
   }
-  logInfo('outreach: campaign started', { projectId, count: ids.length, estimatedMinutes: Math.round(cursorMs / 60_000) })
+  const perDomainCount = Array.from(byDomain.values()).map((v) => v.length)
+  logInfo('outreach: campaign started', {
+    projectId,
+    count: ids.length,
+    domains: domains.length,
+    perDomain: perDomainCount,
+    estimatedMinutes: Math.round(cursorMs / 60_000),
+  })
   res.json({
     ok: true,
     queued: ids.length,
+    domainsUsed: domains.length,
+    perDomain: perDomainCount,
     estimatedMinutes: Math.round(cursorMs / 60_000),
     firstAt: new Date(Date.now() + 90_000).toISOString(),
     lastAt: new Date(Date.now() + cursorMs).toISOString(),
