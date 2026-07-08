@@ -58,7 +58,7 @@ showPageRouter.get('/shows/:slug', async (req: Request, res: Response) => {
     res.status(404).type('text/html').send(notFoundHtml())
     return
   }
-  const [briefRes, epRes] = await Promise.all([
+  const [briefRes, epRes, sisterRes] = await Promise.all([
     pool.query<BriefRow>(
       `SELECT business_description, niche, target_audience, current_metrics
          FROM social_strategy_briefs WHERE project_id = $1`,
@@ -71,9 +71,24 @@ showPageRouter.get('/shows/:slug', async (req: Request, res: Response) => {
         LIMIT 8`,
       [show.id],
     ),
+    // Other Straw Hut Media podcasts, for the "part of the network"
+    // section. Only shows with cover art make the cut (weak visual
+    // otherwise). Cap at 6.
+    pool.query<SisterShowRow>(
+      `SELECT name, slug, cover_art_url, subtitle
+         FROM projects
+        WHERE kind = 'podcast'
+          AND id <> $1
+          AND cover_art_url IS NOT NULL
+          AND cover_art_url <> ''
+        ORDER BY created_at ASC
+        LIMIT 6`,
+      [show.id],
+    ),
   ])
   const brief = briefRes.rows[0] ?? null
   const episodes = epRes.rows
+  const sisters = sisterRes.rows
   res
     .status(200)
     .type('text/html')
@@ -81,15 +96,23 @@ showPageRouter.get('/shows/:slug', async (req: Request, res: Response) => {
     // next request), so let CDNs/proxies cache it briefly to absorb
     // outreach-blast link clicks without hammering the DB.
     .setHeader('Cache-Control', 'public, max-age=300, must-revalidate')
-    .send(renderShowPage({ show, brief, episodes }))
+    .send(renderShowPage({ show, brief, episodes, sisters }))
 })
+
+type SisterShowRow = {
+  name: string
+  slug: string | null
+  cover_art_url: string | null
+  subtitle: string | null
+}
 
 function renderShowPage(args: {
   show: ShowRow
   brief: BriefRow | null
   episodes: EpisodeRow[]
+  sisters: SisterShowRow[]
 }): string {
-  const { show, brief, episodes } = args
+  const { show, brief, episodes, sisters } = args
   // Brand accent — validate the hex or fall back to Straw Hut's default.
   // Untrusted input from the DB, so we don't inject it raw.
   const accent = /^#[0-9a-fA-F]{6}$/.test(show.brand_hex ?? '')
@@ -258,6 +281,46 @@ ${coverUrl ? `<meta property="og:image" content="${escHtml(coverUrl)}">` : ''}
     color: var(--ink); max-width: 620px; margin: 0 auto 32px;
   }
 
+  /* Straw Hut sister-shows grid */
+  .sister-grid {
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 18px;
+  }
+  .sister { text-align: center; }
+  .sister-cover {
+    aspect-ratio: 1; border-radius: 12px; overflow: hidden;
+    background: #f0ede4; margin-bottom: 10px;
+    box-shadow: 0 10px 24px -12px rgba(20, 22, 29, 0.15);
+  }
+  .sister-cover img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .sister-name { font: 600 13px/1.3 -apple-system, sans-serif; color: var(--ink); }
+
+  /* Contact section — prominent, editorial */
+  section.contact {
+    text-align: center; padding: 72px 0 48px;
+  }
+  .contact-pitch {
+    font: 400 20px/1.6 'Charter', 'Georgia', serif;
+    color: var(--ink); max-width: 620px; margin: 0 auto 36px;
+  }
+  .contact-block {
+    display: inline-block; text-align: left;
+    background: var(--card); border: 1px solid var(--line);
+    border-radius: 14px; padding: 22px 28px; margin-bottom: 32px;
+    box-shadow: 0 14px 36px -18px rgba(20, 22, 29, 0.18);
+  }
+  .contact-line { display: flex; align-items: baseline; gap: 16px; padding: 6px 0; }
+  .contact-line + .contact-line { border-top: 1px solid var(--line); margin-top: 6px; padding-top: 12px; }
+  .contact-label {
+    font: 700 10px/1 -apple-system, sans-serif;
+    letter-spacing: .28em; text-transform: uppercase;
+    color: var(--muted); min-width: 100px;
+  }
+  .contact-value {
+    font: 600 17px/1 -apple-system, sans-serif; color: var(--ink);
+    text-decoration: none; border-bottom: 2px solid ${accent};
+  }
+  .contact-value:hover { color: ${accent}; }
+
   footer {
     padding: 32px 0 0; text-align: center;
     color: var(--muted); font-size: 12px;
@@ -330,13 +393,38 @@ ${coverUrl ? `<meta property="og:image" content="${escHtml(coverUrl)}">` : ''}
     </ul>
   </section>` : ''}
 
-  <div class="closing">
-    <p>${escHtml(guestPitch)}</p>
+  ${sisters.length > 0 ? `<section>
+    <h2>Part of Straw Hut Media</h2>
+    <p class="lead" style="margin-bottom: 24px; font-size: 16px;">
+      Straw Hut Media produces and distributes an eclectic slate of interview and lifestyle podcasts. Your appearance
+      here lives inside a broader network audience discovers together.
+    </p>
+    <div class="sister-grid">
+      ${sisters.map((sh) => `<div class="sister">
+        <div class="sister-cover"><img src="${escHtml(sh.cover_art_url!)}" alt="${escHtml(sh.name)} cover art"></div>
+        <div class="sister-name">${escHtml(sh.name)}</div>
+      </div>`).join('')}
+    </div>
+  </section>` : ''}
+
+  <section class="contact">
+    <h2>Get in touch</h2>
+    <p class="contact-pitch">${escHtml(guestPitch)}</p>
+    <div class="contact-block">
+      <div class="contact-line">
+        <span class="contact-label">Bookings</span>
+        <a href="mailto:booking@strawhutmedia.com?subject=${encodeURIComponent(`Guest pitch — ${show.name}`)}" class="contact-value">booking@strawhutmedia.com</a>
+      </div>
+      ${show.contact_email && show.contact_email !== 'booking@strawhutmedia.com' ? `<div class="contact-line">
+        <span class="contact-label">Show contact</span>
+        <a href="mailto:${escHtml(show.contact_email)}" class="contact-value">${escHtml(show.contact_email)}</a>
+      </div>` : ''}
+    </div>
     ${mailto ? `<a class="cta accent" href="${mailto}">Pitch us as a guest →</a>` : ''}
-  </div>
+  </section>
 
   <footer>
-    A Straw Hut Media production · <a href="https://strawhutmedia.com">strawhutmedia.com</a>
+    Produced by Straw Hut Media
   </footer>
 </main>
 </body>

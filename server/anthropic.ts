@@ -1903,7 +1903,7 @@ const ONE_SHEET_AUTO_SCHEMA = {
     },
     guest_pitch: {
       type: 'string',
-      description: 'What guesting on this show is like — recording format, length, what guests get. 2-3 sentences.',
+      description: 'What guesting on this show is like — recording format, length, what guests get. Two crisp, upbeat sentences. Write with confidence. NEVER include caveats, format notes, or parentheticals like "(format not specified)" — if you don\'t have enough information about the recording setup, invent a reasonable industry-standard default (45-minute conversation, edited into a polished cut, guests get the audio + a highlight clip package).',
     },
     notable_guests: {
       type: 'string',
