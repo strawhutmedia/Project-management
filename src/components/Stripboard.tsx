@@ -1142,7 +1142,7 @@ function DayRow({
             'text-stage-mastering'
           }`}>{label}</span>
           {day?.shootDate && <span className="text-[10px] text-muted">· {day.shootDate}</span>}
-          {day && !day.isBreak && (
+          {day && (
             <LocationTagInput
               day={day}
               onChanged={onDayLocationChanged}
@@ -1192,7 +1192,7 @@ function DayRow({
               ))}
             </div>
           )}
-          {day && !day.isBreak && (
+          {day && (
             <DayCostsSection
               shootDayId={day.id}
               isAdmin={isAdmin}

@@ -251,25 +251,25 @@ export async function budgetTopSheetPdf(projectId: string, res: Response): Promi
   const crewPerDiemDaily = Number(budget.crew_per_diem_daily ?? 0)
   const castPerDiemHeadcount = Number(budget.cast_per_diem_headcount ?? 0)
   const crewPerDiemHeadcount = Number(budget.crew_per_diem_headcount ?? 0)
-  // Away days = shoot days tagged != home_location_tag. Drives BOTH
-  // per diem and hotels — cast/crew only earn per diem when they're
-  // stuck on location. Add travel_days as a small buffer.
+  // Away days = ANY day (shoot OR break) tagged != home_location_tag.
+  // Break days between Solvang shoots still need hotels + per diem —
+  // crew's stuck on location. Travel days are a buffer for travel-in
+  // and travel-out, applied to BOTH hotels and per diem.
   const homeTag = (budget.home_location_tag ?? '').trim().toLowerCase()
   const awayDays = (shootDays as ShootDayWithLocation[])
-    .filter((d) => !d.is_break)
     .filter((d) => {
       const t = (d.location_tag ?? '').trim().toLowerCase()
       return t !== '' && t !== homeTag
     })
   const travelDays = Number(budget.travel_days ?? 0)
-  const perDiemDays = awayDays.length + travelDays
-  const castPerDiemTotal = castPerDiemDaily * castPerDiemHeadcount * perDiemDays
-  const crewPerDiemTotal = crewPerDiemDaily * crewPerDiemHeadcount * perDiemDays
+  const awayDaysCount = awayDays.length + travelDays
+  const castPerDiemTotal = castPerDiemDaily * castPerDiemHeadcount * awayDaysCount
+  const crewPerDiemTotal = crewPerDiemDaily * crewPerDiemHeadcount * awayDaysCount
   const perDiemTotal = castPerDiemTotal + crewPerDiemTotal
   const hotelCastNightly = Number(budget.hotel_cast_nightly ?? 0)
   const hotelCrewNightly = Number(budget.hotel_crew_nightly ?? 0)
-  const hotelCastTotal = hotelCastNightly * castPerDiemHeadcount * awayDays.length
-  const hotelCrewTotal = hotelCrewNightly * crewPerDiemHeadcount * awayDays.length
+  const hotelCastTotal = hotelCastNightly * castPerDiemHeadcount * awayDaysCount
+  const hotelCrewTotal = hotelCrewNightly * crewPerDiemHeadcount * awayDaysCount
   const hotelsTotal = hotelCastTotal + hotelCrewTotal
   const directTotal = Array.from(categoryTotals.values()).reduce((s, v) => s + v, 0)
   const directPlusFringes = directTotal + fringesTotal + perDiemTotal + hotelsTotal
@@ -305,21 +305,21 @@ export async function budgetTopSheetPdf(projectId: string, res: Response): Promi
   doc.text(fmtMoney(crewFringes, budget.currency), { width: colW * 0.4, align: 'right' })
   if (perDiemTotal > 0) {
     if (castPerDiemTotal > 0) {
-      doc.text(`Cast per diem (${castPerDiemHeadcount} × ${perDiemDays} away days × ${fmtMoney(castPerDiemDaily, budget.currency)}/day)`, leftX, doc.y, { width: colW * 0.6, continued: true })
+      doc.text(`Cast per diem (${castPerDiemHeadcount} × ${awayDaysCount} away days × ${fmtMoney(castPerDiemDaily, budget.currency)}/day)`, leftX, doc.y, { width: colW * 0.6, continued: true })
       doc.text(fmtMoney(castPerDiemTotal, budget.currency), { width: colW * 0.4, align: 'right' })
     }
     if (crewPerDiemTotal > 0) {
-      doc.text(`Crew per diem (${crewPerDiemHeadcount} × ${perDiemDays} away days × ${fmtMoney(crewPerDiemDaily, budget.currency)}/day)`, leftX, doc.y, { width: colW * 0.6, continued: true })
+      doc.text(`Crew per diem (${crewPerDiemHeadcount} × ${awayDaysCount} away days × ${fmtMoney(crewPerDiemDaily, budget.currency)}/day)`, leftX, doc.y, { width: colW * 0.6, continued: true })
       doc.text(fmtMoney(crewPerDiemTotal, budget.currency), { width: colW * 0.4, align: 'right' })
     }
   }
   if (hotelsTotal > 0) {
     if (hotelCastTotal > 0) {
-      doc.text(`Cast hotels (${castPerDiemHeadcount} × ${awayDays.length} nights × ${fmtMoney(hotelCastNightly, budget.currency)}/night)`, leftX, doc.y, { width: colW * 0.6, continued: true })
+      doc.text(`Cast hotels (${castPerDiemHeadcount} × ${awayDaysCount} nights × ${fmtMoney(hotelCastNightly, budget.currency)}/night)`, leftX, doc.y, { width: colW * 0.6, continued: true })
       doc.text(fmtMoney(hotelCastTotal, budget.currency), { width: colW * 0.4, align: 'right' })
     }
     if (hotelCrewTotal > 0) {
-      doc.text(`Crew hotels (${crewPerDiemHeadcount} × ${awayDays.length} nights × ${fmtMoney(hotelCrewNightly, budget.currency)}/night)`, leftX, doc.y, { width: colW * 0.6, continued: true })
+      doc.text(`Crew hotels (${crewPerDiemHeadcount} × ${awayDaysCount} nights × ${fmtMoney(hotelCrewNightly, budget.currency)}/night)`, leftX, doc.y, { width: colW * 0.6, continued: true })
       doc.text(fmtMoney(hotelCrewTotal, budget.currency), { width: colW * 0.4, align: 'right' })
     }
   }

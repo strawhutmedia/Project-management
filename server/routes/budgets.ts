@@ -121,12 +121,14 @@ budgetsRouter.get('/projects/:projectId', async (req, res) => {
     })
   }
   const numOrNull = (v: unknown) => (v == null ? null : Number(v))
-  // Away days count — shoot days whose location tag differs from
-  // the budget's home_location_tag. Drives per diem + hotels totals.
+  // Away days count — ANY day (shoot OR break) whose location tag
+  // differs from home_location_tag. Break days between Solvang shoots
+  // still count because the crew is stuck there and needs a hotel bed
+  // + meals. Drives per diem + hotels totals.
   const homeTagLower = (budget.home_location_tag ?? '').trim().toLowerCase()
   const awayRes = await pool.query<{ n: string }>(
     `SELECT COUNT(*)::int AS n FROM shoot_days
-      WHERE project_id = $1 AND is_break = FALSE
+      WHERE project_id = $1
         AND location_tag IS NOT NULL
         AND LOWER(TRIM(location_tag)) <> $2`,
     [projectId, homeTagLower],
@@ -504,16 +506,18 @@ budgetsRouter.get('/shoot-days/:shootDayId/items', async (req, res) => {
   const castPerDiemPerDayIfAway = castPerDiemDaily * castPerDiemHeadcount
   const crewPerDiemPerDayIfAway = crewPerDiemDaily * crewPerDiemHeadcount
 
-  // Hotel cost for THIS day. Compare the day's location_tag to the
-  // budget's home_location_tag — if they don't match (and the day is
-  // tagged), hotels are required.
+  // Hotel + per diem cost for THIS day. Compare the day's location_tag
+  // to the budget's home_location_tag — if they don't match (and the
+  // day is tagged), hotels + per diem apply. Break days count too if
+  // they're tagged away (crew stuck in Solvang between shoots still
+  // needs a hotel).
   const dayRes = await pool.query<{ location_tag: string | null; is_break: boolean }>(
     `SELECT location_tag, is_break FROM shoot_days WHERE id = $1`, [shootDayId],
   )
   const dayRow = dayRes.rows[0]
   const homeTag = s?.home_location_tag?.trim().toLowerCase() ?? null
   const dayTag = dayRow?.location_tag?.trim().toLowerCase() ?? null
-  const needsHotels = !dayRow?.is_break && dayTag !== null && dayTag !== homeTag
+  const needsHotels = dayTag !== null && dayTag !== homeTag
   const hotelCastNightly = Number(s?.hotel_cast_nightly ?? 0)
   const hotelCrewNightly = Number(s?.hotel_crew_nightly ?? 0)
   const dayHotelCost = needsHotels
