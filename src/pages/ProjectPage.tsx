@@ -122,7 +122,7 @@ export default function ProjectPage() {
           ← Projects
         </Link>
         <div className="mt-3 flex items-end justify-between flex-wrap gap-4">
-          <div className="flex-1 min-w-0 flex items-start gap-5">
+          <div className="flex-1 min-w-0 flex flex-col sm:flex-row sm:items-start gap-4 sm:gap-5">
             {project.kind === 'podcast' && project.coverArtUrl && (
               <img
                 src={project.coverArtUrl}
@@ -135,12 +135,12 @@ export default function ProjectPage() {
             <div className="text-[10px] uppercase tracking-[0.3em] text-muted mb-2 font-bold">
               {project.kind}
             </div>
-            <h1 className="font-display text-5xl leading-none">
+            <h1 className="font-display text-3xl sm:text-5xl leading-tight sm:leading-none break-words">
               {isAdmin ? (
                 <InlineEdit
                   value={project.name}
                   onSave={saveName}
-                  inputClassName="font-display text-5xl"
+                  inputClassName="font-display text-3xl sm:text-5xl"
                   className="text-rainbow"
                 />
               ) : (
