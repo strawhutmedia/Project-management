@@ -1,9 +1,9 @@
 {
   "version": "0.2.2",
-  "now": "2026-07-08T16:28:18.864Z",
+  "now": "2026-07-08T16:56:36.127Z",
   "boot": {
-    "startedAt": "2026-07-08T16:28:18.534Z",
-    "completedAt": "2026-07-08T16:28:18.854Z",
+    "startedAt": "2026-07-08T16:56:35.726Z",
+    "completedAt": "2026-07-08T16:56:36.111Z",
     "error": null
   },
   "env": {
@@ -96,7 +96,8 @@
       "060_hotels.sql",
       "061_travel_days.sql",
       "062_hotel_contingency.sql",
-      "063_notable_topics.sql"
+      "063_notable_topics.sql",
+      "064_flagship_show.sql"
     ],
     "userCount": 12,
     "projectCount": 13
@@ -104,7 +105,7 @@
   "recentLog": [
     {
       "level": "info",
-      "ts": "2026-07-08T16:28:18.532Z",
+      "ts": "2026-07-08T16:56:35.724Z",
       "msg": "serving client from",
       "data": {
         "clientDir": "/app/dist"
@@ -112,7 +113,7 @@
     },
     {
       "level": "info",
-      "ts": "2026-07-08T16:28:18.534Z",
+      "ts": "2026-07-08T16:56:35.726Z",
       "msg": "boot starting",
       "data": {
         "cwd": "/app",
@@ -123,12 +124,12 @@
     },
     {
       "level": "info",
-      "ts": "2026-07-08T16:28:18.765Z",
+      "ts": "2026-07-08T16:56:35.977Z",
       "msg": "migrations complete"
     },
     {
       "level": "info",
-      "ts": "2026-07-08T16:28:18.846Z",
+      "ts": "2026-07-08T16:56:36.103Z",
       "msg": "BIYA seed: project already exists, ensured shoot days",
       "data": {
         "projectId": "12f53ed1-c6c7-4c11-8d7b-06d91744c9af"
@@ -136,12 +137,12 @@
     },
     {
       "level": "info",
-      "ts": "2026-07-08T16:28:18.854Z",
+      "ts": "2026-07-08T16:56:36.111Z",
       "msg": "listening on :8080"
     },
     {
       "level": "info",
-      "ts": "2026-07-08T16:28:18.854Z",
+      "ts": "2026-07-08T16:56:36.111Z",
       "msg": "scheduler started (every 5 min)"
     }
   ]
