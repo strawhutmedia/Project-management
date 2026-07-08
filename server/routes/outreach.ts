@@ -19,6 +19,7 @@ import { requireAdmin, type SessionUser } from '../auth'
 import { logError, logInfo } from '../diag'
 import { generateUniqueSentence, generateOneSheetAuto, hasAnthropicKey, type UniqueSentenceInput } from '../anthropic'
 import { loadShowBrief } from './show_brief'
+import { syncMissingCoversFromRss } from '../rss_cover_sync'
 
 const resendKey = process.env.RESEND_API_KEY
 const resend = resendKey ? new Resend(resendKey) : null
@@ -462,6 +463,18 @@ outreachRouter.post('/projects/:projectId/send-campaign', async (req, res) => {
     logError('outreach: boot reset failed', { error: err instanceof Error ? err.message : String(err) })
   }
 })()
+
+// Trigger the RSS cover sync on demand. Producer clicks this after
+// registering a new podcast + RSS feed to fetch the cover art without
+// waiting for the next Railway boot.
+outreachRouter.post('/sync-rss-covers', async (_req, res) => {
+  try {
+    const result = await syncMissingCoversFromRss()
+    res.json({ ok: true, ...result })
+  } catch (err) {
+    res.status(500).json({ error: 'sync_failed', detail: err instanceof Error ? err.message : String(err) })
+  }
+})
 
 // Auto-populate a show's one-sheet from its episode list + Show Brief.
 // Producer clicks the button, Claude reads the metadata and drafts:

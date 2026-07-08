@@ -1366,6 +1366,10 @@ export const api = {
       `/api/outreach/projects/${projectId}/generate-all-sentences`,
       { method: 'POST', body: JSON.stringify({}) },
     ),
+  syncRssCovers: () =>
+    request<{ ok: true; synced: number; skipped: number }>(
+      '/api/outreach/sync-rss-covers', { method: 'POST', body: JSON.stringify({}) },
+    ),
   autoPopulateOneSheet: (projectId: string) =>
     request<{ ok: true; url: string | null; heroTagline: string; guestPitch: string; notableGuests: string; notableTopics: string; brandHex: string }>(
       `/api/outreach/projects/${projectId}/auto-populate-one-sheet`,
