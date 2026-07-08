@@ -72,6 +72,10 @@ budgetsRouter.get('/projects/:projectId', async (req, res) => {
   }
   const budgetRes = await pool.query(
     `SELECT id, currency, shoot_days, bond_pct, contingency_pct,
+            cast_payroll_pct, crew_payroll_pct,
+            cast_per_diem_daily, crew_per_diem_daily,
+            cast_per_diem_headcount, crew_per_diem_headcount,
+            cast_per_diem_days, crew_per_diem_days,
             production_target, post_target, marketing_target, admin_target, total_target
        FROM budgets WHERE project_id = $1`,
     [projectId],
@@ -123,6 +127,14 @@ budgetsRouter.get('/projects/:projectId', async (req, res) => {
       shootDays: budget.shoot_days,
       bondPct: Number(budget.bond_pct),
       contingencyPct: Number(budget.contingency_pct),
+      castPayrollPct: Number(budget.cast_payroll_pct ?? 33),
+      crewPayrollPct: Number(budget.crew_payroll_pct ?? 15),
+      castPerDiemDaily: Number(budget.cast_per_diem_daily ?? 0),
+      crewPerDiemDaily: Number(budget.crew_per_diem_daily ?? 0),
+      castPerDiemHeadcount: Number(budget.cast_per_diem_headcount ?? 0),
+      crewPerDiemHeadcount: Number(budget.crew_per_diem_headcount ?? 0),
+      castPerDiemDays: budget.cast_per_diem_days == null ? Number(budget.shoot_days) : Number(budget.cast_per_diem_days),
+      crewPerDiemDays: budget.crew_per_diem_days == null ? Number(budget.shoot_days) : Number(budget.crew_per_diem_days),
       productionTarget: numOrNull(budget.production_target),
       postTarget: numOrNull(budget.post_target),
       marketingTarget: numOrNull(budget.marketing_target),
@@ -210,7 +222,7 @@ budgetsRouter.patch('/:budgetId', async (req, res) => {
   )
   if (lookup.rows.length === 0) { res.status(404).json({ error: 'not_found' }); return }
   if (!await assertWriter(user, lookup.rows[0].project_id, res)) return
-  const { currency, shootDays, bondPct, contingencyPct, productionTarget, postTarget, marketingTarget, adminTarget, totalTarget } = req.body ?? {}
+  const { currency, shootDays, bondPct, contingencyPct, castPayrollPct, crewPayrollPct, castPerDiemDaily, crewPerDiemDaily, castPerDiemHeadcount, crewPerDiemHeadcount, castPerDiemDays, crewPerDiemDays, productionTarget, postTarget, marketingTarget, adminTarget, totalTarget } = req.body ?? {}
   const updates: string[] = []
   const values: unknown[] = []
   let i = 1
@@ -218,6 +230,14 @@ budgetsRouter.patch('/:budgetId', async (req, res) => {
   if (typeof shootDays === 'number') { updates.push(`shoot_days = $${i++}`); values.push(shootDays) }
   if (typeof bondPct === 'number') { updates.push(`bond_pct = $${i++}`); values.push(bondPct) }
   if (typeof contingencyPct === 'number') { updates.push(`contingency_pct = $${i++}`); values.push(contingencyPct) }
+  if (typeof castPayrollPct === 'number') { updates.push(`cast_payroll_pct = $${i++}`); values.push(castPayrollPct) }
+  if (typeof crewPayrollPct === 'number') { updates.push(`crew_payroll_pct = $${i++}`); values.push(crewPayrollPct) }
+  if (typeof castPerDiemDaily === 'number') { updates.push(`cast_per_diem_daily = $${i++}`); values.push(castPerDiemDaily) }
+  if (typeof crewPerDiemDaily === 'number') { updates.push(`crew_per_diem_daily = $${i++}`); values.push(crewPerDiemDaily) }
+  if (typeof castPerDiemHeadcount === 'number') { updates.push(`cast_per_diem_headcount = $${i++}`); values.push(castPerDiemHeadcount) }
+  if (typeof crewPerDiemHeadcount === 'number') { updates.push(`crew_per_diem_headcount = $${i++}`); values.push(crewPerDiemHeadcount) }
+  if (typeof castPerDiemDays === 'number') { updates.push(`cast_per_diem_days = $${i++}`); values.push(castPerDiemDays) }
+  if (typeof crewPerDiemDays === 'number') { updates.push(`crew_per_diem_days = $${i++}`); values.push(crewPerDiemDays) }
   const targetField = (key: string, val: unknown, col: string) => {
     if (!(key in (req.body ?? {}))) return
     if (val === null || val === '') {
@@ -433,6 +453,31 @@ budgetsRouter.get('/shoot-days/:shootDayId/items', async (req, res) => {
      ORDER BY li.spans_all_shoot_days DESC, li.position ASC, li.created_at ASC`,
     [shootDayId, lookup.rows[0].project_id],
   )
+  // Company-wide fringes + per-diem rates. Read-only in the day view
+  // — surfaced so the producer sees the full "if this day happens"
+  // cost, not just the direct items. Editing lives in the budget
+  // Settings (top-level card), not per-day.
+  const summaryRes = await pool.query<{
+    cast_payroll_pct: string | null; crew_payroll_pct: string | null;
+    cast_per_diem_daily: string | null; crew_per_diem_daily: string | null;
+    cast_per_diem_headcount: string | null; crew_per_diem_headcount: string | null;
+  }>(
+    `SELECT cast_payroll_pct, crew_payroll_pct,
+            cast_per_diem_daily, crew_per_diem_daily,
+            cast_per_diem_headcount, crew_per_diem_headcount
+       FROM budgets WHERE project_id = $1`,
+    [lookup.rows[0].project_id],
+  )
+  const s = summaryRes.rows[0]
+  const castPayrollPct = Number(s?.cast_payroll_pct ?? 33)
+  const crewPayrollPct = Number(s?.crew_payroll_pct ?? 15)
+  const castPerDiemDaily = Number(s?.cast_per_diem_daily ?? 0)
+  const crewPerDiemDaily = Number(s?.crew_per_diem_daily ?? 0)
+  const castPerDiemHeadcount = Number(s?.cast_per_diem_headcount ?? 0)
+  const crewPerDiemHeadcount = Number(s?.crew_per_diem_headcount ?? 0)
+  const castPerDiemPerDay = castPerDiemDaily * castPerDiemHeadcount
+  const crewPerDiemPerDay = crewPerDiemDaily * crewPerDiemHeadcount
+
   // Scene-attached rollup for this day. Each scene owns its own
   // priced line items (wardrobe, props, VFX, etc.); when a scene is
   // scheduled here, its budgeted total should be visible + editable
@@ -477,6 +522,12 @@ budgetsRouter.get('/shoot-days/:shootDayId/items', async (req, res) => {
       itemCount: Number(r.item_count),
       total: Number(r.total),
     })),
+    fringes: {
+      castPayrollPct,
+      crewPayrollPct,
+      castPerDiemPerDay,
+      crewPerDiemPerDay,
+    },
   })
 })
 

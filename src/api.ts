@@ -232,6 +232,14 @@ export type ApiBudget = {
   shootDays: number
   bondPct: number
   contingencyPct: number
+  castPayrollPct: number
+  crewPayrollPct: number
+  castPerDiemDaily: number
+  crewPerDiemDaily: number
+  castPerDiemHeadcount: number
+  crewPerDiemHeadcount: number
+  castPerDiemDays: number
+  crewPerDiemDays: number
   productionTarget: number | null
   postTarget: number | null
   marketingTarget: number | null
@@ -823,6 +831,14 @@ export const api = {
     shootDays?: number
     bondPct?: number
     contingencyPct?: number
+    castPayrollPct?: number
+    crewPayrollPct?: number
+    castPerDiemDaily?: number
+    crewPerDiemDaily?: number
+    castPerDiemHeadcount?: number
+    crewPerDiemHeadcount?: number
+    castPerDiemDays?: number
+    crewPerDiemDays?: number
     productionTarget?: number | null
     postTarget?: number | null
     marketingTarget?: number | null
@@ -888,6 +904,7 @@ export const api = {
     request<{
       items: Array<{ id: string; accountId: string; code: string | null; description: string; amt: number; units: string | null; x: number; rate: number; vendor: string | null; datedAt: string | null; notes: string | null; position: number; total: number; spansAllShootDays: boolean; isSource: boolean; sourceShootDayId: string | null }>
       scenes: Array<{ id: string; number: string; slug: string | null; itemCount: number; total: number }>
+      fringes: { castPayrollPct: number; crewPayrollPct: number; castPerDiemPerDay: number; crewPerDiemPerDay: number }
     }>(
       `/api/budgets/shoot-days/${shootDayId}/items`,
     ),

@@ -199,9 +199,27 @@ export default function BudgetSection({ projectId, isAdmin }: { projectId: strin
     return { cat, accounts, subtotal }
   })
   const directTotal = totalsByCategory.reduce((s, c) => s + c.subtotal, 0)
-  const contingency = directTotal * (budget.contingencyPct / 100)
-  const bond = directTotal * (budget.bondPct / 100)
-  const grand = directTotal + contingency + bond
+  // Payroll fringes — cast = accounts with code prefix 14- (StudioBinder
+  // cast standard). Crew = production category minus cast. Percentages
+  // are editable in BudgetSettings.
+  const castSubtotal = budget.accounts
+    .filter((a) => a.code?.startsWith('14-'))
+    .reduce((s, a) => s + accountTotal(a), 0)
+  const crewSubtotal = budget.accounts
+    .filter((a) => a.category === 'production' && !a.code?.startsWith('14-'))
+    .reduce((s, a) => s + accountTotal(a), 0)
+  const castFringes = castSubtotal * (budget.castPayrollPct / 100)
+  const crewFringes = crewSubtotal * (budget.crewPayrollPct / 100)
+  const fringesTotal = castFringes + crewFringes
+  // Per diem = daily rate × headcount × per-side days (defaults to
+  // shoot_days but can be bumped up to cover travel + hold days).
+  const castPerDiemTotal = budget.castPerDiemDaily * budget.castPerDiemHeadcount * budget.castPerDiemDays
+  const crewPerDiemTotal = budget.crewPerDiemDaily * budget.crewPerDiemHeadcount * budget.crewPerDiemDays
+  const perDiemTotal = castPerDiemTotal + crewPerDiemTotal
+  const directPlusFringes = directTotal + fringesTotal + perDiemTotal
+  const contingency = directPlusFringes * (budget.contingencyPct / 100)
+  const bond = directPlusFringes * (budget.bondPct / 100)
+  const grand = directPlusFringes + contingency + bond
 
   return (
     <section className="rounded-2xl border border-line bg-panel/60 p-6 space-y-6">
@@ -297,8 +315,17 @@ export default function BudgetSection({ projectId, isAdmin }: { projectId: strin
         })}
       </div>
 
-      <div className="rounded-xl border border-line/60 bg-ink/40 p-4 grid grid-cols-2 sm:grid-cols-4 gap-3 text-sm">
+      <div className="rounded-xl border border-line/60 bg-ink/40 p-4 grid grid-cols-2 sm:grid-cols-3 gap-3 text-sm">
         <Stat label="Direct total" value={fmtMoney(directTotal, budget.currency)} />
+        <Stat label={`Cast fringes (${budget.castPayrollPct}%)`} value={fmtMoney(castFringes, budget.currency)} hint={fmtMoney(castSubtotal, budget.currency)} />
+        <Stat label={`Crew fringes (${budget.crewPayrollPct}%)`} value={fmtMoney(crewFringes, budget.currency)} hint={fmtMoney(crewSubtotal, budget.currency)} />
+        {perDiemTotal > 0 && (
+          <Stat
+            label="Per diem"
+            value={fmtMoney(perDiemTotal, budget.currency)}
+            hint={`${budget.castPerDiemHeadcount + budget.crewPerDiemHeadcount} ppl × ${budget.shootDays} days`}
+          />
+        )}
         <Stat label={`Contingency (${budget.contingencyPct}%)`} value={fmtMoney(contingency, budget.currency)} />
         <Stat label={`Bond (${budget.bondPct}%)`} value={fmtMoney(bond, budget.currency)} />
         <Stat label="Grand total" value={fmtMoney(grand, budget.currency)} accent />
@@ -468,11 +495,12 @@ function GoalBar({
   )
 }
 
-function Stat({ label, value, accent }: { label: string; value: string; accent?: boolean }) {
+function Stat({ label, value, accent, hint }: { label: string; value: string; accent?: boolean; hint?: string }) {
   return (
     <div>
       <div className="text-[10px] uppercase tracking-wider text-muted font-bold">{label}</div>
       <div className={`font-display ${accent ? 'text-2xl text-rainbow' : 'text-xl'} mt-0.5`}>{value}</div>
+      {hint && <div className="text-[10px] text-muted/70 mt-0.5">on {hint}</div>}
     </div>
   )
 }
@@ -674,6 +702,14 @@ function BudgetSettings({ budget, onSaved }: { budget: ApiBudget; onSaved: () =>
   const [currency, setCurrency] = useState(budget.currency)
   const [bondPct, setBondPct] = useState(budget.bondPct)
   const [contingencyPct, setContingencyPct] = useState(budget.contingencyPct)
+  const [castPayrollPct, setCastPayrollPct] = useState(budget.castPayrollPct)
+  const [crewPayrollPct, setCrewPayrollPct] = useState(budget.crewPayrollPct)
+  const [castPerDiemDaily, setCastPerDiemDaily] = useState(budget.castPerDiemDaily)
+  const [crewPerDiemDaily, setCrewPerDiemDaily] = useState(budget.crewPerDiemDaily)
+  const [castPerDiemHeadcount, setCastPerDiemHeadcount] = useState(budget.castPerDiemHeadcount)
+  const [crewPerDiemHeadcount, setCrewPerDiemHeadcount] = useState(budget.crewPerDiemHeadcount)
+  const [castPerDiemDays, setCastPerDiemDays] = useState(budget.castPerDiemDays)
+  const [crewPerDiemDays, setCrewPerDiemDays] = useState(budget.crewPerDiemDays)
   const [productionTarget, setProductionTarget] = useState<string>(budget.productionTarget != null ? String(budget.productionTarget) : '')
   const [postTarget, setPostTarget] = useState<string>(budget.postTarget != null ? String(budget.postTarget) : '')
   const [marketingTarget, setMarketingTarget] = useState<string>(budget.marketingTarget != null ? String(budget.marketingTarget) : '')
@@ -695,6 +731,14 @@ function BudgetSettings({ budget, onSaved }: { budget: ApiBudget; onSaved: () =>
         currency,
         bondPct,
         contingencyPct,
+        castPayrollPct,
+        crewPayrollPct,
+        castPerDiemDaily,
+        crewPerDiemDaily,
+        castPerDiemHeadcount,
+        crewPerDiemHeadcount,
+        castPerDiemDays,
+        crewPerDiemDays,
         productionTarget: num(productionTarget),
         postTarget: num(postTarget),
         marketingTarget: num(marketingTarget),
@@ -761,6 +805,116 @@ function BudgetSettings({ budget, onSaved }: { budget: ApiBudget; onSaved: () =>
           className="w-full rounded-md bg-ink/60 border border-line text-text px-2 py-1.5 outline-none"
         />
       </label>
+      <div className="col-span-2 sm:col-span-4 mt-1 mb-1 text-[10px] uppercase tracking-[0.15em] text-muted font-bold">
+        💵 Payroll fringes (P&H + FICA + WC + payroll co)
+      </div>
+      <label className="block">
+        <span className="block text-[10px] uppercase tracking-wider text-muted font-bold mb-1">Cast payroll %</span>
+        <input
+          type="number"
+          step="0.5"
+          min={0}
+          value={castPayrollPct}
+          onChange={(e) => setCastPayrollPct(parseFloat(e.target.value) || 0)}
+          className="w-full rounded-md bg-ink/60 border border-line text-text px-2 py-1.5 outline-none"
+          title="SAG-AFTRA norm: ~33% (P&H 21% + FICA/WC/payroll fees). Non-SAG: ~15%."
+        />
+      </label>
+      <label className="block">
+        <span className="block text-[10px] uppercase tracking-wider text-muted font-bold mb-1">Crew payroll %</span>
+        <input
+          type="number"
+          step="0.5"
+          min={0}
+          value={crewPayrollPct}
+          onChange={(e) => setCrewPayrollPct(parseFloat(e.target.value) || 0)}
+          className="w-full rounded-md bg-ink/60 border border-line text-text px-2 py-1.5 outline-none"
+          title="Non-union: ~15%. IATSE union: ~30%."
+        />
+      </label>
+      <div className="col-span-2 sm:col-span-4 mt-1 mb-1 text-[10px] uppercase tracking-[0.15em] text-muted font-bold">
+        🍽 Per diem (Solvang: cast ~$70-100/day, crew ~$60-75/day. Days = shoot + travel + hold days)
+      </div>
+      <label className="block">
+        <span className="block text-[10px] uppercase tracking-wider text-muted font-bold mb-1">Cast $/day</span>
+        <input
+          type="number"
+          step="1"
+          min={0}
+          value={castPerDiemDaily}
+          onChange={(e) => setCastPerDiemDaily(parseFloat(e.target.value) || 0)}
+          className="w-full rounded-md bg-ink/60 border border-line text-text px-2 py-1.5 outline-none font-mono"
+          placeholder="70"
+        />
+      </label>
+      <label className="block">
+        <span className="block text-[10px] uppercase tracking-wider text-muted font-bold mb-1">Cast headcount</span>
+        <input
+          type="number"
+          step="1"
+          min={0}
+          value={castPerDiemHeadcount}
+          onChange={(e) => setCastPerDiemHeadcount(parseInt(e.target.value) || 0)}
+          className="w-full rounded-md bg-ink/60 border border-line text-text px-2 py-1.5 outline-none font-mono"
+          placeholder="4"
+        />
+      </label>
+      <label className="block">
+        <span className="block text-[10px] uppercase tracking-wider text-muted font-bold mb-1">Cast days on loc.</span>
+        <input
+          type="number"
+          step="1"
+          min={0}
+          value={castPerDiemDays}
+          onChange={(e) => setCastPerDiemDays(parseInt(e.target.value) || 0)}
+          className="w-full rounded-md bg-ink/60 border border-line text-text px-2 py-1.5 outline-none font-mono"
+          placeholder={String(shootDays)}
+          title="Total days you'll pay cast per diem — shoot days + travel + hold."
+        />
+      </label>
+      <div className="text-[10px] text-muted self-end pb-2">
+        ={' '}<span className="font-mono">{fmtMoney(castPerDiemDaily * castPerDiemHeadcount * castPerDiemDays, currency)}</span>
+      </div>
+      <label className="block">
+        <span className="block text-[10px] uppercase tracking-wider text-muted font-bold mb-1">Crew $/day</span>
+        <input
+          type="number"
+          step="1"
+          min={0}
+          value={crewPerDiemDaily}
+          onChange={(e) => setCrewPerDiemDaily(parseFloat(e.target.value) || 0)}
+          className="w-full rounded-md bg-ink/60 border border-line text-text px-2 py-1.5 outline-none font-mono"
+          placeholder="60"
+        />
+      </label>
+      <label className="block">
+        <span className="block text-[10px] uppercase tracking-wider text-muted font-bold mb-1">Crew headcount</span>
+        <input
+          type="number"
+          step="1"
+          min={0}
+          value={crewPerDiemHeadcount}
+          onChange={(e) => setCrewPerDiemHeadcount(parseInt(e.target.value) || 0)}
+          className="w-full rounded-md bg-ink/60 border border-line text-text px-2 py-1.5 outline-none font-mono"
+          placeholder="15"
+        />
+      </label>
+      <label className="block">
+        <span className="block text-[10px] uppercase tracking-wider text-muted font-bold mb-1">Crew days on loc.</span>
+        <input
+          type="number"
+          step="1"
+          min={0}
+          value={crewPerDiemDays}
+          onChange={(e) => setCrewPerDiemDays(parseInt(e.target.value) || 0)}
+          className="w-full rounded-md bg-ink/60 border border-line text-text px-2 py-1.5 outline-none font-mono"
+          placeholder={String(shootDays)}
+          title="Total days you'll pay crew per diem — shoot days + travel + hold. Usually shoot_days + 2 travel + a few holds."
+        />
+      </label>
+      <div className="text-[10px] text-muted self-end pb-2">
+        ={' '}<span className="font-mono">{fmtMoney(crewPerDiemDaily * crewPerDiemHeadcount * crewPerDiemDays, currency)}</span>
+      </div>
       <div className="col-span-2 sm:col-span-4 mt-1 mb-1 text-[10px] uppercase tracking-[0.15em] text-muted font-bold">
         🎯 Goals (leave blank to disable a bar)
       </div>

@@ -41,6 +41,10 @@ type Scene = {
 type ShootDay = { id: string; number: number; is_break: boolean; shoot_date: string | null; notes: string | null }
 type Budget = {
   id: string; currency: string; shoot_days: number; bond_pct: number; contingency_pct: number;
+  cast_payroll_pct: number | null; crew_payroll_pct: number | null;
+  cast_per_diem_daily: number | null; crew_per_diem_daily: number | null;
+  cast_per_diem_headcount: number | null; crew_per_diem_headcount: number | null;
+  cast_per_diem_days: number | null; crew_per_diem_days: number | null;
   production_target: number | null; post_target: number | null;
   marketing_target: number | null; admin_target: number | null; total_target: number | null;
 }
@@ -114,6 +118,10 @@ async function loadProjectContext(projectId: string): Promise<{
 
   const budgetRes = await pool.query<Budget>(
     `SELECT id, currency, shoot_days, bond_pct, contingency_pct,
+            cast_payroll_pct, crew_payroll_pct,
+            cast_per_diem_daily, crew_per_diem_daily,
+            cast_per_diem_headcount, crew_per_diem_headcount,
+            cast_per_diem_days, crew_per_diem_days,
             production_target, post_target, marketing_target, admin_target, total_target
        FROM budgets WHERE project_id = $1`,
     [projectId],
@@ -216,10 +224,39 @@ export async function budgetTopSheetPdf(projectId: string, res: Response): Promi
   const marketingSpent = accounts
     .filter((a) => a.code?.startsWith('55-'))
     .reduce((s, a) => s + (accountTotals.get(a.id) ?? 0), 0)
+  // Payroll fringes — SAG P&H + FICA + FUTA/SUTA + WC + payroll co fee.
+  // Cast = account code starts with 14- (StudioBinder standard cast
+  // accounts). Crew = every production-category account except cast
+  // (that's already applied) — producers who don't want crew fringes on
+  // equipment rentals should set the % to 0 or split those into their
+  // own account family.
+  const castSubtotal = accounts
+    .filter((a) => a.code?.startsWith('14-'))
+    .reduce((s, a) => s + (accountTotals.get(a.id) ?? 0), 0)
+  const crewSubtotal = accounts
+    .filter((a) => a.category === 'production' && !a.code?.startsWith('14-'))
+    .reduce((s, a) => s + (accountTotals.get(a.id) ?? 0), 0)
+  const castPayrollPct = Number(budget.cast_payroll_pct ?? 33)
+  const crewPayrollPct = Number(budget.crew_payroll_pct ?? 15)
+  const castFringes = castSubtotal * (castPayrollPct / 100)
+  const crewFringes = crewSubtotal * (crewPayrollPct / 100)
+  const fringesTotal = castFringes + crewFringes
+  // Per diem — daily rate × headcount × shoot days. Zero on either
+  // side (rate or headcount) → that side contributes 0.
+  const castPerDiemDaily = Number(budget.cast_per_diem_daily ?? 0)
+  const crewPerDiemDaily = Number(budget.crew_per_diem_daily ?? 0)
+  const castPerDiemHeadcount = Number(budget.cast_per_diem_headcount ?? 0)
+  const crewPerDiemHeadcount = Number(budget.crew_per_diem_headcount ?? 0)
+  const castPerDiemDays = Number(budget.cast_per_diem_days ?? budget.shoot_days)
+  const crewPerDiemDays = Number(budget.crew_per_diem_days ?? budget.shoot_days)
+  const castPerDiemTotal = castPerDiemDaily * castPerDiemHeadcount * castPerDiemDays
+  const crewPerDiemTotal = crewPerDiemDaily * crewPerDiemHeadcount * crewPerDiemDays
+  const perDiemTotal = castPerDiemTotal + crewPerDiemTotal
   const directTotal = Array.from(categoryTotals.values()).reduce((s, v) => s + v, 0)
-  const contingency = directTotal * (Number(budget.contingency_pct) / 100)
-  const bond = directTotal * (Number(budget.bond_pct) / 100)
-  const grand = directTotal + contingency + bond
+  const directPlusFringes = directTotal + fringesTotal + perDiemTotal
+  const contingency = directPlusFringes * (Number(budget.contingency_pct) / 100)
+  const bond = directPlusFringes * (Number(budget.bond_pct) / 100)
+  const grand = directPlusFringes + contingency + bond
 
   // Two-column section: categories left, summary right
   const leftX = 40, rightX = doc.page.width / 2 + 20
@@ -241,9 +278,25 @@ export async function budgetTopSheetPdf(projectId: string, res: Response): Promi
   doc.font('Helvetica-Bold').fontSize(10)
   doc.text('Direct Total', leftX, doc.y, { width: colW * 0.6, continued: true })
   doc.text(fmtMoney(directTotal, budget.currency), { width: colW * 0.4, align: 'right' })
-  doc.font('Helvetica').text(`Contingency (${budget.contingency_pct}%)`, leftX, doc.y, { width: colW * 0.6, continued: true })
+  // Payroll fringes — always render the lines so the operator sees the
+  // math, even when a percentage is 0 or a subtotal is empty.
+  doc.font('Helvetica').text(`Cast Fringes (${castPayrollPct}% × ${fmtMoney(castSubtotal, budget.currency)})`, leftX, doc.y, { width: colW * 0.6, continued: true })
+  doc.text(fmtMoney(castFringes, budget.currency), { width: colW * 0.4, align: 'right' })
+  doc.text(`Crew Fringes (${crewPayrollPct}% × ${fmtMoney(crewSubtotal, budget.currency)})`, leftX, doc.y, { width: colW * 0.6, continued: true })
+  doc.text(fmtMoney(crewFringes, budget.currency), { width: colW * 0.4, align: 'right' })
+  if (perDiemTotal > 0) {
+    if (castPerDiemTotal > 0) {
+      doc.text(`Cast per diem (${castPerDiemHeadcount} × ${castPerDiemDays} days × ${fmtMoney(castPerDiemDaily, budget.currency)}/day)`, leftX, doc.y, { width: colW * 0.6, continued: true })
+      doc.text(fmtMoney(castPerDiemTotal, budget.currency), { width: colW * 0.4, align: 'right' })
+    }
+    if (crewPerDiemTotal > 0) {
+      doc.text(`Crew per diem (${crewPerDiemHeadcount} × ${crewPerDiemDays} days × ${fmtMoney(crewPerDiemDaily, budget.currency)}/day)`, leftX, doc.y, { width: colW * 0.6, continued: true })
+      doc.text(fmtMoney(crewPerDiemTotal, budget.currency), { width: colW * 0.4, align: 'right' })
+    }
+  }
+  doc.text(`Contingency (${budget.contingency_pct}% of direct + fringes + per diem)`, leftX, doc.y, { width: colW * 0.6, continued: true })
   doc.text(fmtMoney(contingency, budget.currency), { width: colW * 0.4, align: 'right' })
-  doc.text(`Bond (${budget.bond_pct}%)`, leftX, doc.y, { width: colW * 0.6, continued: true })
+  doc.text(`Bond (${budget.bond_pct}% of direct + fringes + per diem)`, leftX, doc.y, { width: colW * 0.6, continued: true })
   doc.text(fmtMoney(bond, budget.currency), { width: colW * 0.4, align: 'right' })
   doc.moveDown(0.3)
   doc.strokeColor('#1a1a1a').lineWidth(1).moveTo(leftX, doc.y).lineTo(leftX + colW, doc.y).stroke()

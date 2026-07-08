@@ -1322,6 +1322,7 @@ function DayCostsSection({
   const [expanded, setExpanded] = useState(false)
   const [items, setItems] = useState<DayCostItem[] | null>(null)
   const [scenes, setScenes] = useState<SceneRollup[]>([])
+  const [fringes, setFringes] = useState<{ castPayrollPct: number; crewPayrollPct: number; castPerDiemPerDay: number; crewPerDiemPerDay: number } | null>(null)
   const [busy, setBusy] = useState(false)
 
   async function load() {
@@ -1335,9 +1336,11 @@ function DayCostsSection({
         sourceShootDayId: it.sourceShootDayId,
       })))
       setScenes(r.scenes ?? [])
+      setFringes(r.fringes ?? null)
     } catch {
       setItems([])
       setScenes([])
+      setFringes(null)
     }
   }
 
@@ -1385,7 +1388,17 @@ function DayCostsSection({
 
   const dayItemsTotal = (items ?? []).reduce((s, i) => s + i.total, 0)
   const sceneItemsTotal = scenes.reduce((s, r) => s + r.total, 0)
-  const total = dayItemsTotal + sceneItemsTotal
+  // Fringes on this day only cover the day's own cast/crew buckets.
+  // Company-wide budget totals are the source of truth — here we just
+  // show the "if this day happens, what fringes/per-diem land" number
+  // so producers see the real day cost.
+  const dayCastItemsTotal = (items ?? []).filter((i) => (i.code ?? 'OTHER') === 'CAST').reduce((s, i) => s + i.total, 0)
+  const dayCrewItemsTotal = (items ?? []).filter((i) => (i.code ?? 'OTHER') === 'CREW').reduce((s, i) => s + i.total, 0)
+  const dayCastFringes = fringes ? dayCastItemsTotal * (fringes.castPayrollPct / 100) : 0
+  const dayCrewFringes = fringes ? dayCrewItemsTotal * (fringes.crewPayrollPct / 100) : 0
+  const dayPerDiem = fringes ? fringes.castPerDiemPerDay + fringes.crewPerDiemPerDay : 0
+  const fringesTotal = dayCastFringes + dayCrewFringes + dayPerDiem
+  const total = dayItemsTotal + sceneItemsTotal + fringesTotal
 
   return (
     <div className="border-t border-line/40 mt-2 pt-2 px-1">
@@ -1445,6 +1458,38 @@ function DayCostsSection({
                         </button>
                       )
                     })}
+                  </div>
+                </div>
+              )}
+              {/* Fringes + per diem (read-only). Edit rates in the
+                  Budget card's Settings. Shown so producers see the
+                  real day cost, not just direct items. */}
+              {fringes && fringesTotal > 0 && (
+                <div className="rounded-lg border border-line/60 bg-ink/20 p-2 space-y-1.5">
+                  <div className="text-[10px] uppercase tracking-wider text-muted font-bold flex items-center gap-1.5">
+                    <span>💵</span>
+                    <span>Fringes & per diem</span>
+                    <span className="text-muted/50 normal-case font-normal">(edit in Budget → Settings)</span>
+                  </div>
+                  <div className="grid grid-cols-2 gap-1 text-[11px] font-mono">
+                    {dayCastFringes > 0 && (
+                      <>
+                        <span className="text-muted">Cast fringes ({fringes.castPayrollPct}%)</span>
+                        <span className="text-right">${Math.round(dayCastFringes).toLocaleString()}</span>
+                      </>
+                    )}
+                    {dayCrewFringes > 0 && (
+                      <>
+                        <span className="text-muted">Crew fringes ({fringes.crewPayrollPct}%)</span>
+                        <span className="text-right">${Math.round(dayCrewFringes).toLocaleString()}</span>
+                      </>
+                    )}
+                    {dayPerDiem > 0 && (
+                      <>
+                        <span className="text-muted">Per diem (this day)</span>
+                        <span className="text-right">${Math.round(dayPerDiem).toLocaleString()}</span>
+                      </>
+                    )}
                   </div>
                 </div>
               )}
