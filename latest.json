@@ -1,9 +1,9 @@
 {
   "version": "0.2.2",
-  "now": "2026-07-08T17:15:35.983Z",
+  "now": "2026-07-08T18:02:31.207Z",
   "boot": {
-    "startedAt": "2026-07-08T17:15:35.504Z",
-    "completedAt": "2026-07-08T17:15:35.967Z",
+    "startedAt": "2026-07-08T18:02:30.774Z",
+    "completedAt": "2026-07-08T18:02:31.196Z",
     "error": null
   },
   "env": {
@@ -105,7 +105,7 @@
   "recentLog": [
     {
       "level": "info",
-      "ts": "2026-07-08T17:15:35.502Z",
+      "ts": "2026-07-08T18:02:30.772Z",
       "msg": "serving client from",
       "data": {
         "clientDir": "/app/dist"
@@ -113,7 +113,7 @@
     },
     {
       "level": "info",
-      "ts": "2026-07-08T17:15:35.504Z",
+      "ts": "2026-07-08T18:02:30.774Z",
       "msg": "boot starting",
       "data": {
         "cwd": "/app",
@@ -124,12 +124,12 @@
     },
     {
       "level": "info",
-      "ts": "2026-07-08T17:15:35.790Z",
+      "ts": "2026-07-08T18:02:31.018Z",
       "msg": "migrations complete"
     },
     {
       "level": "info",
-      "ts": "2026-07-08T17:15:35.935Z",
+      "ts": "2026-07-08T18:02:31.188Z",
       "msg": "BIYA seed: project already exists, ensured shoot days",
       "data": {
         "projectId": "12f53ed1-c6c7-4c11-8d7b-06d91744c9af"
@@ -137,28 +137,12 @@
     },
     {
       "level": "info",
-      "ts": "2026-07-08T17:15:35.957Z",
-      "msg": "podcast: backfilled executive_producer = admin",
-      "data": {
-        "projectId": "d46a04b9-ca9b-409d-a7a5-5fb878eaa7ea"
-      }
-    },
-    {
-      "level": "info",
-      "ts": "2026-07-08T17:15:35.965Z",
-      "msg": "podcast: backfilled executive_producer = admin",
-      "data": {
-        "projectId": "6398889f-2481-4488-ab45-9d5ccace741b"
-      }
-    },
-    {
-      "level": "info",
-      "ts": "2026-07-08T17:15:35.967Z",
+      "ts": "2026-07-08T18:02:31.196Z",
       "msg": "listening on :8080"
     },
     {
       "level": "info",
-      "ts": "2026-07-08T17:15:35.968Z",
+      "ts": "2026-07-08T18:02:31.197Z",
       "msg": "scheduler started (every 5 min)"
     }
   ]
