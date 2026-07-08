@@ -14,7 +14,7 @@
     "rssFeedUrl": null,
     "createdAt": "2026-04-29T22:31:46.421Z"
   },
-  "publishedAt": "2026-07-08T01:45:53.290Z",
+  "publishedAt": "2026-07-08T01:47:12.685Z",
   "counts": {
     "scenes": 157,
     "lineItems": 1761,
@@ -28171,8 +28171,8 @@
       "description": "Camera Support",
       "amt": 1,
       "x": 1,
-      "rate": 667,
-      "total": 667,
+      "rate": 700,
+      "total": 700,
       "notes": null,
       "vendor": "Lightstone Rentals",
       "datedAt": null,
