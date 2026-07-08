@@ -211,10 +211,13 @@ export default function BudgetSection({ projectId, isAdmin }: { projectId: strin
   const castFringes = castSubtotal * (budget.castPayrollPct / 100)
   const crewFringes = crewSubtotal * (budget.crewPayrollPct / 100)
   const fringesTotal = castFringes + crewFringes
-  // Per diem = daily rate × headcount × per-side days (defaults to
-  // shoot_days but can be bumped up to cover travel + hold days).
-  const castPerDiemTotal = budget.castPerDiemDaily * budget.castPerDiemHeadcount * budget.castPerDiemDays
-  const crewPerDiemTotal = budget.crewPerDiemDaily * budget.crewPerDiemHeadcount * budget.crewPerDiemDays
+  // Per diem is only paid on away-from-home days — same rule as
+  // hotels. Away days = shoot days tagged with something other than
+  // the budget's home_location_tag (computed on the server). Add
+  // travel_days as a small buffer for travel-in / travel-out days.
+  const perDiemDays = budget.awayDaysCount + budget.travelDays
+  const castPerDiemTotal = budget.castPerDiemDaily * budget.castPerDiemHeadcount * perDiemDays
+  const crewPerDiemTotal = budget.crewPerDiemDaily * budget.crewPerDiemHeadcount * perDiemDays
   const perDiemTotal = castPerDiemTotal + crewPerDiemTotal
   const directPlusFringes = directTotal + fringesTotal + perDiemTotal
   const contingency = directPlusFringes * (budget.contingencyPct / 100)
@@ -708,8 +711,7 @@ function BudgetSettings({ budget, onSaved }: { budget: ApiBudget; onSaved: () =>
   const [crewPerDiemDaily, setCrewPerDiemDaily] = useState(budget.crewPerDiemDaily)
   const [castPerDiemHeadcount, setCastPerDiemHeadcount] = useState(budget.castPerDiemHeadcount)
   const [crewPerDiemHeadcount, setCrewPerDiemHeadcount] = useState(budget.crewPerDiemHeadcount)
-  const [castPerDiemDays, setCastPerDiemDays] = useState(budget.castPerDiemDays)
-  const [crewPerDiemDays, setCrewPerDiemDays] = useState(budget.crewPerDiemDays)
+  const [travelDays, setTravelDays] = useState(budget.travelDays)
   const [homeLocationTag, setHomeLocationTag] = useState(budget.homeLocationTag ?? '')
   const [hotelCastNightly, setHotelCastNightly] = useState(budget.hotelCastNightly)
   const [hotelCrewNightly, setHotelCrewNightly] = useState(budget.hotelCrewNightly)
@@ -740,8 +742,7 @@ function BudgetSettings({ budget, onSaved }: { budget: ApiBudget; onSaved: () =>
         crewPerDiemDaily,
         castPerDiemHeadcount,
         crewPerDiemHeadcount,
-        castPerDiemDays,
-        crewPerDiemDays,
+        travelDays,
         homeLocationTag: homeLocationTag.trim() || null,
         hotelCastNightly,
         hotelCrewNightly,
@@ -865,21 +866,19 @@ function BudgetSettings({ budget, onSaved }: { budget: ApiBudget; onSaved: () =>
           placeholder="4"
         />
       </label>
-      <label className="block">
-        <span className="block text-[10px] uppercase tracking-wider text-muted font-bold mb-1">Cast days on loc.</span>
+      <div className="text-[10px] text-muted self-end pb-2 col-span-2">
+        Away days: <span className="font-mono text-text">{budget.awayDaysCount}</span> ·
+        travel buffer:{' '}
         <input
           type="number"
           step="1"
           min={0}
-          value={castPerDiemDays}
-          onChange={(e) => setCastPerDiemDays(parseInt(e.target.value) || 0)}
-          className="w-full rounded-md bg-ink/60 border border-line text-text px-2 py-1.5 outline-none font-mono"
-          placeholder={String(shootDays)}
-          title="Total days you'll pay cast per diem — shoot days + travel + hold."
-        />
-      </label>
-      <div className="text-[10px] text-muted self-end pb-2">
-        ={' '}<span className="font-mono">{fmtMoney(castPerDiemDaily * castPerDiemHeadcount * castPerDiemDays, currency)}</span>
+          value={travelDays}
+          onChange={(e) => setTravelDays(parseInt(e.target.value) || 0)}
+          className="w-16 rounded-md bg-ink/60 border border-line text-text px-2 py-0.5 outline-none font-mono inline-block"
+          title="Extra travel-in / travel-out days per diem is paid on top of Solvang days."
+        />{' '}
+        = <span className="font-mono text-text">{budget.awayDaysCount + travelDays}</span> per-diem days
       </div>
       <label className="block">
         <span className="block text-[10px] uppercase tracking-wider text-muted font-bold mb-1">Crew $/day</span>
@@ -905,22 +904,6 @@ function BudgetSettings({ budget, onSaved }: { budget: ApiBudget; onSaved: () =>
           placeholder="15"
         />
       </label>
-      <label className="block">
-        <span className="block text-[10px] uppercase tracking-wider text-muted font-bold mb-1">Crew days on loc.</span>
-        <input
-          type="number"
-          step="1"
-          min={0}
-          value={crewPerDiemDays}
-          onChange={(e) => setCrewPerDiemDays(parseInt(e.target.value) || 0)}
-          className="w-full rounded-md bg-ink/60 border border-line text-text px-2 py-1.5 outline-none font-mono"
-          placeholder={String(shootDays)}
-          title="Total days you'll pay crew per diem — shoot days + travel + hold. Usually shoot_days + 2 travel + a few holds."
-        />
-      </label>
-      <div className="text-[10px] text-muted self-end pb-2">
-        ={' '}<span className="font-mono">{fmtMoney(crewPerDiemDaily * crewPerDiemHeadcount * crewPerDiemDays, currency)}</span>
-      </div>
       <div className="col-span-2 sm:col-span-4 mt-1 mb-1 text-[10px] uppercase tracking-[0.15em] text-muted font-bold">
         🏨 Hotels (nightly rate × per-diem headcount × away days)
       </div>

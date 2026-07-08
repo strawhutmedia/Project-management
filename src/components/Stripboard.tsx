@@ -116,6 +116,9 @@ export default function Stripboard({ projectId, isAdmin, projectName }: { projec
   const [redoStack, setRedoStack] = useState<UndoEntry[]>([])
   const [pendingMove, setPendingMove] = useState<PendingMove | null>(null)
   const [jumpQuery, setJumpQuery] = useState('')
+  // Destructive actions (Re-import .fdx, Re-analyze all, Auto-plan) go
+  // behind this collapsed menu so an errant click can't wipe out work.
+  const [dangerOpen, setDangerOpen] = useState(false)
   const jumpInputRef = useRef<HTMLInputElement | null>(null)
   const [openSceneId, setOpenSceneId] = useState<string | null>(null)
   const [autoScheduleOpen, setAutoScheduleOpen] = useState(false)
@@ -835,38 +838,6 @@ export default function Stripboard({ projectId, isAdmin, projectName }: { projec
               className="hidden"
             />
             <button
-              onClick={() => fileInputRef.current?.click()}
-              disabled={importing}
-              className="text-[10px] uppercase tracking-wider text-stage-stems border border-stage-stems/40 rounded-full px-3 py-1.5 hover:bg-stage-stems/10 disabled:opacity-50"
-            >
-              {importing ? 'Parsing…' : '↻ Re-import .fdx'}
-            </button>
-            <button
-              onClick={() => void reanalyzeAll()}
-              disabled={busy}
-              title="Re-run Claude breakdown on every scene already in the database. No .fdx upload needed."
-              className="text-[10px] uppercase tracking-wider text-stage-mastering border border-stage-mastering/40 rounded-full px-3 py-1.5 hover:bg-stage-mastering/10 disabled:opacity-50"
-            >
-              ✨ Re-analyze all scenes
-            </button>
-            <button
-              onClick={() => setAutoScheduleOpen(true)}
-              disabled={busy || (board?.scenes.length ?? 0) === 0}
-              title="Let Claude plan the shoot. You'll preview and approve before anything changes."
-              className="text-[10px] uppercase tracking-wider text-white bg-gradient-to-r from-stage-tracking to-stage-mixing rounded-full px-3 py-1.5 hover:opacity-90 disabled:opacity-50 font-bold"
-            >
-              ✨ Auto-plan schedule
-            </button>
-            {projectName === 'Back in Your Arms' && (grouped?.unscheduled.length ?? 0) > 0 && (
-              <button
-                onClick={() => void applyBiyaSchedule()}
-                disabled={busy}
-                className="text-[10px] uppercase tracking-wider text-white bg-gradient-to-r from-stage-producing to-stage-mastering rounded-full px-3 py-1.5 hover:opacity-90 disabled:opacity-50 font-bold"
-              >
-                ✨ Apply BIYA schedule
-              </button>
-            )}
-            <button
               onClick={() => void addDay(false)}
               disabled={busy}
               className="text-[10px] uppercase tracking-wider text-stage-mastering border border-stage-mastering/40 rounded-full px-3 py-1.5 hover:bg-stage-mastering/10 disabled:opacity-50"
@@ -882,6 +853,62 @@ export default function Stripboard({ projectId, isAdmin, projectName }: { projec
             >
               + Break
             </button>
+            {/* Danger menu — hides destructive actions (re-import,
+                re-analyze, auto-plan) behind a click so they can't be
+                brushed by accident. */}
+            <div className="relative">
+              <button
+                onClick={() => setDangerOpen((v) => !v)}
+                className="text-[10px] uppercase tracking-wider text-muted border border-line rounded-full px-3 py-1.5 hover:bg-ink/40"
+                title="Destructive actions — re-import, re-analyze, auto-plan"
+              >
+                ⚠ More… {dangerOpen ? '▴' : '▾'}
+              </button>
+              {dangerOpen && (
+                <>
+                  <div className="fixed inset-0 z-10" onClick={() => setDangerOpen(false)} />
+                  <div className="absolute right-0 top-full mt-2 z-20 min-w-[240px] rounded-xl border border-urgent/40 bg-panel shadow-2xl p-2 space-y-1">
+                    <div className="text-[9px] uppercase tracking-[0.2em] text-urgent font-bold px-2 pt-1 pb-1 border-b border-line/60">
+                      ⚠ Destructive · confirm before firing
+                    </div>
+                    <button
+                      onClick={() => { setDangerOpen(false); fileInputRef.current?.click() }}
+                      disabled={importing}
+                      className="w-full text-left px-2 py-1.5 text-[11px] hover:bg-stage-stems/10 rounded disabled:opacity-50"
+                    >
+                      <div className="font-bold text-stage-stems">{importing ? 'Parsing…' : '↻ Re-import .fdx'}</div>
+                      <div className="text-[10px] text-muted">Replaces every scene from a new .fdx upload.</div>
+                    </button>
+                    <button
+                      onClick={() => { setDangerOpen(false); void reanalyzeAll() }}
+                      disabled={busy}
+                      className="w-full text-left px-2 py-1.5 text-[11px] hover:bg-stage-mastering/10 rounded disabled:opacity-50"
+                    >
+                      <div className="font-bold text-stage-mastering">✨ Re-analyze all scenes</div>
+                      <div className="text-[10px] text-muted">Re-runs Claude breakdown on every scene. Uses tokens.</div>
+                    </button>
+                    <button
+                      onClick={() => { setDangerOpen(false); setAutoScheduleOpen(true) }}
+                      disabled={busy || (board?.scenes.length ?? 0) === 0}
+                      className="w-full text-left px-2 py-1.5 text-[11px] hover:bg-stage-tracking/10 rounded disabled:opacity-50"
+                    >
+                      <div className="font-bold text-stage-tracking">✨ Auto-plan schedule</div>
+                      <div className="text-[10px] text-muted">Claude replans the whole shoot. Preview + confirm before it lands.</div>
+                    </button>
+                    {projectName === 'Back in Your Arms' && (grouped?.unscheduled.length ?? 0) > 0 && (
+                      <button
+                        onClick={() => { setDangerOpen(false); void applyBiyaSchedule() }}
+                        disabled={busy}
+                        className="w-full text-left px-2 py-1.5 text-[11px] hover:bg-stage-producing/10 rounded disabled:opacity-50"
+                      >
+                        <div className="font-bold text-stage-producing">✨ Apply BIYA schedule</div>
+                        <div className="text-[10px] text-muted">Overwrites every scene's day assignment.</div>
+                      </button>
+                    )}
+                  </div>
+                </>
+              )}
+            </div>
           </div>
         )}
         <div className="flex items-center gap-1.5 shrink-0">
@@ -1279,54 +1306,39 @@ function SceneCard({
   )
 }
 
-// Small inline location tag editor in each day header. Blank pill
-// prompts the operator to set a location; once set, it colors amber
-// so hotel-required days stand out. Clicking opens an inline text
-// field; blur saves. Stops propagation so clicking the tag doesn't
-// collapse the day.
+// Inline location dropdown per day. Fixed choices for now (LA,
+// Solvang — the only two locations for BIYA). We can promote this to
+// a project-level list of allowed locations later when another film
+// needs it.
+const ALLOWED_LOCATIONS = ['LA', 'Solvang']
+
 function LocationTagInput({ day, onChanged }: { day: ApiShootDay; onChanged?: () => void }) {
-  const [editing, setEditing] = useState(false)
-  const [value, setValue] = useState(day.locationTag ?? '')
-  useEffect(() => { setValue(day.locationTag ?? '') }, [day.locationTag])
-  async function save() {
-    setEditing(false)
-    const next = value.trim() || null
+  async function save(next: string | null) {
     if (next === (day.locationTag ?? null)) return
     try {
       await api.updateShootDay(day.id, { locationTag: next })
       onChanged?.()
     } catch {}
   }
-  if (editing) {
-    return (
-      <input
-        autoFocus
-        value={value}
-        onChange={(e) => setValue(e.target.value)}
-        onBlur={() => void save()}
-        onKeyDown={(e) => {
-          if (e.key === 'Enter') { e.preventDefault(); void save() }
-          if (e.key === 'Escape') { e.preventDefault(); setEditing(false); setValue(day.locationTag ?? '') }
-        }}
-        onClick={(e) => e.stopPropagation()}
-        placeholder="location"
-        className="text-[10px] uppercase tracking-wider bg-ink/60 border border-line rounded-full px-2 py-0.5 w-20 focus:outline-none focus:border-stage-mastering"
-      />
-    )
-  }
-  const hasTag = !!day.locationTag?.trim()
+  const currentTag = day.locationTag?.trim() ?? ''
+  const hasTag = currentTag.length > 0
   return (
-    <span
-      onClick={(e) => { e.stopPropagation(); setEditing(true) }}
-      className={`text-[10px] uppercase tracking-wider font-bold px-2 py-0.5 rounded-full border cursor-pointer hover:brightness-125 ${
+    <select
+      value={currentTag}
+      onChange={(e) => { e.stopPropagation(); void save(e.target.value || null) }}
+      onClick={(e) => e.stopPropagation()}
+      className={`text-[10px] uppercase tracking-wider font-bold px-2 py-0.5 rounded-full border cursor-pointer appearance-none pr-4 ${
         hasTag
           ? 'text-amber-300 border-amber-500/40 bg-amber-500/10'
-          : 'text-muted border-line hover:text-text'
+          : 'text-muted border-line hover:text-text bg-transparent'
       }`}
-      title="Click to set location. Days at your home location cost no hotels."
+      title="Days at your home location cost no hotels or per diem."
     >
-      {hasTag ? `📍 ${day.locationTag}` : '📍 set location'}
-    </span>
+      <option value="">📍 set location</option>
+      {ALLOWED_LOCATIONS.map((loc) => (
+        <option key={loc} value={loc}>📍 {loc}</option>
+      ))}
+    </select>
   )
 }
 

@@ -238,11 +238,11 @@ export type ApiBudget = {
   crewPerDiemDaily: number
   castPerDiemHeadcount: number
   crewPerDiemHeadcount: number
-  castPerDiemDays: number
-  crewPerDiemDays: number
   homeLocationTag: string | null
   hotelCastNightly: number
   hotelCrewNightly: number
+  travelDays: number
+  awayDaysCount: number
   productionTarget: number | null
   postTarget: number | null
   marketingTarget: number | null
@@ -841,11 +841,10 @@ export const api = {
     crewPerDiemDaily?: number
     castPerDiemHeadcount?: number
     crewPerDiemHeadcount?: number
-    castPerDiemDays?: number
-    crewPerDiemDays?: number
     homeLocationTag?: string | null
     hotelCastNightly?: number
     hotelCrewNightly?: number
+    travelDays?: number
     productionTarget?: number | null
     postTarget?: number | null
     marketingTarget?: number | null

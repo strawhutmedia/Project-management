@@ -75,8 +75,8 @@ budgetsRouter.get('/projects/:projectId', async (req, res) => {
             cast_payroll_pct, crew_payroll_pct,
             cast_per_diem_daily, crew_per_diem_daily,
             cast_per_diem_headcount, crew_per_diem_headcount,
-            cast_per_diem_days, crew_per_diem_days,
             home_location_tag, hotel_cast_nightly, hotel_crew_nightly,
+            travel_days,
             production_target, post_target, marketing_target, admin_target, total_target
        FROM budgets WHERE project_id = $1`,
     [projectId],
@@ -121,6 +121,17 @@ budgetsRouter.get('/projects/:projectId', async (req, res) => {
     })
   }
   const numOrNull = (v: unknown) => (v == null ? null : Number(v))
+  // Away days count — shoot days whose location tag differs from
+  // the budget's home_location_tag. Drives per diem + hotels totals.
+  const homeTagLower = (budget.home_location_tag ?? '').trim().toLowerCase()
+  const awayRes = await pool.query<{ n: string }>(
+    `SELECT COUNT(*)::int AS n FROM shoot_days
+      WHERE project_id = $1 AND is_break = FALSE
+        AND location_tag IS NOT NULL
+        AND LOWER(TRIM(location_tag)) <> $2`,
+    [projectId, homeTagLower],
+  )
+  const awayDaysCount = Number(awayRes.rows[0]?.n ?? 0)
   res.json({
     budget: {
       id: budget.id,
@@ -134,11 +145,11 @@ budgetsRouter.get('/projects/:projectId', async (req, res) => {
       crewPerDiemDaily: Number(budget.crew_per_diem_daily ?? 0),
       castPerDiemHeadcount: Number(budget.cast_per_diem_headcount ?? 0),
       crewPerDiemHeadcount: Number(budget.crew_per_diem_headcount ?? 0),
-      castPerDiemDays: budget.cast_per_diem_days == null ? Number(budget.shoot_days) : Number(budget.cast_per_diem_days),
-      crewPerDiemDays: budget.crew_per_diem_days == null ? Number(budget.shoot_days) : Number(budget.crew_per_diem_days),
       homeLocationTag: budget.home_location_tag ?? null,
       hotelCastNightly: Number(budget.hotel_cast_nightly ?? 0),
       hotelCrewNightly: Number(budget.hotel_crew_nightly ?? 0),
+      travelDays: Number(budget.travel_days ?? 0),
+      awayDaysCount,
       productionTarget: numOrNull(budget.production_target),
       postTarget: numOrNull(budget.post_target),
       marketingTarget: numOrNull(budget.marketing_target),
@@ -226,7 +237,7 @@ budgetsRouter.patch('/:budgetId', async (req, res) => {
   )
   if (lookup.rows.length === 0) { res.status(404).json({ error: 'not_found' }); return }
   if (!await assertWriter(user, lookup.rows[0].project_id, res)) return
-  const { currency, shootDays, bondPct, contingencyPct, castPayrollPct, crewPayrollPct, castPerDiemDaily, crewPerDiemDaily, castPerDiemHeadcount, crewPerDiemHeadcount, castPerDiemDays, crewPerDiemDays, homeLocationTag, hotelCastNightly, hotelCrewNightly, productionTarget, postTarget, marketingTarget, adminTarget, totalTarget } = req.body ?? {}
+  const { currency, shootDays, bondPct, contingencyPct, castPayrollPct, crewPayrollPct, castPerDiemDaily, crewPerDiemDaily, castPerDiemHeadcount, crewPerDiemHeadcount, homeLocationTag, hotelCastNightly, hotelCrewNightly, travelDays, productionTarget, postTarget, marketingTarget, adminTarget, totalTarget } = req.body ?? {}
   const updates: string[] = []
   const values: unknown[] = []
   let i = 1
@@ -240,8 +251,7 @@ budgetsRouter.patch('/:budgetId', async (req, res) => {
   if (typeof crewPerDiemDaily === 'number') { updates.push(`crew_per_diem_daily = $${i++}`); values.push(crewPerDiemDaily) }
   if (typeof castPerDiemHeadcount === 'number') { updates.push(`cast_per_diem_headcount = $${i++}`); values.push(castPerDiemHeadcount) }
   if (typeof crewPerDiemHeadcount === 'number') { updates.push(`crew_per_diem_headcount = $${i++}`); values.push(crewPerDiemHeadcount) }
-  if (typeof castPerDiemDays === 'number') { updates.push(`cast_per_diem_days = $${i++}`); values.push(castPerDiemDays) }
-  if (typeof crewPerDiemDays === 'number') { updates.push(`crew_per_diem_days = $${i++}`); values.push(crewPerDiemDays) }
+  if (typeof travelDays === 'number') { updates.push(`travel_days = $${i++}`); values.push(travelDays) }
   if ('homeLocationTag' in (req.body ?? {})) {
     updates.push(`home_location_tag = $${i++}`)
     values.push(typeof homeLocationTag === 'string' && homeLocationTag.trim() ? homeLocationTag.trim().slice(0, 50) : null)
@@ -488,8 +498,11 @@ budgetsRouter.get('/shoot-days/:shootDayId/items', async (req, res) => {
   const crewPerDiemDaily = Number(s?.crew_per_diem_daily ?? 0)
   const castPerDiemHeadcount = Number(s?.cast_per_diem_headcount ?? 0)
   const crewPerDiemHeadcount = Number(s?.crew_per_diem_headcount ?? 0)
-  const castPerDiemPerDay = castPerDiemDaily * castPerDiemHeadcount
-  const crewPerDiemPerDay = crewPerDiemDaily * crewPerDiemHeadcount
+  // Per diem for THIS day is only paid if the day is away from home.
+  // Same rule as hotels — if the day's location tag differs from
+  // home_location_tag, cast/crew get per diem.
+  const castPerDiemPerDayIfAway = castPerDiemDaily * castPerDiemHeadcount
+  const crewPerDiemPerDayIfAway = crewPerDiemDaily * crewPerDiemHeadcount
 
   // Hotel cost for THIS day. Compare the day's location_tag to the
   // budget's home_location_tag — if they don't match (and the day is
@@ -554,8 +567,8 @@ budgetsRouter.get('/shoot-days/:shootDayId/items', async (req, res) => {
     fringes: {
       castPayrollPct,
       crewPayrollPct,
-      castPerDiemPerDay,
-      crewPerDiemPerDay,
+      castPerDiemPerDay: needsHotels ? castPerDiemPerDayIfAway : 0,
+      crewPerDiemPerDay: needsHotels ? crewPerDiemPerDayIfAway : 0,
       dayHotelCost,
       needsHotels,
       dayLocationTag: dayRow?.location_tag ?? null,
