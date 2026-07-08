@@ -6,7 +6,7 @@
 // row. Prospects live in a scrollable list — add, edit inline, delete.
 //
 // Generating unique sentences + sending the campaign land next.
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { api, type ApiOutreachProspect, type ApiOutreachTemplate } from '../api'
 import { useAuth } from '../auth'
 import ProspectDetailModal from './ProspectDetailModal'
@@ -68,6 +68,27 @@ export default function OutreachSection({ projectId }: { projectId: string }) {
   const [testTo, setTestTo] = useState(user?.email ?? 'ryan@strawhutmedia.com')
   const [testSending, setTestSending] = useState(false)
   const [testResult, setTestResult] = useState<string | null>(null)
+  // Refs so token-insert buttons can drop a token at the current cursor
+  // position rather than always appending to the end.
+  const subjectRef = useRef<HTMLInputElement | null>(null)
+  const bodyRef = useRef<HTMLTextAreaElement | null>(null)
+
+  function insertToken(field: 'subject' | 'body', token: string) {
+    const el = field === 'subject' ? subjectRef.current : bodyRef.current
+    const current = field === 'subject' ? subject : body
+    const setter = field === 'subject' ? setSubject : setBody
+    if (!el) { setter(current + token); return }
+    const start = el.selectionStart ?? current.length
+    const end = el.selectionEnd ?? current.length
+    const next = current.slice(0, start) + token + current.slice(end)
+    setter(next)
+    // Restore focus + move cursor to just after the inserted token.
+    requestAnimationFrame(() => {
+      el.focus()
+      const pos = start + token.length
+      el.setSelectionRange(pos, pos)
+    })
+  }
 
   // Keep the default test target in sync once the user loads.
   useEffect(() => {
@@ -271,18 +292,26 @@ export default function OutreachSection({ projectId }: { projectId: string }) {
           </div>
           <div className="space-y-2">
             <label className="block">
-              <span className="text-[10px] uppercase tracking-wider text-muted font-bold">Subject</span>
+              <div className="flex items-center justify-between gap-2 flex-wrap">
+                <span className="text-[10px] uppercase tracking-wider text-muted font-bold">Subject</span>
+                <TokenBar onInsert={(t) => insertToken('subject', t)} />
+              </div>
               <input
+                ref={subjectRef}
                 value={subject}
                 onChange={(e) => setSubject(e.target.value)}
                 className="mt-1 w-full bg-ink/40 border border-line rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-stage-mastering"
               />
             </label>
             <label className="block">
-              <span className="text-[10px] uppercase tracking-wider text-muted font-bold">
-                Body — use [name] and [unique_sentence] to personalize
-              </span>
+              <div className="flex items-center justify-between gap-2 flex-wrap">
+                <span className="text-[10px] uppercase tracking-wider text-muted font-bold">
+                  Body — click a chip to drop the token at your cursor
+                </span>
+                <TokenBar onInsert={(t) => insertToken('body', t)} />
+              </div>
               <textarea
+                ref={bodyRef}
                 value={body}
                 onChange={(e) => setBody(e.target.value)}
                 rows={16}
@@ -613,6 +642,32 @@ function parseBulk(text: string): ParsedRow[] {
     })
   }
   return rows
+}
+
+// Chip row of merge tokens. Each chip is a button — click drops the
+// token at the cursor position of the field it's attached to. Kept
+// tiny so it doesn't dominate the field header on mobile.
+function TokenBar({ onInsert }: { onInsert: (token: string) => void }) {
+  const tokens: { token: string; label: string; hint: string }[] = [
+    { token: '[name]', label: '[name]', hint: 'Prospect first name — e.g. "Alex"' },
+    { token: '[unique_sentence]', label: '[unique_sentence]', hint: 'Claude-written personalized sentence per prospect' },
+    { token: '[one_sheet_url]', label: '[one_sheet_url]', hint: 'Public one-sheet URL (blank if unpublished)' },
+  ]
+  return (
+    <div className="flex items-center gap-1 flex-wrap">
+      {tokens.map((t) => (
+        <button
+          key={t.token}
+          type="button"
+          onMouseDown={(e) => { e.preventDefault(); onInsert(t.token) }}
+          title={t.hint}
+          className="text-[9px] font-mono text-stage-mastering border border-stage-mastering/40 rounded-full px-2 py-0.5 hover:bg-stage-mastering/10 font-bold"
+        >
+          + {t.label}
+        </button>
+      ))}
+    </div>
+  )
 }
 
 function normalizeType(s: string | undefined): ParsedRow['recipientType'] {
