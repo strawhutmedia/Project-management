@@ -44,8 +44,8 @@ async function probeResend(): Promise<void> {
     // SDK returns either {data: [...]} or an array depending on version.
     const raw = list.data as unknown
     const domains = Array.isArray(raw)
-      ? (raw as Array<{ name: string; status: string; region?: string }>)
-      : ((raw as { data?: Array<{ name: string; status: string; region?: string }> })?.data ?? [])
+      ? (raw as Array<{ id: string; name: string; status: string; region?: string }>)
+      : ((raw as { data?: Array<{ id: string; name: string; status: string; region?: string }> })?.data ?? [])
 
     logInfo('resend probe: domains.list ok', {
       count: domains.length,
@@ -54,20 +54,72 @@ async function probeResend(): Promise<void> {
 
     // Cross-reference with Slate's DB — flag any Slate sending_domains
     // rows that don't appear in Resend so this shows up in the log.
-    const { rows: slateDomains } = await pool.query<{ name: string; status: string }>(
-      `SELECT name, status FROM sending_domains ORDER BY created_at ASC`,
+    // AUTO-FIX: Update domain statuses to match Resend's reality.
+    const { rows: slateDomains } = await pool.query<{ id: string; name: string; status: string; resend_id: string | null }>(
+      `SELECT id, name, status, resend_id FROM sending_domains ORDER BY created_at ASC`,
     )
-    const resendNames = new Set(domains.map((d) => d.name.toLowerCase()))
-    const missing = slateDomains
-      .filter((s) => !resendNames.has(s.name.toLowerCase()))
-      .map((s) => s.name)
+    const resendByName = new Map(domains.map((d) => [d.name.toLowerCase(), d]))
+    const missing: string[] = []
+    let autoFixed = 0
+    
+    for (const slate of slateDomains) {
+      const resendMatch = resendByName.get(slate.name.toLowerCase())
+      
+      if (!resendMatch) {
+        // Domain in Slate but not visible in Resend — mark as pending
+        missing.push(slate.name)
+        if (slate.status !== 'pending') {
+          await pool.query(
+            `UPDATE sending_domains SET status = 'pending', updated_at = now() WHERE id = $1`,
+            [slate.id],
+          )
+          autoFixed++
+          logInfo('resend probe: auto-fixed domain status (not in Resend)', {
+            domain: slate.name,
+            oldStatus: slate.status,
+            newStatus: 'pending',
+          })
+        }
+      } else {
+        // Map Resend status to Slate status
+        let mapped: 'pending' | 'verifying' | 'verified' | 'failed'
+        switch (resendMatch.status) {
+          case 'verified':          mapped = 'verified'; break
+          case 'pending':           mapped = 'verifying'; break
+          case 'not_started':       mapped = 'pending'; break
+          case 'failure':
+          case 'temporary_failure': mapped = 'failed'; break
+          default:                  mapped = 'pending'; break
+        }
+        
+        // Auto-update if status or resend_id differs
+        if (slate.status !== mapped || slate.resend_id !== resendMatch.id) {
+          await pool.query(
+            `UPDATE sending_domains SET status = $1, resend_id = $2, updated_at = now() WHERE id = $3`,
+            [mapped, resendMatch.id, slate.id],
+          )
+          autoFixed++
+          logInfo('resend probe: auto-fixed domain status', {
+            domain: slate.name,
+            oldStatus: slate.status,
+            newStatus: mapped,
+            resendStatus: resendMatch.status,
+          })
+        }
+      }
+    }
+    
     if (missing.length > 0) {
       logError('resend probe: Slate domains missing from Resend key', {
         missing,
-        diagnosis: 'This RESEND_API_KEY cannot see these domains. Either the key is scoped to a subset of your account, or it belongs to a different account/team than the one where these domains are verified.',
+        diagnosis: 'This RESEND_API_KEY cannot see these domains. Either the key is scoped to a subset of your account, or it belongs to a different account/team than the one where these domains are verified. These domains have been marked as pending.',
       })
+    }
+    
+    if (autoFixed > 0) {
+      logInfo('resend probe: auto-fixed domain statuses', { count: autoFixed })
     } else {
-      logInfo('resend probe: all Slate domains visible to Resend key')
+      logInfo('resend probe: all Slate domains in sync with Resend')
     }
   } catch (err) {
     logError('resend probe: threw', {

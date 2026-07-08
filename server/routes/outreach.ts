@@ -365,14 +365,30 @@ async function sendOneProspect(prospectId: string): Promise<void> {
       from, to: p.email, subject, text: body, replyTo,
     })
     if (send.error) {
+      const errorMsg = String(send.error.message ?? send.error).slice(0, 500)
       await pool.query(
         `UPDATE outreach_sends SET status = 'failed', error = $1 WHERE id = $2`,
-        [String(send.error.message ?? send.error).slice(0, 500), sendLogId],
+        [errorMsg, sendLogId],
       )
       await pool.query(
         `UPDATE outreach_prospects SET status = 'failed', updated_at = now() WHERE id = $1`,
         [prospectId],
       )
+      
+      // If domain verification error, mark the domain as needing attention
+      if (errorMsg.includes('domain is not verified') || errorMsg.includes('domain not verified')) {
+        await pool.query(
+          `UPDATE sending_domains SET status = 'failed', updated_at = now() 
+           WHERE id = $1`,
+          [domain.id],
+        )
+        logError('outreach: domain verification failed, marked domain as failed', { 
+          domainId: domain.id, 
+          domainName: domain.name,
+          error: errorMsg
+        })
+      }
+      
       throw new Error(`resend_error: ${send.error.message ?? send.error}`)
     }
     await pool.query(
@@ -923,7 +939,19 @@ outreachRouter.post('/projects/:projectId/test-send', async (req, res) => {
     })
     if (send.error) {
       logError('outreach test-send failed', { projectId, error: send.error })
-      res.status(502).json({ error: 'send_failed', detail: send.error.message ?? String(send.error) })
+      
+      // Check if the error is about domain not being verified
+      const errorMsg = send.error.message ?? String(send.error)
+      if (errorMsg.includes('domain is not verified') || errorMsg.includes('domain not verified')) {
+        res.status(400).json({ 
+          error: 'domain_not_verified', 
+          detail: `The domain "${domain}" is not verified in Resend. Go to Admin > Outreach Domains and click "Sync with Resend" to update domain statuses, or verify the domain at https://resend.com/domains first.`,
+          resendError: errorMsg
+        })
+        return
+      }
+      
+      res.status(502).json({ error: 'send_failed', detail: errorMsg })
       return
     }
     logInfo('outreach test-send ok', { projectId, to, domain })
