@@ -56,13 +56,18 @@ async function getOneSheetUrl(projectId: string): Promise<string> {
 // Ryan's team fills this out in Excel/Sheets, then copy-pastes the
 // whole block into the Bulk import textarea. Columns mirror the
 // parseBulk() order in OutreachSection so what you see is what you get.
+//
+// Only 3 columns are required for a good send: name, email, context.
+// The other 3 (full_name, type, represents) are helpful when you're
+// pitching an agent/manager on behalf of someone else — leave them
+// blank for direct-to-person pitches.
 outreachRouter.get('/template.csv', (_req, res) => {
-  const header = 'name,email,full_name,recipient_type,client_name,context'
+  const header = 'name (required),email (required),context (required — Claude writes the unique sentence from this),full_name (optional),type (optional: person / agent / manager / other),represents (optional — only for agents/managers)'
   const rows = [
-    'Alex,alex@company.com,Alex Rodriguez,person,,founder of X — just did Diary of a CEO',
-    'Sarah,sarah@agency.com,Sarah Kim,agent,Emily Blunt,Emily Blunt\'s booking agent',
-    'Tom,tom@bigfilm.com,Tom Hayes,manager,Pedro Pascal,Pedro Pascal\'s longtime manager',
-    'Jamie,jamie@studio.com,Jamie Ortiz,other,,PR contact at A24',
+    'Alex,alex@company.com,Founder of X — just did Diary of a CEO ep 342,Alex Rodriguez,person,',
+    'Sarah,sarah@agency.com,Emily Blunt\'s booking agent at CAA — reached out about Wicked press,Sarah Kim,agent,Emily Blunt',
+    'Tom,tom@bigfilm.com,Pedro Pascal\'s longtime manager — Pedro just wrapped The Last of Us s2,Tom Hayes,manager,Pedro Pascal',
+    'Jamie,jamie@studio.com,PR contact at A24 — pitching guests from their fall slate,Jamie Ortiz,other,',
   ]
   const csv = [header, ...rows].join('\r\n') + '\r\n'
   res.setHeader('Content-Type', 'text/csv; charset=utf-8')

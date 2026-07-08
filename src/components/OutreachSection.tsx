@@ -541,6 +541,11 @@ function parseBulk(text: string): ParsedRow[] {
   const lines = text.split(/\r?\n/).map((l) => l.trim()).filter(Boolean)
   const rows: ParsedRow[] = []
   for (const line of lines) {
+    // Skip the CSV template header if someone pasted the whole file.
+    // Detects "name..." in col 1 and "email..." in col 2 with no @ —
+    // avoids treating it as a real prospect and producing garbage rows.
+    const lower = line.toLowerCase()
+    if (lower.startsWith('name') && lower.includes('email') && !line.includes('@')) continue
     // Detect delimiter — prefer tab (spreadsheet paste), then pipe,
     // then comma. Splitting on the first one we find keeps commas
     // inside a context field intact.
@@ -568,12 +573,14 @@ function parseBulk(text: string): ParsedRow[] {
     }
 
     // Multi-column paste. If c1 looks like an email, standard order is
-    // name, email(s), full_name, type, client, context. A cell can hold
-    // multiple emails (person + manager + agent inline) — we split and
-    // emit one prospect per email so each has its own send target.
+    // name, email(s), context, full_name, type, represents. Context comes
+    // right after email because it's the third required field — the one
+    // Claude uses to write the unique sentence. A cell can hold multiple
+    // emails (person + manager + agent inline) — we split and emit one
+    // prospect per email so each has its own send target.
     if (c1 && /@/.test(c1)) {
       const emails = extractEmails(c1)
-      const type = normalizeType(c3)
+      const type = normalizeType(c4)
       if (emails.length === 0) {
         rows.push({
           name: c0 || '(unknown)',
@@ -585,10 +592,10 @@ function parseBulk(text: string): ParsedRow[] {
         rows.push({
           name: c0 || '(unknown)',
           email,
-          fullName: c2 || undefined,
+          context: c2 || undefined,
+          fullName: c3 || undefined,
           recipientType: type,
-          clientName: c4 || undefined,
-          context: c5 || undefined,
+          clientName: c5 || undefined,
           error: c0 ? undefined : 'name_required',
         })
       }
@@ -657,16 +664,6 @@ function BulkImportPanel({
     <div className="rounded-lg border border-stage-tracking/40 bg-stage-tracking/5 p-3 space-y-3">
       <div className="text-[11px] text-muted space-y-1">
         <p><strong className="text-text">Paste from anywhere</strong> — spreadsheet, plain list, one per line.</p>
-        <p>Supported formats (Slate detects automatically):</p>
-        <ul className="list-disc list-inside pl-2 space-y-0.5 text-[10px]">
-          <li><code>alex@company.com</code> — email only, name auto-derived</li>
-          <li><code>Alex, alex@company.com</code> — name, email</li>
-          <li><code>Alex, alex@company.com, Alex Rodriguez, agent, Sarah Kim, founder of X — just did Diary of a CEO</code> — full: name, email, full name, type (person/agent/manager/other), client, context</li>
-          <li>Or tab-separated (copy from Google Sheets)</li>
-        </ul>
-        <p className="text-amber-300/80 pt-1">
-          <strong>Multiple emails in one cell?</strong> Slate splits them into separate prospects (one send per address) — you get one row per email, not a joined mess.
-        </p>
         <p className="pt-1">
           <a
             href="/api/outreach/template.csv"
@@ -675,7 +672,18 @@ function BulkImportPanel({
           >
             📥 Download CSV template
           </a>
-          <span className="text-muted/70"> — open in Excel or Google Sheets, fill in the rows, then paste the whole thing above.</span>
+          <span className="text-muted/70"> — fill in Excel/Sheets, copy the rows (header optional — we skip it), paste above.</span>
+        </p>
+        <p className="pt-1"><strong className="text-emerald-300">Only 3 fields matter:</strong> name, email, context. Everything else is optional.</p>
+        <ul className="list-disc list-inside pl-2 space-y-0.5 text-[10px]">
+          <li><code>alex@company.com</code> — email only, name auto-derived</li>
+          <li><code>Alex, alex@company.com</code> — name, email</li>
+          <li><code>Alex, alex@company.com, founder of X — just did Diary of a CEO</code> — name, email, context (recommended minimum)</li>
+          <li><code>Sarah, sarah@caa.com, Emily Blunt's booking agent at CAA, Sarah Kim, agent, Emily Blunt</code> — full: name, email, context, full name, type (person/agent/manager/other), represents</li>
+          <li>Or tab-separated (copy from Google Sheets)</li>
+        </ul>
+        <p className="text-amber-300/80 pt-1">
+          <strong>Multiple emails in one cell?</strong> Slate splits them into separate prospects (one send per address) — you get one row per email, not a joined mess.
         </p>
       </div>
       <textarea
