@@ -14,7 +14,7 @@
     "rssFeedUrl": "https://feeds.megaphone.fm/SHML1364632298",
     "createdAt": "2026-07-07T22:55:37.143Z"
   },
-  "publishedAt": "2026-07-07T22:57:25.475Z",
+  "publishedAt": "2026-07-08T15:12:57.730Z",
   "counts": {
     "scenes": 0,
     "lineItems": 0,
@@ -31,6 +31,13 @@
     "showChatMessages": 0
   },
   "members": [
+    {
+      "userId": "e05f70d9-0a70-476e-a032-3b26d083b7f5",
+      "displayName": "Alex",
+      "email": "alex.clayton.wall@gmail.com",
+      "role": "user",
+      "projectRole": "user"
+    },
     {
       "userId": "e0afa8af-ef91-41b5-ad28-afc3189712f6",
       "displayName": "Ryan",
