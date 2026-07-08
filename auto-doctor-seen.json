@@ -399,5 +399,17 @@
     "outcome": "no_tool_call",
     "summary": "agent stopped without calling a terminal tool",
     "iterations": 6
+  },
+  "outreach test-send failed::{\"projectId\":\"c3227529-8bc9-43d9-995f-5d65a7bdbf9c\",\"error\":{\"statusCode\":403,\"m": {
+    "attemptedAt": "2026-07-08T19:57:00.788Z",
+    "outcome": "fixed",
+    "summary": "Fixed outreach test-send domain verification errors by adding automatic domain status syncing on boot, enhanced error handling to detect unverified domains, and auto-marking failed domains to prevent future send attempts with unverified domains.",
+    "iterations": 20
+  },
+  "resend probe: Slate domains missing from Resend key::{\"missing\":[\"strawhut.media\",\"strawhutmedia.net\",\"strawhutshows.com\",\"strawhutpo": {
+    "attemptedAt": "2026-07-08T19:57:58.670Z",
+    "outcome": "gave_up",
+    "summary": "hit max iterations (20)",
+    "iterations": 20
   }
 }
