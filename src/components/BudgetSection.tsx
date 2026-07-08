@@ -710,6 +710,9 @@ function BudgetSettings({ budget, onSaved }: { budget: ApiBudget; onSaved: () =>
   const [crewPerDiemHeadcount, setCrewPerDiemHeadcount] = useState(budget.crewPerDiemHeadcount)
   const [castPerDiemDays, setCastPerDiemDays] = useState(budget.castPerDiemDays)
   const [crewPerDiemDays, setCrewPerDiemDays] = useState(budget.crewPerDiemDays)
+  const [homeLocationTag, setHomeLocationTag] = useState(budget.homeLocationTag ?? '')
+  const [hotelCastNightly, setHotelCastNightly] = useState(budget.hotelCastNightly)
+  const [hotelCrewNightly, setHotelCrewNightly] = useState(budget.hotelCrewNightly)
   const [productionTarget, setProductionTarget] = useState<string>(budget.productionTarget != null ? String(budget.productionTarget) : '')
   const [postTarget, setPostTarget] = useState<string>(budget.postTarget != null ? String(budget.postTarget) : '')
   const [marketingTarget, setMarketingTarget] = useState<string>(budget.marketingTarget != null ? String(budget.marketingTarget) : '')
@@ -739,6 +742,9 @@ function BudgetSettings({ budget, onSaved }: { budget: ApiBudget; onSaved: () =>
         crewPerDiemHeadcount,
         castPerDiemDays,
         crewPerDiemDays,
+        homeLocationTag: homeLocationTag.trim() || null,
+        hotelCastNightly,
+        hotelCrewNightly,
         productionTarget: num(productionTarget),
         postTarget: num(postTarget),
         marketingTarget: num(marketingTarget),
@@ -914,6 +920,46 @@ function BudgetSettings({ budget, onSaved }: { budget: ApiBudget; onSaved: () =>
       </label>
       <div className="text-[10px] text-muted self-end pb-2">
         ={' '}<span className="font-mono">{fmtMoney(crewPerDiemDaily * crewPerDiemHeadcount * crewPerDiemDays, currency)}</span>
+      </div>
+      <div className="col-span-2 sm:col-span-4 mt-1 mb-1 text-[10px] uppercase tracking-[0.15em] text-muted font-bold">
+        🏨 Hotels (nightly rate × per-diem headcount × away days)
+      </div>
+      <label className="block">
+        <span className="block text-[10px] uppercase tracking-wider text-muted font-bold mb-1">Home location (no hotels)</span>
+        <input
+          value={homeLocationTag}
+          onChange={(e) => setHomeLocationTag(e.target.value)}
+          placeholder="LA"
+          className="w-full rounded-md bg-ink/60 border border-line text-text px-2 py-1.5 outline-none"
+          title="Days tagged with this location need no hotels. Any other tag = hotel-required."
+        />
+      </label>
+      <label className="block">
+        <span className="block text-[10px] uppercase tracking-wider text-muted font-bold mb-1">Cast $/night</span>
+        <input
+          type="number"
+          step="1"
+          min={0}
+          value={hotelCastNightly}
+          onChange={(e) => setHotelCastNightly(parseFloat(e.target.value) || 0)}
+          className="w-full rounded-md bg-ink/60 border border-line text-text px-2 py-1.5 outline-none font-mono"
+          placeholder="350"
+        />
+      </label>
+      <label className="block">
+        <span className="block text-[10px] uppercase tracking-wider text-muted font-bold mb-1">Crew $/night</span>
+        <input
+          type="number"
+          step="1"
+          min={0}
+          value={hotelCrewNightly}
+          onChange={(e) => setHotelCrewNightly(parseFloat(e.target.value) || 0)}
+          className="w-full rounded-md bg-ink/60 border border-line text-text px-2 py-1.5 outline-none font-mono"
+          placeholder="275"
+        />
+      </label>
+      <div className="text-[10px] text-muted self-end pb-2">
+        Tag each day's location on the Stripboard.
       </div>
       <div className="col-span-2 sm:col-span-4 mt-1 mb-1 text-[10px] uppercase tracking-[0.15em] text-muted font-bold">
         🎯 Goals (leave blank to disable a bar)

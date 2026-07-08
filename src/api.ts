@@ -240,6 +240,9 @@ export type ApiBudget = {
   crewPerDiemHeadcount: number
   castPerDiemDays: number
   crewPerDiemDays: number
+  homeLocationTag: string | null
+  hotelCastNightly: number
+  hotelCrewNightly: number
   productionTarget: number | null
   postTarget: number | null
   marketingTarget: number | null
@@ -448,6 +451,7 @@ export type ApiShootDay = {
   isBreak: boolean
   shootDate: string | null
   notes: string | null
+  locationTag?: string | null
 }
 
 export type ApiScene = {
@@ -839,6 +843,9 @@ export const api = {
     crewPerDiemHeadcount?: number
     castPerDiemDays?: number
     crewPerDiemDays?: number
+    homeLocationTag?: string | null
+    hotelCastNightly?: number
+    hotelCrewNightly?: number
     productionTarget?: number | null
     postTarget?: number | null
     marketingTarget?: number | null
@@ -904,7 +911,7 @@ export const api = {
     request<{
       items: Array<{ id: string; accountId: string; code: string | null; description: string; amt: number; units: string | null; x: number; rate: number; vendor: string | null; datedAt: string | null; notes: string | null; position: number; total: number; spansAllShootDays: boolean; isSource: boolean; sourceShootDayId: string | null }>
       scenes: Array<{ id: string; number: string; slug: string | null; itemCount: number; total: number }>
-      fringes: { castPayrollPct: number; crewPayrollPct: number; castPerDiemPerDay: number; crewPerDiemPerDay: number }
+      fringes: { castPayrollPct: number; crewPayrollPct: number; castPerDiemPerDay: number; crewPerDiemPerDay: number; dayHotelCost: number; needsHotels: boolean; dayLocationTag: string | null; homeLocationTag: string | null }
     }>(
       `/api/budgets/shoot-days/${shootDayId}/items`,
     ),
@@ -1081,6 +1088,11 @@ export const api = {
     request<{ id: string }>(`/api/stripboard/projects/${projectId}/days`, {
       method: 'POST',
       body: JSON.stringify(body),
+    }),
+  updateShootDay: (shootDayId: string, patch: { locationTag?: string | null; shootDate?: string | null; notes?: string; isBreak?: boolean }) =>
+    request<{ ok: true }>(`/api/stripboard/shoot-days/${shootDayId}`, {
+      method: 'PATCH',
+      body: JSON.stringify(patch),
     }),
   updateScene: (sceneId: string, patch: { shootDayId?: string | null; dayPosition?: number; locationStatus?: 'unset' | 'free' | 'paid'; notes?: string; producerNoteSuggestion?: string | null }) =>
     request<{ ok: true }>(`/api/stripboard/scenes/${sceneId}`, {

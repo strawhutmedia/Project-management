@@ -45,9 +45,12 @@ type Budget = {
   cast_per_diem_daily: number | null; crew_per_diem_daily: number | null;
   cast_per_diem_headcount: number | null; crew_per_diem_headcount: number | null;
   cast_per_diem_days: number | null; crew_per_diem_days: number | null;
+  home_location_tag: string | null;
+  hotel_cast_nightly: number | null; hotel_crew_nightly: number | null;
   production_target: number | null; post_target: number | null;
   marketing_target: number | null; admin_target: number | null; total_target: number | null;
 }
+type ShootDayWithLocation = { id: string; number: number; is_break: boolean; shoot_date: string | null; notes: string | null; location_tag: string | null }
 
 const CATEGORY_LABEL: Record<string, string> = {
   above_line: 'Above the Line',
@@ -122,6 +125,7 @@ async function loadProjectContext(projectId: string): Promise<{
             cast_per_diem_daily, crew_per_diem_daily,
             cast_per_diem_headcount, crew_per_diem_headcount,
             cast_per_diem_days, crew_per_diem_days,
+            home_location_tag, hotel_cast_nightly, hotel_crew_nightly,
             production_target, post_target, marketing_target, admin_target, total_target
        FROM budgets WHERE project_id = $1`,
     [projectId],
@@ -159,7 +163,7 @@ async function loadProjectContext(projectId: string): Promise<{
     [projectId],
   )
   const daysRes = await pool.query<ShootDay>(
-    `SELECT id, number, is_break, shoot_date, notes FROM shoot_days
+    `SELECT id, number, is_break, shoot_date, notes, location_tag FROM shoot_days
      WHERE project_id = $1 ORDER BY number ASC`,
     [projectId],
   )
@@ -197,7 +201,7 @@ function pageHeader(doc: typeof PDFDocument.prototype, project: ProjectRow, titl
 // 1. BUDGET TOP SHEET
 // ────────────────────────────────────────────────────────────────────
 export async function budgetTopSheetPdf(projectId: string, res: Response): Promise<void> {
-  const { project, budget, accounts, items } = await loadProjectContext(projectId)
+  const { project, budget, accounts, items, shootDays } = await loadProjectContext(projectId)
   const doc = setupPdf(res, `${slug(project.name)}-budget-topsheet.pdf`)
   pageHeader(doc, project, 'BUDGET TOP SHEET')
 
@@ -252,8 +256,22 @@ export async function budgetTopSheetPdf(projectId: string, res: Response): Promi
   const castPerDiemTotal = castPerDiemDaily * castPerDiemHeadcount * castPerDiemDays
   const crewPerDiemTotal = crewPerDiemDaily * crewPerDiemHeadcount * crewPerDiemDays
   const perDiemTotal = castPerDiemTotal + crewPerDiemTotal
+  // Hotels — count how many shoot days have a location tag that
+  // differs from the budget's home_location_tag. Breaks don't count.
+  const homeTag = (budget.home_location_tag ?? '').trim().toLowerCase()
+  const hotelDays = (shootDays as ShootDayWithLocation[])
+    .filter((d) => !d.is_break)
+    .filter((d) => {
+      const t = (d.location_tag ?? '').trim().toLowerCase()
+      return t !== '' && t !== homeTag
+    })
+  const hotelCastNightly = Number(budget.hotel_cast_nightly ?? 0)
+  const hotelCrewNightly = Number(budget.hotel_crew_nightly ?? 0)
+  const hotelCastTotal = hotelCastNightly * castPerDiemHeadcount * hotelDays.length
+  const hotelCrewTotal = hotelCrewNightly * crewPerDiemHeadcount * hotelDays.length
+  const hotelsTotal = hotelCastTotal + hotelCrewTotal
   const directTotal = Array.from(categoryTotals.values()).reduce((s, v) => s + v, 0)
-  const directPlusFringes = directTotal + fringesTotal + perDiemTotal
+  const directPlusFringes = directTotal + fringesTotal + perDiemTotal + hotelsTotal
   const contingency = directPlusFringes * (Number(budget.contingency_pct) / 100)
   const bond = directPlusFringes * (Number(budget.bond_pct) / 100)
   const grand = directPlusFringes + contingency + bond
@@ -292,6 +310,16 @@ export async function budgetTopSheetPdf(projectId: string, res: Response): Promi
     if (crewPerDiemTotal > 0) {
       doc.text(`Crew per diem (${crewPerDiemHeadcount} × ${crewPerDiemDays} days × ${fmtMoney(crewPerDiemDaily, budget.currency)}/day)`, leftX, doc.y, { width: colW * 0.6, continued: true })
       doc.text(fmtMoney(crewPerDiemTotal, budget.currency), { width: colW * 0.4, align: 'right' })
+    }
+  }
+  if (hotelsTotal > 0) {
+    if (hotelCastTotal > 0) {
+      doc.text(`Cast hotels (${castPerDiemHeadcount} × ${hotelDays.length} nights × ${fmtMoney(hotelCastNightly, budget.currency)}/night)`, leftX, doc.y, { width: colW * 0.6, continued: true })
+      doc.text(fmtMoney(hotelCastTotal, budget.currency), { width: colW * 0.4, align: 'right' })
+    }
+    if (hotelCrewTotal > 0) {
+      doc.text(`Crew hotels (${crewPerDiemHeadcount} × ${hotelDays.length} nights × ${fmtMoney(hotelCrewNightly, budget.currency)}/night)`, leftX, doc.y, { width: colW * 0.6, continued: true })
+      doc.text(fmtMoney(hotelCrewTotal, budget.currency), { width: colW * 0.4, align: 'right' })
     }
   }
   doc.text(`Contingency (${budget.contingency_pct}% of direct + fringes + per diem)`, leftX, doc.y, { width: colW * 0.6, continued: true })

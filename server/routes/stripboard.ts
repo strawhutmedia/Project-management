@@ -31,7 +31,7 @@ stripboardRouter.get('/projects/:projectId', async (req, res) => {
     res.status(403).json({ error: 'forbidden' }); return
   }
   const days = await pool.query(
-    `SELECT id, number, is_break, shoot_date, notes
+    `SELECT id, number, is_break, shoot_date, notes, location_tag
      FROM shoot_days WHERE project_id = $1 ORDER BY number ASC`,
     [projectId],
   )
@@ -56,12 +56,13 @@ stripboardRouter.get('/projects/:projectId', async (req, res) => {
     [projectId],
   )
   res.json({
-    days: days.rows.map((d: { id: string; number: number; is_break: boolean; shoot_date: string | null; notes: string | null }) => ({
+    days: days.rows.map((d: { id: string; number: number; is_break: boolean; shoot_date: string | null; notes: string | null; location_tag: string | null }) => ({
       id: d.id,
       number: d.number,
       isBreak: d.is_break,
       shootDate: d.shoot_date,
       notes: d.notes,
+      locationTag: d.location_tag,
     })),
     scenes: scenes.rows.map((s: {
       id: string; number: string; script_position: number; slug: string; int_ext: string | null;
@@ -328,6 +329,46 @@ stripboardRouter.post('/projects/:projectId/days', async (req, res) => {
     [projectId, number, isBreak, shootDate],
   )
   res.json({ id: rows[0].id })
+})
+
+// Update a shoot day — location tag, notes, break flag, or date.
+// Location tag drives hotel budgeting: any day whose tag doesn't
+// match the budget's home_location_tag needs hotels.
+stripboardRouter.patch('/shoot-days/:shootDayId', async (req, res) => {
+  const user = (req as typeof req & { user: SessionUser }).user
+  const shootDayId = req.params.shootDayId
+  const access = await pool.query(
+    `SELECT sd.project_id FROM shoot_days sd
+       JOIN projects p ON p.id = sd.project_id
+       LEFT JOIN project_members m ON m.project_id = p.id AND m.user_id = $1
+      WHERE sd.id = $2 AND ($3 = 'admin' OR p.created_by = $1 OR m.user_id IS NOT NULL)`,
+    [user.id, shootDayId, user.role],
+  )
+  if (access.rows.length === 0) { res.status(403).json({ error: 'forbidden' }); return }
+  const { locationTag, shootDate, notes, isBreak } = req.body ?? {}
+  const updates: string[] = []
+  const values: unknown[] = []
+  let i = 1
+  if ('locationTag' in (req.body ?? {})) {
+    updates.push(`location_tag = $${i++}`)
+    values.push(typeof locationTag === 'string' && locationTag.trim() ? locationTag.trim().slice(0, 50) : null)
+  }
+  if ('shootDate' in (req.body ?? {})) {
+    updates.push(`shoot_date = $${i++}`)
+    values.push(shootDate === null || shootDate === '' ? null : shootDate)
+  }
+  if ('notes' in (req.body ?? {})) {
+    updates.push(`notes = $${i++}`)
+    values.push(typeof notes === 'string' ? notes : null)
+  }
+  if (typeof isBreak === 'boolean') {
+    updates.push(`is_break = $${i++}`)
+    values.push(isBreak)
+  }
+  if (updates.length === 0) { res.status(400).json({ error: 'no_fields' }); return }
+  values.push(shootDayId)
+  await pool.query(`UPDATE shoot_days SET ${updates.join(', ')} WHERE id = $${i}`, values)
+  res.json({ ok: true })
 })
 
 // Move a scene to a different shoot day or reorder within day

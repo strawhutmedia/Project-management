@@ -931,9 +931,10 @@ export default function Stripboard({ projectId, isAdmin, projectName }: { projec
             scenes={grouped?.byDay.get(day.id) ?? []}
             isAdmin={isAdmin}
             moveScene={moveScene}
-          reorderScene={reorderScene}
+            reorderScene={reorderScene}
             resolvedTod={resolvedTod}
             onOpenScene={setOpenSceneId}
+            onDayLocationChanged={() => void load()}
           />
         ))}
       </div>
@@ -1045,6 +1046,7 @@ function DayRow({
   reorderScene,
   resolvedTod,
   onOpenScene,
+  onDayLocationChanged,
 }: {
   day: ApiShootDay | null
   label: string
@@ -1054,6 +1056,7 @@ function DayRow({
   moveScene: (sceneId: string, toDayId: string | null, toPosition: number) => Promise<void>
   resolvedTod: Map<string, string>
   onOpenScene: (id: string) => void
+  onDayLocationChanged?: () => void
 }) {
   const [over, setOver] = useState(false)
   const [collapsed, setCollapsed] = useState(false)
@@ -1112,6 +1115,12 @@ function DayRow({
             'text-stage-mastering'
           }`}>{label}</span>
           {day?.shootDate && <span className="text-[10px] text-muted">· {day.shootDate}</span>}
+          {day && !day.isBreak && (
+            <LocationTagInput
+              day={day}
+              onChanged={onDayLocationChanged}
+            />
+          )}
         </div>
         <div className={`text-[11px] font-mono flex items-center gap-2 flex-wrap justify-end ${overTarget ? 'text-urgent font-bold' : heavyTarget ? 'text-stage-overdubs' : 'text-muted'}`}>
           <span>{scenes.length} sc · {fmtEighths(totalEighths)} pages</span>
@@ -1270,6 +1279,57 @@ function SceneCard({
   )
 }
 
+// Small inline location tag editor in each day header. Blank pill
+// prompts the operator to set a location; once set, it colors amber
+// so hotel-required days stand out. Clicking opens an inline text
+// field; blur saves. Stops propagation so clicking the tag doesn't
+// collapse the day.
+function LocationTagInput({ day, onChanged }: { day: ApiShootDay; onChanged?: () => void }) {
+  const [editing, setEditing] = useState(false)
+  const [value, setValue] = useState(day.locationTag ?? '')
+  useEffect(() => { setValue(day.locationTag ?? '') }, [day.locationTag])
+  async function save() {
+    setEditing(false)
+    const next = value.trim() || null
+    if (next === (day.locationTag ?? null)) return
+    try {
+      await api.updateShootDay(day.id, { locationTag: next })
+      onChanged?.()
+    } catch {}
+  }
+  if (editing) {
+    return (
+      <input
+        autoFocus
+        value={value}
+        onChange={(e) => setValue(e.target.value)}
+        onBlur={() => void save()}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') { e.preventDefault(); void save() }
+          if (e.key === 'Escape') { e.preventDefault(); setEditing(false); setValue(day.locationTag ?? '') }
+        }}
+        onClick={(e) => e.stopPropagation()}
+        placeholder="location"
+        className="text-[10px] uppercase tracking-wider bg-ink/60 border border-line rounded-full px-2 py-0.5 w-20 focus:outline-none focus:border-stage-mastering"
+      />
+    )
+  }
+  const hasTag = !!day.locationTag?.trim()
+  return (
+    <span
+      onClick={(e) => { e.stopPropagation(); setEditing(true) }}
+      className={`text-[10px] uppercase tracking-wider font-bold px-2 py-0.5 rounded-full border cursor-pointer hover:brightness-125 ${
+        hasTag
+          ? 'text-amber-300 border-amber-500/40 bg-amber-500/10'
+          : 'text-muted border-line hover:text-text'
+      }`}
+      title="Click to set location. Days at your home location cost no hotels."
+    >
+      {hasTag ? `📍 ${day.locationTag}` : '📍 set location'}
+    </span>
+  )
+}
+
 function LegendChip({ label, className }: { label: string; className: string }) {
   return (
     <span className="inline-flex items-center gap-1.5">
@@ -1322,7 +1382,7 @@ function DayCostsSection({
   const [expanded, setExpanded] = useState(false)
   const [items, setItems] = useState<DayCostItem[] | null>(null)
   const [scenes, setScenes] = useState<SceneRollup[]>([])
-  const [fringes, setFringes] = useState<{ castPayrollPct: number; crewPayrollPct: number; castPerDiemPerDay: number; crewPerDiemPerDay: number } | null>(null)
+  const [fringes, setFringes] = useState<{ castPayrollPct: number; crewPayrollPct: number; castPerDiemPerDay: number; crewPerDiemPerDay: number; dayHotelCost: number; needsHotels: boolean; dayLocationTag: string | null; homeLocationTag: string | null } | null>(null)
   const [busy, setBusy] = useState(false)
 
   async function load() {
@@ -1397,7 +1457,8 @@ function DayCostsSection({
   const dayCastFringes = fringes ? dayCastItemsTotal * (fringes.castPayrollPct / 100) : 0
   const dayCrewFringes = fringes ? dayCrewItemsTotal * (fringes.crewPayrollPct / 100) : 0
   const dayPerDiem = fringes ? fringes.castPerDiemPerDay + fringes.crewPerDiemPerDay : 0
-  const fringesTotal = dayCastFringes + dayCrewFringes + dayPerDiem
+  const dayHotelCost = fringes?.dayHotelCost ?? 0
+  const fringesTotal = dayCastFringes + dayCrewFringes + dayPerDiem + dayHotelCost
   const total = dayItemsTotal + sceneItemsTotal + fringesTotal
 
   return (
@@ -1488,6 +1549,12 @@ function DayCostsSection({
                       <>
                         <span className="text-muted">Per diem (this day)</span>
                         <span className="text-right">${Math.round(dayPerDiem).toLocaleString()}</span>
+                      </>
+                    )}
+                    {dayHotelCost > 0 && (
+                      <>
+                        <span className="text-amber-300 font-bold">🏨 Hotels ({fringes?.dayLocationTag})</span>
+                        <span className="text-right text-amber-300 font-bold">${Math.round(dayHotelCost).toLocaleString()}</span>
                       </>
                     )}
                   </div>
