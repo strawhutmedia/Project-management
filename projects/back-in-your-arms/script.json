@@ -14,7 +14,7 @@
     "rssFeedUrl": null,
     "createdAt": "2026-04-29T22:31:46.421Z"
   },
-  "publishedAt": "2026-07-08T03:20:51.977Z",
+  "publishedAt": "2026-07-08T03:22:10.939Z",
   "counts": {
     "scenes": 157,
     "lineItems": 1766,
@@ -27732,6 +27732,20 @@
       "accountCategory": "production"
     },
     {
+      "id": "0b456803-4973-40b6-9d85-20f5746c8cee",
+      "category": "14-13",
+      "description": "Cast Drivers",
+      "amt": 0,
+      "x": 1,
+      "rate": 0,
+      "total": 0,
+      "notes": null,
+      "vendor": null,
+      "datedAt": null,
+      "account": "CAST",
+      "accountCategory": "above_line"
+    },
+    {
       "id": "8f0150a0-2edb-47b4-b62d-88fca1a7d99b",
       "category": "34-13",
       "description": "Coffee shop (4 scenes — Day 12)",
@@ -27746,18 +27760,18 @@
       "accountCategory": "production"
     },
     {
-      "id": "0b456803-4973-40b6-9d85-20f5746c8cee",
-      "category": "14-13",
-      "description": "Cast Drivers",
-      "amt": 0,
+      "id": "e9d7eb4a-0ba1-4b49-9ae0-020b8e67d860",
+      "category": "CREW",
+      "description": "AD / Line Producer",
+      "amt": 1,
       "x": 1,
-      "rate": 0,
-      "total": 0,
+      "rate": 400,
+      "total": 400,
       "notes": null,
       "vendor": null,
       "datedAt": null,
-      "account": "CAST",
-      "accountCategory": "above_line"
+      "account": "Day Costs",
+      "accountCategory": "production"
     },
     {
       "id": "fe57882c-bb05-4830-9c07-e3dc94f2685d",
@@ -27788,34 +27802,6 @@
       "accountCategory": "above_line"
     },
     {
-      "id": "e9d7eb4a-0ba1-4b49-9ae0-020b8e67d860",
-      "category": "CREW",
-      "description": "AD / Line Producer",
-      "amt": 1,
-      "x": 1,
-      "rate": 400,
-      "total": 400,
-      "notes": null,
-      "vendor": null,
-      "datedAt": null,
-      "account": "Day Costs",
-      "accountCategory": "production"
-    },
-    {
-      "id": "d2078013-cc60-4278-8afd-69eaf1aa8ef5",
-      "category": "CREW",
-      "description": "UPM",
-      "amt": 1,
-      "x": 1,
-      "rate": 300,
-      "total": 300,
-      "notes": null,
-      "vendor": null,
-      "datedAt": null,
-      "account": "Day Costs",
-      "accountCategory": "production"
-    },
-    {
       "id": "4461c4bb-229f-4353-9e1f-1a30b90ff7e4",
       "category": "34-15",
       "description": "Liquor store",
@@ -27830,17 +27816,17 @@
       "accountCategory": "production"
     },
     {
-      "id": "c8bbc0b7-987a-4fe5-84c7-13c21cb264f9",
-      "category": "34-16",
-      "description": "Boutique clothing store",
-      "amt": 0,
+      "id": "d2078013-cc60-4278-8afd-69eaf1aa8ef5",
+      "category": "CREW",
+      "description": "UPM",
+      "amt": 1,
       "x": 1,
-      "rate": 0,
-      "total": 0,
+      "rate": 300,
+      "total": 300,
       "notes": null,
-      "vendor": null,
+      "vendor": "Ashely Rosenberg",
       "datedAt": null,
-      "account": "LOCATIONS",
+      "account": "Day Costs",
       "accountCategory": "production"
     },
     {
@@ -27858,17 +27844,17 @@
       "accountCategory": "production"
     },
     {
-      "id": "cefc30be-b784-415b-87b9-49d6df298133",
-      "category": "CREW",
-      "description": "Grip",
-      "amt": 1,
+      "id": "c8bbc0b7-987a-4fe5-84c7-13c21cb264f9",
+      "category": "34-16",
+      "description": "Boutique clothing store",
+      "amt": 0,
       "x": 1,
-      "rate": 250,
-      "total": 250,
+      "rate": 0,
+      "total": 0,
       "notes": null,
       "vendor": null,
       "datedAt": null,
-      "account": "Day Costs",
+      "account": "LOCATIONS",
       "accountCategory": "production"
     },
     {
@@ -27886,17 +27872,17 @@
       "accountCategory": "production"
     },
     {
-      "id": "0abeb0b1-3935-4927-9cd5-e7c27a7a7d53",
-      "category": "34-18",
-      "description": "Hotel conference (Dayanet) + YMCA",
-      "amt": 0,
+      "id": "cefc30be-b784-415b-87b9-49d6df298133",
+      "category": "CREW",
+      "description": "Grip",
+      "amt": 1,
       "x": 1,
-      "rate": 0,
-      "total": 0,
+      "rate": 250,
+      "total": 250,
       "notes": null,
       "vendor": null,
       "datedAt": null,
-      "account": "LOCATIONS",
+      "account": "Day Costs",
       "accountCategory": "production"
     },
     {
@@ -27914,17 +27900,17 @@
       "accountCategory": "production"
     },
     {
-      "id": "6e095ddc-b158-489a-91f2-a6c37c54745c",
-      "category": "CREW",
-      "description": "PA",
-      "amt": 1,
+      "id": "0abeb0b1-3935-4927-9cd5-e7c27a7a7d53",
+      "category": "34-18",
+      "description": "Hotel conference (Dayanet) + YMCA",
+      "amt": 0,
       "x": 1,
       "rate": 0,
       "total": 0,
       "notes": null,
       "vendor": null,
       "datedAt": null,
-      "account": "Day Costs",
+      "account": "LOCATIONS",
       "accountCategory": "production"
     },
     {
@@ -27939,6 +27925,20 @@
       "vendor": null,
       "datedAt": null,
       "account": "LOCATIONS",
+      "accountCategory": "production"
+    },
+    {
+      "id": "6e095ddc-b158-489a-91f2-a6c37c54745c",
+      "category": "CREW",
+      "description": "PA",
+      "amt": 1,
+      "x": 1,
+      "rate": 0,
+      "total": 0,
+      "notes": null,
+      "vendor": null,
+      "datedAt": null,
+      "account": "Day Costs",
       "accountCategory": "production"
     },
     {
@@ -27978,7 +27978,7 @@
       "rate": 550,
       "total": 550,
       "notes": null,
-      "vendor": null,
+      "vendor": "Daniel McCoy",
       "datedAt": null,
       "account": "Day Costs",
       "accountCategory": "production"
