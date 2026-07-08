@@ -1,9 +1,9 @@
 {
   "version": "0.2.2",
-  "now": "2026-07-08T17:10:07.038Z",
+  "now": "2026-07-08T17:15:35.983Z",
   "boot": {
-    "startedAt": "2026-07-08T17:10:06.509Z",
-    "completedAt": "2026-07-08T17:10:07.025Z",
+    "startedAt": "2026-07-08T17:15:35.504Z",
+    "completedAt": "2026-07-08T17:15:35.967Z",
     "error": null
   },
   "env": {
@@ -100,12 +100,12 @@
       "064_flagship_show.sql"
     ],
     "userCount": 12,
-    "projectCount": 13
+    "projectCount": 15
   },
   "recentLog": [
     {
       "level": "info",
-      "ts": "2026-07-08T17:10:06.504Z",
+      "ts": "2026-07-08T17:15:35.502Z",
       "msg": "serving client from",
       "data": {
         "clientDir": "/app/dist"
@@ -113,7 +113,7 @@
     },
     {
       "level": "info",
-      "ts": "2026-07-08T17:10:06.509Z",
+      "ts": "2026-07-08T17:15:35.504Z",
       "msg": "boot starting",
       "data": {
         "cwd": "/app",
@@ -124,12 +124,12 @@
     },
     {
       "level": "info",
-      "ts": "2026-07-08T17:10:06.779Z",
+      "ts": "2026-07-08T17:15:35.790Z",
       "msg": "migrations complete"
     },
     {
       "level": "info",
-      "ts": "2026-07-08T17:10:07.008Z",
+      "ts": "2026-07-08T17:15:35.935Z",
       "msg": "BIYA seed: project already exists, ensured shoot days",
       "data": {
         "projectId": "12f53ed1-c6c7-4c11-8d7b-06d91744c9af"
@@ -137,12 +137,28 @@
     },
     {
       "level": "info",
-      "ts": "2026-07-08T17:10:07.025Z",
+      "ts": "2026-07-08T17:15:35.957Z",
+      "msg": "podcast: backfilled executive_producer = admin",
+      "data": {
+        "projectId": "d46a04b9-ca9b-409d-a7a5-5fb878eaa7ea"
+      }
+    },
+    {
+      "level": "info",
+      "ts": "2026-07-08T17:15:35.965Z",
+      "msg": "podcast: backfilled executive_producer = admin",
+      "data": {
+        "projectId": "6398889f-2481-4488-ab45-9d5ccace741b"
+      }
+    },
+    {
+      "level": "info",
+      "ts": "2026-07-08T17:15:35.967Z",
       "msg": "listening on :8080"
     },
     {
       "level": "info",
-      "ts": "2026-07-08T17:10:07.028Z",
+      "ts": "2026-07-08T17:15:35.968Z",
       "msg": "scheduler started (every 5 min)"
     }
   ]
