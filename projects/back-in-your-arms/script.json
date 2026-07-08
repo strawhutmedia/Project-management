@@ -14,7 +14,7 @@
     "rssFeedUrl": null,
     "createdAt": "2026-04-29T22:31:46.421Z"
   },
-  "publishedAt": "2026-07-08T03:34:56.990Z",
+  "publishedAt": "2026-07-08T03:36:32.275Z",
   "counts": {
     "scenes": 157,
     "lineItems": 1766,
@@ -24834,20 +24834,6 @@
       "accountCategory": "post"
     },
     {
-      "id": "2e23aafe-c6a7-4375-aba6-caf0e113cc67",
-      "category": "48-01",
-      "description": "Sound Designer",
-      "amt": 0,
-      "x": 1,
-      "rate": 0,
-      "total": 0,
-      "notes": null,
-      "vendor": null,
-      "datedAt": null,
-      "account": "POST PRODUCTION SOUND",
-      "accountCategory": "post"
-    },
-    {
       "id": "5a3e5c44-d310-451f-a497-0f41765c8e59",
       "category": "30-01",
       "description": "Director of Photography",
@@ -24859,6 +24845,20 @@
       "vendor": null,
       "datedAt": null,
       "account": "CAMERA",
+      "accountCategory": "production"
+    },
+    {
+      "id": "6b437756-d309-4434-8eec-3c859fd9d192",
+      "category": "21-01",
+      "description": "Background Extras",
+      "amt": 0,
+      "x": 1,
+      "rate": 0,
+      "total": 0,
+      "notes": null,
+      "vendor": null,
+      "datedAt": null,
+      "account": "EXTRA TALENT",
       "accountCategory": "production"
     },
     {
@@ -24904,17 +24904,17 @@
       "accountCategory": "production"
     },
     {
-      "id": "7839046b-2d58-4ccc-a54a-b0e499a1a0df",
-      "category": "49-01",
-      "description": "Color Correction",
+      "id": "2e23aafe-c6a7-4375-aba6-caf0e113cc67",
+      "category": "48-01",
+      "description": "Sound Designer",
       "amt": 1,
       "x": 1,
-      "rate": 12000,
-      "total": 12000,
+      "rate": 20000,
+      "total": 20000,
       "notes": null,
       "vendor": null,
       "datedAt": null,
-      "account": "POST PRODUCTION FILM & LAB",
+      "account": "POST PRODUCTION SOUND",
       "accountCategory": "post"
     },
     {
@@ -24932,20 +24932,6 @@
       "accountCategory": "production"
     },
     {
-      "id": "6b437756-d309-4434-8eec-3c859fd9d192",
-      "category": "21-01",
-      "description": "Background Extras",
-      "amt": 0,
-      "x": 1,
-      "rate": 0,
-      "total": 0,
-      "notes": null,
-      "vendor": null,
-      "datedAt": null,
-      "account": "EXTRA TALENT",
-      "accountCategory": "production"
-    },
-    {
       "id": "75920480-e41a-4796-a544-b3ac91b38778",
       "category": "36-01",
       "description": "SFX Coordinator",
@@ -24958,6 +24944,20 @@
       "datedAt": null,
       "account": "SPECIAL EFFECTS",
       "accountCategory": "production"
+    },
+    {
+      "id": "7839046b-2d58-4ccc-a54a-b0e499a1a0df",
+      "category": "49-01",
+      "description": "Color Correction",
+      "amt": 1,
+      "x": 1,
+      "rate": 12000,
+      "total": 12000,
+      "notes": null,
+      "vendor": null,
+      "datedAt": null,
+      "account": "POST PRODUCTION FILM & LAB",
+      "accountCategory": "post"
     },
     {
       "id": "09f80b3d-2b24-4c67-8591-b53bea9c59ef",
@@ -25072,20 +25072,6 @@
       "accountCategory": "production"
     },
     {
-      "id": "e7ac22f8-ed1a-40a6-935f-22fc3cef2e8a",
-      "category": "58-01",
-      "description": "Production Package",
-      "amt": 0,
-      "x": 1,
-      "rate": 0,
-      "total": 0,
-      "notes": null,
-      "vendor": null,
-      "datedAt": null,
-      "account": "INSURANCE",
-      "accountCategory": "other"
-    },
-    {
       "id": "4048256e-cd4e-4623-8f75-dda4842a0d88",
       "category": "15-01",
       "description": "Airfares",
@@ -25198,9 +25184,9 @@
       "accountCategory": "above_line"
     },
     {
-      "id": "932bce30-1ad8-41eb-8e7c-fb452418965b",
-      "category": "56-02",
-      "description": "Production Accountant",
+      "id": "e7ac22f8-ed1a-40a6-935f-22fc3cef2e8a",
+      "category": "58-01",
+      "description": "Production Package",
       "amt": 0,
       "x": 1,
       "rate": 0,
@@ -25208,8 +25194,22 @@
       "notes": null,
       "vendor": null,
       "datedAt": null,
-      "account": "LEGAL & ACCOUNTING",
+      "account": "INSURANCE",
       "accountCategory": "other"
+    },
+    {
+      "id": "f6396d42-7b2b-49a0-b45c-413148d2a375",
+      "category": "46-02",
+      "description": "Music Editor",
+      "amt": 0,
+      "x": 1,
+      "rate": 0,
+      "total": 0,
+      "notes": null,
+      "vendor": null,
+      "datedAt": null,
+      "account": "MUSIC",
+      "accountCategory": "post"
     },
     {
       "id": "9c7dfbc9-a8b6-43e7-beb2-d76fd0d50178",
@@ -25240,32 +25240,18 @@
       "accountCategory": "production"
     },
     {
-      "id": "f6396d42-7b2b-49a0-b45c-413148d2a375",
-      "category": "46-02",
-      "description": "Music Editor",
-      "amt": 0,
+      "id": "1b3ac7cf-1635-4509-9632-a7b6385fcda8",
+      "category": "CAST",
+      "description": "JASON KENDRICK",
+      "amt": 1,
       "x": 1,
-      "rate": 0,
-      "total": 0,
+      "rate": 1600,
+      "total": 1600,
       "notes": null,
       "vendor": null,
       "datedAt": null,
-      "account": "MUSIC",
-      "accountCategory": "post"
-    },
-    {
-      "id": "401487c3-b535-442c-82cc-1492a9df45db",
-      "category": "58-02",
-      "description": "E&O Insurance",
-      "amt": 0,
-      "x": 1,
-      "rate": 0,
-      "total": 0,
-      "notes": null,
-      "vendor": null,
-      "datedAt": null,
-      "account": "INSURANCE",
-      "accountCategory": "other"
+      "account": "Day Costs",
+      "accountCategory": "production"
     },
     {
       "id": "77d1f751-a78a-49bd-af1c-a03159a80d1a",
@@ -25282,18 +25268,32 @@
       "accountCategory": "production"
     },
     {
-      "id": "1b3ac7cf-1635-4509-9632-a7b6385fcda8",
-      "category": "CAST",
-      "description": "JASON KENDRICK",
-      "amt": 1,
+      "id": "8ed53500-285e-4340-88e3-35b713597f8a",
+      "category": "57-02",
+      "description": "Office Supplies",
+      "amt": 0,
       "x": 1,
-      "rate": 1600,
-      "total": 1600,
+      "rate": 0,
+      "total": 0,
       "notes": null,
       "vendor": null,
       "datedAt": null,
-      "account": "Day Costs",
-      "accountCategory": "production"
+      "account": "GENERAL EXPENSE",
+      "accountCategory": "other"
+    },
+    {
+      "id": "aac851b6-e5f9-4f75-8a13-b0e323e65dae",
+      "category": "55-02",
+      "description": "EPK Crew",
+      "amt": 0,
+      "x": 1,
+      "rate": 0,
+      "total": 0,
+      "notes": null,
+      "vendor": null,
+      "datedAt": null,
+      "account": "PUBLICITY",
+      "accountCategory": "other"
     },
     {
       "id": "f35627ed-90b5-44d9-ad29-82c9bb378583",
@@ -25324,9 +25324,9 @@
       "accountCategory": "above_line"
     },
     {
-      "id": "aac851b6-e5f9-4f75-8a13-b0e323e65dae",
-      "category": "55-02",
-      "description": "EPK Crew",
+      "id": "07e90604-6bf8-4a6f-9969-cb67efee1466",
+      "category": "30-02",
+      "description": "Camera Operator",
       "amt": 0,
       "x": 1,
       "rate": 0,
@@ -25334,8 +25334,8 @@
       "notes": null,
       "vendor": null,
       "datedAt": null,
-      "account": "PUBLICITY",
-      "accountCategory": "other"
+      "account": "CAMERA",
+      "accountCategory": "production"
     },
     {
       "id": "fdbc0f2d-dca0-412b-81b4-92b7cf44ad1d",
@@ -25352,20 +25352,6 @@
       "accountCategory": "post"
     },
     {
-      "id": "07e90604-6bf8-4a6f-9969-cb67efee1466",
-      "category": "30-02",
-      "description": "Camera Operator",
-      "amt": 0,
-      "x": 1,
-      "rate": 0,
-      "total": 0,
-      "notes": null,
-      "vendor": null,
-      "datedAt": null,
-      "account": "CAMERA",
-      "accountCategory": "production"
-    },
-    {
       "id": "3fe0c4fc-c4de-46fa-acd0-30db89917ecc",
       "category": "21-02",
       "description": "Stand-Ins",
@@ -25380,9 +25366,9 @@
       "accountCategory": "production"
     },
     {
-      "id": "47f1e222-d7f3-4a57-bcd3-37c1800fb714",
-      "category": "32-02",
-      "description": "Asst Make-Up",
+      "id": "0edf2c29-0386-43b0-86f9-9cd657fca36c",
+      "category": "15-02",
+      "description": "Transportation",
       "amt": 0,
       "x": 1,
       "rate": 0,
@@ -25390,8 +25376,8 @@
       "notes": null,
       "vendor": null,
       "datedAt": null,
-      "account": "MAKE-UP & HAIR",
-      "accountCategory": "production"
+      "account": "TRAVEL & LIVING",
+      "accountCategory": "above_line"
     },
     {
       "id": "e44ce1d5-4133-44d2-83d5-055615f729af",
@@ -25422,20 +25408,6 @@
       "accountCategory": "production"
     },
     {
-      "id": "48f90d9b-79ae-4533-bd05-d38c700b6d6c",
-      "category": "11-02",
-      "description": "Script Purchase",
-      "amt": 0,
-      "x": 1,
-      "rate": 0,
-      "total": 0,
-      "notes": null,
-      "vendor": null,
-      "datedAt": null,
-      "account": "STORY & RIGHTS",
-      "accountCategory": "above_line"
-    },
-    {
       "id": "d6ec6362-79d2-4246-ab51-ee3a77f9c366",
       "category": "28-02",
       "description": "Asst Costume Designer",
@@ -25448,6 +25420,34 @@
       "datedAt": null,
       "account": "WARDROBE",
       "accountCategory": "production"
+    },
+    {
+      "id": "47f1e222-d7f3-4a57-bcd3-37c1800fb714",
+      "category": "32-02",
+      "description": "Asst Make-Up",
+      "amt": 0,
+      "x": 1,
+      "rate": 0,
+      "total": 0,
+      "notes": null,
+      "vendor": null,
+      "datedAt": null,
+      "account": "MAKE-UP & HAIR",
+      "accountCategory": "production"
+    },
+    {
+      "id": "48f90d9b-79ae-4533-bd05-d38c700b6d6c",
+      "category": "11-02",
+      "description": "Script Purchase",
+      "amt": 0,
+      "x": 1,
+      "rate": 0,
+      "total": 0,
+      "notes": null,
+      "vendor": null,
+      "datedAt": null,
+      "account": "STORY & RIGHTS",
+      "accountCategory": "above_line"
     },
     {
       "id": "cf2fbe76-f8fe-42d2-b64c-e4bd55d22665",
@@ -25492,6 +25492,20 @@
       "accountCategory": "production"
     },
     {
+      "id": "401487c3-b535-442c-82cc-1492a9df45db",
+      "category": "58-02",
+      "description": "E&O Insurance",
+      "amt": 0,
+      "x": 1,
+      "rate": 0,
+      "total": 0,
+      "notes": null,
+      "vendor": null,
+      "datedAt": null,
+      "account": "INSURANCE",
+      "accountCategory": "other"
+    },
+    {
       "id": "1ba775db-cb6c-49a4-ba9e-b1b5d421b638",
       "category": "47-02",
       "description": "VFX Artists",
@@ -25504,48 +25518,6 @@
       "datedAt": null,
       "account": "VISUAL EFFECTS",
       "accountCategory": "post"
-    },
-    {
-      "id": "0edf2c29-0386-43b0-86f9-9cd657fca36c",
-      "category": "15-02",
-      "description": "Transportation",
-      "amt": 0,
-      "x": 1,
-      "rate": 0,
-      "total": 0,
-      "notes": null,
-      "vendor": null,
-      "datedAt": null,
-      "account": "TRAVEL & LIVING",
-      "accountCategory": "above_line"
-    },
-    {
-      "id": "5159ed61-8dd6-4dc1-a185-914e794049f4",
-      "category": "31-02",
-      "description": "Boom Operator",
-      "amt": 0,
-      "x": 1,
-      "rate": 0,
-      "total": 0,
-      "notes": null,
-      "vendor": null,
-      "datedAt": null,
-      "account": "PRODUCTION SOUND",
-      "accountCategory": "production"
-    },
-    {
-      "id": "56bed118-8093-4478-a392-3282d5a03884",
-      "category": "37-02",
-      "description": "VFX Plates / Witness Cam",
-      "amt": 0,
-      "x": 1,
-      "rate": 0,
-      "total": 0,
-      "notes": null,
-      "vendor": null,
-      "datedAt": null,
-      "account": "VISUAL EFFECTS - PRODUCTION",
-      "accountCategory": "production"
     },
     {
       "id": "42dde1da-6b88-475c-95ee-78bbdd4a43f2",
@@ -25562,9 +25534,9 @@
       "accountCategory": "above_line"
     },
     {
-      "id": "e319ac68-5210-475f-9d9c-598e64467cb4",
-      "category": "49-02",
-      "description": "Colorist",
+      "id": "56bed118-8093-4478-a392-3282d5a03884",
+      "category": "37-02",
+      "description": "VFX Plates / Witness Cam",
       "amt": 0,
       "x": 1,
       "rate": 0,
@@ -25572,27 +25544,13 @@
       "notes": null,
       "vendor": null,
       "datedAt": null,
-      "account": "POST PRODUCTION FILM & LAB",
-      "accountCategory": "post"
-    },
-    {
-      "id": "137631e3-bf21-427b-83dc-96858d4f3512",
-      "category": "36-02",
-      "description": "SFX Foreman",
-      "amt": 0,
-      "x": 1,
-      "rate": 0,
-      "total": 0,
-      "notes": null,
-      "vendor": null,
-      "datedAt": null,
-      "account": "SPECIAL EFFECTS",
+      "account": "VISUAL EFFECTS - PRODUCTION",
       "accountCategory": "production"
     },
     {
-      "id": "8ed53500-285e-4340-88e3-35b713597f8a",
-      "category": "57-02",
-      "description": "Office Supplies",
+      "id": "5159ed61-8dd6-4dc1-a185-914e794049f4",
+      "category": "31-02",
+      "description": "Boom Operator",
       "amt": 0,
       "x": 1,
       "rate": 0,
@@ -25600,8 +25558,8 @@
       "notes": null,
       "vendor": null,
       "datedAt": null,
-      "account": "GENERAL EXPENSE",
-      "accountCategory": "other"
+      "account": "PRODUCTION SOUND",
+      "accountCategory": "production"
     },
     {
       "id": "bfcc97a5-b597-42b8-a17c-993fa43c31c6",
@@ -25618,6 +25576,34 @@
       "accountCategory": "production"
     },
     {
+      "id": "137631e3-bf21-427b-83dc-96858d4f3512",
+      "category": "36-02",
+      "description": "SFX Foreman",
+      "amt": 0,
+      "x": 1,
+      "rate": 0,
+      "total": 0,
+      "notes": null,
+      "vendor": null,
+      "datedAt": null,
+      "account": "SPECIAL EFFECTS",
+      "accountCategory": "production"
+    },
+    {
+      "id": "e319ac68-5210-475f-9d9c-598e64467cb4",
+      "category": "49-02",
+      "description": "Colorist",
+      "amt": 0,
+      "x": 1,
+      "rate": 0,
+      "total": 0,
+      "notes": null,
+      "vendor": null,
+      "datedAt": null,
+      "account": "POST PRODUCTION FILM & LAB",
+      "accountCategory": "post"
+    },
+    {
       "id": "cd682301-3bd6-4bd7-976c-8587d600004b",
       "category": "26-02",
       "description": "Lead",
@@ -25630,6 +25616,20 @@
       "datedAt": null,
       "account": "SET DRESSING",
       "accountCategory": "production"
+    },
+    {
+      "id": "8a77d483-7b6c-4002-a26b-8fc1d07e28be",
+      "category": "48-02",
+      "description": "Re-Recording Mixer",
+      "amt": 0,
+      "x": 1,
+      "rate": 0,
+      "total": 0,
+      "notes": null,
+      "vendor": null,
+      "datedAt": null,
+      "account": "POST PRODUCTION SOUND",
+      "accountCategory": "post"
     },
     {
       "id": "483be992-a419-4b56-90d5-b0215031e518",
@@ -25660,9 +25660,9 @@
       "accountCategory": "production"
     },
     {
-      "id": "8a77d483-7b6c-4002-a26b-8fc1d07e28be",
-      "category": "48-02",
-      "description": "Re-Recording Mixer",
+      "id": "932bce30-1ad8-41eb-8e7c-fb452418965b",
+      "category": "56-02",
+      "description": "Production Accountant",
       "amt": 0,
       "x": 1,
       "rate": 0,
@@ -25670,8 +25670,8 @@
       "notes": null,
       "vendor": null,
       "datedAt": null,
-      "account": "POST PRODUCTION SOUND",
-      "accountCategory": "post"
+      "account": "LEGAL & ACCOUNTING",
+      "accountCategory": "other"
     },
     {
       "id": "bd724636-045d-4666-b2ff-82bd7853ec67",
@@ -26206,9 +26206,9 @@
       "accountCategory": "production"
     },
     {
-      "id": "a545700d-bf3c-4534-858c-6774e35f57aa",
-      "category": "10-04",
-      "description": "Travel Expenses",
+      "id": "23e6bdd8-5791-4da3-950e-17c0b433a351",
+      "category": "45-04",
+      "description": "Edit Hardware / Software",
       "amt": 0,
       "x": 1,
       "rate": 0,
@@ -26216,8 +26216,8 @@
       "notes": null,
       "vendor": null,
       "datedAt": null,
-      "account": "DEVELOPMENT COSTS",
-      "accountCategory": "above_line"
+      "account": "FILM EDITING",
+      "accountCategory": "post"
     },
     {
       "id": "f1ea538d-70d0-454e-a706-ae98c10db0b7",
@@ -26262,9 +26262,9 @@
       "accountCategory": "production"
     },
     {
-      "id": "d8e7b8b9-f4b1-48e3-9cbc-45579f5fb46c",
-      "category": "28-04",
-      "description": "Set Costumer",
+      "id": "de4e09c2-9f08-4d3e-b9fd-df459184cdc1",
+      "category": "27-04",
+      "description": "Prop Purchases",
       "amt": 0,
       "x": 1,
       "rate": 0,
@@ -26272,7 +26272,7 @@
       "notes": null,
       "vendor": null,
       "datedAt": null,
-      "account": "WARDROBE",
+      "account": "PROPERTY",
       "accountCategory": "production"
     },
     {
@@ -26344,34 +26344,6 @@
       "datedAt": null,
       "account": "ELECTRIC",
       "accountCategory": "production"
-    },
-    {
-      "id": "de4e09c2-9f08-4d3e-b9fd-df459184cdc1",
-      "category": "27-04",
-      "description": "Prop Purchases",
-      "amt": 0,
-      "x": 1,
-      "rate": 0,
-      "total": 0,
-      "notes": null,
-      "vendor": null,
-      "datedAt": null,
-      "account": "PROPERTY",
-      "accountCategory": "production"
-    },
-    {
-      "id": "23e6bdd8-5791-4da3-950e-17c0b433a351",
-      "category": "45-04",
-      "description": "Edit Hardware / Software",
-      "amt": 0,
-      "x": 1,
-      "rate": 0,
-      "total": 0,
-      "notes": null,
-      "vendor": null,
-      "datedAt": null,
-      "account": "FILM EDITING",
-      "accountCategory": "post"
     },
     {
       "id": "b9c6d7d3-01a8-4de9-95b6-144a5171bf48",
@@ -26458,6 +26430,20 @@
       "accountCategory": "above_line"
     },
     {
+      "id": "e7a7240f-7cdd-4c0d-a117-1bde4adc15de",
+      "category": "11-04",
+      "description": "Script Timing",
+      "amt": 0,
+      "x": 1,
+      "rate": 0,
+      "total": 0,
+      "notes": null,
+      "vendor": null,
+      "datedAt": null,
+      "account": "STORY & RIGHTS",
+      "accountCategory": "above_line"
+    },
+    {
       "id": "970ccbf8-71fa-44de-889b-f2850643eee2",
       "category": "26-04",
       "description": "Swing Gang",
@@ -26472,9 +26458,9 @@
       "accountCategory": "production"
     },
     {
-      "id": "c67b4653-5c53-42a0-a4dc-42e50a23004b",
-      "category": "20-04",
-      "description": "2nd Asst Director",
+      "id": "90a9d61c-170b-4e68-9efe-1deb2be930e2",
+      "category": "49-04",
+      "description": "Deliverables / Masters",
       "amt": 0,
       "x": 1,
       "rate": 0,
@@ -26482,8 +26468,8 @@
       "notes": null,
       "vendor": null,
       "datedAt": null,
-      "account": "PRODUCTION STAFF",
-      "accountCategory": "production"
+      "account": "POST PRODUCTION FILM & LAB",
+      "accountCategory": "post"
     },
     {
       "id": "f0d22507-05cc-4b3b-8c08-ed79439453e1",
@@ -26497,6 +26483,20 @@
       "vendor": null,
       "datedAt": null,
       "account": "SET OPERATIONS",
+      "accountCategory": "production"
+    },
+    {
+      "id": "c67b4653-5c53-42a0-a4dc-42e50a23004b",
+      "category": "20-04",
+      "description": "2nd Asst Director",
+      "amt": 0,
+      "x": 1,
+      "rate": 0,
+      "total": 0,
+      "notes": null,
+      "vendor": null,
+      "datedAt": null,
+      "account": "PRODUCTION STAFF",
       "accountCategory": "production"
     },
     {
@@ -26528,9 +26528,9 @@
       "accountCategory": "production"
     },
     {
-      "id": "e7a7240f-7cdd-4c0d-a117-1bde4adc15de",
-      "category": "11-04",
-      "description": "Script Timing",
+      "id": "d8e7b8b9-f4b1-48e3-9cbc-45579f5fb46c",
+      "category": "28-04",
+      "description": "Set Costumer",
       "amt": 0,
       "x": 1,
       "rate": 0,
@@ -26538,8 +26538,8 @@
       "notes": null,
       "vendor": null,
       "datedAt": null,
-      "account": "STORY & RIGHTS",
-      "accountCategory": "above_line"
+      "account": "WARDROBE",
+      "accountCategory": "production"
     },
     {
       "id": "6e5891c4-aca7-4d63-addd-11013705584e",
@@ -26584,9 +26584,9 @@
       "accountCategory": "production"
     },
     {
-      "id": "90a9d61c-170b-4e68-9efe-1deb2be930e2",
-      "category": "49-04",
-      "description": "Deliverables / Masters",
+      "id": "a545700d-bf3c-4534-858c-6774e35f57aa",
+      "category": "10-04",
+      "description": "Travel Expenses",
       "amt": 0,
       "x": 1,
       "rate": 0,
@@ -26594,8 +26594,8 @@
       "notes": null,
       "vendor": null,
       "datedAt": null,
-      "account": "POST PRODUCTION FILM & LAB",
-      "accountCategory": "post"
+      "account": "DEVELOPMENT COSTS",
+      "accountCategory": "above_line"
     },
     {
       "id": "7037fc0f-114a-4cc1-99fb-e8e682c3c13b",
@@ -26696,9 +26696,9 @@
       "accountCategory": "post"
     },
     {
-      "id": "65cc4277-7c00-4900-8fdb-45fbe33e112c",
-      "category": "22-05",
-      "description": "Researcher",
+      "id": "2cbe1dc3-32dd-4333-9c8c-0dcdf58d8005",
+      "category": "34-05",
+      "description": "Permits",
       "amt": 0,
       "x": 1,
       "rate": 0,
@@ -26706,7 +26706,7 @@
       "notes": null,
       "vendor": null,
       "datedAt": null,
-      "account": "SET DESIGN",
+      "account": "LOCATIONS",
       "accountCategory": "production"
     },
     {
@@ -26794,9 +26794,9 @@
       "accountCategory": "production"
     },
     {
-      "id": "6253b016-3b35-4870-b0ce-c0e01b5dde3d",
-      "category": "12-05",
-      "description": "All In",
+      "id": "65cc4277-7c00-4900-8fdb-45fbe33e112c",
+      "category": "22-05",
+      "description": "Researcher",
       "amt": 0,
       "x": 1,
       "rate": 0,
@@ -26804,8 +26804,8 @@
       "notes": null,
       "vendor": null,
       "datedAt": null,
-      "account": "PRODUCERS UNIT",
-      "accountCategory": "above_line"
+      "account": "SET DESIGN",
+      "accountCategory": "production"
     },
     {
       "id": "17beb4f4-4b33-418e-b129-02eeb9ad127e",
@@ -26822,6 +26822,20 @@
       "accountCategory": "production"
     },
     {
+      "id": "6253b016-3b35-4870-b0ce-c0e01b5dde3d",
+      "category": "12-05",
+      "description": "All In",
+      "amt": 0,
+      "x": 1,
+      "rate": 0,
+      "total": 0,
+      "notes": null,
+      "vendor": null,
+      "datedAt": null,
+      "account": "PRODUCERS UNIT",
+      "accountCategory": "above_line"
+    },
+    {
       "id": "7af53996-d3b6-4716-ad83-e7d6c73fa8b6",
       "category": "31-05",
       "description": "Wireless Mics",
@@ -26833,20 +26847,6 @@
       "vendor": null,
       "datedAt": null,
       "account": "PRODUCTION SOUND",
-      "accountCategory": "production"
-    },
-    {
-      "id": "f9b071bf-180a-414c-9bfa-cee91d5a2930",
-      "category": "CREW",
-      "description": "2nd AC",
-      "amt": 1,
-      "x": 1,
-      "rate": 250,
-      "total": 250,
-      "notes": null,
-      "vendor": null,
-      "datedAt": null,
-      "account": "Day Costs",
       "accountCategory": "production"
     },
     {
@@ -26864,9 +26864,9 @@
       "accountCategory": "other"
     },
     {
-      "id": "deb6be68-cd9c-40c1-9590-77b3694ae20f",
-      "category": "57-05",
-      "description": "Postage / Shipping",
+      "id": "874e09cb-8f39-4727-a97e-f8fcefcb9fe4",
+      "category": "48-05",
+      "description": "Sound Effects Library",
       "amt": 0,
       "x": 1,
       "rate": 0,
@@ -26874,8 +26874,8 @@
       "notes": null,
       "vendor": null,
       "datedAt": null,
-      "account": "GENERAL EXPENSE",
-      "accountCategory": "other"
+      "account": "POST PRODUCTION SOUND",
+      "accountCategory": "post"
     },
     {
       "id": "8ea67d2e-3702-424e-bb71-0e5822cc2a66",
@@ -26892,9 +26892,9 @@
       "accountCategory": "production"
     },
     {
-      "id": "9ecd4502-9c33-48f8-9e77-d85669b4dc61",
-      "category": "25-05",
-      "description": "Grip Package Rental",
+      "id": "5947d9a2-af8f-4e36-93cf-091c63c4cd8c",
+      "category": "36-05",
+      "description": "SFX Materials",
       "amt": 0,
       "x": 1,
       "rate": 0,
@@ -26902,7 +26902,7 @@
       "notes": null,
       "vendor": null,
       "datedAt": null,
-      "account": "SET OPERATIONS",
+      "account": "SPECIAL EFFECTS",
       "accountCategory": "production"
     },
     {
@@ -26920,6 +26920,34 @@
       "accountCategory": "production"
     },
     {
+      "id": "deb6be68-cd9c-40c1-9590-77b3694ae20f",
+      "category": "57-05",
+      "description": "Postage / Shipping",
+      "amt": 0,
+      "x": 1,
+      "rate": 0,
+      "total": 0,
+      "notes": null,
+      "vendor": null,
+      "datedAt": null,
+      "account": "GENERAL EXPENSE",
+      "accountCategory": "other"
+    },
+    {
+      "id": "9ecd4502-9c33-48f8-9e77-d85669b4dc61",
+      "category": "25-05",
+      "description": "Grip Package Rental",
+      "amt": 0,
+      "x": 1,
+      "rate": 0,
+      "total": 0,
+      "notes": null,
+      "vendor": null,
+      "datedAt": null,
+      "account": "SET OPERATIONS",
+      "accountCategory": "production"
+    },
+    {
       "id": "d9476d12-c37a-4f6f-bd3f-58c11251211a",
       "category": "26-05",
       "description": "Set Dressing Rentals",
@@ -26932,34 +26960,6 @@
       "datedAt": null,
       "account": "SET DRESSING",
       "accountCategory": "production"
-    },
-    {
-      "id": "9df7805f-45f7-4d81-a74b-c94509a01772",
-      "category": "23-05",
-      "description": "Lumber & Hardware",
-      "amt": 0,
-      "x": 1,
-      "rate": 0,
-      "total": 0,
-      "notes": null,
-      "vendor": null,
-      "datedAt": null,
-      "account": "SET CONSTRUCTION",
-      "accountCategory": "production"
-    },
-    {
-      "id": "87234e56-3657-4d5e-b038-532fd86bfc01",
-      "category": "15-05",
-      "description": "Self Drive Vehicles & Gas",
-      "amt": 0,
-      "x": 1,
-      "rate": 0,
-      "total": 0,
-      "notes": null,
-      "vendor": null,
-      "datedAt": null,
-      "account": "TRAVEL & LIVING",
-      "accountCategory": "above_line"
     },
     {
       "id": "9380cf7a-1371-4089-b080-91b999b935df",
@@ -26990,9 +26990,9 @@
       "accountCategory": "above_line"
     },
     {
-      "id": "418ddc6c-d9f9-4f2d-a89e-bda7ff494df2",
-      "category": "49-05",
-      "description": "Closed Captioning",
+      "id": "9df7805f-45f7-4d81-a74b-c94509a01772",
+      "category": "23-05",
+      "description": "Lumber & Hardware",
       "amt": 0,
       "x": 1,
       "rate": 0,
@@ -27000,8 +27000,8 @@
       "notes": null,
       "vendor": null,
       "datedAt": null,
-      "account": "POST PRODUCTION FILM & LAB",
-      "accountCategory": "post"
+      "account": "SET CONSTRUCTION",
+      "accountCategory": "production"
     },
     {
       "id": "184058ad-3275-4c3e-91f5-5660bb7f8224",
@@ -27032,9 +27032,9 @@
       "accountCategory": "production"
     },
     {
-      "id": "874e09cb-8f39-4727-a97e-f8fcefcb9fe4",
-      "category": "48-05",
-      "description": "Sound Effects Library",
+      "id": "87234e56-3657-4d5e-b038-532fd86bfc01",
+      "category": "15-05",
+      "description": "Self Drive Vehicles & Gas",
       "amt": 0,
       "x": 1,
       "rate": 0,
@@ -27042,8 +27042,8 @@
       "notes": null,
       "vendor": null,
       "datedAt": null,
-      "account": "POST PRODUCTION SOUND",
-      "accountCategory": "post"
+      "account": "TRAVEL & LIVING",
+      "accountCategory": "above_line"
     },
     {
       "id": "800dd393-d71c-4c76-a062-bc0ccfecf892",
@@ -27060,6 +27060,34 @@
       "accountCategory": "above_line"
     },
     {
+      "id": "418ddc6c-d9f9-4f2d-a89e-bda7ff494df2",
+      "category": "49-05",
+      "description": "Closed Captioning",
+      "amt": 0,
+      "x": 1,
+      "rate": 0,
+      "total": 0,
+      "notes": null,
+      "vendor": null,
+      "datedAt": null,
+      "account": "POST PRODUCTION FILM & LAB",
+      "accountCategory": "post"
+    },
+    {
+      "id": "f9b071bf-180a-414c-9bfa-cee91d5a2930",
+      "category": "CREW",
+      "description": "2nd AC",
+      "amt": 1,
+      "x": 1,
+      "rate": 250,
+      "total": 250,
+      "notes": null,
+      "vendor": null,
+      "datedAt": null,
+      "account": "Day Costs",
+      "accountCategory": "production"
+    },
+    {
       "id": "9c4480d4-ecd8-4968-8273-338551cc0d0e",
       "category": "29-05",
       "description": "Electric Expendables",
@@ -27071,34 +27099,6 @@
       "vendor": null,
       "datedAt": null,
       "account": "ELECTRIC",
-      "accountCategory": "production"
-    },
-    {
-      "id": "5947d9a2-af8f-4e36-93cf-091c63c4cd8c",
-      "category": "36-05",
-      "description": "SFX Materials",
-      "amt": 0,
-      "x": 1,
-      "rate": 0,
-      "total": 0,
-      "notes": null,
-      "vendor": null,
-      "datedAt": null,
-      "account": "SPECIAL EFFECTS",
-      "accountCategory": "production"
-    },
-    {
-      "id": "2cbe1dc3-32dd-4333-9c8c-0dcdf58d8005",
-      "category": "34-05",
-      "description": "Permits",
-      "amt": 0,
-      "x": 1,
-      "rate": 0,
-      "total": 0,
-      "notes": null,
-      "vendor": null,
-      "datedAt": null,
-      "account": "LOCATIONS",
       "accountCategory": "production"
     },
     {
@@ -27158,6 +27158,20 @@
       "accountCategory": "production"
     },
     {
+      "id": "f43b4b4f-7854-40e8-97c3-2c5fe6132813",
+      "category": "48-06",
+      "description": "Mix Stage Rental",
+      "amt": 0,
+      "x": 1,
+      "rate": 0,
+      "total": 0,
+      "notes": null,
+      "vendor": null,
+      "datedAt": null,
+      "account": "POST PRODUCTION SOUND",
+      "accountCategory": "post"
+    },
+    {
       "id": "7765916d-f518-427a-896c-ddc98d78e493",
       "category": "34-06",
       "description": "Site Rep",
@@ -27198,20 +27212,6 @@
       "datedAt": null,
       "account": "CAMERA",
       "accountCategory": "production"
-    },
-    {
-      "id": "f43b4b4f-7854-40e8-97c3-2c5fe6132813",
-      "category": "48-06",
-      "description": "Mix Stage Rental",
-      "amt": 0,
-      "x": 1,
-      "rate": 0,
-      "total": 0,
-      "notes": null,
-      "vendor": null,
-      "datedAt": null,
-      "account": "POST PRODUCTION SOUND",
-      "accountCategory": "post"
     },
     {
       "id": "c678848d-3ea3-452e-9958-6255a6bbec6d",
