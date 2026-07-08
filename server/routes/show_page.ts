@@ -72,8 +72,9 @@ showPageRouter.get('/shows/:slug', async (req: Request, res: Response) => {
       [show.id],
     ),
     // Other Straw Hut Media podcasts, for the "part of the network"
-    // section. Only shows with cover art make the cut (weak visual
-    // otherwise). Cap at 6.
+    // section. Flagship shows (is_flagship=TRUE) surface first — those
+    // are the ones a guest would recognize. Fall back to other shows
+    // with cover art if we don't hit the limit. Cap at 8.
     pool.query<SisterShowRow>(
       `SELECT name, slug, cover_art_url, subtitle
          FROM projects
@@ -81,8 +82,8 @@ showPageRouter.get('/shows/:slug', async (req: Request, res: Response) => {
           AND id <> $1
           AND cover_art_url IS NOT NULL
           AND cover_art_url <> ''
-        ORDER BY created_at ASC
-        LIMIT 6`,
+        ORDER BY is_flagship DESC, created_at ASC
+        LIMIT 8`,
       [show.id],
     ),
   ])
@@ -352,7 +353,6 @@ ${coverUrl ? `<meta property="og:image" content="${escHtml(coverUrl)}">` : ''}
     <div>
       <h1>${escHtml(show.name)}</h1>
       ${tagline ? `<p class="tagline">${escHtml(tagline)}</p>` : ''}
-      ${mailto ? `<a class="cta accent" href="${mailto}">Pitch us as a guest →</a>` : ''}
     </div>
   </section>
 
@@ -393,11 +393,25 @@ ${coverUrl ? `<meta property="og:image" content="${escHtml(coverUrl)}">` : ''}
     </ul>
   </section>` : ''}
 
-  ${sisters.length > 0 ? `<section>
+  <section class="contact">
+    <h2>Contact</h2>
+    <p class="contact-pitch">${escHtml(guestPitch)}</p>
+    <div class="contact-block">
+      <div class="contact-line">
+        <span class="contact-label">Bookings</span>
+        <a href="mailto:booking@strawhutmedia.com" class="contact-value">booking@strawhutmedia.com</a>
+      </div>
+      ${show.contact_email && show.contact_email !== 'booking@strawhutmedia.com' ? `<div class="contact-line">
+        <span class="contact-label">Show contact</span>
+        <a href="mailto:${escHtml(show.contact_email)}" class="contact-value">${escHtml(show.contact_email)}</a>
+      </div>` : ''}
+    </div>
+  </section>
+
+  ${sisters.length > 0 ? `<section class="sisters">
     <h2>Part of Straw Hut Media</h2>
-    <p class="lead" style="margin-bottom: 24px; font-size: 16px;">
-      Straw Hut Media produces and distributes an eclectic slate of interview and lifestyle podcasts. Your appearance
-      here lives inside a broader network audience discovers together.
+    <p class="lead" style="margin-bottom: 28px; font-size: 16px;">
+      A few of the shows in the Straw Hut Media roster.
     </p>
     <div class="sister-grid">
       ${sisters.map((sh) => `<div class="sister">
@@ -406,22 +420,6 @@ ${coverUrl ? `<meta property="og:image" content="${escHtml(coverUrl)}">` : ''}
       </div>`).join('')}
     </div>
   </section>` : ''}
-
-  <section class="contact">
-    <h2>Get in touch</h2>
-    <p class="contact-pitch">${escHtml(guestPitch)}</p>
-    <div class="contact-block">
-      <div class="contact-line">
-        <span class="contact-label">Bookings</span>
-        <a href="mailto:booking@strawhutmedia.com?subject=${encodeURIComponent(`Guest pitch — ${show.name}`)}" class="contact-value">booking@strawhutmedia.com</a>
-      </div>
-      ${show.contact_email && show.contact_email !== 'booking@strawhutmedia.com' ? `<div class="contact-line">
-        <span class="contact-label">Show contact</span>
-        <a href="mailto:${escHtml(show.contact_email)}" class="contact-value">${escHtml(show.contact_email)}</a>
-      </div>` : ''}
-    </div>
-    ${mailto ? `<a class="cta accent" href="${mailto}">Pitch us as a guest →</a>` : ''}
-  </section>
 
   <footer>
     Produced by Straw Hut Media
