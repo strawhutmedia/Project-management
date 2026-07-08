@@ -43,6 +43,8 @@ Our episodes run about 45 minutes and are edited into a polished cut. Guests get
 
 Would you have 30 minutes this month or next to jump on a call and see if it's a fit?
 
+More about the show: [one_sheet_url]
+
 Best,
 Ryan`
 
@@ -60,6 +62,8 @@ export default function OutreachSection({ projectId }: { projectId: string }) {
   const [bulkOpen, setBulkOpen] = useState(false)
   const [openProspect, setOpenProspect] = useState<ApiOutreachProspect | null>(null)
   const [generatingAll, setGeneratingAll] = useState(false)
+  const [sendingCampaign, setSendingCampaign] = useState(false)
+  const [campaignResult, setCampaignResult] = useState<string | null>(null)
   // Test-send bar
   const [testTo, setTestTo] = useState(user?.email ?? 'ryan@strawhutmedia.com')
   const [testSending, setTestSending] = useState(false)
@@ -135,6 +139,38 @@ export default function OutreachSection({ projectId }: { projectId: string }) {
       await loadProspects()
     } catch (err) {
       setError(err instanceof Error ? err.message : 'delete failed')
+    }
+  }
+
+  async function sendCampaign() {
+    const readyList = (prospects ?? []).filter(
+      (p) => p.status === 'ready' && p.email && p.unique_sentence?.trim(),
+    )
+    if (readyList.length === 0) {
+      setError('No prospects are Ready. Each needs an email + a unique sentence.')
+      return
+    }
+    const ok = confirm(
+      `Send ${readyList.length} outreach emails?\n\n` +
+      `Slate will jitter them 90-180s apart via your verified sending domains. ` +
+      `Estimated wall-clock time: ${Math.round((readyList.length * 135) / 60)} minutes.\n\n` +
+      `You can't stop the campaign once it starts. Test one to yourself first?`,
+    )
+    if (!ok) return
+    setSendingCampaign(true)
+    setError(null)
+    setCampaignResult(null)
+    try {
+      const r = await api.sendOutreachCampaign(projectId)
+      setCampaignResult(
+        `✓ Campaign queued: ${r.queued} emails will send over the next ~${r.estimatedMinutes} min. ` +
+        `First fires around ${new Date(r.firstAt).toLocaleTimeString()}, last around ${new Date(r.lastAt).toLocaleTimeString()}.`,
+      )
+      await loadProspects()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'campaign failed')
+    } finally {
+      setSendingCampaign(false)
     }
   }
 
@@ -285,9 +321,29 @@ export default function OutreachSection({ projectId }: { projectId: string }) {
 
         {/* ─── Prospects list ──────────────────────────────────── */}
         <div className="space-y-3">
+          {/* Campaign-status banner sits above the prospect controls
+              because it's the outcome of the biggest button. */}
+          {campaignResult && (
+            <div className="rounded-lg border border-emerald-500/40 bg-emerald-500/10 px-3 py-2 text-xs text-emerald-100">
+              {campaignResult}
+            </div>
+          )}
+
           <div className="flex items-baseline justify-between gap-2 flex-wrap">
             <h3 className="text-[10px] uppercase tracking-[0.2em] text-muted font-bold">Prospects</h3>
             <div className="flex items-center gap-2 flex-wrap">
+              {/* Ryan's ship-it button. Big, obvious, red-pink so it
+                  reads as "irreversible action". */}
+              {readyCount > 0 && (
+                <button
+                  onClick={() => void sendCampaign()}
+                  disabled={sendingCampaign}
+                  className="text-[10px] uppercase tracking-wider text-white bg-gradient-to-r from-urgent to-stage-mastering rounded-full px-3 py-1 hover:opacity-90 disabled:opacity-40 font-bold shadow-lg"
+                  title={`Send ${readyCount} outreach emails now, jittered across your verified sending domains.`}
+                >
+                  {sendingCampaign ? 'Queueing…' : `🚀 Send campaign (${readyCount})`}
+                </button>
+              )}
               {prospects && prospects.some((p) => !p.unique_sentence) && (
                 <button
                   onClick={() => void generateAllSentences()}

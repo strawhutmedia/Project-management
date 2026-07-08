@@ -1365,6 +1365,11 @@ export const api = {
       `/api/outreach/projects/${projectId}/generate-all-sentences`,
       { method: 'POST', body: JSON.stringify({}) },
     ),
+  sendOutreachCampaign: (projectId: string, prospectIds?: string[]) =>
+    request<{ ok: true; queued: number; estimatedMinutes: number; firstAt: string; lastAt: string }>(
+      `/api/outreach/projects/${projectId}/send-campaign`,
+      { method: 'POST', body: JSON.stringify({ prospectIds: prospectIds ?? null }) },
+    ),
   testSendOutreach: (projectId: string, to: string) =>
     request<{ ok: true; from: string; to: string; subject: string; previewName: string }>(
       `/api/outreach/projects/${projectId}/test-send`,

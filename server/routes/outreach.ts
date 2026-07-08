@@ -29,10 +29,25 @@ outreachRouter.use(requireAdmin)
 // Merge [name] and [unique_sentence] tokens in a template. Used by the
 // test-send preview + (later) the real sender. Kept minimal — the
 // template writer controls which tokens exist; anything else stays.
-function mergeTemplate(text: string, tokens: { name: string; uniqueSentence: string }): string {
+function mergeTemplate(text: string, tokens: { name: string; uniqueSentence: string; oneSheetUrl: string }): string {
   return text
     .replace(/\[name\]/gi, tokens.name)
     .replace(/\[unique_sentence\]/gi, tokens.uniqueSentence)
+    .replace(/\[one_sheet_url\]|\[onesheet_url\]|\[link\]/gi, tokens.oneSheetUrl)
+}
+
+// Build the public one-sheet URL for a show. Returns empty string
+// when the show isn't published — merge tokens will be blank rather
+// than emitting a broken link.
+async function getOneSheetUrl(projectId: string): Promise<string> {
+  const { rows } = await pool.query<{ slug: string | null; one_sheet_published: boolean }>(
+    `SELECT slug, one_sheet_published FROM projects WHERE id = $1`,
+    [projectId],
+  )
+  const r = rows[0]
+  if (!r?.slug || !r.one_sheet_published) return ''
+  const base = process.env.APP_BASE_URL || 'https://slate.strawhutmedia.com'
+  return `${base}/shows/${r.slug}`
 }
 
 // ─── Templates ──────────────────────────────────────────────────────
@@ -237,6 +252,217 @@ outreachRouter.patch('/prospects/:id', async (req, res) => {
   res.json({ ok: true })
 })
 
+// ─── Campaign sender ─────────────────────────────────────────────────
+//
+// Fires N prospect sends in the background, jittered 90-180s apart so
+// the pattern looks human. Rotates through verified sending domains,
+// prefers a domain pinned to this show. Records every send attempt in
+// outreach_sends so we can compute health per domain.
+
+async function sendOneProspect(prospectId: string): Promise<void> {
+  if (!resend) throw new Error('resend_not_configured')
+
+  // Load prospect + template + project + one_sheet + a domain to send from.
+  const pRes = await pool.query<{
+    project_id: string; name: string; email: string | null;
+    unique_sentence: string | null; status: string;
+  }>(
+    `SELECT project_id, name, email, unique_sentence, status
+       FROM outreach_prospects WHERE id = $1`,
+    [prospectId],
+  )
+  const p = pRes.rows[0]
+  if (!p) throw new Error('prospect_not_found')
+  if (!p.email) throw new Error('prospect_has_no_email')
+  if (!p.unique_sentence?.trim()) throw new Error('prospect_missing_sentence')
+
+  const tplRes = await pool.query<{
+    subject: string; body: string; reply_to: string | null; from_name: string | null;
+  }>(
+    `SELECT subject, body, reply_to, from_name FROM outreach_templates WHERE project_id = $1`,
+    [p.project_id],
+  )
+  const tpl = tplRes.rows[0]
+  if (!tpl || !tpl.subject.trim() || !tpl.body.trim()) throw new Error('template_empty')
+
+  // Pick sending domain — prefer show's pinned, else first verified + active.
+  const domRes = await pool.query<{ id: string; name: string }>(
+    `SELECT id, name FROM sending_domains
+      WHERE status = 'verified' AND active = TRUE
+      ORDER BY (primary_show_id = $1) DESC, created_at ASC
+      LIMIT 1`,
+    [p.project_id],
+  )
+  const domain = domRes.rows[0]
+  if (!domain) throw new Error('no_verified_domain')
+
+  const showRes = await pool.query<{ name: string }>(
+    `SELECT name FROM projects WHERE id = $1`, [p.project_id],
+  )
+  const showName = showRes.rows[0]?.name || 'Straw Hut Media'
+  const fromName = tpl.from_name?.trim() || showName
+  const from = `${fromName} <booking@${domain.name}>`
+  const replyTo = tpl.reply_to?.trim() || 'booking@strawhutmedia.com'
+
+  const oneSheetUrl = await getOneSheetUrl(p.project_id)
+  const subject = mergeTemplate(tpl.subject, { name: p.name, uniqueSentence: p.unique_sentence, oneSheetUrl })
+  const body = mergeTemplate(tpl.body, { name: p.name, uniqueSentence: p.unique_sentence, oneSheetUrl })
+
+  // Log the attempt (status: queued) before firing so we have a record
+  // even if Resend errors mid-flight.
+  const logRes = await pool.query<{ id: string }>(
+    `INSERT INTO outreach_sends
+       (prospect_id, sending_domain_id, from_email, to_email, subject, body, status)
+     VALUES ($1, $2, $3, $4, $5, $6, 'queued')
+     RETURNING id`,
+    [prospectId, domain.id, from, p.email, subject, body],
+  )
+  const sendLogId = logRes.rows[0].id
+
+  try {
+    const send = await resend.emails.send({
+      from, to: p.email, subject, text: body, replyTo,
+    })
+    if (send.error) {
+      await pool.query(
+        `UPDATE outreach_sends SET status = 'failed', error = $1 WHERE id = $2`,
+        [String(send.error.message ?? send.error).slice(0, 500), sendLogId],
+      )
+      await pool.query(
+        `UPDATE outreach_prospects SET status = 'failed', updated_at = now() WHERE id = $1`,
+        [prospectId],
+      )
+      throw new Error(`resend_error: ${send.error.message ?? send.error}`)
+    }
+    await pool.query(
+      `UPDATE outreach_sends
+          SET status = 'sent', resend_message_id = $1, sent_at = now()
+        WHERE id = $2`,
+      [send.data?.id ?? null, sendLogId],
+    )
+    await pool.query(
+      `UPDATE outreach_prospects
+          SET status = 'sent', sent_at = now(), sending_domain_id = $1, updated_at = now()
+        WHERE id = $2`,
+      [domain.id, prospectId],
+    )
+    logInfo('outreach: sent', { prospectId, to: p.email, domain: domain.name })
+  } catch (err) {
+    logError('outreach: send failed', { prospectId, error: err instanceof Error ? err.message : String(err) })
+    throw err
+  }
+}
+
+// In-memory scheduler — simplest thing that works. Each queued send is
+// a setTimeout that fires N minutes from now. Queue is not persisted
+// across Railway restarts; on redeploy any queued (not-yet-sent)
+// prospects revert to 'ready' status via the resume-queue block at
+// module load (see bottom of file).
+const scheduledSends = new Set<string>()
+
+function scheduleSend(prospectId: string, delayMs: number): void {
+  if (scheduledSends.has(prospectId)) return
+  scheduledSends.add(prospectId)
+  setTimeout(async () => {
+    scheduledSends.delete(prospectId)
+    try {
+      await sendOneProspect(prospectId)
+    } catch (err) {
+      logError('outreach: scheduled send failed', {
+        prospectId,
+        error: err instanceof Error ? err.message : String(err),
+      })
+    }
+  }, delayMs).unref()
+}
+
+outreachRouter.post('/projects/:projectId/send-campaign', async (req, res) => {
+  const projectId = req.params.projectId
+  if (!resend) {
+    res.status(503).json({ error: 'resend_not_configured' })
+    return
+  }
+  const rawIds = req.body?.prospectIds
+  const explicit = Array.isArray(rawIds) ? rawIds.filter((x): x is string => typeof x === 'string') : null
+
+  // Only send to prospects that are (a) belong to this project, (b)
+  // have an email, (c) have a unique_sentence, (d) are in 'ready'
+  // status. Anything else the operator has to fix manually.
+  const q = explicit && explicit.length > 0
+    ? await pool.query<{ id: string }>(
+        `SELECT id FROM outreach_prospects
+          WHERE project_id = $1
+            AND id = ANY($2::uuid[])
+            AND email IS NOT NULL
+            AND unique_sentence IS NOT NULL AND trim(unique_sentence) <> ''
+            AND status = 'ready'`,
+        [projectId, explicit],
+      )
+    : await pool.query<{ id: string }>(
+        `SELECT id FROM outreach_prospects
+          WHERE project_id = $1
+            AND email IS NOT NULL
+            AND unique_sentence IS NOT NULL AND trim(unique_sentence) <> ''
+            AND status = 'ready'
+          ORDER BY created_at ASC`,
+        [projectId],
+      )
+  const ids = q.rows.map((r) => r.id)
+  if (ids.length === 0) {
+    res.status(400).json({ error: 'no_eligible_prospects', detail: 'No prospects are Ready (need email + unique sentence).' })
+    return
+  }
+
+  // Verify at least one sending domain exists.
+  const dc = await pool.query<{ n: string }>(
+    `SELECT COUNT(*)::int AS n FROM sending_domains WHERE status = 'verified' AND active = TRUE`,
+  )
+  if (Number(dc.rows[0]?.n ?? 0) === 0) {
+    res.status(400).json({ error: 'no_verified_domain' })
+    return
+  }
+
+  // Mark all as queued immediately so the UI reflects the campaign
+  // state, and schedule each one 90-180s apart. Small jitter also
+  // between adjacent sends via Math.random so the pattern isn't
+  // exactly deterministic.
+  await pool.query(
+    `UPDATE outreach_prospects SET status = 'queued', updated_at = now() WHERE id = ANY($1::uuid[])`,
+    [ids],
+  )
+  let cursorMs = 0
+  for (const id of ids) {
+    const jitter = 90_000 + Math.floor(Math.random() * 90_000) // 90-180s
+    cursorMs += jitter
+    scheduleSend(id, cursorMs)
+  }
+  logInfo('outreach: campaign started', { projectId, count: ids.length, estimatedMinutes: Math.round(cursorMs / 60_000) })
+  res.json({
+    ok: true,
+    queued: ids.length,
+    estimatedMinutes: Math.round(cursorMs / 60_000),
+    firstAt: new Date(Date.now() + 90_000).toISOString(),
+    lastAt: new Date(Date.now() + cursorMs).toISOString(),
+  })
+})
+
+// On boot, resume any prospects that were mid-queue when the process
+// died. They flip back to 'ready' so the operator can rerun the send
+// button — otherwise they'd sit stuck as 'queued' forever.
+;(async () => {
+  try {
+    const { rowCount } = await pool.query(
+      `UPDATE outreach_prospects SET status = 'ready', updated_at = now()
+        WHERE status = 'queued'`,
+    )
+    if (rowCount && rowCount > 0) {
+      logInfo('outreach: reset stuck queued prospects on boot', { count: rowCount })
+    }
+  } catch (err) {
+    logError('outreach: boot reset failed', { error: err instanceof Error ? err.message : String(err) })
+  }
+})()
+
 outreachRouter.delete('/prospects/:id', async (req, res) => {
   const { rowCount } = await pool.query(
     `DELETE FROM outreach_prospects WHERE id = $1`,
@@ -440,8 +666,9 @@ outreachRouter.post('/projects/:projectId/test-send', async (req, res) => {
   const previewSentence = preview?.unique_sentence
     || 'Your recent work jumped out to me — the way you framed it in your last piece is exactly the angle we chase on the show.'
 
-  const subject = mergeTemplate(tpl.subject, { name: previewName, uniqueSentence: previewSentence })
-  const body = mergeTemplate(tpl.body, { name: previewName, uniqueSentence: previewSentence })
+  const oneSheetUrl = await getOneSheetUrl(projectId)
+  const subject = mergeTemplate(tpl.subject, { name: previewName, uniqueSentence: previewSentence, oneSheetUrl })
+  const body = mergeTemplate(tpl.body, { name: previewName, uniqueSentence: previewSentence, oneSheetUrl })
 
   // Pick a sending domain — first verified + active one in the pool.
   // Prefer the domain pinned to this show if one is set.
