@@ -1417,7 +1417,10 @@ function DayCostsSection({
   }
 
   useEffect(() => {
-    if (expanded && items === null) void load()
+    // Load on mount so the collapsed header shows the real day total
+    // (day items + scene rollup + fringes + per diem + hotels), not
+    // $0 until the operator expands. Runs once per day column.
+    if (items === null) void load()
   }, [expanded])
 
   async function autoAddCast() {
@@ -1445,6 +1448,11 @@ function DayCostsSection({
 
   async function updateCost(id: string, cost: number) {
     await api.updateBudgetItem(id, { rate: cost, amt: 1, x: 1 })
+    await load()
+  }
+
+  async function updateVendor(id: string, vendor: string) {
+    await api.updateBudgetItem(id, { vendor })
     await load()
   }
 
@@ -1479,13 +1487,17 @@ function DayCostsSection({
         onClick={() => setExpanded(!expanded)}
         className="w-full flex items-center justify-between text-[10px] uppercase tracking-wider text-muted hover:text-text"
       >
-        <span className="flex items-center gap-2">
+        <span className="flex items-center gap-2 flex-wrap">
           <span>{expanded ? '▾' : '▸'}</span>
           <span className="font-bold">💰 Day budget</span>
           <span className="text-muted/70">
             ({(items ?? []).length} day item{(items ?? []).length === 1 ? '' : 's'}
-            {scenes.length > 0 && ` + ${scenes.length} scene${scenes.length === 1 ? '' : 's'}`})
+            {scenes.length > 0 && ` · ${scenes.length} scene${scenes.length === 1 ? '' : 's'}`}
+            {fringes?.needsHotels && ` · +hotels/pd`}
           </span>
+          {items === null && (
+            <span className="text-muted/50 normal-case italic">loading…</span>
+          )}
         </span>
         <span className="font-mono text-text font-bold">
           ${Math.round(total).toLocaleString()}
@@ -1534,41 +1546,82 @@ function DayCostsSection({
                   </div>
                 </div>
               )}
-              {/* Fringes + per diem (read-only). Edit rates in the
-                  Budget card's Settings. Shown so producers see the
-                  real day cost, not just direct items. */}
-              {fringes && fringesTotal > 0 && (
-                <div className="rounded-lg border border-line/60 bg-ink/20 p-2 space-y-1.5">
-                  <div className="text-[10px] uppercase tracking-wider text-muted font-bold flex items-center gap-1.5">
-                    <span>💵</span>
-                    <span>Fringes & per diem</span>
-                    <span className="text-muted/50 normal-case font-normal">(edit in Budget → Settings)</span>
+              {/* Location + fringes + per diem + hotels. Always shown
+                  on non-break days so producers see the real day cost
+                  (or explicitly "home — no extras"). Read-only here;
+                  edit rates in Budget → Settings. */}
+              {fringes && (
+                <div className="space-y-2">
+                  {/* Payroll fringes */}
+                  {(dayCastFringes > 0 || dayCrewFringes > 0) && (
+                    <div className="rounded-lg border border-line/60 bg-ink/20 p-2 space-y-1">
+                      <div className="text-[10px] uppercase tracking-wider text-muted font-bold flex items-center gap-1.5">
+                        <span>💵</span>
+                        <span>Payroll fringes</span>
+                      </div>
+                      <div className="grid grid-cols-2 gap-1 text-[11px] font-mono">
+                        {dayCastFringes > 0 && (
+                          <>
+                            <span className="text-muted">Cast ({fringes.castPayrollPct}%)</span>
+                            <span className="text-right">${Math.round(dayCastFringes).toLocaleString()}</span>
+                          </>
+                        )}
+                        {dayCrewFringes > 0 && (
+                          <>
+                            <span className="text-muted">Crew ({fringes.crewPayrollPct}%)</span>
+                            <span className="text-right">${Math.round(dayCrewFringes).toLocaleString()}</span>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Per diem — always shown so producers know where it stands */}
+                  <div className={`rounded-lg border p-2 space-y-1 ${
+                    dayPerDiem > 0 ? 'border-sky-500/40 bg-sky-500/5' : 'border-line/60 bg-ink/20'
+                  }`}>
+                    <div className="text-[10px] uppercase tracking-wider font-bold flex items-center gap-1.5">
+                      <span>🍽</span>
+                      <span className={dayPerDiem > 0 ? 'text-sky-300' : 'text-muted'}>Per diem</span>
+                    </div>
+                    <div className="text-[11px] font-mono flex items-center justify-between">
+                      {dayPerDiem > 0 ? (
+                        <>
+                          <span className="text-muted">Cast + crew on {fringes.dayLocationTag}</span>
+                          <span className="text-sky-300 font-bold">${Math.round(dayPerDiem).toLocaleString()}</span>
+                        </>
+                      ) : (
+                        <span className="text-muted/70 italic">
+                          {fringes.dayLocationTag
+                            ? `Home day (${fringes.dayLocationTag}) — no per diem`
+                            : 'Tag day location → per diem auto-calculates'}
+                        </span>
+                      )}
+                    </div>
                   </div>
-                  <div className="grid grid-cols-2 gap-1 text-[11px] font-mono">
-                    {dayCastFringes > 0 && (
-                      <>
-                        <span className="text-muted">Cast fringes ({fringes.castPayrollPct}%)</span>
-                        <span className="text-right">${Math.round(dayCastFringes).toLocaleString()}</span>
-                      </>
-                    )}
-                    {dayCrewFringes > 0 && (
-                      <>
-                        <span className="text-muted">Crew fringes ({fringes.crewPayrollPct}%)</span>
-                        <span className="text-right">${Math.round(dayCrewFringes).toLocaleString()}</span>
-                      </>
-                    )}
-                    {dayPerDiem > 0 && (
-                      <>
-                        <span className="text-muted">Per diem (this day)</span>
-                        <span className="text-right">${Math.round(dayPerDiem).toLocaleString()}</span>
-                      </>
-                    )}
-                    {dayHotelCost > 0 && (
-                      <>
-                        <span className="text-amber-300 font-bold">🏨 Hotels ({fringes?.dayLocationTag})</span>
-                        <span className="text-right text-amber-300 font-bold">${Math.round(dayHotelCost).toLocaleString()}</span>
-                      </>
-                    )}
+
+                  {/* Hotels — always shown */}
+                  <div className={`rounded-lg border p-2 space-y-1 ${
+                    dayHotelCost > 0 ? 'border-amber-500/50 bg-amber-500/10' : 'border-line/60 bg-ink/20'
+                  }`}>
+                    <div className="text-[10px] uppercase tracking-wider font-bold flex items-center gap-1.5">
+                      <span>🏨</span>
+                      <span className={dayHotelCost > 0 ? 'text-amber-300' : 'text-muted'}>Hotels</span>
+                    </div>
+                    <div className="text-[11px] font-mono flex items-center justify-between">
+                      {dayHotelCost > 0 ? (
+                        <>
+                          <span className="text-muted">Cast + crew rooms in {fringes.dayLocationTag}</span>
+                          <span className="text-amber-300 font-bold">${Math.round(dayHotelCost).toLocaleString()}</span>
+                        </>
+                      ) : (
+                        <span className="text-muted/70 italic">
+                          {fringes.dayLocationTag
+                            ? `Home day (${fringes.dayLocationTag}) — no hotels`
+                            : 'Tag day location → hotels auto-calculate'}
+                        </span>
+                      )}
+                    </div>
                   </div>
                 </div>
               )}
@@ -1582,6 +1635,7 @@ function DayCostsSection({
                   isAdmin={isAdmin}
                   onAdd={(desc, vendor, cost) => add(bucket.code, desc, vendor, cost)}
                   onUpdate={updateCost}
+                  onUpdateVendor={updateVendor}
                   onDelete={remove}
                   onToggleRunOfShoot={toggleRunOfShoot}
                   onAutoAddCast={bucket.code === 'CAST' ? autoAddCast : undefined}
@@ -1604,6 +1658,7 @@ function DayBucket({
   isAdmin,
   onAdd,
   onUpdate,
+  onUpdateVendor,
   onDelete,
   onToggleRunOfShoot,
   onAutoAddCast,
@@ -1616,6 +1671,7 @@ function DayBucket({
   isAdmin: boolean
   onAdd: (description: string, vendor: string, cost: number) => void | Promise<void>
   onUpdate: (id: string, cost: number) => void | Promise<void>
+  onUpdateVendor: (id: string, vendor: string) => void | Promise<void>
   onDelete: (id: string) => void | Promise<void>
   onToggleRunOfShoot: (id: string, current: boolean) => void | Promise<void>
   onAutoAddCast?: () => void | Promise<void>
@@ -1668,6 +1724,7 @@ function DayBucket({
             item={it}
             isAdmin={isAdmin}
             onUpdate={(cost) => void onUpdate(it.id, cost)}
+            onUpdateVendor={(v) => void onUpdateVendor(it.id, v)}
             onDelete={() => void onDelete(it.id)}
             onToggleRunOfShoot={() => void onToggleRunOfShoot(it.id, it.spansAllShootDays)}
           />
@@ -1714,17 +1771,21 @@ function DayCostRow({
   item,
   isAdmin,
   onUpdate,
+  onUpdateVendor,
   onDelete,
   onToggleRunOfShoot,
 }: {
   item: DayCostItem
   isAdmin: boolean
   onUpdate: (cost: number) => void
+  onUpdateVendor: (vendor: string) => void
   onDelete: () => void
   onToggleRunOfShoot: () => void
 }) {
   const [cost, setCost] = useState(String(item.rate))
   useEffect(() => { setCost(String(item.rate)) }, [item.rate])
+  const [vendor, setVendor] = useState(item.vendor ?? '')
+  useEffect(() => { setVendor(item.vendor ?? '') }, [item.vendor])
 
   // A run-of-shoot item appears on every day's view but is only
   // editable on the day it lives on (the "source"). On other days
@@ -1745,11 +1806,26 @@ function DayCostRow({
       <div className="basis-full sm:basis-auto sm:flex-1 min-w-0 order-1">
         <div className="flex items-baseline gap-2 flex-wrap">
           <span className="text-text break-words sm:truncate" title={item.description}>{item.description}</span>
-          {item.vendor && (
+          {/* Editable person / vendor name — click to type. Placeholder
+              "who?" prompts producers to fill it in as they hire. */}
+          {editable ? (
+            <input
+              value={vendor}
+              onChange={(e) => setVendor(e.target.value)}
+              onBlur={() => { if ((vendor.trim() || null) !== (item.vendor ?? null)) onUpdateVendor(vendor.trim()) }}
+              onKeyDown={(e) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur() }}
+              placeholder="who?"
+              className={`text-[11px] bg-transparent border-b border-dashed border-line/60 focus:border-stage-mastering focus:outline-none px-1 min-w-[8ch] ${
+                vendor ? 'text-muted' : 'text-muted/40 italic'
+              }`}
+              style={{ width: `${Math.max(vendor.length + 2, 8)}ch` }}
+              title="Attach a person's name — filled in as you hire."
+            />
+          ) : item.vendor ? (
             <span className="text-muted text-[11px] break-words sm:truncate" title={item.vendor}>
               — {item.vendor}
             </span>
-          )}
+          ) : null}
           {isMirror && (
             <span className="text-[9px] uppercase tracking-wider text-stage-mastering/70 italic shrink-0">
               · run of shoot (edit on source day)
