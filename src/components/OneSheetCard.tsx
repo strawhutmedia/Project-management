@@ -11,6 +11,7 @@ type Fields = {
   contactEmail: string
   brandHex: string
   notableGuests: string
+  notableTopics: string
   oneSheetPublished: boolean
 }
 
@@ -21,6 +22,7 @@ function fromProject(p: ApiProject): Fields {
     contactEmail: p.contactEmail ?? 'booking@strawhutmedia.com',
     brandHex: p.brandHex ?? '',
     notableGuests: p.notableGuests ?? '',
+    notableTopics: p.notableTopics ?? '',
     oneSheetPublished: !!p.oneSheetPublished,
   }
 }
@@ -52,6 +54,7 @@ export default function OneSheetCard({ project, onSaved }: { project: ApiProject
         contactEmail: fields.contactEmail || 'booking@strawhutmedia.com',
         brandHex: r.brandHex,
         notableGuests: r.notableGuests,
+        notableTopics: r.notableTopics,
         oneSheetPublished: true,
       })
       if (r.url) setOverrideUrl(r.url)
@@ -207,6 +210,19 @@ export default function OneSheetCard({ project, onSaved }: { project: ApiProject
             onBlur={() => void saveField('notableGuests', fields.notableGuests)}
             rows={3}
             placeholder="e.g. Alexis Texas, Ron Jeremy, Sasha Grey"
+            className="mt-1 w-full bg-ink/40 border border-line rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-stage-mastering"
+          />
+        </label>
+        <label className="block col-span-full">
+          <span className="text-[10px] uppercase tracking-wider text-muted font-bold">
+            Topics we cover (comma or newline separated)
+          </span>
+          <textarea
+            value={fields.notableTopics}
+            onChange={(e) => setFields((f) => ({ ...f, notableTopics: e.target.value }))}
+            onBlur={() => void saveField('notableTopics', fields.notableTopics)}
+            rows={3}
+            placeholder="e.g. Modern relationships, Career reinvention, Recovery, Fame + privacy"
             className="mt-1 w-full bg-ink/40 border border-line rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-stage-mastering"
           />
         </label>

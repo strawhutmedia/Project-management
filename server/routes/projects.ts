@@ -514,6 +514,11 @@ projectsRouter.patch('/:id', async (req, res) => {
     updates.push(`notable_guests = $${i++}`)
     values.push(typeof v === 'string' && v.trim() ? v.trim().slice(0, 2000) : null)
   }
+  if ('notableTopics' in (req.body ?? {})) {
+    const v = req.body.notableTopics
+    updates.push(`notable_topics = $${i++}`)
+    values.push(typeof v === 'string' && v.trim() ? v.trim().slice(0, 2000) : null)
+  }
   if (updates.length === 0) {
     res.status(400).json({ error: 'no_fields' })
     return
@@ -533,7 +538,7 @@ projectsRouter.get('/:id', async (req, res) => {
             rss_feed_url, cover_art_url, brand_assets_folder,
             socials_brand_profile, socials_brand_profile_at,
             slug, hero_tagline, guest_pitch, contact_email, brand_hex,
-            one_sheet_published, notable_guests
+            one_sheet_published, notable_guests, notable_topics
        FROM projects WHERE id = $1`,
     [projectId],
   )
@@ -650,6 +655,7 @@ projectsRouter.get('/:id', async (req, res) => {
       brandHex: project.brand_hex ?? null,
       oneSheetPublished: !!project.one_sheet_published,
       notableGuests: project.notable_guests ?? null,
+      notableTopics: project.notable_topics ?? null,
       songs: songs.rows.map((s: { id: string; title: string; subtitle: string | null; stage: string; release_date: string | Date | null; processing_state: string | null; autopipeline_error: string | null }) => ({
         id: s.id,
         title: s.title,

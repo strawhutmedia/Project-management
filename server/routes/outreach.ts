@@ -527,12 +527,13 @@ outreachRouter.post('/projects/:projectId/auto-populate-one-sheet', async (req, 
           SET hero_tagline = $1,
               guest_pitch = $2,
               notable_guests = $3,
-              brand_hex = $4,
-              contact_email = COALESCE(contact_email, $5),
+              notable_topics = $4,
+              brand_hex = $5,
+              contact_email = COALESCE(contact_email, $6),
               one_sheet_published = TRUE
-        WHERE id = $6`,
-      [result.heroTagline, result.guestPitch, result.notableGuests, result.brandHex,
-       'booking@strawhutmedia.com', projectId],
+        WHERE id = $7`,
+      [result.heroTagline, result.guestPitch, result.notableGuests, result.notableTopics,
+       result.brandHex, 'booking@strawhutmedia.com', projectId],
     )
     const base = process.env.APP_BASE_URL || 'https://slate.strawhutmedia.com'
     const url = `${base}/shows/${slug}`
@@ -543,6 +544,7 @@ outreachRouter.post('/projects/:projectId/auto-populate-one-sheet', async (req, 
       heroTagline: result.heroTagline,
       guestPitch: result.guestPitch,
       notableGuests: result.notableGuests,
+      notableTopics: result.notableTopics,
       brandHex: result.brandHex,
     })
   } catch (err) {

@@ -1887,6 +1887,7 @@ export type OneSheetAutoResult = {
   heroTagline: string
   guestPitch: string
   notableGuests: string       // comma-separated
+  notableTopics: string       // comma-separated
   brandHex: string            // 6-char hex including #
   usage: { inputTokens: number; outputTokens: number }
 }
@@ -1894,7 +1895,7 @@ export type OneSheetAutoResult = {
 const ONE_SHEET_AUTO_SCHEMA = {
   type: 'object',
   additionalProperties: false,
-  required: ['hero_tagline', 'guest_pitch', 'notable_guests', 'brand_hex'],
+  required: ['hero_tagline', 'guest_pitch', 'notable_guests', 'notable_topics', 'brand_hex'],
   properties: {
     hero_tagline: {
       type: 'string',
@@ -1906,11 +1907,15 @@ const ONE_SHEET_AUTO_SCHEMA = {
     },
     notable_guests: {
       type: 'string',
-      description: 'Comma-separated list of the most name-recognizable past guests extracted from episode titles/subtitles. Up to 12 names. If you can\'t identify any guest names, return "".',
+      description: 'Comma-separated list of names of past guests. Extract from episode titles + subtitles + business description + anywhere else they appear. Names to look for: "w/ NAME", "with NAME", "feat. NAME", "featuring NAME", "hosted by NAME", or a person\'s name that appears as the episode title itself. Up to 12 names. If truly none can be identified, return the empty string "".',
+    },
+    notable_topics: {
+      type: 'string',
+      description: 'Comma-separated list of the 5-8 subject areas / themes this show explores. Derive from the show description, niche, brand voice, and episode titles. Concrete themes, not filler ("Modern relationships", "Career reinvention", "Post-industry storytelling"), NOT generic ("Interviews", "Life").',
     },
     brand_hex: {
       type: 'string',
-      description: 'A 6-digit hex color starting with # that matches the show\'s vibe. Adult/alt shows lean pink/red; business shows lean navy/gold; comedy shows lean yellow/orange; interview shows lean deep amber.',
+      description: 'A 6-digit hex color starting with # that matches the show\'s vibe. Adult/alt shows lean pink/magenta; business shows lean navy/gold; comedy shows lean yellow/orange; interview shows lean deep amber.',
     },
   },
 } as const
@@ -1957,12 +1962,14 @@ export async function generateOneSheetAuto(input: OneSheetAutoInput): Promise<On
   const textBlock = response.content.find((b) => b.type === 'text')
   if (!textBlock || textBlock.type !== 'text') throw new Error('one-sheet auto: no text block')
   const parsed = JSON.parse(textBlock.text) as {
-    hero_tagline: string; guest_pitch: string; notable_guests: string; brand_hex: string
+    hero_tagline: string; guest_pitch: string; notable_guests: string;
+    notable_topics: string; brand_hex: string
   }
   return {
     heroTagline: parsed.hero_tagline,
     guestPitch: parsed.guest_pitch,
     notableGuests: parsed.notable_guests,
+    notableTopics: parsed.notable_topics,
     brandHex: parsed.brand_hex,
     usage: {
       inputTokens: response.usage.input_tokens,

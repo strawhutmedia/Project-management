@@ -533,6 +533,7 @@ export type ApiProject = {
   brandHex?: string | null
   oneSheetPublished?: boolean
   notableGuests?: string | null
+  notableTopics?: string | null
   songs: ApiSong[]
 }
 
@@ -1366,7 +1367,7 @@ export const api = {
       { method: 'POST', body: JSON.stringify({}) },
     ),
   autoPopulateOneSheet: (projectId: string) =>
-    request<{ ok: true; url: string | null; heroTagline: string; guestPitch: string; notableGuests: string; brandHex: string }>(
+    request<{ ok: true; url: string | null; heroTagline: string; guestPitch: string; notableGuests: string; notableTopics: string; brandHex: string }>(
       `/api/outreach/projects/${projectId}/auto-populate-one-sheet`,
       { method: 'POST', body: JSON.stringify({}) },
     ),
