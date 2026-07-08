@@ -577,6 +577,16 @@ budgetsRouter.get('/shoot-days/:shootDayId/items', async (req, res) => {
       crewPayrollPct,
       castPerDiemPerDay: needsHotels ? castPerDiemPerDayIfAway : 0,
       crewPerDiemPerDay: needsHotels ? crewPerDiemPerDayIfAway : 0,
+      castHotelPerDay: needsHotels ? hotelCastNightly * castPerDiemHeadcount : 0,
+      crewHotelPerDay: needsHotels ? hotelCrewNightly * crewPerDiemHeadcount : 0,
+      // Raw inputs — the day dropdown shows the formula so the operator
+      // sees where each number comes from.
+      castPerDiemDaily,
+      crewPerDiemDaily,
+      castHeadcount: castPerDiemHeadcount,
+      crewHeadcount: crewPerDiemHeadcount,
+      hotelCastNightly,
+      hotelCrewNightly,
       dayHotelCost,
       needsHotels,
       dayLocationTag: dayRow?.location_tag ?? null,
