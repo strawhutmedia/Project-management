@@ -1060,6 +1060,14 @@ function DayRow({
   const totalEighths = scenes.reduce((s, sc) => s + sc.pageEighths, 0)
   const overTarget = totalEighths > 56 // 7 pages = warn (red)
   const heavyTarget = totalEighths > 48 // 6 pages = caution (yellow)
+  // Sum every scene's budgetTotal so the day header shows the running
+  // scene-cost rollup. When a scene moves to another day, its cost
+  // moves with it — the scene owns its priced items, days just
+  // aggregate. `pricedCount` tracks how many scenes have real dollars
+  // on them so the header can hint "N/M priced" instead of a bare $0
+  // when the day is only partially estimated.
+  const sceneCostTotal = scenes.reduce((s, sc) => s + (sc.budgetTotal || 0), 0)
+  const pricedCount = scenes.filter((sc) => (sc.budgetTotal || 0) > 0).length
 
   async function handleDrop(e: React.DragEvent) {
     e.preventDefault()
@@ -1105,9 +1113,22 @@ function DayRow({
           }`}>{label}</span>
           {day?.shootDate && <span className="text-[10px] text-muted">· {day.shootDate}</span>}
         </div>
-        <div className={`text-[11px] font-mono ${overTarget ? 'text-urgent font-bold' : heavyTarget ? 'text-stage-overdubs' : 'text-muted'}`}>
-          {scenes.length} sc · {fmtEighths(totalEighths)} pages
-          {overTarget && ' ⚠ over'}
+        <div className={`text-[11px] font-mono flex items-center gap-2 flex-wrap justify-end ${overTarget ? 'text-urgent font-bold' : heavyTarget ? 'text-stage-overdubs' : 'text-muted'}`}>
+          <span>{scenes.length} sc · {fmtEighths(totalEighths)} pages</span>
+          {sceneCostTotal > 0 && !isBreak && !isUnscheduled && (
+            <span
+              className="text-emerald-400 font-bold"
+              title={`Sum of every scene's priced budget on this day. ${pricedCount} of ${scenes.length} scenes have prices in.`}
+            >
+              ${Math.round(sceneCostTotal).toLocaleString()}
+              {pricedCount < scenes.length && (
+                <span className="text-muted/60 font-normal ml-1">
+                  ({pricedCount}/{scenes.length} priced)
+                </span>
+              )}
+            </span>
+          )}
+          {overTarget && <span>⚠ over</span>}
         </div>
       </button>
 
