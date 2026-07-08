@@ -93,6 +93,21 @@ export default function Layout() {
                       </div>
                       <div className="text-[11px] text-muted truncate">{user?.email}</div>
                     </div>
+                    <button
+                      onClick={() => { setMenuOpen(false); switchWorkspace() }}
+                      className="block w-full text-left px-4 py-2.5 text-sm text-text hover:bg-line/40"
+                    >
+                      ↻ Switch workspace
+                    </button>
+                    <NavMenuLink to="/scheduler" onClick={() => setMenuOpen(false)}>
+                      📅 Scheduler
+                    </NavMenuLink>
+                    {user?.role === 'admin' && (
+                      <NavMenuLink to="/admin/outreach" onClick={() => setMenuOpen(false)}>
+                        ✉ Outreach
+                      </NavMenuLink>
+                    )}
+                    <div className="border-t border-line/60" />
                     <NavMenuLink to="/profile" onClick={() => setMenuOpen(false)}>
                       👤 Profile
                     </NavMenuLink>
