@@ -9,6 +9,7 @@ export default function Layout() {
   const { user, logout } = useAuth()
   const initial = (user?.display_name || user?.name || '?').charAt(0).toUpperCase()
   const [menuOpen, setMenuOpen] = useState(false)
+  const [navOpen, setNavOpen] = useState(false)
   const navigate = useNavigate()
 
   function switchWorkspace() {
@@ -72,11 +73,57 @@ export default function Layout() {
 
             <NotificationsBell />
 
+            {/* Hamburger — top-level navigation (Switch, Scheduler,
+                Outreach, Domains). Separate from the profile avatar
+                because clicking your own face to find "Scheduler"
+                doesn't make sense. Icon-based label on all screen
+                sizes so mobile users have a clear jump-to. */}
             <div className="relative">
               <button
-                onClick={() => setMenuOpen((v) => !v)}
+                onClick={() => { setNavOpen((v) => !v); setMenuOpen(false) }}
+                className="w-9 h-9 rounded-full border border-line hover:border-stage-mastering/60 grid place-items-center text-text text-lg"
+                title="Menu"
+                aria-label="Open menu"
+              >
+                ☰
+              </button>
+              {navOpen && (
+                <>
+                  <div
+                    className="fixed inset-0 z-10"
+                    onClick={() => setNavOpen(false)}
+                  />
+                  <div className="absolute right-0 mt-2 w-56 rounded-2xl border border-line bg-panel/95 backdrop-blur-md shadow-2xl z-20 overflow-hidden">
+                    <button
+                      onClick={() => { setNavOpen(false); switchWorkspace() }}
+                      className="block w-full text-left px-4 py-2.5 text-sm text-text hover:bg-line/40"
+                    >
+                      ↻ Switch workspace
+                    </button>
+                    <NavMenuLink to="/scheduler" onClick={() => setNavOpen(false)}>
+                      📅 Scheduler
+                    </NavMenuLink>
+                    {user?.role === 'admin' && (
+                      <>
+                        <NavMenuLink to="/admin/outreach" onClick={() => setNavOpen(false)}>
+                          ✉ Outreach
+                        </NavMenuLink>
+                        <NavMenuLink to="/admin/outreach/domains" onClick={() => setNavOpen(false)}>
+                          📡 Sending domains
+                        </NavMenuLink>
+                      </>
+                    )}
+                  </div>
+                </>
+              )}
+            </div>
+
+            <div className="relative">
+              <button
+                onClick={() => { setMenuOpen((v) => !v); setNavOpen(false) }}
                 className="w-9 h-9 rounded-full bg-gradient-to-br from-stage-producing via-stage-mastering to-stage-tracking grid place-items-center text-xs font-bold shadow-[0_0_20px_-4px_rgba(244,114,182,0.6)]"
                 title={user?.display_name || user?.name}
+                aria-label="Profile"
               >
                 {initial}
               </button>
@@ -93,21 +140,6 @@ export default function Layout() {
                       </div>
                       <div className="text-[11px] text-muted truncate">{user?.email}</div>
                     </div>
-                    <button
-                      onClick={() => { setMenuOpen(false); switchWorkspace() }}
-                      className="block w-full text-left px-4 py-2.5 text-sm text-text hover:bg-line/40"
-                    >
-                      ↻ Switch workspace
-                    </button>
-                    <NavMenuLink to="/scheduler" onClick={() => setMenuOpen(false)}>
-                      📅 Scheduler
-                    </NavMenuLink>
-                    {user?.role === 'admin' && (
-                      <NavMenuLink to="/admin/outreach" onClick={() => setMenuOpen(false)}>
-                        ✉ Outreach
-                      </NavMenuLink>
-                    )}
-                    <div className="border-t border-line/60" />
                     <NavMenuLink to="/profile" onClick={() => setMenuOpen(false)}>
                       👤 Profile
                     </NavMenuLink>
