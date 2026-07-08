@@ -241,6 +241,7 @@ export type ApiBudget = {
   homeLocationTag: string | null
   hotelCastNightly: number
   hotelCrewNightly: number
+  hotelContingencyPct: number
   travelDays: number
   awayDaysCount: number
   productionTarget: number | null
@@ -844,6 +845,7 @@ export const api = {
     homeLocationTag?: string | null
     hotelCastNightly?: number
     hotelCrewNightly?: number
+    hotelContingencyPct?: number
     travelDays?: number
     productionTarget?: number | null
     postTarget?: number | null
@@ -917,6 +919,7 @@ export const api = {
         castPerDiemDaily: number; crewPerDiemDaily: number
         castHeadcount: number; crewHeadcount: number
         hotelCastNightly: number; hotelCrewNightly: number
+        hotelContingencyPct: number
         dayHotelCost: number; needsHotels: boolean
         dayLocationTag: string | null; homeLocationTag: string | null
       }

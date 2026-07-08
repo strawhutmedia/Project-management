@@ -76,6 +76,7 @@ budgetsRouter.get('/projects/:projectId', async (req, res) => {
             cast_per_diem_daily, crew_per_diem_daily,
             cast_per_diem_headcount, crew_per_diem_headcount,
             home_location_tag, hotel_cast_nightly, hotel_crew_nightly,
+            hotel_contingency_pct,
             travel_days,
             production_target, post_target, marketing_target, admin_target, total_target
        FROM budgets WHERE project_id = $1`,
@@ -150,6 +151,7 @@ budgetsRouter.get('/projects/:projectId', async (req, res) => {
       homeLocationTag: budget.home_location_tag ?? null,
       hotelCastNightly: Number(budget.hotel_cast_nightly ?? 0),
       hotelCrewNightly: Number(budget.hotel_crew_nightly ?? 0),
+      hotelContingencyPct: Number(budget.hotel_contingency_pct ?? 10),
       travelDays: Number(budget.travel_days ?? 0),
       awayDaysCount,
       productionTarget: numOrNull(budget.production_target),
@@ -239,7 +241,7 @@ budgetsRouter.patch('/:budgetId', async (req, res) => {
   )
   if (lookup.rows.length === 0) { res.status(404).json({ error: 'not_found' }); return }
   if (!await assertWriter(user, lookup.rows[0].project_id, res)) return
-  const { currency, shootDays, bondPct, contingencyPct, castPayrollPct, crewPayrollPct, castPerDiemDaily, crewPerDiemDaily, castPerDiemHeadcount, crewPerDiemHeadcount, homeLocationTag, hotelCastNightly, hotelCrewNightly, travelDays, productionTarget, postTarget, marketingTarget, adminTarget, totalTarget } = req.body ?? {}
+  const { currency, shootDays, bondPct, contingencyPct, castPayrollPct, crewPayrollPct, castPerDiemDaily, crewPerDiemDaily, castPerDiemHeadcount, crewPerDiemHeadcount, homeLocationTag, hotelCastNightly, hotelCrewNightly, hotelContingencyPct, travelDays, productionTarget, postTarget, marketingTarget, adminTarget, totalTarget } = req.body ?? {}
   const updates: string[] = []
   const values: unknown[] = []
   let i = 1
@@ -260,6 +262,7 @@ budgetsRouter.patch('/:budgetId', async (req, res) => {
   }
   if (typeof hotelCastNightly === 'number') { updates.push(`hotel_cast_nightly = $${i++}`); values.push(hotelCastNightly) }
   if (typeof hotelCrewNightly === 'number') { updates.push(`hotel_crew_nightly = $${i++}`); values.push(hotelCrewNightly) }
+  if (typeof hotelContingencyPct === 'number') { updates.push(`hotel_contingency_pct = $${i++}`); values.push(hotelContingencyPct) }
   const targetField = (key: string, val: unknown, col: string) => {
     if (!(key in (req.body ?? {}))) return
     if (val === null || val === '') {
@@ -488,11 +491,13 @@ budgetsRouter.get('/shoot-days/:shootDayId/items', async (req, res) => {
     cast_per_diem_headcount: string | null; crew_per_diem_headcount: string | null;
     home_location_tag: string | null;
     hotel_cast_nightly: string | null; hotel_crew_nightly: string | null;
+    hotel_contingency_pct: string | null;
   }>(
     `SELECT cast_payroll_pct, crew_payroll_pct,
             cast_per_diem_daily, crew_per_diem_daily,
             cast_per_diem_headcount, crew_per_diem_headcount,
-            home_location_tag, hotel_cast_nightly, hotel_crew_nightly
+            home_location_tag, hotel_cast_nightly, hotel_crew_nightly,
+            hotel_contingency_pct
        FROM budgets WHERE project_id = $1`,
     [lookup.rows[0].project_id],
   )
@@ -523,9 +528,11 @@ budgetsRouter.get('/shoot-days/:shootDayId/items', async (req, res) => {
   const needsHotels = dayTag !== null && dayTag !== homeTag
   const hotelCastNightly = Number(s?.hotel_cast_nightly ?? 0)
   const hotelCrewNightly = Number(s?.hotel_crew_nightly ?? 0)
-  const dayHotelCost = needsHotels
+  const hotelContingencyPct = Number(s?.hotel_contingency_pct ?? 10)
+  const dayHotelBase = needsHotels
     ? (hotelCastNightly * castPerDiemHeadcount) + (hotelCrewNightly * crewPerDiemHeadcount)
     : 0
+  const dayHotelCost = dayHotelBase * (1 + hotelContingencyPct / 100)
 
   // Scene-attached rollup for this day. Each scene owns its own
   // priced line items (wardrobe, props, VFX, etc.); when a scene is
@@ -579,6 +586,7 @@ budgetsRouter.get('/shoot-days/:shootDayId/items', async (req, res) => {
       crewPerDiemPerDay: needsHotels ? crewPerDiemPerDayIfAway : 0,
       castHotelPerDay: needsHotels ? hotelCastNightly * castPerDiemHeadcount : 0,
       crewHotelPerDay: needsHotels ? hotelCrewNightly * crewPerDiemHeadcount : 0,
+      hotelContingencyPct,
       // Raw inputs — the day dropdown shows the formula so the operator
       // sees where each number comes from.
       castPerDiemDaily,

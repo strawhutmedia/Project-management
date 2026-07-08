@@ -46,6 +46,7 @@ type Budget = {
   cast_per_diem_headcount: number | null; crew_per_diem_headcount: number | null;
   home_location_tag: string | null;
   hotel_cast_nightly: number | null; hotel_crew_nightly: number | null;
+  hotel_contingency_pct: number | null;
   travel_days: number | null;
   production_target: number | null; post_target: number | null;
   marketing_target: number | null; admin_target: number | null; total_target: number | null;
@@ -125,6 +126,7 @@ async function loadProjectContext(projectId: string): Promise<{
             cast_per_diem_daily, crew_per_diem_daily,
             cast_per_diem_headcount, crew_per_diem_headcount,
             home_location_tag, hotel_cast_nightly, hotel_crew_nightly,
+            hotel_contingency_pct,
             travel_days,
             production_target, post_target, marketing_target, admin_target, total_target
        FROM budgets WHERE project_id = $1`,
@@ -268,8 +270,13 @@ export async function budgetTopSheetPdf(projectId: string, res: Response): Promi
   const perDiemTotal = castPerDiemTotal + crewPerDiemTotal
   const hotelCastNightly = Number(budget.hotel_cast_nightly ?? 0)
   const hotelCrewNightly = Number(budget.hotel_crew_nightly ?? 0)
-  const hotelCastTotal = hotelCastNightly * castPerDiemHeadcount * awayDaysCount
-  const hotelCrewTotal = hotelCrewNightly * crewPerDiemHeadcount * awayDaysCount
+  const hotelContingencyPct = Number(budget.hotel_contingency_pct ?? 10)
+  const hotelCastBase = hotelCastNightly * castPerDiemHeadcount * awayDaysCount
+  const hotelCrewBase = hotelCrewNightly * crewPerDiemHeadcount * awayDaysCount
+  const hotelsBase = hotelCastBase + hotelCrewBase
+  const hotelContingency = hotelsBase * (hotelContingencyPct / 100)
+  const hotelCastTotal = hotelCastBase * (1 + hotelContingencyPct / 100)
+  const hotelCrewTotal = hotelCrewBase * (1 + hotelContingencyPct / 100)
   const hotelsTotal = hotelCastTotal + hotelCrewTotal
   const directTotal = Array.from(categoryTotals.values()).reduce((s, v) => s + v, 0)
   const directPlusFringes = directTotal + fringesTotal + perDiemTotal + hotelsTotal

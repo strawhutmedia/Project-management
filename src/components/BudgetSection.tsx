@@ -219,7 +219,13 @@ export default function BudgetSection({ projectId, isAdmin }: { projectId: strin
   const castPerDiemTotal = budget.castPerDiemDaily * budget.castPerDiemHeadcount * perDiemDays
   const crewPerDiemTotal = budget.crewPerDiemDaily * budget.crewPerDiemHeadcount * perDiemDays
   const perDiemTotal = castPerDiemTotal + crewPerDiemTotal
-  const directPlusFringes = directTotal + fringesTotal + perDiemTotal
+  // Hotels = (cast + crew nightly × headcount × away+travel days) with
+  // the operator's buffer % on top for last-minute room additions.
+  const hotelsBase =
+    (budget.hotelCastNightly * budget.castPerDiemHeadcount * perDiemDays) +
+    (budget.hotelCrewNightly * budget.crewPerDiemHeadcount * perDiemDays)
+  const hotelsTotal = hotelsBase * (1 + budget.hotelContingencyPct / 100)
+  const directPlusFringes = directTotal + fringesTotal + perDiemTotal + hotelsTotal
   const contingency = directPlusFringes * (budget.contingencyPct / 100)
   const bond = directPlusFringes * (budget.bondPct / 100)
   const grand = directPlusFringes + contingency + bond
@@ -326,7 +332,14 @@ export default function BudgetSection({ projectId, isAdmin }: { projectId: strin
           <Stat
             label="Per diem"
             value={fmtMoney(perDiemTotal, budget.currency)}
-            hint={`${budget.castPerDiemHeadcount + budget.crewPerDiemHeadcount} ppl × ${budget.shootDays} days`}
+            hint={`${budget.castPerDiemHeadcount + budget.crewPerDiemHeadcount} ppl × ${perDiemDays} away days`}
+          />
+        )}
+        {hotelsTotal > 0 && (
+          <Stat
+            label={`Hotels (+${budget.hotelContingencyPct}%)`}
+            value={fmtMoney(hotelsTotal, budget.currency)}
+            hint={`${budget.awayDaysCount + budget.travelDays} nights`}
           />
         )}
         <Stat label={`Contingency (${budget.contingencyPct}%)`} value={fmtMoney(contingency, budget.currency)} />
@@ -715,6 +728,7 @@ function BudgetSettings({ budget, onSaved }: { budget: ApiBudget; onSaved: () =>
   const [homeLocationTag, setHomeLocationTag] = useState(budget.homeLocationTag ?? '')
   const [hotelCastNightly, setHotelCastNightly] = useState(budget.hotelCastNightly)
   const [hotelCrewNightly, setHotelCrewNightly] = useState(budget.hotelCrewNightly)
+  const [hotelContingencyPct, setHotelContingencyPct] = useState(budget.hotelContingencyPct)
   const [productionTarget, setProductionTarget] = useState<string>(budget.productionTarget != null ? String(budget.productionTarget) : '')
   const [postTarget, setPostTarget] = useState<string>(budget.postTarget != null ? String(budget.postTarget) : '')
   const [marketingTarget, setMarketingTarget] = useState<string>(budget.marketingTarget != null ? String(budget.marketingTarget) : '')
@@ -746,6 +760,7 @@ function BudgetSettings({ budget, onSaved }: { budget: ApiBudget; onSaved: () =>
         homeLocationTag: homeLocationTag.trim() || null,
         hotelCastNightly,
         hotelCrewNightly,
+        hotelContingencyPct,
         productionTarget: num(productionTarget),
         postTarget: num(postTarget),
         marketingTarget: num(marketingTarget),
@@ -941,8 +956,24 @@ function BudgetSettings({ budget, onSaved }: { budget: ApiBudget; onSaved: () =>
           placeholder="275"
         />
       </label>
-      <div className="text-[10px] text-muted self-end pb-2">
-        Tag each day's location on the Stripboard.
+      <label className="block">
+        <span className="block text-[10px] uppercase tracking-wider text-muted font-bold mb-1">
+          Buffer %
+        </span>
+        <input
+          type="number"
+          step="1"
+          min={0}
+          max={50}
+          value={hotelContingencyPct}
+          onChange={(e) => setHotelContingencyPct(parseFloat(e.target.value) || 0)}
+          className="w-full rounded-md bg-ink/60 border border-line text-text px-2 py-1.5 outline-none font-mono"
+          placeholder="10"
+          title="Extra room buffer for late-adds (guest talent, day players, etc.). 10% ≈ 2 extra rooms for a 15-crew shoot."
+        />
+      </label>
+      <div className="text-[10px] text-muted self-end pb-2 col-span-2 sm:col-span-4">
+        Tag each day's location on the Stripboard. Buffer applies to hotel totals only.
       </div>
       <div className="col-span-2 sm:col-span-4 mt-1 mb-1 text-[10px] uppercase tracking-[0.15em] text-muted font-bold">
         🎯 Goals (leave blank to disable a bar)

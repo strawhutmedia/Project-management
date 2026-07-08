@@ -1402,6 +1402,7 @@ function DayCostsSection({
     castPerDiemDaily: number; crewPerDiemDaily: number
     castHeadcount: number; crewHeadcount: number
     hotelCastNightly: number; hotelCrewNightly: number
+    hotelContingencyPct: number
     dayHotelCost: number; needsHotels: boolean
     dayLocationTag: string | null; homeLocationTag: string | null
   } | null>(null)
@@ -1587,63 +1588,48 @@ function DayCostsSection({
                     </div>
                   )}
 
-                  {/* Per diem — split cast + crew so the math is obvious.
-                      Shows formula (headcount × daily) so the producer
-                      can trace where every dollar comes from. */}
-                  <div className={`rounded-lg border p-2 space-y-1 ${
+                  {/* Per diem — total for this day. Formula is
+                      cast_headcount × cast_daily + crew_headcount ×
+                      crew_daily, but the operator only needs the total. */}
+                  <div className={`rounded-lg border p-2 flex items-center justify-between gap-3 ${
                     dayPerDiem > 0 ? 'border-sky-500/40 bg-sky-500/5' : 'border-line/60 bg-ink/20'
                   }`}>
-                    <div className="text-[10px] uppercase tracking-wider font-bold flex items-center gap-1.5">
+                    <div className="text-[11px] flex items-center gap-1.5">
                       <span>🍽</span>
-                      <span className={dayPerDiem > 0 ? 'text-sky-300' : 'text-muted'}>Per diem</span>
+                      <span className={`uppercase tracking-wider font-bold ${dayPerDiem > 0 ? 'text-sky-300' : 'text-muted'}`}>Per diem</span>
                       {fringes.dayLocationTag && (
-                        <span className="text-muted/50 normal-case font-normal">· {fringes.dayLocationTag}</span>
+                        <span className="text-muted/60">· {fringes.dayLocationTag}</span>
                       )}
                     </div>
                     {dayPerDiem > 0 ? (
-                      <div className="grid grid-cols-[1fr_auto] gap-x-3 gap-y-0.5 text-[11px] font-mono">
-                        <span className="text-muted">Cast: {fringes.castHeadcount} × ${fringes.castPerDiemDaily}/day</span>
-                        <span className="text-right">${Math.round(fringes.castPerDiemPerDay).toLocaleString()}</span>
-                        <span className="text-muted">Crew: {fringes.crewHeadcount} × ${fringes.crewPerDiemDaily}/day</span>
-                        <span className="text-right">${Math.round(fringes.crewPerDiemPerDay).toLocaleString()}</span>
-                        <span className="text-sky-300 font-bold pt-0.5 border-t border-line/40">Day total</span>
-                        <span className="text-right text-sky-300 font-bold pt-0.5 border-t border-line/40">${Math.round(dayPerDiem).toLocaleString()}</span>
-                      </div>
+                      <span className="text-sky-300 font-bold font-mono text-sm">${Math.round(dayPerDiem).toLocaleString()}</span>
                     ) : (
-                      <div className="text-[11px] text-muted/70 italic">
-                        {fringes.dayLocationTag
-                          ? `Home day (${fringes.dayLocationTag}) — no per diem`
-                          : 'Tag day location → per diem auto-calculates'}
-                      </div>
+                      <span className="text-[11px] text-muted/70 italic">
+                        {fringes.dayLocationTag ? `Home — no per diem` : 'Tag location to auto-calc'}
+                      </span>
                     )}
                   </div>
 
-                  {/* Hotels — split cast + crew with formula */}
-                  <div className={`rounded-lg border p-2 space-y-1 ${
+                  {/* Hotels — includes contingency buffer */}
+                  <div className={`rounded-lg border p-2 flex items-center justify-between gap-3 ${
                     dayHotelCost > 0 ? 'border-amber-500/50 bg-amber-500/10' : 'border-line/60 bg-ink/20'
                   }`}>
-                    <div className="text-[10px] uppercase tracking-wider font-bold flex items-center gap-1.5">
+                    <div className="text-[11px] flex items-center gap-1.5">
                       <span>🏨</span>
-                      <span className={dayHotelCost > 0 ? 'text-amber-300' : 'text-muted'}>Hotels</span>
+                      <span className={`uppercase tracking-wider font-bold ${dayHotelCost > 0 ? 'text-amber-300' : 'text-muted'}`}>Hotels</span>
                       {fringes.dayLocationTag && (
-                        <span className="text-muted/50 normal-case font-normal">· {fringes.dayLocationTag}</span>
+                        <span className="text-muted/60">· {fringes.dayLocationTag}</span>
+                      )}
+                      {dayHotelCost > 0 && fringes.hotelContingencyPct > 0 && (
+                        <span className="text-muted/50 normal-case">+{fringes.hotelContingencyPct}% buffer</span>
                       )}
                     </div>
                     {dayHotelCost > 0 ? (
-                      <div className="grid grid-cols-[1fr_auto] gap-x-3 gap-y-0.5 text-[11px] font-mono">
-                        <span className="text-muted">Cast: {fringes.castHeadcount} × ${fringes.hotelCastNightly}/night</span>
-                        <span className="text-right">${Math.round(fringes.castHotelPerDay).toLocaleString()}</span>
-                        <span className="text-muted">Crew: {fringes.crewHeadcount} × ${fringes.hotelCrewNightly}/night</span>
-                        <span className="text-right">${Math.round(fringes.crewHotelPerDay).toLocaleString()}</span>
-                        <span className="text-amber-300 font-bold pt-0.5 border-t border-line/40">Day total</span>
-                        <span className="text-right text-amber-300 font-bold pt-0.5 border-t border-line/40">${Math.round(dayHotelCost).toLocaleString()}</span>
-                      </div>
+                      <span className="text-amber-300 font-bold font-mono text-sm">${Math.round(dayHotelCost).toLocaleString()}</span>
                     ) : (
-                      <div className="text-[11px] text-muted/70 italic">
-                        {fringes.dayLocationTag
-                          ? `Home day (${fringes.dayLocationTag}) — no hotels`
-                          : 'Tag day location → hotels auto-calculate'}
-                      </div>
+                      <span className="text-[11px] text-muted/70 italic">
+                        {fringes.dayLocationTag ? `Home — no hotels` : 'Tag location to auto-calc'}
+                      </span>
                     )}
                   </div>
                 </div>
