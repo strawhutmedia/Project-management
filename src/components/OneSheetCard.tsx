@@ -93,8 +93,8 @@ export default function OneSheetCard({ project, onSaved }: { project: ApiProject
   }
 
   return (
-    <section className="rounded-2xl border border-line bg-panel/60 p-5 space-y-4">
-      <div className="flex items-start justify-between gap-3 flex-wrap">
+    <section className="rounded-2xl border border-line bg-panel/60 p-4 sm:p-5 space-y-4">
+      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
         <div>
           <h2 className="text-[11px] uppercase tracking-[0.2em] text-muted font-bold">📄 Public one-sheet</h2>
           <p className="text-[11px] text-muted/80 mt-1 max-w-2xl">
@@ -109,27 +109,37 @@ export default function OneSheetCard({ project, onSaved }: { project: ApiProject
             className="text-[10px] uppercase tracking-wider text-emerald-950 bg-emerald-400 rounded-full px-3 py-1.5 hover:bg-emerald-300 disabled:opacity-40 font-bold"
             title="Read the show's episodes and Show Brief, then draft hero tagline, notable guests, guesting pitch, and brand color. Overwrites current fields."
           >
-            {autoPopulating ? 'Drafting…' : '✨ Auto-populate from episodes'}
+            {autoPopulating ? 'Drafting…' : '✨ Auto-populate'}
           </button>
-          <button
-            onClick={() => void togglePublish()}
-            disabled={saving}
-            className={`text-[10px] uppercase tracking-wider font-bold border rounded-full px-3 py-1.5 disabled:opacity-40 ${
-              fields.oneSheetPublished
-                ? 'text-emerald-300 border-emerald-500/40 hover:bg-emerald-500/10'
-                : 'text-muted border-line hover:bg-ink/40'
-            }`}
-          >
-            {fields.oneSheetPublished ? '✓ Published' : 'Publish one-sheet'}
-          </button>
+          {/* When published, primary CTA is "View" — an actual link
+              that opens the live one-sheet. Producer can unpublish
+              from the URL panel below. */}
+          {fields.oneSheetPublished && url ? (
+            <a
+              href={url}
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex items-center gap-1.5 text-[10px] uppercase tracking-wider font-bold text-emerald-950 bg-emerald-400 rounded-full px-3 py-1.5 hover:bg-emerald-300"
+            >
+              ↗ View one-sheet
+            </a>
+          ) : (
+            <button
+              onClick={() => void togglePublish()}
+              disabled={saving}
+              className="text-[10px] uppercase tracking-wider font-bold border rounded-full px-3 py-1.5 disabled:opacity-40 text-muted border-line hover:bg-ink/40"
+            >
+              Publish one-sheet
+            </button>
+          )}
         </div>
       </div>
 
       {error && <p className="text-xs text-urgent">{error}</p>}
 
       {fields.oneSheetPublished && url && (
-        <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/5 p-3 flex items-center gap-2 flex-wrap">
-          <span className="text-[10px] uppercase tracking-wider text-emerald-300 font-bold">Live at</span>
+        <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/5 p-3 flex flex-col sm:flex-row sm:items-center gap-2">
+          <span className="text-[10px] uppercase tracking-wider text-emerald-300 font-bold shrink-0">Live at</span>
           <a
             href={url}
             target="_blank"
@@ -138,20 +148,22 @@ export default function OneSheetCard({ project, onSaved }: { project: ApiProject
           >
             {url}
           </a>
-          <button
-            onClick={() => { void navigator.clipboard.writeText(url) }}
-            className="text-[10px] uppercase tracking-wider text-emerald-200 border border-emerald-500/40 rounded-full px-2.5 py-1 hover:bg-emerald-500/10 font-bold"
-          >
-            Copy
-          </button>
-          <a
-            href={url}
-            target="_blank"
-            rel="noreferrer"
-            className="text-[10px] uppercase tracking-wider text-emerald-200 border border-emerald-500/40 rounded-full px-2.5 py-1 hover:bg-emerald-500/10 font-bold"
-          >
-            Preview ↗
-          </a>
+          <div className="flex items-center gap-2 flex-wrap shrink-0">
+            <button
+              onClick={() => { void navigator.clipboard.writeText(url) }}
+              className="text-[10px] uppercase tracking-wider text-emerald-200 border border-emerald-500/40 rounded-full px-2.5 py-1 hover:bg-emerald-500/10 font-bold"
+            >
+              Copy link
+            </button>
+            <button
+              onClick={() => void togglePublish()}
+              disabled={saving}
+              className="text-[10px] uppercase tracking-wider text-muted border border-line rounded-full px-2.5 py-1 hover:bg-ink/40 font-bold disabled:opacity-40"
+              title="Take the one-sheet offline"
+            >
+              Unpublish
+            </button>
+          </div>
         </div>
       )}
 

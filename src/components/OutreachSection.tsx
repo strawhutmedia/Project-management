@@ -199,7 +199,7 @@ export default function OutreachSection({ projectId }: { projectId: string }) {
   const repliedCount = prospects?.filter((p) => p.status === 'replied').length ?? 0
 
   return (
-    <section className="rounded-2xl border border-line bg-panel/60 p-5 space-y-5">
+    <section className="rounded-2xl border border-line bg-panel/60 p-4 sm:p-5 space-y-5">
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <div>
           <h2 className="text-[11px] uppercase tracking-[0.2em] text-muted font-bold">✉ Guest outreach</h2>
@@ -208,19 +208,19 @@ export default function OutreachSection({ projectId }: { projectId: string }) {
             everything jittered so it looks human. Replies land in <code>booking@strawhutmedia.com</code>.
           </p>
         </div>
-        <div className="flex items-center gap-2 text-[10px] uppercase tracking-wider text-muted">
+        <div className="flex items-center gap-1.5 sm:gap-2 text-[10px] uppercase tracking-wider text-muted flex-wrap">
           {prospects === null ? 'Loading…' : (
             <>
-              <span className="px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-300 border border-amber-500/30 font-bold">
+              <span className="px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-300 border border-amber-500/30 font-bold whitespace-nowrap">
                 {needsEmailCount} needs email
               </span>
-              <span className="px-2 py-0.5 rounded-full bg-sky-500/15 text-sky-300 border border-sky-500/30 font-bold">
+              <span className="px-2 py-0.5 rounded-full bg-sky-500/15 text-sky-300 border border-sky-500/30 font-bold whitespace-nowrap">
                 {readyCount} ready
               </span>
-              <span className="px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 font-bold">
+              <span className="px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 font-bold whitespace-nowrap">
                 {sentCount} sent
               </span>
-              <span className="px-2 py-0.5 rounded-full bg-fuchsia-500/15 text-fuchsia-300 border border-fuchsia-500/30 font-bold">
+              <span className="px-2 py-0.5 rounded-full bg-fuchsia-500/15 text-fuchsia-300 border border-fuchsia-500/30 font-bold whitespace-nowrap">
                 {repliedCount} replied
               </span>
             </>

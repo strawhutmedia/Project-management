@@ -130,43 +130,43 @@ export default function OutreachHubPage() {
                 to={`/admin/outreach/shows/${s.project.id}`}
                 className="block rounded-2xl border border-line bg-panel/60 p-4 hover:border-stage-mastering/40 transition group"
               >
-                <div className="flex items-center gap-3 flex-wrap">
+                <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3">
                   <div className="flex-1 min-w-0">
-                    <div className="font-bold text-lg group-hover:text-stage-mastering transition truncate">
+                    <div className="font-bold text-base sm:text-lg group-hover:text-stage-mastering transition truncate">
                       {s.project.name}
                     </div>
                     {s.project.subtitle && (
                       <div className="text-[11px] text-muted truncate">{s.project.subtitle}</div>
                     )}
                   </div>
-                  <div className="flex items-center gap-2 text-[10px] uppercase tracking-wider font-bold">
+                  <div className="flex items-center gap-1.5 flex-wrap text-[10px] uppercase tracking-wider font-bold">
                     {s.needsEmail > 0 && (
-                      <span className="px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-300 border border-amber-500/30">
+                      <span className="px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-300 border border-amber-500/30 whitespace-nowrap">
                         {s.needsEmail} needs email
                       </span>
                     )}
                     {s.ready > 0 && (
-                      <span className="px-2 py-0.5 rounded-full bg-sky-500/15 text-sky-300 border border-sky-500/30">
+                      <span className="px-2 py-0.5 rounded-full bg-sky-500/15 text-sky-300 border border-sky-500/30 whitespace-nowrap">
                         {s.ready} ready
                       </span>
                     )}
                     {s.sent > 0 && (
-                      <span className="px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">
+                      <span className="px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 whitespace-nowrap">
                         {s.sent} sent
                       </span>
                     )}
                     {s.replied > 0 && (
-                      <span className="px-2 py-0.5 rounded-full bg-fuchsia-500/15 text-fuchsia-300 border border-fuchsia-500/30">
+                      <span className="px-2 py-0.5 rounded-full bg-fuchsia-500/15 text-fuchsia-300 border border-fuchsia-500/30 whitespace-nowrap">
                         {s.replied} replied
                       </span>
                     )}
                     {s.total === 0 && (
                       <span className="text-muted/60 italic normal-case font-normal">
-                        No prospects yet — click to start
+                        No prospects — tap to start
                       </span>
                     )}
                   </div>
-                  <span className="text-muted group-hover:text-stage-mastering transition">→</span>
+                  <span className="hidden sm:inline text-muted group-hover:text-stage-mastering transition">→</span>
                 </div>
               </Link>
             ))}
