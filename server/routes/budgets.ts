@@ -458,15 +458,18 @@ budgetsRouter.get('/shoot-days/:shootDayId/items', async (req, res) => {
     vendor: string | null; dated_at: string | null; notes: string | null;
     position: number; spans_all_shoot_days: boolean;
     is_source: boolean; source_shoot_day_id: string | null;
+    source_shoot_day_number: number | null;
   }>(
     `SELECT li.id, li.account_id, li.code, li.description, li.amt, li.units,
             li.x, li.rate, li.vendor, li.dated_at, li.notes, li.position,
             li.spans_all_shoot_days,
             (li.shoot_day_id = $1) AS is_source,
-            li.shoot_day_id AS source_shoot_day_id
+            li.shoot_day_id AS source_shoot_day_id,
+            sd.number AS source_shoot_day_number
      FROM budget_line_items li
      JOIN budget_accounts a ON a.id = li.account_id
      JOIN budgets b ON b.id = a.budget_id
+     LEFT JOIN shoot_days sd ON sd.id = li.shoot_day_id
      WHERE b.project_id = $2
        AND (
          li.shoot_day_id = $1
@@ -560,6 +563,7 @@ budgetsRouter.get('/shoot-days/:shootDayId/items', async (req, res) => {
       spansAllShootDays: r.spans_all_shoot_days,
       isSource: r.is_source,
       sourceShootDayId: r.source_shoot_day_id,
+      sourceShootDayNumber: r.source_shoot_day_number,
     })),
     scenes: scenesRes.rows.map((r) => ({
       id: r.id,

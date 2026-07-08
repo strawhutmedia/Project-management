@@ -1369,6 +1369,7 @@ type DayCostItem = {
   spansAllShootDays: boolean
   isSource: boolean
   sourceShootDayId: string | null
+  sourceShootDayNumber: number | null
 }
 
 const DAY_BUCKETS: Array<{ code: string; label: string; icon: string }> = [
@@ -1406,6 +1407,7 @@ function DayCostsSection({
         spansAllShootDays: it.spansAllShootDays,
         isSource: it.isSource,
         sourceShootDayId: it.sourceShootDayId,
+        sourceShootDayNumber: it.sourceShootDayNumber,
       })))
       setScenes(r.scenes ?? [])
       setFringes(r.fringes ?? null)
@@ -1828,7 +1830,7 @@ function DayCostRow({
           ) : null}
           {isMirror && (
             <span className="text-[9px] uppercase tracking-wider text-stage-mastering/70 italic shrink-0">
-              · run of shoot (edit on source day)
+              · run of shoot{item.sourceShootDayNumber != null ? ` (edit on day ${item.sourceShootDayNumber})` : ' (edit on source day)'}
             </span>
           )}
         </div>
@@ -1839,7 +1841,7 @@ function DayCostRow({
           disabled={isMirror}
           title={
             isMirror
-              ? 'Run of shoot — edit on the source day'
+              ? `Run of shoot — edit on day ${item.sourceShootDayNumber ?? '?'}`
               : isRos
                 ? 'Currently applies to every shoot day. Click to revert to just this day.'
                 : 'Click to apply this cost to every shoot day in the production'
