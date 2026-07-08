@@ -1394,11 +1394,14 @@ function BudgetItemsTable({
   const [query, setQuery] = useState('')
   const [sortKey, setSortKey] = useState<'category' | 'account' | 'code' | 'description' | 'total'>('category')
   const [sortAsc, setSortAsc] = useState(true)
-  // Categories start collapsed — 1500+ rows is overwhelming on first
-  // load. Producer expands the categories they're working on. When a
-  // search query is active, all matching categories auto-expand so
-  // the matches are visible without an extra click.
-  const [expandedCats, setExpandedCats] = useState<Set<BudgetCategory>>(new Set())
+  // Categories start EXPANDED so producers can edit values without
+  // hunting for the right group. Ryan hated the previous "collapse
+  // after every save" behavior — expanded default means no reload
+  // ever makes it look like the page shrunk on him. Producer can
+  // hit Collapse-all if they want to tidy up. Search auto-expands.
+  const [expandedCats, setExpandedCats] = useState<Set<BudgetCategory>>(
+    new Set(['above_line', 'production', 'post', 'other']),
+  )
   function toggleCat(c: BudgetCategory) {
     setExpandedCats((s) => {
       const next = new Set(s)
