@@ -11,11 +11,26 @@ import { pool } from '../db'
 import { logError, logInfo } from '../diag'
 import { syncMissingCoversFromRss } from '../rss_cover_sync'
 
-// Ryan's flagship set. Add or remove IDs here; the seed is idempotent.
-const FLAGSHIP_ITUNES_IDS = [
-  '1620018481',   // Naked Lunch
-  '1848746721',   // Wicked — The Official Podcast
-  '1835954447',   // Only Murders in the Building Official Podcast
+// Ryan's flagship set. Add or remove entries here; the seed is
+// idempotent. Optional `fallbackName` is used when iTunes lookup is
+// missing collectionName; optional `fallbackArtwork` fills cover art
+// when both iTunes lookup AND RSS parsing come up empty (some feeds
+// don't publish the itunes:image tag).
+type FlagshipEntry = {
+  itunesId: string
+  fallbackName?: string
+  fallbackArtwork?: string
+}
+const FLAGSHIP_ENTRIES: FlagshipEntry[] = [
+  { itunesId: '1620018481', fallbackName: 'Naked Lunch' },
+  { itunesId: '1848746721', fallbackName: 'Wicked, The Official Podcast' },
+  {
+    itunesId: '1835954447',
+    fallbackName: 'Only Murders in the Building Official Podcast',
+    // Apple CDN URL for the show's cover art. Guaranteed to work even
+    // if iTunes lookup / RSS both fail.
+    fallbackArtwork: 'https://is1-ssl.mzstatic.com/image/thumb/Podcasts221/v4/2c/61/1c/2c611c8d-4d92-9ea4-1ffe-d31128e8f57c/mza_15038265989023095515.png/600x600bb.jpg',
+  },
 ]
 
 type ItunesResult = {
@@ -76,33 +91,35 @@ async function pickUniqueSlug(base: string, ownId: string | null): Promise<strin
 }
 
 export async function seedFlagshipPodcasts(): Promise<void> {
-  for (const id of FLAGSHIP_ITUNES_IDS) {
+  for (const entry of FLAGSHIP_ENTRIES) {
+    const { itunesId, fallbackName, fallbackArtwork } = entry
     try {
-      const result = await lookupItunes(id)
-      if (!result?.collectionName || !result.feedUrl) {
-        logInfo('flagship seed: itunes lookup empty', { id })
+      const result = await lookupItunes(itunesId)
+      const name = (result?.collectionName || fallbackName || '').trim()
+      const feedUrl = (result?.feedUrl || '').trim()
+      // Prefer 600px iTunes artwork, then 100px, then the hardcoded
+      // fallback we stashed on the entry. Guarantees a cover renders
+      // even when iTunes returns an empty artworkUrl.
+      const artwork = (result?.artworkUrl600 || result?.artworkUrl100 || fallbackArtwork || '').trim()
+
+      if (!name) {
+        logInfo('flagship seed: skipping — no name from iTunes or fallback', { itunesId })
         continue
       }
-      const name = result.collectionName.trim()
-      const feedUrl = result.feedUrl.trim()
-      // Prefer 600px artwork; some responses only expose the 100px thumbnail.
-      const artwork = (result.artworkUrl600 || result.artworkUrl100 || '').trim()
 
-      const existingId = await findExistingProject(name, feedUrl)
+      const existingId = await findExistingProject(name, feedUrl || '__no_feed__')
       if (existingId) {
-        // Make sure the flagship flag is on + fill in any missing
-        // cover art (some earlier rows didn't get artwork because
-        // iTunes lookup came back thin). Don't overwrite anything
-        // the producer set manually.
         await pool.query(
           `UPDATE projects
               SET is_flagship = TRUE,
                   cover_art_url = COALESCE(NULLIF(cover_art_url, ''), $2),
                   rss_feed_url  = COALESCE(NULLIF(rss_feed_url, ''), $3)
             WHERE id = $1`,
-          [existingId, artwork || null, feedUrl],
+          [existingId, artwork || null, feedUrl || null],
         )
-        logInfo('flagship seed: existing show flagged', { id, name, projectId: existingId, hadArtwork: Boolean(artwork) })
+        logInfo('flagship seed: existing show flagged', {
+          itunesId, name, projectId: existingId, hadArtwork: Boolean(artwork),
+        })
         continue
       }
 
@@ -111,12 +128,14 @@ export async function seedFlagshipPodcasts(): Promise<void> {
         `INSERT INTO projects (name, kind, rss_feed_url, cover_art_url, slug, is_flagship)
          VALUES ($1, 'podcast', $2, $3, $4, TRUE)
          RETURNING id`,
-        [name, feedUrl, artwork || null, slug],
+        [name, feedUrl || null, artwork || null, slug],
       )
-      logInfo('flagship seed: created show', { id, name, projectId: insertRes.rows[0].id, hadArtwork: Boolean(artwork) })
+      logInfo('flagship seed: created show', {
+        itunesId, name, projectId: insertRes.rows[0].id, hadArtwork: Boolean(artwork), hadFeed: Boolean(feedUrl),
+      })
     } catch (err) {
       logError('flagship seed: failed for id', {
-        id, error: err instanceof Error ? err.message : String(err),
+        itunesId, error: err instanceof Error ? err.message : String(err),
       })
     }
   }

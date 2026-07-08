@@ -20,6 +20,7 @@ import { logError, logInfo } from '../diag'
 import { generateUniqueSentence, generateOneSheetAuto, hasAnthropicKey, type UniqueSentenceInput } from '../anthropic'
 import { loadShowBrief } from './show_brief'
 import { syncMissingCoversFromRss } from '../rss_cover_sync'
+import { seedFlagshipPodcasts } from '../seeds/flagship_podcasts'
 
 const resendKey = process.env.RESEND_API_KEY
 const resend = resendKey ? new Resend(resendKey) : null
@@ -473,6 +474,17 @@ outreachRouter.post('/sync-rss-covers', async (_req, res) => {
     res.json({ ok: true, ...result })
   } catch (err) {
     res.status(500).json({ error: 'sync_failed', detail: err instanceof Error ? err.message : String(err) })
+  }
+})
+
+// Same as the boot-time seed but callable on-demand. Runs iTunes
+// lookups + RSS-cover fallback for every flagship show.
+outreachRouter.post('/seed-flagship', async (_req, res) => {
+  try {
+    await seedFlagshipPodcasts()
+    res.json({ ok: true })
+  } catch (err) {
+    res.status(500).json({ error: 'seed_failed', detail: err instanceof Error ? err.message : String(err) })
   }
 })
 

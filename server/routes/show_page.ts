@@ -80,11 +80,18 @@ showPageRouter.get('/shows/:slug', async (req: Request, res: Response) => {
     // (e.g. two "Private Talk" entries from a seed collision) doesn't
     // slip in. Belt-and-suspenders.
     pool.query<SisterShowRow>(
+      // Exclude the current show broadly: by id, exact-name, and any
+      // row whose name is a substring of the current name or vice
+      // versa (catches "Private Talk" vs "Private Talk with Alexis
+      // Texas" duplicates). Prefix wildcards need explicit escaping
+      // but our show names don't include %/_ characters.
       `SELECT name, slug, cover_art_url, subtitle
          FROM projects
         WHERE kind = 'podcast'
           AND id <> $1
           AND LOWER(name) <> LOWER($2)
+          AND LOWER(name) NOT LIKE '%' || LOWER($2) || '%'
+          AND LOWER($2) NOT LIKE '%' || LOWER(name) || '%'
           AND cover_art_url IS NOT NULL
           AND cover_art_url <> ''
         ORDER BY is_flagship DESC, created_at ASC
