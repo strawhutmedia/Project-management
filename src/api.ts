@@ -1431,6 +1431,19 @@ export const api = {
     }),
   deleteOutreachDomain: (id: string) =>
     request<{ ok: true }>(`/api/admin/outreach/domains/${id}`, { method: 'DELETE' }),
+  syncOutreachDomainsWithResend: () =>
+    request<{
+      ok: true;
+      resendDomainsSeen: Array<{ name: string; status: string; region: string | null }>;
+      changes: Array<{
+        name: string;
+        before: { status: string; resend_id: string | null };
+        after: { status: string; resend_id: string | null };
+        resendVisibility: 'visible' | 'missing';
+        resendStatus: string | null;
+        action: 'updated' | 'unchanged' | 'missing_in_resend';
+      }>;
+    }>('/api/admin/outreach/domains/sync-with-resend', { method: 'POST' }),
 
   // Notifications
   notifications: () => request<{ notifications: ApiNotification[]; unreadCount: number }>('/api/notifications'),

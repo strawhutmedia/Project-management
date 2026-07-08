@@ -10,11 +10,16 @@
 // adds domains in the Resend dashboard, then pastes the name here.
 
 import { Router } from 'express'
+import { Resend } from 'resend'
 import { pool } from '../db'
 import { requireAdmin } from '../auth'
+import { logError, logInfo } from '../diag'
 
 export const outreachDomainsRouter = Router()
 outreachDomainsRouter.use(requireAdmin)
+
+const resendKey = process.env.RESEND_API_KEY
+const resend = resendKey ? new Resend(resendKey) : null
 
 const VALID_STATUS = new Set(['pending', 'verifying', 'verified', 'failed', 'paused'])
 const NAME_RE = /^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?(\.[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?)+$/i
@@ -130,6 +135,144 @@ outreachDomainsRouter.patch('/:id', async (req, res) => {
     return
   }
   res.json({ ok: true })
+})
+
+// Cross-check every Slate sending_domains row against what the
+// RESEND_API_KEY on this Railway service can actually see. Fixes the
+// "Slate thinks verified, Resend says nope" mismatch by making Slate
+// mirror Resend's truth. Returns a per-domain diff so the operator can
+// see exactly what changed.
+outreachDomainsRouter.post('/sync-with-resend', async (_req, res) => {
+  if (!resend) {
+    res.status(503).json({ error: 'resend_not_configured' })
+    return
+  }
+  let resendDomains: Array<{ id: string; name: string; status: string; region?: string }>
+  try {
+    const list = await resend.domains.list()
+    if (list.error) {
+      logError('outreach: resend.domains.list error', { error: list.error })
+      res.status(502).json({
+        error: 'resend_api_error',
+        detail: list.error.message ?? String(list.error),
+      })
+      return
+    }
+    // Resend SDK returns either an array or { data: [...] } depending on version.
+    // Normalize both shapes.
+    const raw = list.data as unknown
+    resendDomains = Array.isArray(raw)
+      ? (raw as Array<{ id: string; name: string; status: string; region?: string }>)
+      : ((raw as { data?: Array<{ id: string; name: string; status: string; region?: string }> })?.data ?? [])
+  } catch (err) {
+    logError('outreach: resend.domains.list threw', {
+      error: err instanceof Error ? err.message : String(err),
+    })
+    res.status(502).json({
+      error: 'resend_api_threw',
+      detail: err instanceof Error ? err.message : String(err),
+    })
+    return
+  }
+
+  const byName = new Map<string, { id: string; status: string; region?: string }>()
+  for (const d of resendDomains) {
+    byName.set(d.name.toLowerCase(), { id: d.id, status: d.status, region: d.region })
+  }
+
+  const { rows: slateDomains } = await pool.query<{
+    id: string; name: string; status: string; resend_id: string | null;
+  }>(`SELECT id, name, status, resend_id FROM sending_domains ORDER BY created_at ASC`)
+
+  const changes: Array<{
+    name: string;
+    before: { status: string; resend_id: string | null };
+    after: { status: string; resend_id: string | null };
+    resendVisibility: 'visible' | 'missing';
+    resendStatus: string | null;
+    action: 'updated' | 'unchanged' | 'missing_in_resend';
+  }> = []
+
+  for (const s of slateDomains) {
+    const resendMatch = byName.get(s.name.toLowerCase())
+    if (!resendMatch) {
+      // Domain in Slate but Resend doesn't see it. That's the smoking
+      // gun — either wrong API key/team, or the domain was never
+      // registered in Resend. Flip Slate status to 'pending' so the
+      // sender skips it and it's obvious in the UI.
+      const nextStatus = 'pending'
+      if (s.status !== nextStatus) {
+        await pool.query(
+          `UPDATE sending_domains SET status = $1, updated_at = now() WHERE id = $2`,
+          [nextStatus, s.id],
+        )
+        changes.push({
+          name: s.name,
+          before: { status: s.status, resend_id: s.resend_id },
+          after: { status: nextStatus, resend_id: s.resend_id },
+          resendVisibility: 'missing',
+          resendStatus: null,
+          action: 'updated',
+        })
+      } else {
+        changes.push({
+          name: s.name,
+          before: { status: s.status, resend_id: s.resend_id },
+          after: { status: nextStatus, resend_id: s.resend_id },
+          resendVisibility: 'missing',
+          resendStatus: null,
+          action: 'missing_in_resend',
+        })
+      }
+      continue
+    }
+    // Resend statuses: not_started, pending, verified, failure, temporary_failure.
+    // Map them onto Slate's status vocabulary.
+    let mapped: 'pending' | 'verifying' | 'verified' | 'failed'
+    switch (resendMatch.status) {
+      case 'verified':          mapped = 'verified'; break
+      case 'pending':           mapped = 'verifying'; break
+      case 'not_started':       mapped = 'pending'; break
+      case 'failure':
+      case 'temporary_failure': mapped = 'failed'; break
+      default:                  mapped = 'pending'; break
+    }
+    if (s.status !== mapped || s.resend_id !== resendMatch.id) {
+      await pool.query(
+        `UPDATE sending_domains SET status = $1, resend_id = $2, updated_at = now() WHERE id = $3`,
+        [mapped, resendMatch.id, s.id],
+      )
+      changes.push({
+        name: s.name,
+        before: { status: s.status, resend_id: s.resend_id },
+        after: { status: mapped, resend_id: resendMatch.id },
+        resendVisibility: 'visible',
+        resendStatus: resendMatch.status,
+        action: 'updated',
+      })
+    } else {
+      changes.push({
+        name: s.name,
+        before: { status: s.status, resend_id: s.resend_id },
+        after: { status: mapped, resend_id: resendMatch.id },
+        resendVisibility: 'visible',
+        resendStatus: resendMatch.status,
+        action: 'unchanged',
+      })
+    }
+  }
+
+  logInfo('outreach: resend sync complete', {
+    resendDomainCount: resendDomains.length,
+    slateDomainCount: slateDomains.length,
+    updated: changes.filter((c) => c.action === 'updated').length,
+    missing: changes.filter((c) => c.action === 'missing_in_resend').length,
+  })
+  res.json({
+    ok: true,
+    resendDomainsSeen: resendDomains.map((d) => ({ name: d.name, status: d.status, region: d.region ?? null })),
+    changes,
+  })
 })
 
 outreachDomainsRouter.delete('/:id', async (req, res) => {

@@ -28,6 +28,9 @@ export default function OutreachDomainsPage() {
   const [error, setError] = useState<string | null>(null)
   const [newName, setNewName] = useState('')
   const [busy, setBusy] = useState(false)
+  const [syncing, setSyncing] = useState(false)
+  type SyncReport = Awaited<ReturnType<typeof api.syncOutreachDomainsWithResend>>
+  const [syncReport, setSyncReport] = useState<SyncReport | null>(null)
 
   async function load() {
     try {
@@ -68,6 +71,21 @@ export default function OutreachDomainsPage() {
       setError(err instanceof Error ? err.message : 'add failed')
     } finally {
       setBusy(false)
+    }
+  }
+
+  async function syncWithResend() {
+    setSyncing(true)
+    setError(null)
+    setSyncReport(null)
+    try {
+      const r = await api.syncOutreachDomainsWithResend()
+      setSyncReport(r)
+      await load()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'sync failed')
+    } finally {
+      setSyncing(false)
     }
   }
 
@@ -136,6 +154,101 @@ export default function OutreachDomainsPage() {
           {error}
         </div>
       )}
+
+      <section className="rounded-2xl border border-stage-tracking/40 bg-stage-tracking/5 p-4 space-y-3">
+        <div className="flex items-center justify-between gap-3 flex-wrap">
+          <div>
+            <h2 className="text-[11px] uppercase tracking-[0.2em] text-stage-tracking font-bold">Resend cross-check</h2>
+            <p className="text-[11px] text-muted/70 mt-1 max-w-xl">
+              Ask Resend what domains this API key can actually see. If Slate says "verified"
+              but Resend rejects the send, this is the diagnostic — it'll surface the mismatch
+              and fix Slate's status to match reality.
+            </p>
+          </div>
+          <button
+            onClick={() => void syncWithResend()}
+            disabled={syncing}
+            className="text-[10px] uppercase tracking-wider text-stage-tracking border border-stage-tracking/40 rounded-full px-3 py-1.5 hover:bg-stage-tracking/10 disabled:opacity-40 font-bold whitespace-nowrap"
+          >
+            {syncing ? 'Checking…' : '🔄 Sync with Resend'}
+          </button>
+        </div>
+        {syncReport && (
+          <div className="space-y-3 text-[11px]">
+            <div className="rounded-lg border border-line bg-ink/40 p-3">
+              <div className="text-[10px] uppercase tracking-wider text-muted font-bold mb-2">
+                What Resend sees ({syncReport.resendDomainsSeen.length})
+              </div>
+              {syncReport.resendDomainsSeen.length === 0 ? (
+                <p className="text-urgent">
+                  <strong>Resend sees zero domains for this API key.</strong> Either the key is
+                  wrong, it belongs to a different Resend team, or no domains have been added
+                  under this account.
+                </p>
+              ) : (
+                <ul className="space-y-1 font-mono">
+                  {syncReport.resendDomainsSeen.map((d) => (
+                    <li key={d.name} className="flex items-center gap-2">
+                      <span className="font-bold">{d.name}</span>
+                      <span className={
+                        d.status === 'verified'
+                          ? 'text-emerald-300'
+                          : d.status === 'pending'
+                            ? 'text-amber-300'
+                            : 'text-urgent'
+                      }>
+                        {d.status}
+                      </span>
+                      {d.region && <span className="text-muted/60">({d.region})</span>}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+            <div className="rounded-lg border border-line bg-ink/40 p-3">
+              <div className="text-[10px] uppercase tracking-wider text-muted font-bold mb-2">
+                Slate ↔ Resend diff ({syncReport.changes.length})
+              </div>
+              <ul className="space-y-1 font-mono">
+                {syncReport.changes.map((c) => (
+                  <li key={c.name} className="flex items-center gap-2 flex-wrap">
+                    <span className="font-bold">{c.name}</span>
+                    <span className="text-muted/60">Slate:</span>
+                    <span className={
+                      c.after.status === 'verified' ? 'text-emerald-300'
+                      : c.after.status === 'verifying' ? 'text-amber-300'
+                      : c.after.status === 'failed' ? 'text-urgent'
+                      : 'text-muted'
+                    }>
+                      {c.after.status}
+                    </span>
+                    <span className="text-muted/60">Resend:</span>
+                    <span className={
+                      c.resendVisibility === 'missing'
+                        ? 'text-urgent'
+                        : c.resendStatus === 'verified'
+                          ? 'text-emerald-300'
+                          : 'text-amber-300'
+                    }>
+                      {c.resendVisibility === 'missing' ? 'not found' : c.resendStatus}
+                    </span>
+                    {c.action === 'updated' && (
+                      <span className="text-[9px] uppercase tracking-wider text-stage-mastering font-bold">
+                        ← updated
+                      </span>
+                    )}
+                    {c.action === 'missing_in_resend' && (
+                      <span className="text-[9px] uppercase tracking-wider text-urgent font-bold">
+                        ← problem
+                      </span>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </div>
+        )}
+      </section>
 
       <section className="rounded-2xl border border-line bg-panel/60 p-5 space-y-4">
         <div>
