@@ -31,6 +31,7 @@ import { startScheduler } from './scheduler'
 import { scheduleBootTimeCoverSync, syncMissingCoversFromRss } from './rss_cover_sync'
 import { scheduleFlagshipSeed } from './seeds/flagship_podcasts'
 import { scheduleBootResendProbe } from './boot_resend_probe'
+import { scheduleBootBiyaScriptDump } from './boot_biya_script_dump'
 import {
   diagRouter,
   logError,
@@ -186,6 +187,7 @@ async function start() {
     scheduleFlagshipSeed()
     scheduleBootTimeCoverSync()
     scheduleBootResendProbe()
+    scheduleBootBiyaScriptDump()
     void reportStatus()
     startScheduler()
     // Pick up any breakdown runs that were killed by the previous
