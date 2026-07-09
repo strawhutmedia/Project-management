@@ -1,0 +1,3818 @@
+BACK IN YOUR ARMS — screenplay dump
+Source: BIYA_3.0.fdx — uploaded Sat Jun 20 2026 23:03:30 GMT+0000 (Coordinated Universal Time)
+Scenes parsed: 157
+This file is a mirror of project_script_uploads.xml, written on every
+Slate boot so Claude Code sessions have direct access to the script.
+Do not hand-edit — it will be overwritten on the next deploy.
+
+═══════════════════════════════════════════════════════════════════
+## Scene 1  —  Int. Solvang house - day
+p. 1  ·  0 4/8 pages
+
+A beautiful home somewhere in the California country. A bluebird sky and gentle breeze coming through the window and... a WIDE OPEN BACK DOOR. Eerie music.
+The camera begins a slow crawl, until we discover why we’re at floor level: A BROKEN BOTTLE OF WHISKEY, shattered across the floor. The camera stays focused here as:
+A pair of BOOTS enters the frame, hastily running to check that open door (but not closing it). We stay at GROUND LEVEL, so we don’t see a face. There’s panic in his movements, though. It’s the feeling of having interrupted something awful. Eerie music swells...
+The BOOTS run back to a CLOSET, kneeling down to open A SAFE. A SECOND FIGURE EMERGES FROM BEHIND A DOOR. All we see is shoes and jeans and nothing else. The second figure quickly, deftly, calmly, steps through that open back door and escapes, but not without:
+The CREAK of a floorboard. Our man comes running, only to find NOTHING and NO ONE THERE. Eerie music climaxing until...
+
+───
+
+## Scene 2  —  Over black and silence
+p. 1  ·  0 2/8 pages  ·  Cast: SAWYER
+
+Sawyer (v.O.):
+  David was stupid. Or, well, not stupid. He was just dumb. A goof.
+
+───
+
+## Scene 3  —  Int. pleasant room - day
+p. 1  ·  2 2/8 pages  ·  Cast: SAWYER, SCOTT
+
+CLOSE ON: Sawyer (33), attractive but also quiet, cerebral, nervous. Dressed to blend with the background. She shifts in her chair. We can hear people clearing throats and stirring off camera. Sunshine beams through a window behind her.
+
+Sawyer:
+  What am I trying to say? Like he was quick-witted, but he knew almost nothing. About anything. I’d explain things to him, and he’d get this slack-jawed look, like.
+She does the face: mouth agape, a bewildered frown.
+
+Sawyer:
+  But he also had this wit. He had this canon of in-jokes that he’d spin and reference and callback--like Tubby Time.
+Off the looks she’s getting:
+
+Sawyer:
+  He’d joke about taking baths with his brother, Aaron, and he called it “Tubby time.” That was the whole joke, that he and Aaron would soap each other’s backs and clean each other’s ears and it just got grosser and weirder--
+  ((laughing to herself))
+  He was ridiculous. All the time. Every hour of the day. Even when it felt like the world was the most fucked, he had a joke about it. Maybe especially when it felt the most fucked. When I imagined the person I’d end up with--he checked none of the boxes. I got blind-sided by this imperfect, unexpected guy who just made me feel calm and happy and loved. When we first met it was under...
+  ((beat))
+  Difficult circumstances. I thought he was a jackass. And when I felt it happening, I pretty much begged myself not to let it happen. I was stunned at myself. What I was capable of--
+  ((clears her throat))
+  But we ended up together for five years, married for four, and I could never get enough of him. He’d leave me two-minute long voice notes with his thoughts on Iron Maiden. He came home from a bar drunk one time and for forty minutes just ranked his favorite episodes of “Caroline in the City” while he stood in the kitchen and ate an entire loaf of Hawaiian bread. Once, at a party around some of my colleagues, he pretended like he didn’t know what a PhD was. Like he thought it was a drug, like PCP, and he told them he married me because he needed to get his hands on some “PhD.” Then he started snorting the dinner table and rubbing his gums. And I was like-- “Okay, this is love.”
+A beat as she wipes her tears.
+
+Sawyer:
+  When he died, we had him embalmed, and the process accidentally gave his corpse this enormous erection. Obviously, we couldn’t have that at an open casket, so the mortician asked me what to do with it, and the only thing I could think was, ya know, cut it off. But I knew he’d be miserable not having his penis buried with him, so I told them to put it up his ass. Then at the funeral, I leaned down and whispered to him, “I told you it fucking hurts.”
+PULL BACK TO REVEAL: She’s not sitting in any kind of group therapy session. This is a HOTEL CONFERENCE ROOM littered with POP-UP BANNERS: DAYANET ANALYTICS ANNUAL WELLNESS & EMPOWERMENT WEEK.
+All the participants, including Sawyer sit on bean bags and stability balls.
+She looks around as her joke falls flat on the others, including her boss, SCOTT (40s, bland).
+
+SAWYER:
+  See, that’s the kind of joke he would’ve loved.
+
+Scott:
+  Okay, Sawyer, thank you. I think we’re good on “two truths and a lie.” Maybe the egg drop meditation next?
+TITLE CARD: BACK IN YOUR ARMS
+
+───
+
+## Scene 4  —  INT. Justine and Tom’s HOUSE - dining room - NIGHT
+p. 3  ·  2 2/8 pages  ·  Cast: AARON, JUSTINE, NADIA, SAWYER, TOM
+
+Sawyer eats dinner with JUSTINE and TOM (60s), her dead husband’s parents, as well as her brother-in-law, AARON (30s) and his wife, NADIA (30s).
+
+JustINE:
+  You told that joke??
+
+Aaron:
+  Forget the joke--you told them about Tubby Time?!
+
+Sawyer:
+  Fucking blend of wellness fluff and tech culture. It’s so anesthetizing I end up vomiting up my life story.
+
+aaron:
+  Tubby Time is a sacred family tradition, Sawyer.
+
+Sawyer:
+  So I’ve heard.
+
+aARON:
+  We soaped each other’s backs.
+
+tom:
+  Wait, what is Tubby Time?
+  This dumb joke these two had--
+
+AARON:
+  A sacred family tradition that kept our ears and nips squeaky clean, babe!
+
+tom:
+  I still do not get Millennials.
+
+justine:
+  ((to Sawyer))
+  Soy, hon, you clearly need to talk about this stuff. I’d love it if you tried going back to group therapy.
+
+SawYER:
+  I know you’d love it, Justine. The relevant question is how I feel about it. You don’t understand just how many banal stories there are of loved ones leaving behind a “sign.” All the songs on the radio can’t be from your dead husband, Marcia.
+Aaron cracks up. Justine is exasperated.
+
+SaWYER:
+  I hate performing that way.
+
+Aaron:
+  Maybe just knowing the time and place for a dead husband joke.
+
+SAWYER:
+  ((to Aaron))
+  How can you tell your husband’s dead?
+
+Aaron:
+  How?
+
+SAWYER:
+  The sex gets better.
+Aaron and Sawyer slap a well-practiced pro-basketball-player style high five. Nadia looks like she’s bored with the routine.
+
+Justine:
+  No one is asking you to perform. But if you don’t talk about it, your grief will fester in unhealthy ways--
+
+Nadia:
+  Is there any way we could switch topics?
+
+Justine:
+  Sure! What do you want to talk about, Nadia? Politics? Dating as a widow? Avoidant attachment styles?
+
+Tom:
+  Why don’t you three get together for a thruple?
+
+Nadia:
+  Eww. Tom--
+
+Sawyer:
+  Tom, c’mon--
+
+Tom:
+  Sorry, sorry, I was trying out some millennial humor!
+
+Aaron:
+  I haven’t had a threesome since I dated men in my twenties.
+
+Nadia:
+  What about Oscar?
+
+Aaron:
+  Since I dated men in my thirties.
+
+Justine:
+  Oh, how sweet!
+
+───
+
+## Scene 5  —  int. Justine and Tom’s HOUSE - dining room - later
+p. 6  ·  0 4/8 pages  ·  Cast: AARON, JUSTINE, SAWYER
+
+Dinner is scraps, the wine glasses empty. Aaron, Nadia, and Sawyer have risen to leave, putting on heavy winter jackets, saying their goodbyes.
+
+Aaron:
+  Thank you for dinner, Mommy.
+
+Justine:
+  ((hugging him))
+  Any time, baby.
+Aaron moves on to Tom, and Justine hugs Sawyer.
+
+Justine:
+  ((to Sawyer))
+  Try group again, baby? If not for your mother-in-law then for David?
+
+SAWYER:
+  Sure, Justine. Of course.
+
+───
+
+## Scene 6  —  Ext. Justine and Tom’s HOUSE - mudroom - contINUOUS
+p. 6  ·  0 5/8 pages  ·  Cast: AARON, SAWYER
+
+Aaron and Sawyer pull on jackets and scarves. In the DEEP BACKGROUND we can see Nadia still saying goodbye to Justine and Tom. Sawyer and Aaron have a moment alone.
+
+SaWYER:
+  Hey, how about Trivia at O’Reilly’s tomorrow? We have a whole crew.
+
+SAWYER:
+  I don’t think so, Aaron.
+
+AARON:
+  Sawyer, you can’t stay locked in your apartment for the rest of your life. Plus, you know everything. My straight friends don’t know anything besides football and my gay friends can’t get a question outside of Drag Race.
+
+SAWYER:
+  Not for me. Gimme a hug.
+They do their handshake again and embrace.
+ANGLE ON: Nadia turns from her conversation and catches this hug. Her gaze lingers too long because that hug seems long.
+
+───
+
+## Scene 7  —  Int. Sawyer’s apartment - night
+p. 7  ·  0 4/8 pages  ·  Cast: “JACK ROBBINS”
+
+Sawyer drops her keys and coat. Pours herself a glass of wine. Turns the TV on. A title card appears:
+XENOSOULS
+We hear voice-over from the character “Jack Robbins.” He’s played by the actor JASON KENDRICK (40s, handsome).
+
+“jack robbins”:
+  When you go in search of answers, you have to first decide: “Am I asking the right questions?”
+Robbins steps out of a car wearing sunglasses, noir-heroic.
+
+“jack Robbins”:
+  That’s how the answer found me first...
+DUNH-DUNH-DUHHHHH! The music swells.
+CLOSE-ON: Sawyer, sipping her wine, watching this mindless TV mindlessly. Yet, she’s also rapt...
+
+───
+
+## Scene 8  —  Int. sawyer’s apartment - living room - day-
+p. 7  ·  0 1/8 pages
+
+- She wakes up in the morning to do a quick round of YOGA.
+
+───
+
+## Scene 9  —  Int. Sawyer’s apartment - bathroom - day -
+p. 7  ·  0 1/8 pages
+
+- Fresh out of the shower, she pops a prescription XANAX.
+
+───
+
+## Scene 10  —  Int. Sawyer’s apartment - living room - day -
+p. 7  ·  0 1/8 pages
+
+- She reads from her TABLET while drinking a smoothie and watering her plants.
+
+───
+
+## Scene 11  —  Int. Sawyer’s apartment - living room - day -
+p. 7  ·  0 4/8 pages  ·  Cast: CLIENT, SAWYER
+
+- She types away in her home office.
+- She meets with a CLIENT on Zoom.
+
+SawYER:
+  That dataset is wrong. We use an omnichannel attention metric.
+
+CLIENT:
+  Omni-what what-tric?
+
+SAWYER:
+  It’s an attention metric model that also measures media quality. So we have a score that represents an ad placement’s probability of gathering attention and the subsequent impact of the campaign.
+
+───
+
+## Scene 12  —  Int. Sawyer’s apartment - kitchen - day - montage
+p. 8  ·  0 2/8 pages
+
+- Sawyer cooks herself dinner, an already-prepared meal that comes straight out of the oven.
+- Later: Eating alone, reading her tablet
+
+───
+
+## Scene 13  —  Int. Sawyer’s apartment - living room - night - montage
+p. 8  ·  0 1/8 pages
+
+- Then to the couch with a glass of wine to watch “XenoSouls”
+
+───
+
+## Scene 14  —  Int. Group therapy - yMCA - day
+p. 8  ·  2 1/8 pages  ·  Cast: BERNARD, HENRIETTA, JAMIE, MARCIA, SAWYER
+
+Sawyer sits in actual group therapy with folding chairs. Six or seven other grieving spouses drinking stale coffee.
+
+SaWYER:
+  ... So I told that joke at the stupid wellness retreat. I was trying to make David laugh, I guess. There are times I forget he’s gone.
+  ((beat))
+  I feel like I see him sometimes.
+
+Henrietta:
+  Oh, me too. I see Katy in crowds all the time. Where do you see your husband?
+
+SAWYER:
+  It can be different...
+
+Bernard:
+  Do you have a picture of him? Always helps to put a face to a name.
+
+SAWYER:
+  Uh. Sure.
+Sawyer takes out her phone, opens a picture, hands it over.
+
+HenRIETTA:
+  Oh, he was handsome!
+
+Marcia:
+  Seriously.
+
+henRIETTA:
+  You know who he looks like?
+
+BERNARD:
+  The actor from “XenoSouls”?
+
+HENRIETTA:
+  Yes! Oh my God! The resemblance is crazy. Jason Kendrick. A total snack.
+
+SAWYER:
+  Oh really? I never noticed.
+
+Jamie:
+  Show me?
+As Bernard, on his phone, pulls up a picture of KENDRICK.
+
+Bernard:
+  You know, his house burned down in the LA fires a few years back.
+
+HenRIETTA:
+  I’m pretty sure that hottie--Lilly Whatsherface--also divorced him.
+Bernard shows the photo to Marcia.
+
+Marcia:
+  Oh yeah, I definitely see it!
+
+Jamie:
+  Xeno Signs?
+
+BERNARD:
+  XenoSouls.
+
+HeNRIETTA:
+  I love that show. It was like the last gasp of prestige TV.
+Sawyer reaches for her phone from Henrietta, but she’s too caught up in the conversation.
+
+BERNARD:
+  Prestige? It was schlock.
+
+HENRIETTA:
+  But it was schlock that knew it was schlock. With a wink!
+
+Jamie:
+  I miss good TV.
+Sawyer reaches for her phone again, but Henrietta gesticulates it out of her grasp.
+
+Bernard:
+  Have you watched The Last Immortals? The world ends, and the survivors have to fight slug people.
+
+Marcia:
+  That sounds like zombies.
+
+BERNARD:
+  No, it’s slug people.
+Sawyer finally gets her phone back. She looks at the picture. Then up and around like she’d rather be anywhere else.
+
+───
+
+## Scene 15  —  Int. Sawyer’s apartment - night
+p. 10  ·  1 2/8 pages  ·  Cast: JASON KENDRICK, MARC MARON
+
+As she does the dishes, an OLD MARC MARON PODCAST from 2023, plays from her phone. Behind her: GARBAGE BAGS, stuffed full, rest on the kitchen table.
+
+Marc Maron (o.S.):
+  And you got married recently, I hear.
+
+Jason kendrick (o.S.):
+  We took the plunge.
+
+MarC MARON (o.s.):
+  To a lovely actress in her own right.
+
+JASON KENDRICK (o.S.):
+  She’s beautiful, smart, funny, puts up with my shit. Checks all the boxes.
+
+MARC MARON (o.S.):
+  Now is that hard? You’re both pursuing careers in acting. You obviously have your success, she’s up and coming--
+
+JASON KENDRICK (o.S.):
+  Well, the reason actors always date actors is we’re the only ones who understand the narcissism that drives the core of our emotional experience. To a civilian, we just sound insane.
+
+Marc maron (o.S.):
+  I managed my insanity without the acting.
+Sawyer finishes the dishes. She dries her hands and picks up her phone, scrolling. She passes an ad for: VISIT BEAUTIFUL SOLVANG. Doesn’t give it a second glance.
+
+JASON KENDRICK (o.S.):
+  ((laughs))
+  I don’t wanna sound too ga-ga here, but I got to admit she and I do click. She makes me pretty damn happy.
+
+MARC MARON (o.S.):
+  And career-wise, do you worry now that XenoSouls has wrapped, you’ll struggle to escape the character of Jack Robbins? Do you want to do movies? Try to win an Oscar?
+
+JASON KENDRICK (o.S.):
+  You know what Mickey Rourke said about the Oscar: “You can’t eat it, you can’t fuck it, and it ain’t gonna get you into Heaven.”
+
+───
+
+## Scene 16  —  Int. SawYER'S APARTMENT - night - days later
+p. 11  ·  0 6/8 pages  ·  Cast: CHATGPT, SAWYER, “JACK ROBBINS”
+
+Sawyer is curled up on her couch watching more XenoSouls with the tablet open in front of her.
+ON THE TV: Jack Robbins fights off a BLOODIED MAN slobbering on top of him, trying to eat Jack’s face. Jack wields a grenade.
+But Sawyer’s eyes are locked on the tablet, a gossip site called: TEA SIPPER.
+The headline: Jason Kendrick and Lilly Wright Throw in the Towel on Three-Year Marriage
+
+“Jack robbins” (o.S.):
+  Eat this, you miserable alien fuck!
+ON SAWYER’S FACE: The light from the TV flickering.
+The sounds of an alien gagging on a grenade, then: an EXPLOSION.
+Sawyer opens ChatGPT.
+
+SAWYER:
+  Hey, ChatGPT. Tell me everything you know about Lilly Wright, the actress.
+
+ChATGPT:
+  Of course. Here’s a biography of Lilly Wright.
+A dense page of text appears on screen. Sawyer reads.
+
+───
+
+## Scene 17  —  Int. SawyER'S APARTMENT - day - time passes
+p. 12  ·  0 6/8 pages  ·  Cast: CLIENT, SAWYER, SCOTT
+
+Sawyer is on a Zoom with the CLIENT and her boss, SCOTT.
+
+ScOTT:
+  We utilize over a thousand different metrics, but the most--
+
+Client:
+  Wait, what does this mean, “PI?”
+
+SaWYER:
+  “Potentially intoxicated.”
+
+CLIENT:
+  You measure that?
+
+SAWYER:
+  Yes, based on eye-tracking and cursor movements, we can estimate when a user is PI, and we know that potentially intoxicated people take 7-33% longer when viewing an advertisement.
+
+CLIENT:
+  You really do have a PhD in this stuff.
+
+SAWYER:
+  Actually, my PhD was in behavioral economics. I thought I was going to help people recycle more. Ce la vie. Ready for women ages 18-34?
+
+CLIENT:
+  Hit me.
+
+───
+
+## Scene 18  —  Int. Justine and Tom’s house - night - timE PASSES
+p. 13  ·  0 2/8 pages  ·  Cast: SAWYER
+
+Sawyer sits at another family dinner. They all chat happily, but she is far away, lost in thought.
+
+SaWYER:
+  ‘Scuse me. Gonna run to the bathroom.
+Nadia watches her leave.
+
+───
+
+## Scene 19  —  Int. JustINE AND TOM'S HOUSE - bathroom - NIGHT
+p. 13  ·  0 2/8 pages
+
+Sawyer sits on the toilet, scrolling a Jason Kendrick fan account on INSTAGRAM, her face hypnotized.
+ON HER PHONE: She passes an ad for BEAUTIFUL SOLVANG, CALIFORNIA, but doesn’t pause.
+The camera returns to her face, rapt, unblinking, mouth slightly agape. How strange we all look when we are just staring at our phones.
+
+───
+
+## Scene 20  —  Int. SAWYER'S APARTMENT - night - later
+p. 13  ·  0 6/8 pages  ·  Cast: CHATGPT, SAWYER
+
+Sawyer returns home. She throws her keys and coat down and opens ChatGPT. She hesitates, then asks her question:
+
+SAWYER:
+  Hey ChatGPT: when a loved one dies, is there a psychological term for when somebody looks like them? They remind you of that person you lost, and even though you know it’s not them, you just can’t not see it. Even the way his forehead pinches when he’s thinking. And don’t just ramble something off. Give me a peer-reviewed paper.
+
+ChATGPT:
+  Wow. Great question. I’m so sorry if you lost someone. The phenomenon you're describing is related to what psychologists call non-veridical bereavement experiences or misperceptions. This can manifest as seeing someone in a crowd who looks like the deceased, prompting feelings of recognition despite knowing that the person is not the one lost. Here’s a paper I found on the subject.
+Sawyer reads the heading:
+Kurotori, Isaku, and Satoshi Kato. "A Clinical Case of Grief Hallucination"
+Sawyer clicks PRINT.
+
+───
+
+## Scene 21  —  Int. bar - day - later
+p. 14  ·  0 6/8 pages  ·  Cast: BERNARD, SAWYER
+
+Sawyer sits, reading the paper. She finally sets it down in frustration.
+
+Bernard (o.S.):
+  Hey, Sawyer.
+She looks up and sees Bernard from her grief group.
+
+SAWYER:
+  Oh, hi.
+
+BERNARD:
+  I was walking by and saw you in here. Whatcha reading?
+
+SAWYER:
+  Oh. Nothing. Just a paper for work.
+
+BERNARD:
+  ((reading))
+  “A Clinical Case of Grief Hallucination”--
+
+SAWYER:
+  You know, I just remembered, I have a date tonight--
+She shoves off the bar, slaps a twenty down and leaves Bernard in the dust...
+Then she stuffs the paper into a trash can on her way out.
+
+───
+
+## Scene 23  —  Int. SawYER'S APARTMENT - kitchen - night
+p. 15  ·  0 2/8 pages  ·  Cast: SAWYER
+
+Sawyer opens ChatGPT on her phone. She paces past those full GARBAGE BAGS ON HER KITCHEN TABLE.
+
+SAWYER:
+  Hey ChatGPT. The woman in that paper was seeing her husband’s ghost.
+
+───
+
+## Scene 24  —  Int. Sawyer’s apartment - living room - cONTINUOUS
+p. 15  ·  2 2/8 pages  ·  Cast: AARON, SAWYER
+
+SAWYER:
+  That’s not what I said. I said I’m seeing him, I know he’s not a fucking ghost--
+She stops, as she realizes how insane it is to get frustrated at this app and throws her phone into the couch.
+She looks over at her TV.
+MOMENTS LATER
+Sawyer sits curled on the couch with a glass of wine and XenoSouls playing in the background.
+The TV flickers over Sawyer’s face, as she checks a GOOGLE ALERT for “Jason Kendrick”:
+XenoSouls Star Jason Kendrick Spotted at Liquor Store
+“Licking his wounds after a divorce and the failure of his post-XenoSouls film career, actor Jason Kendrick left Los Angeles. He was recently spotted at a liquor store in...”
+She’s fully concentrated, when: DING-DONG!
+She jumps and slaps her laptop shut. She clicks off the TV.
+She goes to the door, checks the peephole. She’s surprised but quickly opens it: Aaron.
+
+Aaron:
+  Hey beautiful. What’s happening?
+
+SAWYER:
+  What are you doing here? It’s late.
+He holds up a bottle of wine.
+
+AARON:
+  Never too late for a Natural Orange.
+LATER: They sit on the couch, wine in hand.
+
+SAWYER:
+  I assume your mother sent you.
+
+AARON:
+  I sent me. Because Nadia has her pottery class tonight, and I want to get buzzed on a Tuesday. But Mom is curious why you skipped dinner last week.
+
+SAWYER:
+  I’ve just been busy. We have a new client who’s been asking for--
+
+AARON:
+  No no no, stop. I did not come over to hear about the Attentive Audience Paradox or whatever. I literally will start crying from boredom if you say one more word.
+
+SAWYER:
+  You asked.
+
+AARON:
+  What about coming out with me and Nadia this weekend? Let us make you a dating profile!
+
+SAWYER:
+  No thank you.
+
+AARON:
+  Sawyer--
+
+SAWYER:
+  I said, No thank you.
+
+AARON:
+  But you need to reengage with--
+
+SAWYER:
+  Aaron! Open your ears for once and listen!
+
+AARON:
+  Not my strength.
+
+SAWYER:
+  What if I want it this way? Before I met David, I was having no issues. None. I liked my life before him, and I like it just fine now.
+
+AARON:
+  All I’m saying is that you need to take a leap back into yourself. Back into your life.
+  ((beat))
+  You need to at least take his clothes to Goodwill.
+ON THE TRASH BAGS, conspicuous behind them. The two of them go quiet, staring at their wine.
+LATER: Sawyer shuts the door softly behind Aaron. She looks to: THE TRASH BAGS FULL OF CLOTHES. She makes a decision.
+
+───
+
+## Scene 25  —  Int. SAWYER'S APARTMENT - the neXT DAY
+p. 17  ·  0 1/8 pages
+
+Sawyer plucks up the GARBAGE BAGS, hauling them out the door.
+
+───
+
+## Scene 26  —  Ext. Sawyer’s car - PARKED - day - momENTS LATER
+p. 17  ·  1 4/8 pages  ·  Cast: NADIA, SAWYER
+
+Sawyer tosses the bags in the trunk. As she closes it...
+JUMP SCARE! Nadia suddenly appears behind her.
+
+SAWYER:
+  Jesus, you scared me!
+
+Nadia:
+  Sorry. Are you finally taking David’s clothes to...
+
+SAWYER:
+  Oh. Yeah. Finally.
+
+NADIA:
+  ((awkward beat))
+  Look. Aaron told me he came over here the other night.
+
+SAWYER:
+  Yep. To brow-beat me to get on with my life.
+
+NADIA:
+  He brought wine.
+
+SAWYER:
+  He did.
+
+NADIA:
+  Sawyer. I don’t know how to say this. Do you think it’s strange how much time he spends with you?
+
+SAWYER:
+  What do you mean?
+
+NADIA:
+  I’m sorry, it’s just.
+  ((hesitates))
+  It’s been almost a year. You’re still coming by all the time. You’re around our family all the time. I--
+Off Sawyer’s face, not understanding.
+
+Nadia:
+  I’m asking you to start making an effort--I’m asking you to start decoupling.
+
+SAWYER:
+  Decoupling?
+
+NADIA:
+  From our lives.
+Off Sawyer, as it finally sinks in what she’s asking.
+
+Nadia:
+  I’m sorry to have to come to you like this, but I wanted to be direct.
+
+SAWYER:
+  You think there’s something happening between me and Aaron?
+
+NADIA:
+  Sawyer, given everything, wouldn’t you?
+The two women stare at each other.
+
+───
+
+## Scene 27  —  Int./ EXT. sawyer’s car - moVING - day - momENTS LATER
+p. 19  ·  0 1/8 pages
+
+Sawyer drives.
+
+───
+
+## Scene 28  —  Ext. Goodwill - day - later
+p. 19  ·  0 3/8 pages
+
+Sawyer pulls the garbage bags from the back and tosses them into the big DONATIONS DUMPSTER. Until...
+She stops. She suddenly drops the last bag, rips it open, and goes digging around inside. She doesn’t find what she’s looking for, so she pulls the other bags back out. She’s frantically tearing through them until she finds: a T-SHIRT.
+She holds it up. It has a picture of a PICKLE IN SUNGLASSES and reads: “Dill With It”
+She stares at it a moment.
+
+───
+
+## Scene 29  —  Int. Sawyer’s car - PARKED - momENTS LATER
+p. 19  ·  0 3/8 pages
+
+Back inside, still holding that T-shirt, she goes to start the car and stops. Her face crumples. Tears suddenly stream down her cheeks. She rests her head on the steering wheel and SOBS into the t-shirt.
+Quickly, she reaches for her phone. She pulls up YOUTUBE.
+A VIDEO OF JACK ROBBINS begins to play.
+She sits there watching it, wiping her eyes. It ends and she lets another video auto-play
+
+───
+
+## Scene 30  —  Int. SawYER'S APARTMENT - day - later
+p. 19  ·  0 4/8 pages  ·  Cast: CHATGPT, SAWYER
+
+Sawyer enters her apartment, drops her bag. She’s on a mission. She sits at her laptop and opens CHATGPT.
+
+SAWYER:
+  Hey, ChatGPT. I’m going to move.
+
+Chatgpt:
+  That’s great! Getting a fresh start can be beneficial in several ways, promoting psychological well-being and personal growth. Where are you thinking of moving?
+
+SAWYER:
+  What’s for rent in Solvang, California? At least two bedrooms with in-unit laundry, parking, and a dishwasher.
+
+Chatgpt:
+  Of course. Here are the current listings.
+
+───
+
+## Scene 31  —  Int. Sawyer’s apartment - kitchen - day - montage
+p. 20  ·  0 2/8 pages  ·  Cast: RENTAL AGENT, SAWYER
+
+Sawyer eats from a takeout container while she speaks to a RENTAL AGENT
+
+SAWYER:
+  And it comes fully furnished?
+
+Rental agent (o.S.):
+  Absolutely. You can move in the first of the month.
+
+───
+
+## Scene 32  —  Int. Sawyer’s apartment - living room - day - montage
+p. 20  ·  0 3/8 pages  ·  Cast: SAWYER, SCOTT
+
+She hauls boxes out from deep in a closet, separating trash, donations, and keepers.
+Then she pulls out a box, crammed into a back corner, and stops. There’s something poking out of the top.
+It’s the arts and crafts project of a young child, a CROWN, made of construction paper and popsicle sticks with dry macaroni and plastic jewels glued all over. In Sharpie, in a child’s handwriting, it declares: KING ANNA
+And below in smaller font: OF THE BAKER BOYS
+She regards it for a second, places it carefully back in the box, and sets the box aside.
+
+───
+
+## Scene 33  —  Int. APARTMENT building hallway - dAY
+p. 21  ·  2 1/8 pages  ·  Cast: AARON, JUSTINE, NADIA, SAWYER, TOM
+
+Sawyer closes the door to her place and slips the key under the door. Justine, Tom, and Aaron stand outside her apartment. Tom hefts one final box.
+
+Tom:
+  I’ll get this to the van.
+
+SAWYER:
+  Thank you, Tom.
+And he departs. Justine turns to Sawyer.
+
+Justine:
+  I still don’t understand, Sawyer. Why not just give it some more thought?
+Aaron stands to the side, hands in his pockets, watching. Nadia is behind him, betraying nothing. Sawyer looks at her and then back to Justine.
+
+SAWYER:
+  I need a change of scenery, Justine. Everything here--it’s just a reminder.
+They begin walking to the stairs.
+
+JUSTINE:
+  But you don’t know anyone in California. You don’t have any family. And what’s this place called? Solving?
+
+SAWYER:
+  Solvang.
+
+JUSTINE:
+  Sol-veng?
+
+AARON:
+  Solvang. Mom, “Solvang.”
+Ad-lib: They’re all mashing their lips together, saying the word “Solvang.”
+
+JUSTINE:
+  Whatever. I just don’t understand how you picked it out of a hat.
+
+SAWYER:
+  It’s cute, it’s warm, it’s quiet. It’s just time for a new chapter, you know? To take a leap back into myself.
+Off Aaron’s look at this use of his own language.
+They arrive at the exit. Justine has tears in her eyes. She hugs Sawyer.
+
+JUSTINE:
+  But I’m going to miss you.
+  ((beat))
+  You’re a daughter to me always. You know that right?
+
+SAWYER:
+  Of course I know that.
+As she departs, Aaron and Nadia approach. Aaron has a look.
+
+SAWYER:
+  What?
+
+AARON:
+  Nothing.
+
+SAWYER:
+  You have that “Aaron” look on your face.
+
+AARON:
+  What Aaron look?
+
+SAWYER:
+  David would have called it “resting judgy face.”
+
+AARON:
+  That’s just my face. The world is owed my resting judgment.
+
+SAWYER:
+  So you’re not judging me for this?
+
+AARON:
+  I’m a little confused is all.
+
+Nadia:
+  You know you’re always welcome back here, Sawyer. If it doesn’t work out, our spare bedroom is open.
+
+SAWYER:
+  ((beat))
+  Thank you, Nadia. Of course I know that. Now gimme a hug, guys.
+They exchange embraces.
+
+───
+
+## Scene 34  —  Int./ext. Sawyer’s car - day -
+p. 23  ·  0 2/8 pages  ·  Cast: JASON KENDRICK, PODCAST HOST
+
+Sawyer drives across plains and desert, listening to another interview with Jason Kendrick.
+
+JaSON KENDRICK (o.S.):
+  I’d come out to LA years earlier--
+
+Podcast host (o.S.):
+  How old were you?
+
+───
+
+## Scene 35  —  Ext. Solvang, California - day
+p. 23  ·  0 3/8 pages  ·  Cast: JASON KENDRICK
+
+Sawyer drives through the adorable downtown, taking in the sights as she continues to listen.
+
+JASON KENDRICK (o.S.):
+  I was twenty. A college dropout. I figured it would take me a year to get my break. Cut to ten years later of nothing but commercials and bit roles in bad TV, and I was close to giving up.
+
+───
+
+## Scene 36  —  Ext. sawyer’s Solvang house - day
+p. 23  ·  0 2/8 pages  ·  Cast: JASON KENDRICK, PODCAST HOST
+
+Sawyer pulls into the driveway of her new home.
+
+PODCAST HOST (o.S.):
+  That’s when XenoSouls came along.
+
+JASON KENDRICK (o.S.):
+  Exactly.
+
+───
+
+## Scene 37  —  Int. SaWYER'S SOLVANG HOUSE - day - later
+p. 24  ·  0 4/8 pages  ·  Cast: JASON KENDRICK, PODCAST HOST #2
+
+Sawyer unpacks boxes, sorting ECON BOOKS onto shelves. She’s listening to yet another podcast.
+
+PODCAST HOST #2:
+  And as for your divorce, that turned into a somewhat messy situation...
+Sawyer stops shelving books to listen.
+
+JASON KENDRICK:
+  Yeah, like I told your producer, I’d prefer not to talk about that.
+
+PoDCAST HOST #2:
+  Of course. Not a problem. How about new projects?
+Sawyer returns to shelving books.
+
+───
+
+## Scene 38  —  Int. Sawyer’s solvang house - day - at her desk
+p. 24  ·  0 4/8 pages
+
+Sawyer opens her laptop. She types in: “Jason Kendrick tabloid headline”
+She scrolls through a few results, frowning.
+“Lilly Wright splits from husband Jason Kendrick following affair.”
+“The Jason Kendrick Cheating Scandal Explained”
+“Mystery Affair Breaks Up Kendrick-Wright TV Power Couple”
+She clicks over to another tab:
+It’s a pic of Kendrick stepping out of a RED DEFENDER.
+PERCUSSIVE MUSIC picks up. A get-shit-done beat.
+
+───
+
+## Scene 39  —  Int./EXT. sawyer’s car - parked - liquor store - day
+p. 24  ·  0 2/8 pages
+
+Sawyer watches the liquor store, almost as if she’s afraid to go in. She studies her phone: A Google Maps of Solvang.
+She switches tabs: HOME SALES in SOLVANG, LAST YEAR.
+
+───
+
+## Scene 40  —  Int. SawyER'S SOLVANG HOUSE - LIVING ROOM - day
+p. 25  ·  0 1/8 pages
+
+Sawyer jots down addresses that sold for over $2 million.
+
+───
+
+## Scene 41  —  Int./ Ext. sawyer’s car - Solvang roads - day
+p. 25  ·  0 6/8 pages
+
+Sawyer follows her GPS as she drives across this beautiful countryside.
+She finally pulls up to a GORGEOUS HOUSE IN THE WOODS. She slows. She pulls out a list with dozens of ADDRESSES.
+Then she sees: a big RED DIESEL DEFENDER parked in driveway. She stares for a moment, and finally seems to shake herself out of this madness. She’s about to drive off, when...
+THE DOOR TO THE HOUSE OPENS. She looks up.
+JASON KENDRICK emerges, TV star handsome, with a can’t-be-bothered-attitude in the way he makes for his DEFENDER. He holds his phone to his lips, talking casually. Sawyer stares and stares.
+ANGLE ON: Kendrick goes to the side of the Defender. He appears to be concerned with a scratch in the side. He kneels down, peering at it, jabbering away.
+ANGLE ON: Tears suddenly spring into Sawyer’s eyes. She makes an involuntary sound--half-sob, half-laugh--and claps her fist over her mouth.
+She gathers herself, raises her camera, zooms in as far as she can, and takes a quick series of pics.
+She’s not sure whether she’s about to burst into laughter or tears. And neither are we...
+
+───
+
+## Scene 42  —  Int. SaWYER'S SOLVANG HOUSE - living room - night
+p. 25  ·  2 0/8 pages  ·  Cast: MARGO, SAWYER
+
+Sipping a glass of wine, Sawyer gently zooms in on the picture she took of KENDRICK that morning. She’s transfixed, almost as if instead of using her fingers to zoom, she can change the shape of his face to precisely match David’s.
+KNOCK-KNOCK!
+SAWYER JUMPS. She looks to the door. Hesitates. She goes to the door and checks the keyhole. She answers.
+MARGO (50s) an earthy, friendly woman with a preponderance of bracelets and funky earrings holds a BOTTLE OF WINE. She looks at Sawyer’s glass.
+
+Margo:
+  Oh! You were thinking what I was thinking.
+
+SAWYER:
+  Excuse me?
+
+MARGO:
+  ((holding out the wine))
+  For you! I’m Margo. I’m your neighbor down the road.
+
+SAWYER:
+  Down the road--
+
+MARGO:
+  I saw you moving in and thought, Ah that looks like a chance to stack up some karma and dharma and all that.
+She hands over the wine.
+
+SAWYER:
+  Thank you. I’m Sawyer.
+
+MARGO:
+  New to town?
+
+SAWYER:
+  That’s right.
+
+MARGO:
+  Well, just wanted to say hi, and I’m around if you need any tips, advice, borrow some sugar--whatever. This town can be a bit of shock to the system. Pace of life is slower here.
+
+SAWYER:
+  How long have you lived here?
+
+MARGO:
+  Never left! Anyway, don’t want to bother you, but I’m around if you need me.
+She turns to leave and Sawyer makes a decision.
+
+SAWYER:
+  Actually. I don’t know a single person here. If you wanted to grab dinner sometime? I don’t cook--
+
+MARGO:
+  What is this the Fifties? Neither do I. But I know the best takeout spots in town.
+
+SAWYER:
+  I’d love that.
+
+MARGO:
+  Here’s my number.
+She holds her phone up to Sawyer’s to transfer the info.
+
+MARGO:
+  Welcome to Solvang, kid.
+Sawyer shuts the door, happy. She’s made a friend.
+She picks up her wine and walks over to: a CORKBOARD fixed to the living room wall. She’s pinned to it a MAP OF SOLVANG. She stares. She sips.
+She looks at a box of RED PUSH-PINS. Shaking her head at herself, how insane this is. Nevertheless...
+Right where Jason Kendrick’s house is, she pushes in a RED PUSHPIN.
+She assesses her work as the get-shit-done beat returns.
+She tilts her head like: OK. You’re really doing this.
+
+───
+
+## Scene 43  —  Int./Ext. sawyer’s car - jason kendrick’s house - day
+p. 27  ·  0 2/8 pages  ·  Cast: SAWYER
+
+Parked down the road, Sawyer waits in sunglasses and a ballcap.
+
+SawYER (o.S.):
+  Yeah, Scott, sorry.
+
+───
+
+## Scene 44  —  Int. SAWYER'S SOLVANG HOUSE - night
+p. 27  ·  0 2/8 pages  ·  Cast: SAWYER
+
+Sawyer paces in her living room.
+
+SAWYER:
+  I’m going to need another week off.
+  The move has been more complicated than I thought.
+
+───
+
+## Scene 45  —  Int./Ext. sawyer’s car - jason kendrick’s house - day
+p. 28  ·  0 1/8 pages
+
+Sawyer looks up from her phone as, finally: KENDRICK emerges.
+
+───
+
+## Scene 46  —  Int. SawYER'S SOLVANG HOUSE - night
+p. 28  ·  0 2/8 pages  ·  Cast: SAWYER
+
+Sawyer on with Scott.
+
+SAWYER:
+  I’m sorry, Scott. That’s the best I can do.
+
+───
+
+## Scene 47  —  Ext. JASON KENDRICK'S HOUSE - day
+p. 28  ·  0 1/8 pages
+
+Kendrick pulls out of his drive. Sawyer watches. She starts her own vehicle.
+
+───
+
+## Scene 48  —  Int./Ext. sawyer’s car - downtown solvang - day
+p. 28  ·  0 2/8 pages
+
+Following his Defender, Sawyer watches him pull into a parking spot. He exits and goes into a COFFEE SHOP. She drives by, watching.
+
+───
+
+## Scene 49  —  Int. SawYER'S sOLVANG HOUSE - night - that night
+p. 28  ·  0 1/8 pages
+
+Facing her SOLVANG MAP, she pushes another RED PUSH-PIN into the map where the COFFEE SHOP is.
+
+───
+
+## Scene 50  —  Int. SawYER'S solvang house - night
+p. 28  ·  0 2/8 pages
+
+Sawyer GOOGLES: “What is the best pair of binoculars”
+She jots down notes on the specs of each different pair, until she’s filled an entire legal pad with her scrawl. Finally, she orders a pair.
+
+───
+
+## Scene 51  —  Int./Ext. sawyer’s car - jason kendrick’s house - day
+p. 28  ·  0 2/8 pages
+
+Sawyer watches him through his kitchen window with her new BINOCULARS. She watches as he pours himself a whiskey.
+CLOSE ON: The dashboard clock, the time 11:33 am.
+
+───
+
+## Scene 52  —  Int./Ext. sawyer’s car - liquor store - day
+p. 28  ·  0 1/8 pages
+
+Sawyer watches him come out of the liquor store with a FIFTH in brown paper bag. Sunglasses. Ballcap. He checks both ways.
+
+───
+
+## Scene 53  —  Int. SAWYER'S soLVANG HOUSE - night - later
+p. 29  ·  0 2/8 pages
+
+Sawyer pushes another red pin into the liquor store. The board now has seven red pins.
+There is another tally. It’s all the DAYS OF THE WEEK at the top and COFFEE SHOP, LIQUOR STORE, GROCERY, RUNNING TRAIL, along with hash marks denoting when he does these activities.
+
+───
+
+## Scene 54  —  Ext. Running trail - day
+p. 29  ·  0 2/8 pages
+
+Sawyer jogs with her cap low and sunglasses on. Behind her comes Kendrick, shirt off, hustling, sweating, air pods in. He breezes by without even glancing at her.
+She turns to watch his back as he runs.
+
+───
+
+## Scene 55  —  Int. Coffee shop - day
+p. 29  ·  0 7/8 pages  ·  Cast: BARISTA, JASON KENDRICK
+
+Sawyer sits with a book The Attention Economy - Mastering the New Gold Rush with AI: Unlock the Secrets to Capturing, Retaining, and Monetizing Focus in the Digital Age.
+She’s not really reading. She’s waiting. She keeps glancing at the door.
+Finally, Kendrick breezes in, sunglasses on, fishing his credit card from his wallet.
+
+JasON KENDRICK:
+  ((to the barista))
+  Can I get the usual? Remembered my wallet today.
+
+Barista:
+  ((laughing))
+  No problem. Oat milk cap coming up.
+Kendrick types furiously on his phone while Sawyer steals glances, keeping up the ruse of reading.
+Behind her, a TRIO OF STRANGERS watch him. One of them, a pretty WOMAN IN RED, snaps a picture of KENDRICK.
+
+BARISTA:
+  All set.
+He hands him the coffee-to-go.
+
+JASON KENDRICK:
+  My man. See what I’m tipping here? A hundo. A Benjy. Don’t mind me.
+
+BARISTA:
+  ((laughing))
+  I knew you were good for it.
+Kendrick salutes him and departs. Sawyer quickly snatches up the paper and hustles after him...
+
+───
+
+## Scene 56  —  Ext. CoFFEE SHOP - day - conTINUOUS
+p. 30  ·  0 1/8 pages
+
+... And watches him hop into the DEFENDER and drive away.
+
+───
+
+## Scene 57  —  Int./Ext. sawyer’s car - kendrick’s house - the next day
+p. 30  ·  0 2/8 pages
+
+Sawyer waits, watching the house with binoculars.
+Kendrick finally emerges and hops in his car.
+
+───
+
+## Scene 58  —  Int./ EXT. saWYER'S CAR - MOVING - DAY - momENTS LATER
+p. 30  ·  0 3/8 pages  ·  Cast: SAWYER
+
+Sawyer follows the DEFENDER. But he passes the coffee shop.
+
+SAWYER:
+  ((softly))
+  Where are you going?
+Kendrick turns onto the highway. She follows from a safe distance as the Defender drives and drives. She glances at the clock: 9:35
+LATER: She follows over forest and desert highway. She glances at the clock: 11:09.
+Finally, Kendrick exits and pulls into:
+
+───
+
+## Scene 59  —  Int./Ext. sawyer’s car - Mall parking lot - day
+p. 30  ·  0 1/8 pages
+
+Sawyer parks a reasonable distance away. She exits her car to follow Kendrick.
+
+───
+
+## Scene 60  —  Int. Mall - day - contINUOUS
+p. 30  ·  0 4/8 pages
+
+The camera, hand-held, surreptitious, follows Sawyer as she trails Jason Kendrick through the mall. We also get DISTANT SHOTS of the two of them as if the camera is watching them from afar. Sawyer watches:
+- DISTANT SHOT: He stops in a GNC and examines supplements before replacing them all, buying nothing, and ambling out.
+- He enters a Gamestop, rifles through video games, reading the backs of boxes, but again buys nothing.
+- DISTANT SHOT: Back in the central part of the Mall, he abruptly turns and looks back. Sawyer, quickly pretends to look at iPhone cases. He’s striding towards her, and she’s panicked until finally--
+- Kendrick breezes by, on his way to:
+- DISTANT SHOT: He walks into a Sunglass Hut. He didn’t spot her at all.
+
+───
+
+## Scene 61  —  Int. Mall - sunglass hut - day - conTINUOUS
+p. 31  ·  0 7/8 pages  ·  Cast: JASON KENDRICK, SAWYER, SUNGLASS HUT WOMAN
+
+Kendrick continues to try on pairs of sunglasses as Sawyer enters. She pretends to pick up a pair of frames and examine them. They’re two of only four people in the store.
+
+Sunglass hut woman:
+  ((to Sawyer))
+  Let me know if you need any help.
+
+SaWYER:
+  Thanks, just looking.
+She’s creeping closer and closer to Kendrick. Finally, she’s right behind him, pretending to look in the mirror.
+As she replaces the glasses, she moves to try to BRUSH HIS ARM WITH HER FINGERTIPS...
+But he moves past her, and their skin just misses. Sawyer’s fingers are left haunting the air where he stood.
+He carries a pair of sunglasses to the cashier.
+
+SuNGLASS HUT WOMAN:
+  These will look great on you.
+
+JASON KENDRICK:
+  Thank you. I’m going to a funeral.
+
+SUNGLASS HUT WOMAN:
+  Oh, I’m so sorry.
+
+JASON KENDRICK:
+  Don’t be. I hated him.
+The woman looks thrown off by this. It shuts her up.
+He finishes the transaction, and peels off, stalking past Sawyer without a glance. She reaches out to touch him again as he breezes by but retracts her hand at the last second.
+She breathes deeply, like she’s smelling him.
+
+───
+
+## Scene 62  —  Int. mall - outside the sunglass hut - day - conTINUOUS
+p. 32  ·  0 5/8 pages  ·  Cast: FILMING WOMAN, SAWYER
+
+Sawyer emerges from the store to follow Kendrick when she spots: A WOMAN FILMING KENDRICK with her phone. She’s beautiful and very dolled up.
+Annoyed, Sawyer approaches her.
+
+SAWYER:
+  That’s kind of rude, isn’t it?
+
+Filming woman:
+  What?
+
+SAWYER:
+  Filming him? The guy’s just buying sunglasses.
+
+FILMING WOMAN:
+  ((mimicking))
+  “Guy’s just buying sunglasses--” How ‘bout mind your own fucking business, cunt?
+Whoa! Sawyer turns away.
+
+SAWYER:
+  ((to herself))
+  At least I’m not that crazy.
+
+───
+
+## Scene 63  —  Int./ EXT. saWYER'S CAR - MOVING - day - later
+p. 32  ·  0 1/8 pages
+
+Sawyer slows to a crawl and parks down the road from:
+
+───
+
+## Scene 64  —  Ext. JASON KENDRICK'S HOUSE - day - conTINUOUS
+p. 32  ·  0 3/8 pages  ·  Cast: JASON KENDRICK
+
+Kendrick exits his car as Sawyer watches.
+When Kendrick reaches the door, he pats his pockets and realizes:
+
+JasON KENDRICK:
+  ((inaudible, mouthing))
+  Fuck.
+He remembers. He walks around the side of the house.
+When he comes back, he’s holding: A KEY. He lets himself in.
+Sawyer definitely clocks this.
+
+───
+
+## Scene 65  —  Int. SawYER'S SOLVANG HOUSE - NIGHT
+p. 33  ·  2 7/8 pages  ·  Cast: MARGO, SAWYER
+
+Sawyer stands at her corkboard with wine. She has an extra map with a route drawn between Solvang and the mall Kendrick went to that day. She begins to carefully take it all down.
+HOURS LATER
+Margo sits at Sawyer’s table. They’ve finished dinner, now enjoying the wine. The CORKBOARD has a few innocuous sightseeing pamphlets pinned up.
+
+SAWYER:
+  Your whole life?
+
+MarGO:
+  Born and raised--No, that’s not true. I went away to college for a year, but it wasn’t for me. I knew I wanted to open my own business. But it took a bad divorce and his alimony payments before I could afford it.
+
+SAWYER:
+  Reiki, you mean?
+
+MARGO:
+  Have you ever tried it?
+
+SAWYER:
+  Once. I didn’t really get it. I might be a bit too much of a materialist.
+
+MARGO:
+  How do you keep yourself spiritually healthy, Sawyer?
+
+SAWYER:
+  I dunno. A Xanax prescription? Have conversations with ChatGPT all day?
+
+MARGO:
+  Ah, but hon, that’s not a conversation, it’s just language and statistics. We all need to hear human voices. There’s no substitute.
+  ((sips her wine))
+  You know, your energy is very strong. Just being around you, I can feel that you’re hurting.
+Sawyer looks at her, surprised, alarmed.
+
+MARGO:
+  I’m sorry, I overstepped.
+
+SAWYER:
+  No. Tell me what you see.
+
+MARGO:
+  I’m not a psychic, let’s be clear. But your energy. You’re in pain. I’m guessing from a divorce?
+
+SAWYER:
+  ((hesitates))
+  That’s right.
+
+MARGO:
+  He cheated. That’s why you moved here.
+
+SAWYER:
+  Can I tell you something and maybe it stays between us? Reiki-master/ client privilege?
+
+MARGO:
+  I have no one to tell.
+
+SAWYER:
+  There was a man who looked just like my husband. We used to joke about it all the time, David and I. This man, we always saw on--
+  ((beat))
+  --on local TV in Minneapolis. After the divorce, I couldn’t stop seeing it. This news anchor. It wasn’t just that he and David looked alike. It was his mannerisms, his little inflections of speech, the way his forehead pinches when he’s thinking. And so I thought if I went down to the TV station, it would help me get over it. I’d see that they weren’t exactly alike, and I’d get it out of my head. But instead it got stronger. It got so strong, I started to become afraid of what I was doing.
+On Margo, face falling, starting to get creeped out.
+
+SAWYER:
+  I thought if I saw him up close, it would melt away. But it’s the opposite. It became even more powerful. It was like looking at his ghost.
+
+margo:
+  You moved across the country so you’d stop stalking a TV anchor?
+
+SAWYER:
+  Well, I thought the downtown here was charming, too.
+Margo gulps her wine. She checks her phone. Rises.
+
+MARGO:
+  Ah, it got really late.
+
+SAWYER:
+  Do you want to take some of these leftovers?
+
+MARGO:
+  No, no, I’m fine. Thank you so much for dinner.
+Margo hastily gathers her jacket.
+
+MARGO:
+  Really great. Thank you. We should do this again sometime.
+She exits.
+
+SAWYER:
+  ((self-mocking))
+  Whoops.
+Sawyer goes to a drawer. She removes her JASON KENDRICK CORKBOARD MATERIAL and begins pinning it up again.
+
+───
+
+## Scene 66  —  Int./ Ext. sawyer’s car - JASON KENDRICK'S HOUSE - dAY
+p. 36  ·  0 2/8 pages
+
+Sawyer watches the house from her car. She’s marking down DATES AND TIMES in a NOTEBOOK: May 3 - leaves 11:10 am; May 4 - leaves 11:27 am; May 5 - leaves 11:02 am...
+She’s jotting more notes, when: SNAP
+A tree branch cracks. She jumps and whips her head around. But there’s no one there. The forest is silent.
+She returns to her notes.
+
+───
+
+## Scene 67  —  Int. SawyER'S SOLVANG HOUSE - day
+p. 36  ·  0 2/8 pages
+
+Sawyer, wearing the DILL WITH IT T-shirt, types at her laptop with her phone beside her, JUSTINE ON SPEAKERPHONE.
+INTERCUT:
+
+───
+
+## Scene 68  —  INT. JUSTINE AND TOM'S HOUSE - DAY
+p. 36  ·  0 4/8 pages  ·  Cast: JUSTINE, SAWYER
+
+JUSTINE in her home. Tom in the background.
+
+JuSTINE:
+  I saw the pictures you sent. The town looks beautiful.
+  ((beat))
+  You doing okay out there, Soy?
+  Have you met anyone?
+
+SAWYER:
+  I told you I’m not looking to date right now.
+
+JUSTINE:
+  Not date--even a friend? Have you made any friends?
+
+SAWYER:
+  ((interrupts her))
+  Trust me, Justine, I’m going to find people. It’s just that right now I have a project that’s occupying most of my time.
+
+───
+
+## Scene 69  —  Int./ext. Sawyer’s car - outside kendrick’s house - day
+p. 36  ·  0 3/8 pages
+
+CLOSE ON: Sawyer taps her pen against a notepad filled with KENDRICK’S SCHEDULE.
+Today he’s got: RUNNING - ~10:40 until ~ 12:15
+CLOSE ON: THE CLOCK: 10:57
+Sawyer taps and taps and taps and finally: Kendrick emerges, locking the door to his house. He drives off in the Defender.
+Sawyer takes a deep breath. She exits.
+
+───
+
+## Scene 70  —  Ext. JasON KENDRICK'S HOUSE - driveway - day
+p. 37  ·  0 1/8 pages
+
+Sawyer looks both ways from the end of the drive, then darts up to the house.
+
+───
+
+## Scene 71  —  Ext. JasON KENDRICK'S - side of house - day - conTINUOUS
+p. 37  ·  0 1/8 pages
+
+She looks around at the ground. Her eyes land on: AN UPSIDE-DOWN POTTED PLANT. She picks it up and sure enough: A KEY.
+
+───
+
+## Scene 72  —  Ext. JaSON KENDRICK'S HOUSE - day - coNTINUOUS
+p. 37  ·  0 1/8 pages
+
+At the front door, she again looks behind her. The street and forest are still and quiet. She lets herself in.
+
+───
+
+## Scene 73  —  Int. JASON KENDRICK'S HOUSE - main room - day - coNTINUOUS
+p. 37  ·  0 3/8 pages
+
+Sawyer shuts the door softly behind her. She moves into the main room of this sparse but elegant home--the home we recognize from the OPENING SEQUENCE.
+She notes the take-out bags still sitting on the coffee table. A video game console, the game PAUSED. Dishes in the sink. A bottle of bourbon, half-empty, on the counter.
+She opens a few kitchen drawers. She glances through cabinets. She pokes her head into a closet, a bathroom, wherever else. She walks back toward:
+
+───
+
+## Scene 74  —  Int. JASON KENDRICK'S HOUSE - bedroom - conTINUOUS
+p. 37  ·  0 1/8 pages
+
+The bed is unmade, looking like someone was tossing and turning all night. She goes into the:
+
+───
+
+## Scene 75  —  Int. JASON KENDRICK'S HOUSE - baTHROOM - cONTINUOUS
+p. 37  ·  0 3/8 pages
+
+It takes her a moment to realize that THE LIGHT SWITCH IS ON THE OUTSIDE (this will come back).
+She picks up his toothbrush, runs her thumb over the bristles. She opens the MEDICINE CABINET. Scans.
+In a drawer she finds: CONDOMS and VIAGRA. She looks at the toilet, and then:
+She lowers her pants, sits down on the toilet, and pees.
+She flushes and washes her hands. She wanders back out to:
+
+───
+
+## Scene 76  —  Int. JASON KENDRICK'S HOUSE - bedROOM - cONTINUOUS
+p. 38  ·  0 5/8 pages  ·  Cast: SAWYER
+
+She looks inside a closet. Nothing interesting, except--
+She turns back because there’s a SAFE ON THE FLOOR.
+She kneels down and tries: 1-2-3-4.
+It beeps to tell her, NOPE.
+She tries: 1-1-1-1
+The safe clicks open.
+
+SawYER:
+  ((shaking her head))
+  Pssssh.
+The only thing inside is: a big, black HANDGUN.
+She holds it delicately by the butt, like it’s a dirty sock before replacing it and shutting the safe.
+She goes to the DRESSER, opens the top drawer. She pulls out: A WHITE UNDERSHIRT.
+She smells it, inhaling deeply. But doesn’t get what she wants.
+Thinking, she makes a decision and walks quickly for:
+
+───
+
+## Scene 77  —  Int. JaSON KENDRICK'S HOUSE - laundry room - conTINUOUS
+p. 38  ·  0 2/8 pages
+
+In the laundry room, she finds the DIRTY CLOTHES HAMPER. She’s rifling through, when...
+CLICK-CLACK-CLICK!
+The front door unlocking. Her eyes go wide.
+
+───
+
+## Scene 78  —  Int. JASON KENDRICK'S HOUSE - main room - conTINUOUS
+p. 39  ·  2 1/8 pages  ·  Cast: JASON KENDRICK
+
+Sawyer tries to go for the back door, but is forced to duck behind the couch as: JASON KENDRICK ENTERS.
+Sweat-soaked from a run, he throws his keys and wallet on the island and goes straight for the bourbon on the counter. He gets ice and pours himself a drink. Then he opens the refrigerator and cracks a beer as well. He chugs thirstily from the beer. Then he chases it with quaff of bourbon.
+As he walks through the house, Sawyer must duck around the couch, finally making a dive for the kitchen island:
+[NOTE: Depending on the geography of the house, this scene will adjust. Kendrick will move and Sawyer will avoid him like the kids dodging the velociraptor in Jurassic Park.]
+Kendrick strips off his shirt and tosses it in the laundry room. Sawyer sees this. When he walks away, she deftly returns to that room.
+ANGLE ON: Kendrick heads to his room where he sees: the DRESSER DRAWER OPEN.
+He stops.
+ANGLE ON: Sawyer picks up the SWEAT-STAINED UNDERSHIRT and smells it, breathing deeply, holding it to her face. Eyes closed, face calm, and for once at peace, she suddenly hears--
+ANGLE ON: Kendrick turns back.
+
+JasON KENDRICK:
+  Hello?
+ANGLE ON: SAWYER freezes, holding her breath, waiting.
+ANGLE ON: Kendrick stalks back into the living room.
+
+JASON KENDRICK:
+  Hello?
+Sawyer pokes her head out and quickly dives around the side the island.
+
+JASON KENDRICK:
+  Are you in my fucking house, bitch?!
+Kendrick storms through, searching, opening closets, slamming doors, finding nothing as Sawyer deftly crawls, darts, and hides.
+Kendrick picks up his phone and dials. He waits.
+
+JASON KENDRICK:
+  Hey, Alex, I think she was here.
+  ((beat))
+  Because I came home and my dresser drawer was open.
+  ((beat))
+  No, Alex, because I don’t leave fucking random drawers open. I know when I got a shirt this morning I closed that fucking drawer, and when I got home it was open.
+Sawyer pokes her head out from the kitchen island to check--
+--Just as Kendrick turns to look, and she SNAPS HER HEAD BACK behind the island.
+
+JASON KENDRICK:
+  ((beat))
+  Yeah, the house is in a blind trust, but it’s the motherfucking internet age. You can find anything on-line. My fucking six year old nephew can find the location of nuclear missile silos and bukaki videos--fuck!
+  ((beat))
+  No, there’s no one here now.
+As he turns his back, Sawyer creeps toward the door. But she can’t escape without going by him.
+
+JASON KENDRICK:
+  ((beat, listening))
+  No, I’m not getting cameras! That data just goes to the goddamn security companies and it can be hacked in about twelve seconds. That’s how those nudes of what’s-her-face got out.
+  ((rubbing his temples))
+  I don’t know what I want you to do! Lawyer shit. Have her killed, can’t you do that?
+  ((beat))
+  Well what the fuck good are you?
+  ((beat))
+  Yeah, good talking to you, too. Don’t forget you owe me dinner for that UFC bet.
+He hangs up. Suddenly, he appears to realize something.
+
+JASON KENDRICK:
+  Fuck...
+He heads for the front door. Sawyer understands exactly where he’s going.
+She sprints through the backdoor.
+
+───
+
+## Scene 79  —  Ext. JasON KENDRICK'S HOUSE - DAY - conTINUOUS
+p. 41  ·  0 2/8 pages
+
+She hustles around the side of the house. She replaces the key under the FLOWER POT and runs back around, clearing the corner just as:
+KENDRICK ROUNDS THE CORNER. He picks up the flower pot and sees the key there. He deflates. Maybe it was in his head.
+
+───
+
+## Scene 80  —  Ext. JaSON KENDRICK'S HOUSE - yard - day - coNTINUOUS
+p. 41  ·  0 1/8 pages
+
+Sawyer sprints down the grass and through the woods.
+
+───
+
+## Scene 81  —  Ext. SawyER'S CAR - PARKED - day - momENTS LATER
+p. 41  ·  0 1/8 pages
+
+Sawyer reaches her car and hurtles inside, heaving breath.
+
+───
+
+## Scene 82  —  Int. SawYER'S CAR - PARKED - DAY - cONTINUOUS
+p. 41  ·  0 2/8 pages
+
+When she catches her breath, she pulls from her sweatshirt pocket, the SWEATY T-SHIRT.
+She starts laughing. She starts the car. Pulls away.
+
+───
+
+## Scene 83  —  Int. SaWYER'S SOLVANG HOUSE - day - later
+p. 41  ·  0 1/8 pages
+
+With great care, Sawyer pins the dirty shirt to her corkboard beside the maps and timelines.
+
+───
+
+## Scene 84  —  Ext. Solvang downtown - day
+p. 41  ·  0 2/8 pages
+
+As Sawyer walks to the coffee shop, she spots MARGO. She goes to wave but Margo quickly pretends like she doesn’t see her and turns into a store.
+If Sawyer is hurt by this, she can’t dwell on it. She enters:
+
+───
+
+## Scene 85  —  Int. COFFEE SHOP - day - later
+p. 42  ·  1 7/8 pages  ·  Cast: FANBOY, JASON KENDRICK, SAWYER
+
+Sawyer sits at a table pretending to read (AI Marketing Intelligence Demystified: Extracting Core Monetization Value from Scaled Customer Data via Audience Segmentation). But she’s really watching the door. Finally:
+Jason Kendrick enters, wearing sunglasses, agitated, in a hurry. To the barista:
+
+JASON KENDRICK:
+  Hey bud, can I get the usual? Thanks.
+Sawyer joins him at the register. He pecks at his phone.
+
+SAWYER:
+  ((to the barista))
+  Could I do another soy milk latte? Thank you.
+She glances over at Kendrick, still in his phone. She opens her mouth to say something when--
+
+Fanboy:
+  Jack Robbins, whattup!
+Kendrick looks up, not in the mood. Sawyer is basically shoved aside by a guy holding a tray of iced coffees.
+
+JASON KENDRICK:
+  Hey.
+
+FANBOY:
+  I heard you moved here!
+
+JASON KENDRICK:
+  Um.
+
+FANBOY:
+  You know, my cousin actually might’ve been at an audition with you once. You remember Frolyn Dwire? That name ring a bell?
+
+JASON KENDRICK:
+  Frolyn?
+
+FANBOY:
+  Yeah, Frolyn. I think he tried out with you once for a commercial.
+
+JASON KENDRICK:
+  Don’t recall.
+
+FANBOY:
+  The problem with the way XenoSouls ended was we never actually found out if Jack Robbins was a Xeno, ya know? Don’t you think that sucked?
+
+JASON KENDRICK:
+  Yeah. No. Hey man, I’m kinda--
+
+FANBOY:
+  Can we do a pic?
+Sawyer watches as Fanboy turns his phone to selfie them.
+
+JASON KENDRICK:
+  Not right now, dude.
+But he’s already snapped it.
+
+FANBOY:
+  C’mon, it’s cool. Don’t be rude.
+
+JASON KENDRICK:
+  No, I’m serious, bro, don’t post that.
+
+FANBOY:
+  What? Why not? It’s a great pic--
+Kendrick SMACKS the tray from the guy’s hands. Coffee sprays across the floor. Everyone in the shop looks up.
+
+JASON KENDRICK:
+  Because I don’t want people fucking knowing where I am! Now fucking delete it.
+Chastened the guy, does so. People are now filming Kendrick. Phones angle toward him and the overhead lights gleam off the camera eyes.
+
+FANBOY:
+  Sure. Here. Done.
+Kendrick blows by Sawyer without a glance or his coffee.
+
+───
+
+## Scene 86  —  Int. SaWYER'S SOLVANG HOUSE - DAY - later
+p. 43  ·  1 0/8 pages  ·  Cast: AARON, SAWYER
+
+Sawyer Googles: “Actor Jason Kendrick news”
+She’s greeted with a dozen headlines in the vein of: “Jason Kendrick freaks out at fan photo”
+Sawyer tries again: “Actor Jason Kendrick stalker”
+She scrolls down and we see a few options: “Famous Celebrities with Terrifying Stalker Stories”
+“Scariest Celebrity Stalkers Over the Years”
+“Celebrities Who Were Murdered by Their Own Fans”
+A KNOCK AT THE DOOR.
+Sawyer JUMPS and quickly slaps the laptop closed.
+She peeks outside. She can’t believe who she sees.
+
+SAWYER:
+  Oh my God--
+
+AarON (o.S.):
+  Surprise! Let me in!
+Then she remembers: THE CORKBOARD.
+
+SAWYER:
+  Hold on! Just a second!
+She goes to the board and begins hastily tearing down all the materials: the timelines, maps, the SHIRT.
+
+AARON (o.S.):
+  Sawyer?
+
+SAWYER:
+  Yeah yeah one sec--
+She looks around for a place to hide it all. Finally, she runs to the kitchen and crams it all into a bottom cabinet.
+Flustered, she runs back to the door and opens it to Aaron.
+
+AARON:
+  Like I said: Surprise!
+He drops his suitcase. They embrace.
+
+───
+
+## Scene 87  —  Int. SAWYER'S SOLVANG HOUSE - night - later
+p. 44  ·  1 5/8 pages  ·  Cast: AARON, SAWYER
+
+Sawyer and Aaron sit drinking wine, low music playing.
+
+saWYER:
+  And Nadia didn’t mind you coming to--what? Check on me?
+
+aARON:
+  Ah, she’s on her last binge-drinking weekend with her friends in Nashville before we start trying for a baby. I’ll tell her when I get back.
+Sawyer sips her wine, unsure of how to handle this.
+
+AARON:
+  What’s happening here? You seeing anyone? You’re dressing slightly sluttier than I remember. Not slutty enough, but it’s progress.
+
+SAWYER:
+  You’re not quite gay enough to get away with saying that...
+
+AARON:
+  Wait, you didn’t say ‘No.’ Are you seeing someone?!
+
+SAWYER:
+  No! No. But maybe I have a dating-type question for you--
+Aaron rockets up in his seat, tucking his legs under him and bouncing in excitement.
+
+AARON:
+  Are you fucking serious right now? That is a bisexual man’s absolute Venn diagram of interests. I’m practically edging!
+
+SAWYER:
+  So I got together with my first boyfriend in college, and we dated until my late twenties. After we broke up, I was single for less than a year--a really dry year, mind you--before, you know, David came into my life.
+  ((off Aaron’s look: Sure))
+  My dating experience is so limited I might as well be seventeen again and hiding that I read about math from the boys I like.
+
+AARON:
+  Yeah, don’t lead with that. But legit just get on one of these apps, put a picture of yourself with your titties pushed up, and you’ll at least find a semi-hot DJ within two days.
+
+SAWYER:
+  I’m more interested in: How do you attract a guy who’s out of your league?
+
+AARON:
+  Who is he?!
+
+SAWYER:
+  Just someone I’ve seen around town. But again, this is a scenario where he has not glanced my way once.
+
+AARON:
+  ((bouncing with excitement))
+  Jesus! It’s like my whole life has led to this moment! I’ll tell Nadia to cancel the pregnancy!
+
+───
+
+## Scene 88  —  Ext. Hiking trail - day - the NEXT DAY
+p. 46  ·  0 5/8 pages  ·  Cast: AARON, SAWYER
+
+Sawyer and Aaron hike.
+
+AARON:
+  With straight men, you have to remember three things: One, they are not people, they are hard dicks attached to a brain stem, and a hard dick has no conscience. That is exploitable. Two, they all secretly want to marry their mothers. Find out as much about his mother as fast possible and start subtly doing things that remind him of her. And three, if you want to strike up a conversation, ask him a question you know he will be knowledgable about. Make him feel like a caveman who knows how to build an atlatl.
+
+SAWYER:
+  That was all alarmingly specific.
+
+AARON:
+  No offense, Soy, I love you, but we also have to go shopping. You dress like a bag lady. We need that hip-to-waist ratio at point-seven. The hourglass figure. It’s evolution.
+
+───
+
+## Scene 89  —  Int. SaWYER'S SOLVANG HOUSE - bedroom - day
+p. 47  ·  0 3/8 pages  ·  Cast: AARON, SAWYER
+
+Sawyer tries on an outfit per Aaron’s instructions, judging herself in the mirror.
+
+SAWYER (v.O.):
+  Do you sit around watching YouTube videos of pick-up artist advice?
+
+AARON (V.O.):
+  Next, your demeanor.
+
+SAWYER (V.O.):
+  What’s wrong with my demeanor?
+She tries on a smile that feels entirely false.
+
+───
+
+## Scene 90  —  Ext. HiKING TRAIL - DAY - back to present
+p. 47  ·  0 4/8 pages  ·  Cast: AARON, SAWYER
+
+AARON:
+  You come off as a widow. An old one. You need to exude youthfulness and energy. Play with your hair. Smile while you talk. Your vibe should be that bereavement is secretly making you a thirsty slut!
+
+SAWYER:
+  I should be appalled by how sexist you sound right now.
+
+AARON:
+  I didn’t invent the straights, Sawyer! I just learned how to manipulate them into exploring their queer side.
+
+───
+
+## Scene 91  —  Int. SAWYER'S solvANG HOUSE - beDROOM - night
+p. 47  ·  0 3/8 pages
+
+Sawyer studies JASON KENDRICK’S WIKIPEDIA PAGE. She sees that his mother was a MIDDLE SCHOOL ENGLISH TEACHER.
+MOMENTS LATER: She’s reading an article with the phrase: “Kendrick grew up in New Jersey...”
+MOMENTS LATER: She finds a picture of him in a Philadelphia Eagles hat.
+MOMENTS LATER: She types in POPULAR BOOKS TO TEACH IN MIDDLE SCHOOL 1990s. We see titles like: FREAK THE MIGHTY, TUCK EVERLASTING, ON THE FAR SIDE OF THE MOUNTAIN, HATCHET, WHERE THE RED FERN GROWS.
+
+───
+
+## Scene 92  —  Int. SAWYER'S solvANG HOUSE - day - days later
+p. 48  ·  0 1/8 pages
+
+Sawyer cuts open an Amazon package with those books inside.
+
+───
+
+## Scene 93  —  Int. SaWYER'S SOLVANG HOUSE - BEDROOM - night
+p. 48  ·  0 1/8 pages
+
+Sawyer lies in bed with her glasses on reading HATCHET.
+
+───
+
+## Scene 94  —  INT. SAWYER'S Solvang house - DINING ROOM - NIGHT
+p. 48  ·  2 5/8 pages  ·  Cast: AARON, SAWYER
+
+Sawyer and Aaron eat takeout with wine.
+
+SAWYER:
+  How is everyone?
+
+AARON:
+  Tom got himself a new sofa with recliner seats and fold-down cupholders, so he’s the happiest boy in all the land. Mom is busy with her various causes--I think the latest is like breast cancer awareness for disabled trans dogs or something.
+
+SAWYER:
+  And Nadia?
+
+AARON:
+  She misses you. She asks about you all the time.
+Off Sawyer’s eyes, shifting down to her plate.
+
+AARON:
+  We haven’t really heard from you since you moved out here.
+
+SAWYER:
+  I’ve been crazy busy with work.
+
+AARON:
+  ((hesitates))
+  Well. About that. Your boss, the squirrelly guy, Scott? He reached out to me.
+  ((carefully))
+  He wants to know ‘whatup’ with you.
+  ((Sawyer picks at her food))
+  You know, Soy, this is known in the brother-in-law trade as a “red flag.” Talk to me. We’re all worried.
+
+SAWYER:
+  Okay, Aaron, you guys aren’t my actual family, remember? Did it ever occur to you that maybe one of the reasons I moved away was to get some space?
+This lands very hard with Aaron. He sets his wine glass down.
+
+SAWYER:
+  That was extra. I’m sorry.
+
+AARON:
+  No, it’s fine.
+
+SAWYER:
+  Really. I am.
+
+AARON:
+  ((it’s not fine))
+  You aren’t the only one who loved David, you know.
+
+SAWYER:
+  I know.
+
+AARON:
+  He was my brother. It ripped my heart out, too.
+
+SAWYER:
+  I know. I’m sorry.
+
+AARON:
+  Sometimes you act like you’re the only person who lost someone. I knew David since I was born, Sawyer. For chrissakes we had Tubby Time.
+
+SAWYER:
+  ((tearing up))
+  I’m sorry, Aaron.
+  ((beat))
+  After we had the miscarriage, it was a few nights later and David asked if there was anything he could do for me, and I told him I didn’t think his dumb jokes would help this time. So he goes, “That’s only because, like the miscarriage, the delivery was all wrong.”
+Aaron snorts a laugh, able to hear his brother saying this.
+
+SAWYER:
+  Then he goes, “That’s why you can’t trick a miscarriage. Because it wasn’t born yesterday.”
+Aaron’s laughing harder.
+
+SAWYER:
+  I know! And I couldn’t stop laughing because he was. So. Dumb! And I just thought...
+  ((tearing up again))
+  It was like I had this weapon against the world. As long as I had him, I felt like nothing could hurt me. And now I just can’t move on, I can’t get him out of my head. Hell, there are moments where I think I can smell the cheap deodorant he wore, like he just walked out of the room.
+A long beat as Sawyer wipes her eyes. Finally:
+
+aarON:
+  What’s the most awkward thing to do at your husband’s funeral?
+  ((beat))
+  The corpse.
+
+sawyer:
+  How do you know death is a man?
+  ((beat))
+  He always comes quicker than expected.
+Wiping their eyes, they snicker together.
+
+───
+
+## Scene 95  —  Int. SawYER'S SOLVANG HOUSE - living room - DAY -
+p. 51  ·  0 2/8 pages
+
+- Morning. Aaron has his bag packed. He and Sawyer do their NBA handshake.
+- Sawyer takes the items she stowed from under the kitchen counter and carefully replaces them on the corkboard, taking care as she pins them back, including the shirt.
+
+───
+
+## Scene 96  —  Int. Sawyer’s solvang house - bedroom - night -
+p. 51  ·  0 1/8 pages
+
+- She reads Freak the Mighty in bed
+
+───
+
+## Scene 97  —  Int. Sawyer’s solvang house - living room - the next day
+p. 51  ·  0 2/8 pages
+
+- She reads an email from Scott: “...going to have to let you go...” But she just clicks to another tab about THE HISTORY OF THE PHILADELPHIA EAGLES.
+
+───
+
+## Scene 98  —  Int. Sawyer’s solvang house - night -
+p. 51  ·  0 2/8 pages
+
+- She watches an ep of XenoSouls, the light of the screen flickering on her face as she also scrolls Instagram. Ads for GILLETTE DEODORANT passing by...
+- Finally, we end on:
+
+───
+
+## Scene 99  —  Int. CofFEE SHOP - day
+p. 51  ·  2 6/8 pages  ·  Cast: BARISTA, JASON KENDRICK, SAWYER
+
+Sawyer sits in her usual spot, reading, as JASON KENDRICK stalks inside, checking for fans or other hassles.
+
+JASON KENDRICK:
+  Yo, bro. The usual. Sorry ‘bout the other day.
+
+BaRISTA:
+  Just try not to go viral this time.
+
+JASON KENDRICK:
+  Barely viral. The outrage-industrial complex has moved on.
+Sawyer rises and approaches the barista to order.
+
+SAWYER:
+  Hi. Could I have another Latte?
+As she steps back to wait, she stands beside Kendrick. A beat as she pretends to look at her phone.
+
+SAWYER:
+  ((to Jason))
+  ‘Scuse me. Do you know about sports by chance?
+
+JASON KENDRICK:
+  ((not looking up))
+  Not particularly.
+
+SAWYER:
+  My sister ran into some football player at a charity event. Nick Foles. Never heard of him.
+Kendrick finally glances up.
+
+JASON KENDRICK:
+  Like the Eagles’ Nick Foles?
+
+SAWYER:
+  The who?
+
+JASON KENDRICK:
+  The Philadelphia Eagles?
+
+SAWYER:
+  Is Nick Foles a player for them?
+
+JASON KENDRICK:
+  He was. Super Bowl MVP. What event was she at?
+
+SAWYER:
+  Children with cancer. Sounds like he’s a very nice guy.
+
+JASON KENDRICK:
+  That’s what we hear. I’m actually from there.
+
+SAWYER:
+  Philadelphia?
+
+JASON KENDRICK:
+  Well. Jersey. Don’t hold it against me. You live in one part of the state, you’re an Eagles fan, you live in the other part, then you root for the fucktard-Giants.
+
+SAWYER:
+  Sorry. I’m clueless about sports or pop culture.
+  ((extends her hand))
+  Sawyer.
+
+JASON KENDRICK:
+  Jason.
+They shake.
+
+SAWYER:
+  What should I tell my sister to make me sound like I’m impressed?
+
+JASON KENDRICK:
+  Tell her Jalen Hurts makes Nick Foles look like Kevin Kolb.
+Sawyer pretends to type.
+
+SAWYER:
+  It’s like a whole other language...
+  ((beat, she fake sends))
+  You moved here from Jersey?
+
+JASON KENDRICK:
+  ((sideways glance))
+  Not exactly. I used to live in LA.
+The barista has his coffee. He appears to want to wrap up this conversation and peel away.
+
+SAWYER:
+  I’m brand-new in town. Such a beautiful place.
+
+JASON KENDRICK:
+  It’s got its charm.
+A beat. Sawyer takes the plunge.
+
+SAWYER:
+  Hey, sorry if this is forward, but do you want my number? Totally your call if you use it.
+
+JASON KENDRICK:
+  ((awkward))
+  Sure. Yeah. Why not.
+  ((fishing for his phone))
+  You don’t watch TV, do you?
+
+SAWYER:
+  TV? Not really. Maybe the news sometimes when I can stomach the anxiety.
+
+JASON KENDRICK:
+  I hear that.
+CLOSE ON: They tap phones, and her finger brushes his.
+
+SAWYER:
+  It was nice talking to you. Thanks for helping me with, um. Rick Kolb?
+
+JASON KENDRICK:
+  Nick Foles.
+
+SAWYER:
+  Right.
+Kendrick departs. She watches him go.
+
+───
+
+## Scene 100  —  Int. SAWYER'S SOLVANG HOUSE - night
+p. 54  ·  1 2/8 pages  ·  Cast: SAWYER, YOUTUBE VIDEO
+
+Sawyer watches a YouTube video: “How to Land a Man Out of Your League.” This is bad animation and voiceover.
+
+YouTube video (v.O.):
+  When he’s talking, it’s not just about physical cues like your active listening or your smile. When you touch your hair, it signals to him that you’re interested.
+Behind her, the corkboard is loaded with ever more info. Pics and facts of Kendrick’s family, especially his MOM.
+
+YOUTUBE VIDEO (V.O.):
+  The second most important moment of the date is the opening conversation. Get him engaged immediately. Ask him about something he enjoys: His career, his suit, his car.
+Sawyer checks her phone. Impatient. Nothing.
+
+YOUTUBE VIDEO (v.O.):
+  The most important moment comes at the end of the date: The kiss. First, go in for a hug to say goodbye. If it seems like he’ll kiss you, great. Let him do it. If not, pause briefly. Pretend like you are considering what you want to happen. Make sure your breath is pristine. Make sure it’s slow at first, so it can build...
+Sawyer watches. Rapt.
+
+YOUTUBE VIDEO (V.O.):
+  Reach behind his head and gently scratch where the hair meets the nape of the neck. Lightly tug if it’s long enough. This is an intimate signal that reminds men of their mothers caring for them. It will drive him wild.
+Sawyer clicks off the video and gets up to get more wine.
+
+Sawyer:
+  What is it with the mom fetish stuff...?
+As she’s walking away, her phone buzzes. She hurtles back to the phone, practically tripping. She snatches it up.
+Jason K: How about Solly’s tomorrow at 8
+Sawyer stares at the message, not smiling, deadly serious.
+She texts back: See you then
+
+───
+
+## Scene 101  —  Int. SawYER'S SOLVANG HOUSE - BEDROOM - the nEXT DAY
+p. 55  ·  0 2/8 pages
+
+Sawyer stands in front of her mirror in a new outfit. Trying to achieve the precious hourglass effect. She’s completely dissatisfied.
+
+───
+
+## Scene 102  —  Int. Boutique clothing store - day - later
+p. 55  ·  0 2/8 pages
+
+- Sawyer sifts through a rack of dresses
+- She stands in front of a dressing room mirror wearing the new dress.
+- She pays for the new dress with a credit card. A beep.
+
+───
+
+## Scene 103  —  Int. Bar - night
+p. 55  ·  5 7/8 pages  ·  Cast: JASON KENDRICK, SAWYER
+
+Sawyer sits waiting in the dim quiet, deep in thought. So much so that when Kendrick approaches her...
+
+JaSON KENDRICK:
+  Hey.
+She JUMPS.
+
+SaWYER:
+  Oh! Hi! Sorry. I was wool-gathering.
+
+JASON KENDRICK:
+  My bad...
+
+SAWYER:
+  ((stumbling))
+  I zone out sometimes. My mom used to say I live in my own reality.
+  ((pointing outside))
+  Is that your car?
+
+JASON KENDRICK:
+  ((taking a seat))
+  The Defender? Yeah, I know. Every time I turn it on, a polar bear dies.
+
+SAWYER:
+  No, it’s great. Very... big--is it diesel?
+
+JASON KENDRICK:
+  Yeah, that’s right. You know cars?
+
+SAWYER:
+  I’m just wondering how you got it certified in California?
+
+JASON KENDRICK:
+  Okay, I lied. You actually have to feed the engine a baby penguin to start it.
+They exchange a smile as he cracks the menu.
+LATER: They face each other. Drinks between them.
+
+JASON KENDRICK:
+  So where were you before this?
+
+SAWYER:
+  Minneapolis.
+
+JASON KENDRICK:
+  That’s a big change.
+
+SAWYER:
+  I needed warm weather.
+
+JASON KENDRICK:
+  What kind of work do you do?
+
+SAWYER:
+  Well, before this I taught English. Seventh graders.
+Kendrick looks up at her, suddenly much more intrigued.
+
+JASON KENDRICK:
+  No shit? My mom taught English. Same grade.
+
+SAWYER:
+  Oh really? Wow. So she probably had the whole curriculum. Freak the Mighty, On the Far Side of the Mountain--
+
+JASON KENDRICK:
+  Where the Red Fern Grows, The Outsiders--
+  Hatchet.
+
+JASON KENDRICK:
+  Hatchet.
+
+JASON KENDRICK:
+  ((cracking up))
+  Oh my God! Hatchet! My favorite fucking book at age twelve.
+
+SAWYER:
+  He’s a boy surviving in the wilderness with nothing but a hatchet. What’s not to love?
+
+JASON KENDRICK:
+  He cuts trees with the hatchet, he starts a fire with the hatchet...
+
+SAWYER:
+  A simple premise that translates to a universal quest for survival.
+
+JASON KENDRICK:
+  But you’re not teaching anymore?
+
+SAWYER:
+  I’d been wanting to move on. But it took a bad divorce and his alimony payments before I could afford to.
+
+JASON KENDRICK:
+  Oh. I’m sorry to hear that.
+  ((holds up his drink))
+  Welcome to the club.
+They clink.
+
+JASON KENDRICK:
+  Divorced two years now, but the marriage went to shit well before that. It’s not so bad. You learn to hate them and yourself a little less with each passing day.
+
+SaWYER:
+  And what is it that you do in Solvang?
+
+JASON KENDRICK:
+  I’m an actor actually. But not in Solvang. A real actor.
+
+SAWYER:
+  Sorry. I don’t watch many movies.
+
+JASON KENDRICK:
+  TV mostly. I was on this show...
+  ((trails off))
+  Never mind.
+
+SAWYER:
+  No! That’s so great. What kind of show? What was it called? Sorry, I feel stupid right now.
+
+JASON KENDRICK:
+  I’m the one who feels stupid, trust me. I made my name on a show called XenoSouls.
+
+SAWYER:
+  XenoSouls?
+
+JASON KENDRICK:
+  ((smirking))
+  That’s right. It was about this detective who stumbles onto a conspiracy, a race of aliens living amongst us, disguised as regular people.
+
+SAWYER:
+  Oh, that sounds...
+
+JASON KENDRICK:
+  Cheesy as fuck. Derivative as all hell. I know. But, ya know, every once in a while the writing could be zippy. A little fun. It was kind of incredible for a while there.
+
+SAWYER:
+  But it’s not anymore?
+
+JASON KENDRICK:
+  I’m trying not to lead with any woe-is-me actor stories. There is nothing worse than an actor complaining about his lot in life.
+
+SAWYER:
+  Try me.
+She is attentive, eyes wide, ready. She plays with her hair.
+
+JASON KENDRICK:
+  The show ended. Right? As shows do. So I tried to make a few movies. And it was just a rude awakening, like, Oh, not everything will be successful. Oh, maybe I have bad taste in scripts. Oh, maybe the prior thing was a fluke.
+  ((a beat))
+  I never had any dreams of being Tom Cruise or Daniel Day Lewis or, hell, even Freddie Prinze Jr.--
+
+SAWYER:
+  Now you’ve really lost me.
+
+JASON KENDRICK:
+  ((laughing))
+  All I ever wanted was something sustainable, so I wouldn’t have to be slinging Nissans back in Jersey. But then I got this big role, and it was the most money I’d ever seen in my life and...
+
+SAWYER:
+  And what?
+
+JASON KENDRICK:
+  Nah. Nothing. I’m talking too much. How was your divorce?
+
+SAWYER:
+  My divorce?
+
+JASON KENDRICK:
+  Yeah. If it was enough to send you fleeing, must’ve been a good one.
+
+SAWYER:
+  I don’t know--what happens in any marriage that sours?
+
+JASON KENDRICK:
+  He cheats.
+
+SAWYER:
+  No. Never.
+  ((beat))
+  We just. It just. It became something else. Why? Did you cheat?
+
+JASON KENDRICK:
+  No. When we got married, my wife and I said we’d have a Don’t Ask, Don’t Tell policy. You know, when it came to extracurriculars. We both worked in the game, in the world of celebrity, and with that comes a certain amount of temptation you can never really be rid of. For a while it worked. Then it didn’t.
+
+SAWYER:
+  What happened? You fell in love? She fell in love?
+
+JASON KENDRICK:
+  You got a way of asking questions without answering any.
+
+SAWYER:
+  I’m sorry. I’m just interested.
+Kendrick assesses her. She’s playing with her hair again.
+
+JASON KENDRICK:
+  Not sure I’m ready to spill my entire divorce on a first date.
+
+SAWYER:
+  Fair enough. Maybe on Date Two we can wander around a mall or something like we’re fourteen...
+
+JASON KENDRICK:
+  A mall?
+  ((scoffs))
+  Don’t think I’ve been to a mall in twenty years.
+Off Sawyer, trying to gauge why he told this fib.
+
+JaSON KENDRICK:
+  Back to my original question...
+
+SAWYER:
+  Which was...?
+
+JASON KENDRICK:
+  Why a middle school teacher wanted to drop everything and move out here.
+
+SAWYER:
+  Isn’t California where everyone goes for a second chance?
+
+JASON KENDRICK:
+  Not with our housing prices.
+
+SAWYER:
+  Sometimes, when your life has been completely turned upside-down, when you had all these goals to have kids, a family, a life with a person, and it all falls apart...
+  ((beat))
+  I needed a drastic change. And even if it didn’t exactly make sense, here I am sitting with you. And I like the way your forehead pinches when you’re thinking.
+He relaxes his forehead as he realizes he’s been doing just this. He looks at his drink.
+
+───
+
+## Scene 104  —  Ext. Parking lot - night - later
+p. 61  ·  0 6/8 pages  ·  Cast: JASON KENDRICK, SAWYER
+
+Sawyer and Kendrick walk, coming to a stop by his car.
+
+JASON KENDRICK:
+  That was surprisingly fun.
+
+SAWYER:
+  Surprisingly?!
+
+JASON KENDRICK:
+  I just mean it’s been a long time since I’ve been out on a date. I had a good time.
+
+SAWYER:
+  Good. Me too.
+They are standing very close together. Sawyer waits for him to lean in to hug her, then, like the video explained, she pauses, as if uncertain. He stops. Then she moves in slightly, and he follows her lead. They kiss.
+CLOSE ON: Sawyer begins rubbing the hair on the nape of his neck. Playing with it.
+When they pull away, Kendrick looks ever so slightly dazzled.
+
+SAWYER:
+  Maybe I’ll see you again?
+
+JASON KENDRICK:
+  I’d really like that.
+
+SAWYER:
+  Good.
+She cooly opens her car door. Kendrick steps back as she starts the car, and pulls away. We SMASH CUT TO:
+
+───
+
+## Scene 105  —  INT. SAWYER'S SOLVANG HOUSE - NIGHT
+p. 62  ·  0 2/8 pages
+
+Sawyer bursts through the door, kicking aside an ENVELOPE she doesn’t notice. She hustles to the TV like she’s missing election results, turns on an ep of XenoSouls. She goes to the bedroom and returns with her VIBRATOR, falling onto the couch, hastily pulling her dress up.
+
+───
+
+## Scene 106  —  Int. SAWYER'S SOLVANG HOUSE - night - momENTS LATER
+p. 62  ·  0 3/8 pages
+
+Sawyer lies on her couch, sweating, heaving breath, absolutely spent.
+ON THE TV: Jack Robbins sprints across a field, running from an alien or toward one.
+That’s when she finally spots something near the door: AN ENVELOPE.
+She goes over and picks it up. Opens it: AN EVICTION NOTICE - PAYMENTS PAST DUE
+
+───
+
+## Scene 107  —  Int. SAWYER'S SOLVANG HOUSE - living room - DAY
+p. 63  ·  0 2/8 pages  ·  Cast: SAWYER
+
+Sawyer, on the phone, picks up a package from Amazon, and begins to cut it open.
+
+SAWYER:
+  Yeah, just a small loan. It’s been more expensive out here than I anticipated.
+She removes a three-pack of GILLETTE COOL BREEZE DEODORANT.
+
+───
+
+## Scene 108  —  Int. Sawyer’s solvang house - kitchen - day
+p. 63  ·  0 2/8 pages  ·  Cast: SAWYER
+
+MOMENTS LATER: Her XANAX bottle nearby, she crushes up three of the pills into a fine powder with a mortar and pestle.
+
+SAWYER:
+  Thank you, Justine. You don’t know how much this means.
+
+───
+
+## Scene 109  —  ext. ruNNING TRAIL - day - the NEXT DAY
+p. 63  ·  3 2/8 pages  ·  Cast: JASON KENDRICK, SAWYER
+
+Sawyer and Kendrick walk the trail together, chatting.
+
+JASON KENDRICK:
+  I run this daily. Gotta stay in shape on the off-chance someone ever gives me a roll again.
+
+SAWYER:
+  Why can’t you get a roll? I thought you were famous.
+
+JASON KENDRICK:
+  The industry is a mess. Peak TV is rubble, so we’re back to network procedurals, and movies have basically been swallowed by superhero and videogame IP.
+
+SAWYER:
+  You know some people mine coal for a living.
+
+JASON KENDRICK:
+  ((laughs))
+  Poor little rich boy actor, I know. It has a way of making you feel like King Midas. Or like I wished upon a monkey’s paw or some shit. I tried to make an indie movie with this ego-crazed director, thinks he’s fucking PTA, and I had to bail halfway through, we hated each other so much. So instead I made a big CGI trash pile that lost some $70 million. Then right after that...
+  ((beat))
+  Remember the fires in LA?
+
+SAWYER:
+  Kinda hard to forget.
+
+JASON KENDRICK:
+  Mine was one of the houses that burned down. After the fires, we needed the stupid VIN number from our cars that got destroyed. You know, for insurance. So as soon as we could, we headed up there to sift around in the rubble and look for VINs on the burnt-out frames. Lilly wanted to hire someone to do it, but I just needed to see. So there we were in N95s, sifting around in the ashes. I just couldn’t believe my eyes. Here, I thought I’d been living fearlessly, living for the moment, seize the day, all that shit. But looking at my home and everything I’d ever owned and everything I’d ever accomplished in all those years in Los Angeles suddenly vaporized. That’s when I knew Lilly was going to leave me. I kinda fell apart. I couldn’t work, I couldn’t focus, I was acting erratic.
+
+SAWYER:
+  Erratic how? Like buying another house in the middle of the woods in wildfire country?
+
+JASON KENDRICK:
+  ((smiles, good-natured))
+  Like finding connections that weren’t there. Being at the center of conspiracies I could never quite see.
+
+SAWYER:
+  Now you sound like Jack Robbins.
+
+JASON KENDRICK:
+  I thought you didn’t watch TV?
+
+SAWYER:
+  ((effortless))
+  Since we met, I may have checked out an episode or two.
+She smiles at him, and he smiles right back.
+
+JASON KENDRICK:
+  You ever have something like that? Something that blindsides you so hard, you’re still walking around stunned years later?
+A beat of silence from Sawyer.
+
+SAWYER:
+  Of course.
+
+JASON KENDRICK:
+  Your marriage?
+
+SAWYER:
+  That’s right.
+
+JASON KENDRICK:
+  Do you still talk to him?
+
+SAWYER:
+  No. But his family sometimes.
+
+JASON KENDRICK:
+  Really? How does that work?
+
+SAWYER:
+  They’re kind to me. After it all happened, they more or less became my family.
+
+JASON KENDRICK:
+  Where’s yours?
+
+SAWYER:
+  My dad has another life in Japan. That’s been the situation since I turned five, so I’m not sure I’d even recognize him if we crossed on a street. And my mom passed away. Five years ago now.
+
+JASON KENDRICK:
+  I’m sorry.
+
+SAWYER:
+  Thank you.
+
+JASON KENDRICK:
+  ((beat))
+  Hey. So this will sound incredibly weird, but um, my ex called me. Lilly. Her and her uhh partner are coming to Solvang. To my place. For dinner.
+
+SAWYER:
+  Really?
+
+JASON KENDRICK:
+  Yeah, I know. We’re trying to stay friends--ah, sorry this is a weird ask.
+
+SAWYER:
+  Just dive in, Jason.
+
+JASON KENDRICK:
+  ((laughs))
+  Would you want to come to dinner?
+
+SAWYER:
+  With your ex and her new boyfriend?
+
+JASON KENDRICK:
+  That’s right.
+
+SAWYER:
+  That’s the most interesting third date offer of my life.
+
+───
+
+## Scene 110  —  Int. sawyer’s SOLVANG HOUSE - DAY
+p. 66  ·  0 3/8 pages  ·  Cast: JASON KENDRICK, SAWYER
+
+Sawyer and Kendrick enter together. He looks around. Her corkboard is again transformed with banal tourism info.
+
+jaSON KENDRICK:
+  Hey, so, today was fun, but we should probably take it slow?
+
+SAWYER:
+  I agree. A glass of wine, though? That doesn’t count as speed, right?
+
+JASON KENDRICK:
+  No. I guess it doesn’t.
+Sawyer heads into the kitchen alone.
+
+───
+
+## Scene 111  —  Int. Sawyer’s solvang house - day - momENTS LATER
+p. 67  ·  0 1/8 pages
+
+Sawyer has poured two glasses of wine. She quickly stirs the Xanax powder into one of the glasses.
+
+───
+
+## Scene 112  —  Int. Sawyer’s solvang house - day - simultaneous
+p. 67  ·  2 4/8 pages  ·  Cast: JASON KENDRICK, SAWYER
+
+Kendrick steps toward the window, looking out. When he glances down his eye catches: a box, with something poking out of it. He reaches in and pulls out:
+THE MACARONI CROWN. He examines the words: KING ANNA OF THE BAKER BOYS.
+As Sawyer returns with their wine...
+
+Jason kendrick:
+  Do you have a kid?
+
+Sawyer:
+  What?
+  ((seeing what he’s holding))
+  Oh. No. That’s--that’s nothing.
+She hands him his glass.
+
+SaWYER:
+  It’s from when me and my sister were kids. It’s really stupid.
+  ((off Kendrick’s look))
+  Our parents had a DVD of this movie--did you ever see The Fabulous Baker Boys? With Jeff Bridges and Michelle Pfeiffer?
+
+JASON KENDRICK:
+  Never caught that one, no.
+She takes the crown from him and studies it, lightly feeling the macaronis.
+
+SAWYER:
+  Anna was eight and I was six when we started stealing it off the living room shelf to watch in the basement. And, it is a really sexy movie, really not appropriate for us, so of course we loved it. Anna had this whole scenario, this game she dreamed up--she was so in love with Jeff Bridges. We ruled this kingdom, and it mostly involved us kidnapping the Baker Boys and, like, tying them up to the slide at the playground to kiss them. And there were goats.
+
+JASON KENDRICK:
+  There were goats in The Fabulous Baker Boys?
+
+SAWYER:
+  No, no, goats were the currency of the realm. How many goats you had decided which one of us got to be king. It usually involved me stealing her crown and her goats and then she’d kill me and get them back and kiss both of the Baker Boys.
+
+JASON KENDRICK:
+  So what are you doing with the crown?
+
+SAWYER:
+  I was the one who cleaned out the house after our mom passed. I tried to send it to her, but Anna and I don’t really talk anymore.
+She replaces the crown in the box.
+
+JASON KENDRICK:
+  Didn’t you talk to her the other day? She was at the charity event? She met Nick Foles?
+
+SAWYER:
+  ((hesitating, caught))
+  Yeah, that was a story from like ten years ago. I’m sorry, I’d seen you in the coffee shop a few times, and I just figured asking a sports question might break the ice because you were such a dudey-looking dude...
+Jason watches her, unsure of how to take this.
+
+SAWYER:
+  I’m so sorry, I know how weird--
+
+JASON KENDRICK:
+  No, it’s fine. It’s okay.
+
+SAWYER:
+  I’m embarrassed, really--
+
+JASON KENDRICK:
+  Was it money?
+
+SAWYER:
+  Was what money?
+
+JASON KENDRICK:
+  Why you don’t talk to her anymore. Was it the inheritance? The will?
+
+SAWYER:
+  ((hesitates))
+  Yeah. Exactly. How did you know?
+
+JASON KENDRICK:
+  From my fucking miserable family. My grandpa died and you wouldn’t believe how much people can hate each other over ten thousand dollars. My dad and his brothers still get in fistfights over it.
+
+SAWYER:
+  ((holds up his glass))
+  Cheers to family money drama.
+
+jaSON KENDRICK:
+  Cheers.
+They clink and drink.
+
+───
+
+## Scene 113  —  Int. SAWYER'S SOLVANG HOUSE - living room - day - later
+p. 69  ·  0 3/8 pages
+
+Jason is out cold on the couch. Breathing heavy. Sawyer sits beside him, the wine bottle on the table, watching him. She gives him a little shove. He doesn’t stir. She shoves him a little harder. Nothing.
+From the cushion, she pulls out: THE DEODORANT.
+She lifts his T-shirt up and smears deodorant under one armpit. Then the other. She clicks out a little bit more and spreads it on his chest. Then she recaps it and hides it back in the cushion.
+She crawls into him, draping his arm over her, nuzzling into his chest. She closes her eyes.
+
+───
+
+## Scene 114  —  Int. SAWYER'S SOLVANG HOUSE - LIVING ROOM - night
+p. 70  ·  0 5/8 pages  ·  Cast: JASON KENDRICK, SAWYER
+
+Kendrick awakes to find Sawyer sleeping on him. As he wakes up, so does she.
+
+JASON KENDRICK:
+  Sorry. Jesus. I totally zonked out there.
+
+SaWYER:
+  Wow, me too. Must’ve been the walk and the sun. I’m a lightweight with a Shiraz.
+
+JASON KENDRICK:
+  ((checks phone))
+  Man, it’s late. I should get going.
+
+SAWYER:
+  Of course.
+They move to the front door.
+
+SAWYER:
+  It was chaste, though. And cozy.
+
+JaSON KENDRICK:
+  For sure. I’ll see you for dinner Friday.
+He kisses her on the cheek. He departs.
+
+───
+
+## Scene 115  —  Ext. SawYER'S SOLVANG HOUSE - night - conTINUOUS
+p. 70  ·  0 1/8 pages
+
+As Kendrick descends the steps, he stops. He sniffs the air. He smells himself, noticing this new scent. Confused.
+
+───
+
+## Scene 116  —  Int. Boutique clothing store - day - later
+p. 70  ·  1 3/8 pages  ·  Cast: CASHIER, MARGO, SAWYER
+
+- Sawyer sifts through a rack of dresses
+- She stands in front of a dressing room mirror wearing the new dress. Nervous, but it looks good.
+- She pays for the new dress with a credit card. A beep.
+The cashier looks up at her.
+
+Cashier:
+  I’m sorry, the card isn’t going through.
+
+SAWYER:
+  Oh. Let’s try this one.
+She runs it, but same result. Sawyer taps her wallet on the counter nervously.
+
+CASHIER:
+  It doesn’t seem to be working either.
+
+SAWYER:
+  ((tearing up))
+  Okay. Let me try...
+She digs out a final card.
+
+SAWYER:
+  Can you please just--I really need this--
+
+Cashier:
+  I’m sorry, ma’am. I can’t just give you a dress.
+
+SAWYER:
+  ((near tears))
+  Please. Maybe on credit? I’m going to this dinner, and I need this dress--
+
+Margo:
+  I’ve got it.
+Margo appears beside her, holding out a credit card. The cashier looks at her a beat and then accepts it.
+Sawyer blinks back her tears.
+
+SAWYER:
+  Hi. Thank you.
+
+MARGO:
+  Don’t mention it.
+  ((a kind smile))
+Sawyer suddenly turns and hugs Margo fiercely.
+
+MarGO:
+  Like I said, I’ve been through a divorce myself. I hope he’s someone special.
+The two women continue to hug as the cashier steals glances: This is a weird one.
+
+───
+
+## Scene 117  —  Int./ EXT. sawYER'S CAR - MOVING - day
+p. 72  ·  0 1/8 pages
+
+Sawyer pulls up to Kendrick’s house, this time parking right in the driveway.
+
+───
+
+## Scene 118  —  Ext. JaSON KENDRICK'S HOUSE - day - contINUOUS
+p. 72  ·  0 2/8 pages
+
+She exits and walks up to the door, carrying a bottle of wine. Dressed beautifully. The sexiest outfit we’ve seen yet.
+CLOSE ON: The deadbolt lock has been replaced by an ELECTRONIC KEYPAD LOCK.
+The door swings open. Kendrick, dressed casually. They both smile, a nervous laugh each. He lets her in.
+
+───
+
+## Scene 119  —  Int. Jason kendrick’s house - night - later
+p. 72  ·  5 2/8 pages  ·  Cast: ALEX, JASON KENDRICK, LILLY, SAWYER
+
+Sawyer and Jason sit across from Lilly (30s) beautiful, and Alex (40s), his lawyer. Shots of the meals finished, the wine bottle half empty. A big KITCHEN KNIFE rests unobtrusively on a CUTTING BOARD in the kitchen.
+
+Alex:
+  No, no--that’s not true! I called Jason first. Didn’t I call you Jason?
+
+Lilly:
+  You asked me out drunk at the Vanity Fair party.
+
+JASON KENDRICK:
+  It’s true. You did call me. And I told you to fuck yourself.
+
+LILLY:
+  ((to Alex))
+  And the only reason I went out with you was to piss him off.
+
+AlEX:
+  We’re being rude. Sawyer doesn’t want to hear about Vanity Fair parties.
+
+JASON KENDRICK:
+  Sawyer likes to ask the questions but she doesn’t volunteer.
+
+SAWYER:
+  That’s not true. I just wait to speak until I have something to say. Not a popular stance these days.
+Everyone pauses, then Alex and Lilly laugh.
+
+LILLY:
+  I like her, Jason. She’s not what I expected.
+
+SAWYER:
+  What would you have expected?
+
+LILLY:
+  To be honest? A yoga bimbo. A pilates bimbo. Some kind of feckless Bambi in a wellness industry gig-job with a 24-carat ass.
+
+SAWYER:
+  Well, I’m a civilian with a skinny butt and a thing for guys from Pennsauken, New Jersey.
+She smiles at Jason. He smiles back--then blinks at something she said.
+
+AleX:
+  I think it’s refreshing. Jason, you’re dating a real, uncorrupted, uncelebrated, un-papparazzi’d human woman.
+
+JASON KENDRICK:
+  You can only let fame fuck your life up for so long.
+
+SAWYER:
+  Do you--
+  ((stops herself))
+
+JASON KENDRICK:
+  What?
+
+SAWYER:
+  Nothing. Nevermind.
+
+JASON KENDRICK:
+  No, what?
+
+SAWYER:
+  It’s just you refer to yourself being famous a lot.
+  ((playful))
+  Like, a lot.
+
+lillY:
+  Isn’t he?
+
+Alex:
+  Yeah, just because two or three or five movies bomb...
+
+Sawyer:
+  No, I mean it’s funny that anyone thinks actors are famous anymore.
+
+Lilly:
+  Go on.
+Sawyer sips her wine, grinning. Maybe she’s overindulged a bit.
+
+SAWYER:
+  It’s like in the 1920s, the old Vaudeville acts that used to go from town to town, they were famous. Until movies came along and made them all obsolete. The stage theaters went belly-up and the motion picture theaters opened next door. You’re the old Vaudeville.
+  ((taps Jason’s phone))
+  These people are the new famous. Their audience is loyal, addicted, and growing in every corner of the world while yours is dying off in droves year after year. You’re still doing the two-step for a geriatric medium, and every week there are more and more theater seats with no one in them.
+Off Jason’s disquieted look.
+
+LILLY:
+  You are definitely not what I expected.
+
+Alex:
+  Jason’s still famous enough for a stalker.
+
+JASON KENDRICK:
+  Hey. Alex--
+
+AleX:
+  Did you ever find out if it was her in here?
+
+JASON KENDRICK:
+  Not now, Alex.
+
+SAWYER:
+  ((feigning surprise))
+  You had a stalker?
+
+AlEX:
+  A real piece of work. It got ugly. But this is also not the kind of thing you want getting out there. Encourages copycats. I told him to ignore her and eventually she’d get bored and go after someone with more talent.
+
+JASON KENDRICK:
+  Alex...
+
+ALEX:
+  He calls me from time to time, saying he’s sure she’s been in his house.
+  ((winks))
+  What a drama queen.
+
+JASON KENDRICK:
+  I said not now.
+
+LiLLY:
+  It’s cute, Jase. The last gasp of what TV stardom can inspire.
+
+JASON KENDRICK:
+  Okay, well, you were the one who wanted to call the FBI.
+
+LILLY:
+  Because I didn’t want her to kill me. If she boiled your rabbit, I could’ve dealt.
+He gives her a look: Nice one. Sawyer, meanwhile, watches this volley.
+
+LiLLY:
+  The only thing that upset me was that you never took responsibility for your behavior towards her.
+
+JaSON KENDRICK:
+  My behavior towards her?!
+
+LILLY:
+  That’s right. You were so eager to leap to the premise of Single White Female, you never stopped to consider that maybe YOU instigated the entire episode.
+
+AleX:
+  C’mon, Lill, you wouldn’t be saying that if she’d done something violent.
+
+LILLY:
+  ((sipping wine))
+  I don’t believe it’s possible for women to commit violence against men.
+
+ALEX:
+  Oh you don’t?
+
+LILLY:
+  No. No matter what it is, it’s always justified.
+
+ALEX:
+  How do you figure?
+
+LILLY:
+  The entire history of men is one long episode of violence against women. It’s a millennia-long hate crime. So anything a woman does is self-defense.
+
+ALEX:
+  Okay, say I ask you to marry me, and we get up there on the alter, and you shoot me dead at our wedding in front of all our guests. That would be justified?
+
+LILLY:
+  Yes.
+
+AleX:
+  Murdering me?
+
+LILLY:
+  Yes. That’s not how I’d do it, though.
+
+ALEX:
+  You’ve thought about this?
+
+LILLY:
+  Honestly, I think about killing you all the time.
+  ((off his look))
+  When you’re sleeping, I’ll sometimes look at your thigh and think about severing the artery. You’d wake up but only in time for both of us to watch you bleed to death.
+
+ALEX:
+  ((a beat))
+  I really can’t wait to marry you.
+He kisses her.
+
+SaWYER:
+  ((she stands))
+  I need to use the bathroom.
+
+JASON KENDRICK:
+  It’s on the left, and the light’s on the outside--
+But she’s already inside with the light on. He looks after her, frowning. She knew exactly where to find it.
+
+───
+
+## Scene 120  —  Int. jASON KENDRICK'S HOUSE - living room - night - later
+p. 77  ·  1 6/8 pages  ·  Cast: ALEX, JASON KENDRICK, LILLY, SAWYER
+
+Lilly and Alex say their goodbyes.
+ON JASON AND ALEX: A handshake-hug-backpat.
+
+AleX:
+  Thanks for letting me steal your wife.
+
+JASON KENDRICK:
+  Trust me, you can have her.
+Kendrick’s eyes track: SAWYER’S PURSE, sitting on a chair.
+ON SAWYER AND LILLY: A chilly hug.
+
+LiLLY:
+  The one thing I’ll say for him is that he’s an alcoholic, so he’s excellent at eating pussy.
+ON LILLY AND JASON AT THE STOOP: Alex moving toward the car, Sawyer hanging back.
+
+LILLY:
+  She’s great, so I assume you’ll fuck it up.
+
+JASON KENDRICK:
+  I’ve never been so happy to watch someone leave my house.
+They embrace lovingly.
+
+LILLY:
+  Are you sure you’re okay, Jase?
+
+JASON KENDRICK:
+  ((beat))
+  I honestly don’t know.
+MOMENTS LATER: Jason closes the door behind them.
+
+SAWYER:
+  That was... interesting.
+Kendrick downs the rest of his wine. He goes to her.
+
+JASON KENDRICK:
+  Thank you for doing that. I know it was weird.
+
+SAWYER:
+  No. I actually loved her.
+
+JASON KENDRICK:
+  Hey, I’m sorry to do this, but it’s late. And that was a little emotionally draining.
+
+SAWYER:
+  ((disappointed))
+  Oh. Yeah. Totally.
+
+JASON KENDRICK:
+  Is that okay?
+
+SAWYER:
+  No. I completely understand.
+
+jaSON KENDRICK:
+  Maybe let’s talk tomorrow?
+
+SAWYER:
+  Yeah, for sure.
+She gathers her jacket. She’s looking for her purse, when--
+--Jason hands it to her.
+
+SAWYER:
+  Thank you.
+As they say goodbye at the door, she appears to be expecting to kiss him, but he simply shows her out. He shuts the door behind her.
+He pulls up a picture on his phone: SAWYER’S MINNEAPOLIS DRIVER’S LICENSE. He studies it.
+
+───
+
+## Scene 121  —  Int. SawYER'S SOLVANG HOUSE - DAY
+p. 79  ·  0 2/8 pages
+
+She stares at her phone. Refreshing the texts. Refreshing again. Growing frustrated. She starts to text: Hey... and deletes. Last night was fun... And deletes.
+
+───
+
+## Scene 122  —  Int./Ext. sawyer’s car - kendrick’s house - day
+p. 79  ·  0 2/8 pages
+
+Back in her stakeout spot, Sawyer stares forlornly at the house. With her binoculars, she can see him moving around inside. She texts him: Hey how you been? Any chance you want to get together tonight?
+She sees him in the window pick up his phone, look at it, set it back down, and walk away.
+
+───
+
+## Scene 123  —  Int. SawYER'S solvang house - LIVING ROOM - Day
+p. 79  ·  0 2/8 pages  ·  Cast: SAWYER
+
+Sawyer paces. She stares at the phone. Finally, she snatches it up and dials.
+
+SAWYER:
+  Hey, it’s me. It’s Sawyer.
+
+───
+
+## Scene 124  —  Int. Justine and tom’s House - hallway - day - intercut
+p. 79  ·  0 3/8 pages  ·  Cast: AARON, SAWYER
+
+Holding Aaron’s phone to her ear, Justine takes a seat on the bed. Door closed for privacy. Intercut Justine and Sawyer.
+
+Justine:
+  Hi, Sawyer.
+
+SAWYER:
+  Oh. Hi, Justine. What--Where’s Aaron?
+
+JUSTINE:
+  Sawyer, I need to say something to you, and it’s not going to be easy: Aaron didn’t tell Nadia that he went out to see you.
+
+SAWYER:
+  Okay...
+
+JUSTINE:
+  And as you can imagine, this caused a lot of problems here. He says nothing went on, and I believe him--
+
+SAWYER:
+  Of course, nothing went on.
+
+JUSTINE:
+  Okay. I believe you. But you have to see how that looked. And how it feels for Nadia.
+  ((off Sawyer’s silence.))
+  Sawyer, you can’t talk to him anymore. You can’t text him. You can’t call him. Understand?
+
+SAWYER:
+  I didn’t mean to--
+
+JUSTINE:
+  ((stern))
+  Do you understand?
+
+SAWYER:
+  Yeah. I understand.
+
+JUSTINE:
+  And I think, Sawyer...
+  ((tearing up))
+  That has to go for the rest of us, too. Tom and I went out of our way, after... everything, to welcome you into our family. We said ‘water under the bridge’ to all of it. After our boy died, we looked after you. And not that money is important, but we’ve now lent you a lot of it. So we need to draw some new boundaries.
+
+SAWYER:
+  Okay...
+
+JUSTINE:
+  I want you to be happy, Sawyer. We all wish you well, we really do. But this is going to be the last time we speak. Okay?...
+Tears spring to Sawyer’s eyes, as she understands what’s happening. She sounds very young and very small:
+
+SAWYER:
+  Okay.
+
+JUSTINE:
+  Goodbye, Sawyer.
+
+SAWYER:
+  Bye.
+They hang up. Sawyer stares at her phone a moment, shocked tears dripping. Then:
+She wipes her eyes.
+She takes a deep breath. Collects herself.
+She opens ChatGPT. She clears her voice:
+
+SAWYER:
+  Hey ChatGPT. If a guy hasn’t spoken to you for a while, what’s the best way to reengage with him?
+
+ChATGPT:
+  Here’s what I found: The best strategy is to casually see him in person. Men tend to be visually stimulated, so catch his eye with a fetching outfit. Another tactic would be to bring him a gift that he finds thoughtful.
+
+SAWYER:
+  What if I’ve been lying to him. Like a lot.
+
+CHATGPT:
+  If you've been lying to him, addressing the situation with honesty and empathy is crucial for rebuilding trust.
+She nods.
+
+SAWYER:
+  ((sincere, grateful))
+  Thank you.
+
+Chatgpt:
+  You're welcome! If you have any more questions or need further assistance, feel free to ask.
+Sawyer stands.
+
+───
+
+## Scene 126  —  Int. sawYER'S SOLVANG HOUSE - bedroom - momENTS LATER
+p. 82  ·  0 1/8 pages
+
+Dressed beautifully yet again, she does her makeup.
+
+───
+
+## Scene 127  —  Int./ Ext. sawyer’s car - moving - sunset
+p. 83  ·  0 1/8 pages
+
+Sawyer driving. She pulls into:
+
+───
+
+## Scene 128  —  Ext. JasoN KENDRICK'S driveway - sunset - coNTINUOUS
+p. 83  ·  0 1/8 pages
+
+She exits, carrying a bottle of Jason’s brand of whiskey. She takes a deep breath. She knocks twice.
+
+───
+
+## Scene 129  —  Int. JasON KENDRICK'S HOUSE - sunset - cONTINUOUS
+p. 83  ·  0 1/8 pages
+
+Jason looks out from the peephole. He lowers his head. He turns away from the door.
+
+───
+
+## Scene 130  —  Ext. JasON KENDRICK'S HOUSE - sunset - cONTINUOUS
+p. 83  ·  0 4/8 pages  ·  Cast: JASON KENDRICK, SAWYER
+
+Sawyer waits, fidgeting. She knocks again. This time, mid-knock: Kendrick answers. The door swings open.
+
+SAWYER:
+  Hi. You didn’t call--I mean, I didn’t hear from you, so...
+She holds up the bottle.
+
+SAWYER:
+  I got you this.
+He stares at it. He’s already holding a GLASS OF BOURBON.
+
+SAWYER:
+  Can I come in?
+
+JASON KENDRICK:
+  ((hesitates))
+  Sure.
+
+SAWYER:
+  Really? Yeah, okay...
+
+───
+
+## Scene 131  —  Int. jaSON KENDRICK'S HOUSE - sunset - coNTINUOUS
+p. 83  ·  3 6/8 pages  ·  Cast: JASON KENDRICK, SAWYER
+
+Sawyer enters. She’s anxious, edgy, maybe near a breakdown of some kind. She sets the bottle on the counter.
+
+SaWYER:
+  I just wanted to--I told you I’m not good at this. I’m not good at dating. I just wanted to ask if I did anything wrong at dinner the other night. I don’t know, I feel like maybe I made a fool of myself with all that Vaudeville stuff...
+They stand in the middle of the kitchen. All the dishes are still dirty from the night before.
+The KITCHEN KNIFE still lies on the cutting board, in the frame but not central. Just visible.
+
+JASON KENDRICK:
+  A fool?
+
+SAWYER:
+  Yeah. If I said something. Or did something.
+He points at her with his whiskey-glass hand.
+
+JASON KENDRICK:
+  How did you know I’m from Pennsauken?
+
+SAWYER:
+  Huh?
+  ((beat))
+  You told me that.
+
+JASON KENDRICK:
+  Right. I think I told you I was from Jersey.
+
+SAWYER:
+  Well. I did a quick Google. And Wikipedia.
+
+JASON KENDRICK:
+  Okay, Pennsauken ain’t on my Wikipedia page. It’s wrong on there and says Palmyra--but whatever. When we met, though, you just guessed I was an Eagles fan?
+
+SAWYER:
+  Jason, it’s really not a big deal. All I did was look you up--
+
+JASON KENDRICK:
+  How did you know about the bathroom?
+
+Sawyer:
+  What about it?
+
+Jason Kendrick:
+  When you were over for dinner, you knew the bathroom light was on the outside of the door.
+Sawyer’s eyes land on the bedroom behind him. She sees the SAFE is open.
+
+JASON KENDRICK:
+  Who are you?
+  ((off Sawyer’s confusion))
+  Who are you?
+
+SAWYER:
+  I don’t understand.
+
+JASON KENDRICK:
+  Let’s try this: what school did you teach at?
+
+SAWYER:
+  In Minneapolis.
+
+JASON KENDRICK:
+  That’s a city. I said, “What school?”
+Sawyer stares at him. He holds up his phone with the picture of her driver’s license.
+
+JASON KENDRICK:
+  It’s not just celebrities you can Google, Sawyer. You’re an economist? You have a PhD. You did your dissertation on
+  ((reads from phone))
+  “Social Drivers of Digital Transformation Economics for IT, AI, and Machine Learning.”
+Sawyer just stands there.
+
+JASON KENDRICK:
+  And you knew where my bathroom light was. That light confuses everyone. You didn’t ask. You didn’t hesitate. You went straight to it.
+Sawyer says nothing.
+
+JASON KENDRICK:
+  It was you in my house, wasn’t it? Everyone thought I was losing my fucking mind, but I knew someone had been in here. I knew it.
+
+SAWYER:
+  Jason, I--
+Tucked into his pants, he pulls from behind him: THE GUN. It dangles from his arm, pointing at the ground.
+
+JASON KENDRICK:
+  I want you to leave. Now.
+Sawyer stares at the gun, breathless. But she doesn’t move.
+
+JASON KENDRICK:
+  ((furious))
+  Get out of my house, you crazy fucking cunt!
+A beat. Sawyer stares. The knife is within arm’s reach. Her eyes don’t go there at all. But ours do.
+
+SaWYER:
+  You look like him. Just like him.
+
+JASON KENDRICK:
+  ((beat))
+  What? What are you talking about?
+
+SAWYER:
+  My husband. I’m not divorced. He died. A pulmonary embolism. Out of nowhere. No warning. I just came downstairs one night--we were about to watch a show--and there he was lying on the floor, not breathing.
+Kendrick still looks furious but he doesn’t interrupt her.
+
+SAWYER:
+  His name was David. We’d bought a house. We were trying to get pregnant. He and I--we had to fight to be together. I had to give up everything. He and I used to joke, that he looked like you. Or you looked like him. We loved your show, and you became a little in-joke we had. He’d do your voice, recite lines. It isn’t just the physical resemblance either. It’s little tics. Small mannerisms. You’re... brasher than he was. He was gentler, good-humored, and not sad in the same way you’re sad.
+On Kendrick, this lands. She’s seen into him somehow.
+
+SAWYER:
+  Coming here, to find you--I just wanted a sliver of that back. Even if it’s fake. I wanted to make love to you. Just once. I know that sounds insane, I know I sound insane, and I swear I’m not some crazy stalker, I’m just--
+  ((beat, crying now))
+  I just want to touch your chest and arms like I did with him him. I want to make love to you like you’re him. I want to put your cock in my mouth like I did with him. And I want to fall asleep beside you. Like you’re him.
+On Kendrick staring at her in stunned silence. Absolutely still. The gun dangling from his hand.
+SMASH CUT:
+
+───
+
+## Scene 132  —  Int. JaSON KENDRICK'S HOUSE - bedROOM - momenTS LATER
+p. 87  ·  0 2/8 pages
+
+Sawyer and Kendrick kiss, silhouetted in the dark of his bedroom, pulling each other’s shirts off. The music swells. Sawyer finally gets exactly what she wants.
+
+───
+
+## Scene 133  —  Int. JASON KENDRICK'S HOUSE - bedROOM - NIGHT - laTER
+p. 87  ·  0 4/8 pages  ·  Cast: JASON KENDRICK, SAWYER
+
+Sawyer and Kendrick lie beside each other, spent from the activities. She clutches him, a tear crawling from her eye.
+He holds her, not sure what just happened or why he did that. But he’s felt something profound, and he squeezes her back.
+
+SAWYER:
+  I’m sorry.
+
+JaSON KENDRICK:
+  Don’t be.
+
+SAWYER:
+  I’ll leave soon.
+
+JASON KENDRICK:
+  You don’t have to.
+They clutch each other, as if they’re not strangers.
+
+───
+
+## Scene 134  —  Int. JaSON KENDRICK'S HOUSE - beDROOM - laTER
+p. 88  ·  1 0/8 pages  ·  Cast: JASON KENDRICK, THE WOMAN
+
+Sawyer and Jason lie asleep beside each other. The house is quiet, still, lovely.
+CLOSE ON: Sawyer’s face, eyes closed, serene, catching the moonlight.
+CLOSE ON: Kendrick beside her, breathing quietly.
+PULL BACK to reveal: A FIGURE STANDING OVER THE BED, shrouded in darkness.
+CLOSE ON: Sawyer, stirring.
+BACK ON: The figure holds something. The KITCHEN KNIFE.
+Sawyer’s eyes open, just in time to see:
+The Figure brings the knife down with both hands, PLUNGING IT INTO SAWYER’S CHEST.
+Sawyer gasp-screams.
+
+The woman:
+  ((screaming))
+  You did this! You did this!
+Kendrick bolts awake, tumbling out of bed. Sawyer clutches the knife in her ribs, stuck in to the hilt. She spasms, eyes wide in pain, shock, and fear. The camera stays with her.
+
+The WOMAN:
+  How could you do this, you fucking animal! How could you!
+
+JaSON KENDRICK:
+  Oh God what did you do?!
+
+THE WOMAN:
+  You know what you did!
+
+JASON KENDRICK:
+  What the fuck did you do?!
+The light goes on to reveal: MARGO. The neighbor.
+As Margo carries on and Kendrick tries to rip her off, the knife remains buried in Sawyer’s chest.
+CLOSE ON: Sawyer, her face, as she gasps and wheezes while the struggle ensues beside her. The sound fades to the buzzing in her ears. Closer and closer until we cut to:
+
+───
+
+## Scene 135  —  int. JaSON KENDRICK'S HOUSE - night - later
+p. 89  ·  0 1/8 pages
+
+Kendrick carries her to the car, knife still in her chest.
+
+───
+
+## Scene 136  —  Int./ EXT. jASON KENDRICK'S car - nigHT - momENTS LATER
+p. 89  ·  0 2/8 pages  ·  Cast: JASON KENDRICK
+
+Kendrick speeds through the night, sweating, crying. He glances back at Sawyer. She touches the knife.
+
+JASON KENDRICK:
+  Don’t touch it! Don’t pull it out! We’re almost there...
+
+───
+
+## Scene 137  —  Int. Hospital entrance - night - montage
+p. 89  ·  0 1/8 pages
+
+Kendrick carries Sawyer inside, panicked.
+
+───
+
+## Scene 138  —  Int. Hospital - waiting area - night - montage
+p. 89  ·  0 1/8 pages
+
+He sits in the waiting area with his head in his hands
+
+───
+
+## Scene 139  —  Int. Hospital hallway - night - montage
+p. 89  ·  0 1/8 pages
+
+Doctors rush Sawyer into the Operating Room.
+
+───
+
+## Scene 140  —  Int. Hospital waiting area - night - later
+p. 89  ·  0 1/8 pages
+
+PLAIN-CLOTHES POLICE speak to Kendrick, who’s still red-eyed, teary, scared. He gesticulates as he explains.
+
+───
+
+## Scene 141  —  Int. Hospital room - night - conTINUOUS
+p. 89  ·  0 1/8 pages
+
+Sawyer lies in bed, asleep, hooked to a heart monitor and a saline bag, post-surgery.
+
+───
+
+## Scene 142  —  Int. HoSPITAL ROOM - day
+p. 89  ·  0 4/8 pages  ·  Cast: NURSE, SAWYER
+
+CHYRON: TWO WEEKS LATER
+Sawyer sits on the edge of her bed in just her bra and pants. She slowly stands and goes to the mirror to examine the fresh dressing covering her wound.
+As she pulls on her shirt, a NURSE brings in a WHEELCHAIR.
+
+Nurse:
+  Sawyer, honey? Your ride’s here.
+
+SAWYER:
+  My ride?
+Sawyer sees, standing in the doorway: ANNA (mid-30s).
+Anna stares at her, arms crossed, face blank. Sawyer looks stunned. The nurse pats the WHEELCHAIR.
+
+NURSE:
+  Just to the parking lot.
+
+───
+
+## Scene 143  —  Ext. PARKING LOT - day - momENTS LATER
+p. 90  ·  0 2/8 pages
+
+The nurse wheels Sawyer to a car as Anna walks alongside. Anna is icy, silent. Anna opens the door for Sawyer, who stands with relative ease, wincing a bit, and lowers herself into the passenger seat.
+
+───
+
+## Scene 144  —  Int./ EXT. anna’s car - moving - day - momENTS LATER
+p. 90  ·  0 1/8 pages
+
+Anna drives while Sawyer rides shotgun in a chilly silence.
+
+───
+
+## Scene 145  —  Ext. SaWYER'S SOLVANG HOUSE - DAY - laTER
+p. 90  ·  0 2/8 pages
+
+Anna’s car pulls into the driveway. Sawyer and Anna exit, Sawyer very gingerly. Anna has the keys to let them in. Anna’s every movement is tinged with anger, aggression.
+
+───
+
+## Scene 146  —  Int. SaWYER'S SOLVANG HOUSE - DAY - conTINUOUS
+p. 90  ·  0 6/8 pages  ·  Cast: ANNA, SAWYER
+
+Anna and Sawyer enter. Still without having said a word.
+
+Anna:
+  I threw out the spoiled stuff and got some basics. Eggs, milk, bread.
+
+SAWYER:
+  Okay.
+  ((beat))
+  How long have you been here?
+
+ANNA:
+  I got here last week. I’ve just been at a hotel. The doctor says you should walk as much you can but don’t overdue it. My flight back to Frankfurt is tomorrow, so I’m going to drive down and spend the night near LAX.
+
+SAWYER:
+  Yeah. Okay.
+Anna turns to leave. She pauses.
+
+ANNA:
+  Oh, and I paid your rent.
+Sawyer nods.
+
+SAWYER:
+  Thank you--
+But Anna exits before she can even finish the phrase.
+Sawyer hesitates. Then, still in pain, she follows Anna.
+
+───
+
+## Scene 147  —  Ext. SawYER'S SOLVANG HOUSE - DAY - cONTINUOUS
+p. 91  ·  2 7/8 pages  ·  Cast: ANNA, SAWYER
+
+Anna opens the car door as Sawyer emerges.
+
+SAWYER:
+  Hey. Wait. Anna, wait.
+Anna stops. Turns.
+
+Anna:
+  What, Sawyer?
+
+SAWYER:
+  ((beat))
+  I’m not sure.
+
+anna:
+  Great.
+She starts to get inside the car.
+
+SAWYER:
+  Why’d you come?
+
+ANNA:
+  Because someone stabbed you.
+
+SAWYER:
+  And now you’re just going to drive away?
+
+ANNA:
+  That’s right, Sawyer. I’m just going to drive away.
+
+SAWYER:
+  This will never be over?
+
+ANNA:
+  This?
+She shakes her head in amazement. Slams the car door shut.
+
+AnNA:
+  You mean “this” when you fucked my fiancé. When you stole him and married him and ruined my life? Is that the “this” you’re referring to, Sawyer?
+
+SAWYER:
+  He’s gone, Anna. David’s gone.
+
+ANNA:
+  Oh, I know. But you at least got those years with him. My grief just got a fresh new twist. The man I planned a life with, who left me for my fucking sister, died. And all I can think, after all these years, is how much I still hate him... and how much I miss him.
+  ((crying, shakes her head))
+  The thing is I saw it happening. I saw the way you two acted around each other. I just told myself it couldn’t actually be real. I was imagining jealousies the way I’d always imagined them with you since we were teenagers.
+
+SAWYER:
+  I told you, nothing ever happened while you guys were together--
+
+ANNA:
+  That’s not the point! Do you understand at all, Sawyer? It’s been five years, and I’m stuck. Completely stuck. I had to take a job in Germany just to get away from you! And I can’t date, I can’t move on, I still can’t think about anything else. And I can’t be around my sister because you just remind me of--
+She breaks down, unable to continue.
+
+SAWYER:
+  I’m sorry, Anna. I’m so sorry. I’ve always been sorry.
+
+ANNA:
+  Before Mom died, she warned me, too. She knew something about being fucked over by a man. She told me there was something happening between you and David, and I told her it was impossible. “Sawyer would never do that.”
+
+SAWYER:
+  We were in love, Anna. I don’t have any defense besides that.
+
+ANNA:
+  What is that worth?
+
+SAWYER:
+  I need you. I’ve needed you so badly. I miss both of you so much I feel like I’m drowning.
+
+ANNA:
+  And that’s why I can’t forgive you. There has to be a consequence for what you did. And even if it kills me, Sawyer--even if shutting you out costs me my sanity--I swear to fucking God, I will make you live with the consequence. I will never forgive you, and this will never be right.
+
+SAWYER:
+  I’m not asking you to forgive me--
+
+ANNA:
+  What the fuck are you asking then?!
+
+SAWYER:
+  Just... wait here. One minute.
+Sawyer turns and goes as fast as she can back inside the house.
+Frustrated, Anna grinds her heel into the gravel and waits.
+Sawyer returns, holding: the MACARONI CROWN. She hands it to Anna.
+
+SAWYER:
+  I’ve been meaning to... When I cleaned out the house, I found it. But it’s yours. I was more your court jester than anything.
+Anna doesn’t give it another glance. She just stares at Sawyer like: This fucking bitch still doesn’t get it.
+She drops the Crown in the dirt. She turns, gets back in her rental car, and drives away.
+
+───
+
+## Scene 150  —  Int. Sawyer’s solvang house - living room - day - montage
+p. 94  ·  0 2/8 pages
+
+Sawyer clicks through MINNEAPOLIS ONE-BEDROOM APARTMENTS on her laptop.
+
+───
+
+## Scene 149  —  Int. Sawyer’s solvang house - bedroom - day - montage
+p. 94  ·  0 1/8 pages
+
+Sawyer continues to box up all her stuff.
+
+───
+
+## Scene 151  —  Int. SawYER'S SOLVANG HOUSE - DAY
+p. 94  ·  0 2/8 pages  ·  Cast: JASON KENDRICK
+
+Sawyer is packing when the doorbell rings. Packed boxes have accumulated around the room. She answers to find: JASON.
+
+JASON KENDRICK:
+  Hey.
+
+───
+
+## Scene 152  —  Int. SaWYER'S SOLVANG HOUSE - DAY - momENTS LATER
+p. 95  ·  2 5/8 pages  ·  Cast: JASON KENDRICK, SAWYER
+
+Jason sits on the couch as Sawyer hands him a cup of coffee.
+
+SaWYER:
+  Sorry. All I have is the instant stuff. The coffee maker’s packed.
+
+JASON KENDRICK:
+  Where are you going?
+
+SAWYER:
+  Back to Minneapolis. Have they found...?
+
+JASON KENDRICK:
+  No. Not yet. They said she just used her credit card in Canada. Some place called Red Deer north of Calgary.
+  ((reassuring))
+  They’ll find her.
+  ((beat))
+  Look, I just wanted--
+
+SAWYER:
+  I want to say how sorry--
+  --to say how sorry I am.
+
+SAWYER:
+  --I am.
+
+JASON KENDRICK:
+  You don’t have anything to be sorry for.
+
+SAWYER:
+  I do. I lost myself.
+Kendrick shakes his head.
+
+JASON KENDRICK:
+  I knew she was dangerous. It was like the more I tried to tell everyone, the more they thought I was overreacting.
+
+SAWYER:
+  She must’ve started following me after I started following you. She told me her name was Margo. And that she was a local Reiki healer.
+
+JASON KENDRICK:
+  She is. Just in LA. We--
+  ((he rephrases))
+  I was drunk at this party, and I thought she knew it would be a one-time--it doesn’t matter.
+  ((beat))
+  I’m sorry about your husband.
+
+SAWYER:
+  Thank you.
+
+JASON KENDRICK:
+  I think that’s why I was attracted to you when we first met. I could sense you had something similar.
+
+SAWYER:
+  Similar how?
+
+JASON KENDRICK:
+  I dunno what to call it. A knowledge.
+  ((his voice gets shaky))
+  After I slept with her, that woman started texting me all the time, leaving voicemails, commenting on every post I’d ever put up on social media. I had to change my number. Then she started showing up--at the grocery store or near the set of the show. Never crossing the line enough to where I could do anything about it.
+  ((beat))
+  But when the fires started, I was sure it was her, that the bitch had finally snapped. And she wasn’t just going to take my house, she was going to burn down the whole city. Later, even after it was all said and done, I still had a hard time believing it was just the Santa Ana winds.
+  ((beat))
+  When we got the alert, Lilly and I ran outside, to get in one of our three cars to get the fuck outta there, and over the hill, I could see this awful orange glow. For a full ten seconds I couldn’t move. I couldn’t even reach for the door handle. I was just totally paralyzed.
+  ((beat))
+  Afterwards, I couldn’t get rid of this... terror. It’s like I’m still standing frozen by the car waiting for the fire to come over the hill. And there’s nothing I can do but buy bullshit online and try not to think about it all too much. When I bought that gun, I told myself it was for protection. From her. But obviously that's not what it was for. It was in case I couldn't be alone with my thoughts any longer.
+A long beat passes between them.
+
+JASON KENDRICK:
+  ((half-joking))
+  So. You wanna get a drink sometime?
+
+SAWYER:
+  If you’re ever in Minneapolis, you can look me up.
+Kendrick lets a wan smile slip at this soft, careful rejection.
+
+SAWYER:
+  Oh, this is yours, by the way.
+She holds out his sweaty, crumpled running shirt.
+
+───
+
+## Scene 153  —  Int./ EXT. sawyer’s cAR - MOVING - DAY
+p. 97  ·  0 1/8 pages
+
+Quick pops of her home city, still inhospitably cold.
+
+───
+
+## Scene 157  —  ext. Sawyer’s new apartment - day
+p. 97  ·  0 1/8 pages
+
+She walks up to an apartment with a FOR RENT SIGN in the yard.
+
+───
+
+## Scene 155  —  Int. Sawyer’s new apartment - living room - day
+p. 97  ·  0 2/8 pages  ·  Cast: SAWYER
+
+In her newly outfitted apartment, a few boxes still waiting to be unpacked, Sawyer interviews for a job over zoom.
+
+SaWYER:
+  Three years there, then I left for an opportunity with another digital media company.
+LATER: She works at a laptop, typing up a report.
+
+───
+
+## Scene 156  —  Int. Goodwill - day
+p. 98  ·  0 1/8 pages
+
+Sawyer donates the Dill With It shirt.
+
+───
+
+## Scene 158  —  Int. Bar - night
+p. 98  ·  1 2/8 pages  ·  Cast: BERNARD, SAWYER
+
+Sawyer is on a date with BERNARD, who we met in the opening at the grief group.
+
+BERNARD:
+  A masters in civil engineering. That’s where I met Joyce. She was in that game, too.
+
+SaWYER:
+  And how long were you married?
+
+BERNARD:
+  Almost seven years. We were just starting to try. You know, for kids, which is how we found out. She had a doctors appointment, and suddenly...
+
+SAWYER:
+  You’re thrust into the most terrifying situation of your life.
+
+BERNARD:
+  Yeah, pretty much--but honestly, we don’t have to talk about our dead spouses.
+
+SAWYER:
+  What else do we have to talk about?
+
+BERNARD:
+  I don’t know. Do you like movies? TV?
+
+SAWYER:
+  Not really.
+A pregnant pause.
+
+Sawyer:
+  A lady asked me if it’s possible to bore your husband to death.
+  ((beat))
+  I told her, it depends on how big the drill is.
+Bernard stares at her, uncomprehending.
+
+Bernard:
+  Huh?
+
+SAWYER:
+  It’s a dead husband joke.
+
+BERNARD:
+  A dead husband...? What?
+
+SAWYER:
+  A joke. It’s a joke.
+
+BERNARD:
+  Oh! Sure. Right.
+
+───
+
+## Scene 159  —  Ext. Sawyer’s car - PARKED - night - later
+p. 99  ·  0 6/8 pages  ·  Cast: BERNARD, SAWYER
+
+Bernard walks Sawyer to her car.
+
+BERNARD:
+  This was fun.
+
+SAWYER:
+  Yeah. For sure.
+
+BERNARD:
+  I have tickets to see Blue Velvet this weekend. You know, David Lynch? If you’re interested.
+
+SAWYER:
+  Oh, I actually have a plan to see some family this weekend.
+
+BERNARD:
+  Okay. Maybe next week?
+
+SAWYER:
+  Maybe.
+
+BERNARD:
+  Okay. Cool. Goodnight.
+He leans in for a kiss, and Sawyer deftly turns her head so it lands on her cheek.
+
+SAWYER:
+  Goodnight.
+
+───
+
+## Scene 160  —  Int. Sawyer’s new apartment - night - later
+p. 100  ·  0 2/8 pages
+
+Sawyer returns home. She dumps her keys and jacket. She collapses on the couch. Turns on the TV.
+She clicks through a few streamers.
+She comes to, XenoSouls. She stares at it a moment.
+She shuts off the TV, and picks up a book. She settles into her couch, reading.
+
+───
+
+## Scene 161  —  Int. SaWYER'S new APARTMENT - night
+p. 100  ·  1 1/8 pages  ·  Cast: ANNA, THE END
+
+Sawyer wakes. She’s fallen asleep with the book on her chest.
+She gets up to get ready for bed.
+She changes her shirt. We see the SCAR, now a thin, white line.
+As she goes to put toothpaste on her brush, there’s a CREAK from outside the apartment door. She FREEZES.
+She carefully steps into the hallway, staring at the door.
+ON THE PEEPHOLE: It’s dark. Suddenly, someone’s head moves from behind it and the HALLWAY LIGHT COMES SHINING THROUGH.
+Sawyer quickly goes to the KITCHEN.
+She quietly slides a KNIFE from the KITCHEN BLOCK and holds it by her side.
+She carefully approaches the door. She looks through the peephole.
+The knife CLATTERS to the ground.
+She swings the door open, and we see:
+ANNA.
+CLOSE ON: Sawyer, stunned
+Anna has her arms crossed petulantly.
+
+Anna:
+  I need my crown back. You suck at taking care of the goats. And then the Baker Boys will escape and--
+Sawyer practically tackles her with an embrace, squeezing her sister tight.
+CLOSE ON: Anna, returning the hug. Choking up. Finally dropping something she’s been carrying for years.
+CLOSE ON: Sawyer, tears streaming down her face.
+NEEDLE DROP: Maggie Glass’s cover of Springsteen’s “Back in Your Arms.”
+In the doorway, the two sisters hold each other even tighter.
+
+The end:
+.
+.
+Back in your arms
+Written by
+Stephen Markley
+Address
+Phone Number
+"I bought that gun, I told myself it was for protection. From her. But I'm not sure that's what it was for. It was in case I couldn't be alone with my thoughts any longer"
+
+───
