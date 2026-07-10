@@ -68,6 +68,9 @@ export default function OutreachSection({ projectId }: { projectId: string }) {
   // Kept separate from `error` so a normal result (some written, some
   // still needing a note) never renders in the red error banner.
   const [generateResult, setGenerateResult] = useState<{ text: string; tone: 'success' | 'info' } | null>(null)
+  // Email-verification (MX check) state + its own calm result banner.
+  const [verifying, setVerifying] = useState(false)
+  const [verifyResult, setVerifyResult] = useState<{ text: string; tone: 'success' | 'info' | 'warn' } | null>(null)
   // Test-send bar
   const [testTo, setTestTo] = useState(user?.email ?? 'ryan@strawhutmedia.com')
   const [testSending, setTestSending] = useState(false)
@@ -187,12 +190,49 @@ export default function OutreachSection({ projectId }: { projectId: string }) {
     }
   }
 
+  async function verifyEmails() {
+    setVerifying(true)
+    setError(null)
+    setVerifyResult(null)
+    try {
+      const r = await api.verifyOutreachEmails(projectId)
+      const fresh = await api.outreachProspects(projectId)
+      setProspects(fresh.prospects)
+      if (r.checked === 0) {
+        setVerifyResult({ text: 'No addresses to check yet — add some prospects with emails first.', tone: 'info' })
+        return
+      }
+      const parts = [`✓ Checked ${r.checked} address${r.checked === 1 ? '' : 'es'}: ${r.valid} good`]
+      if (r.risky > 0) parts.push(`${r.risky} risky (no mail server — may not deliver)`)
+      if (r.invalid > 0) parts.push(`${r.invalid} undeliverable (won't be sent)`)
+      const tone: 'success' | 'warn' = r.invalid > 0 || r.risky > 0 ? 'warn' : 'success'
+      const tail = r.invalid > 0
+        ? ' Look for the red tags below — fix or remove those before sending.'
+        : ''
+      setVerifyResult({ text: parts.join(' · ') + '.' + tail, tone })
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'verify failed')
+    } finally {
+      setVerifying(false)
+    }
+  }
+
   async function sendCampaign() {
+    // Only count addresses that will actually send: Ready, with a
+    // sentence, verified, and not flagged undeliverable.
     const readyList = (prospects ?? []).filter(
-      (p) => p.status === 'ready' && p.email && p.unique_sentence?.trim(),
+      (p) => p.status === 'ready' && p.email && p.unique_sentence?.trim()
+        && p.email_check_status !== 'invalid' && p.email_check_status !== 'unchecked',
     )
     if (readyList.length === 0) {
-      setError('No prospects are Ready. Each needs an email + a unique sentence.')
+      const needVerify = (prospects ?? []).filter(
+        (p) => p.status === 'ready' && p.email && p.email_check_status === 'unchecked',
+      ).length
+      setError(
+        needVerify > 0
+          ? `Verify emails first — ${needVerify} Ready ${needVerify === 1 ? 'address hasn\'t' : 'addresses haven\'t'} been checked. Click “✅ Verify emails”.`
+          : 'No prospects are Ready. Each needs an email + a unique sentence.',
+      )
       return
     }
     const ok = confirm(
@@ -274,6 +314,16 @@ export default function OutreachSection({ projectId }: { projectId: string }) {
   const needsEmailCount = prospects?.filter((p) => p.status === 'needs_email').length ?? 0
   const sentCount = prospects?.filter((p) => p.status === 'sent').length ?? 0
   const repliedCount = prospects?.filter((p) => p.status === 'replied').length ?? 0
+  // Addresses with an email that still need the deliverability check.
+  const uncheckedCount = prospects?.filter(
+    (p) => p.email && p.email_check_status === 'unchecked'
+      && p.status !== 'sent' && p.status !== 'replied' && p.status !== 'opted_out',
+  ).length ?? 0
+  // Ready prospects whose address hasn't been verified — these BLOCK the
+  // campaign send until they're checked.
+  const readyUncheckedCount = prospects?.filter(
+    (p) => p.status === 'ready' && p.email && p.email_check_status === 'unchecked',
+  ).length ?? 0
 
   return (
     <section className="rounded-2xl border border-line bg-panel/60 p-4 sm:p-5 space-y-5">
@@ -426,6 +476,20 @@ export default function OutreachSection({ projectId }: { projectId: string }) {
             </div>
           )}
 
+          {verifyResult && (
+            <div
+              className={`rounded-lg border px-3 py-2 text-xs ${
+                verifyResult.tone === 'success'
+                  ? 'border-emerald-500/40 bg-emerald-500/10 text-emerald-100'
+                  : verifyResult.tone === 'warn'
+                    ? 'border-amber-500/40 bg-amber-500/10 text-amber-100'
+                    : 'border-sky-500/40 bg-sky-500/10 text-sky-100'
+              }`}
+            >
+              {verifyResult.text}
+            </div>
+          )}
+
           <div className="flex items-baseline justify-between gap-2 flex-wrap">
             <h3 className="text-[10px] uppercase tracking-[0.2em] text-muted font-bold">Prospects</h3>
             <div className="flex items-center gap-2 flex-wrap">
@@ -434,11 +498,29 @@ export default function OutreachSection({ projectId }: { projectId: string }) {
               {readyCount > 0 && (
                 <button
                   onClick={() => void sendCampaign()}
-                  disabled={sendingCampaign}
+                  disabled={sendingCampaign || readyUncheckedCount > 0}
                   className="text-[10px] uppercase tracking-wider text-white bg-gradient-to-r from-urgent to-stage-mastering rounded-full px-3 py-1 hover:opacity-90 disabled:opacity-40 font-bold shadow-lg"
-                  title={`Send ${readyCount} outreach emails now, jittered across your verified sending domains.`}
+                  title={
+                    readyUncheckedCount > 0
+                      ? `Verify emails before sending — ${readyUncheckedCount} Ready address${readyUncheckedCount === 1 ? '' : 'es'} not checked yet.`
+                      : `Send ${readyCount} outreach emails now, jittered across your verified sending domains.`
+                  }
                 >
-                  {sendingCampaign ? 'Queueing…' : `🚀 Send campaign (${readyCount})`}
+                  {sendingCampaign
+                    ? 'Queueing…'
+                    : readyUncheckedCount > 0
+                      ? '🔒 Verify emails to send'
+                      : `🚀 Send campaign (${readyCount})`}
+                </button>
+              )}
+              {uncheckedCount > 0 && (
+                <button
+                  onClick={() => void verifyEmails()}
+                  disabled={verifying}
+                  className="text-[10px] uppercase tracking-wider text-sky-950 bg-sky-400 rounded-full px-3 py-1 hover:bg-sky-300 disabled:opacity-40 font-bold"
+                  title="Check each address's domain can actually receive mail (MX lookup) before you send. Required before a campaign can go out."
+                >
+                  {verifying ? 'Verifying…' : `✅ Verify emails (${uncheckedCount})`}
                 </button>
               )}
               {prospects && prospects.some((p) => !p.unique_sentence) && (
@@ -531,6 +613,30 @@ export default function OutreachSection({ projectId }: { projectId: string }) {
                       {!hasSentence && p.context && (
                         <span className="text-[9px] uppercase tracking-wider font-bold px-2 py-0.5 rounded-full border border-amber-500/40 bg-amber-500/10 text-amber-300">
                           Ready to generate
+                        </span>
+                      )}
+                      {p.email && p.email_check_status === 'invalid' && (
+                        <span
+                          title={p.email_check_detail ?? 'Undeliverable — this address won\'t be sent to'}
+                          className="text-[9px] uppercase tracking-wider font-bold px-2 py-0.5 rounded-full border border-urgent/50 bg-urgent/10 text-urgent"
+                        >
+                          ✕ Undeliverable
+                        </span>
+                      )}
+                      {p.email && p.email_check_status === 'risky' && (
+                        <span
+                          title={p.email_check_detail ?? 'Domain has no mail server — delivery not guaranteed'}
+                          className="text-[9px] uppercase tracking-wider font-bold px-2 py-0.5 rounded-full border border-amber-500/40 bg-amber-500/10 text-amber-300"
+                        >
+                          ⚠ Risky
+                        </span>
+                      )}
+                      {p.email && p.email_check_status === 'valid' && (
+                        <span
+                          title={p.email_check_detail ?? 'Domain accepts mail'}
+                          className="text-[9px] uppercase tracking-wider font-bold px-2 py-0.5 rounded-full border border-emerald-500/40 bg-emerald-500/10 text-emerald-300"
+                        >
+                          ✓ Email ok
                         </span>
                       )}
                       <div className="flex-1" />

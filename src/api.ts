@@ -636,6 +636,9 @@ export type ApiOutreachProspect = {
   unique_sentence: string | null
   unique_sentence_generated_at: string | null
   status: 'needs_email' | 'ready' | 'queued' | 'sent' | 'replied' | 'bounced' | 'opted_out' | 'failed'
+  email_check_status: 'unchecked' | 'valid' | 'risky' | 'invalid'
+  email_checked_at: string | null
+  email_check_detail: string | null
   sent_at: string | null
   replied_at: string | null
   bounced_at: string | null
@@ -1373,6 +1376,11 @@ export const api = {
   autoPopulateOneSheet: (projectId: string) =>
     request<{ ok: true; url: string | null; heroTagline: string; guestPitch: string; notableGuests: string; notableTopics: string; brandHex: string }>(
       `/api/outreach/projects/${projectId}/auto-populate-one-sheet`,
+      { method: 'POST', body: JSON.stringify({}) },
+    ),
+  verifyOutreachEmails: (projectId: string) =>
+    request<{ ok: true; checked: number; valid: number; risky: number; invalid: number }>(
+      `/api/outreach/projects/${projectId}/verify-emails`,
       { method: 'POST', body: JSON.stringify({}) },
     ),
   sendOutreachCampaign: (projectId: string, prospectIds?: string[]) =>

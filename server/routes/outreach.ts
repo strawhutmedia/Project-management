@@ -21,6 +21,7 @@ import { generateUniqueSentence, generateOneSheetAuto, hasAnthropicKey, type Uni
 import { loadShowBrief } from './show_brief'
 import { syncMissingCoversFromRss } from '../rss_cover_sync'
 import { seedFlagshipPodcasts } from '../seeds/flagship_podcasts'
+import { checkEmail } from '../email_verify'
 
 const resendKey = process.env.RESEND_API_KEY
 const resend = resendKey ? new Resend(resendKey) : null
@@ -121,6 +122,7 @@ outreachRouter.get('/projects/:projectId/prospects', async (req, res) => {
   const { rows } = await pool.query(
     `SELECT id, project_id, name, full_name, email, recipient_type, client_name,
             context, unique_sentence, unique_sentence_generated_at, status,
+            email_check_status, email_checked_at, email_check_detail,
             sent_at, replied_at, bounced_at, sending_domain_id, created_at, updated_at
        FROM outreach_prospects
       WHERE project_id = $1
@@ -218,8 +220,9 @@ outreachRouter.post('/projects/:projectId/prospects', async (req, res) => {
        (project_id, name, full_name, email, recipient_type, client_name,
         context, status, created_by)
      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-     RETURNING id, name, full_name, email, recipient_type, client_name,
+     RETURNING id, project_id, name, full_name, email, recipient_type, client_name,
                context, unique_sentence, unique_sentence_generated_at, status,
+               email_check_status, email_checked_at, email_check_detail,
                sent_at, replied_at, bounced_at, sending_domain_id, created_at, updated_at`,
     [projectId, name, fullName, email, recipientType, clientName, context, initialStatus, user.id],
   )
@@ -246,6 +249,11 @@ outreachRouter.patch('/prospects/:id', async (req, res) => {
   }
   if ('email' in patch) {
     addField('email', typeof patch.email === 'string' && patch.email.trim() ? patch.email.trim().toLowerCase() : null)
+    // Address changed → the old verification no longer applies. Reset so
+    // it must be re-checked before the campaign will send to it.
+    addField('email_check_status', 'unchecked')
+    addField('email_check_detail', null)
+    addField('email_checked_at', null)
   }
   if (typeof patch.recipientType === 'string') {
     if (!RECIPIENT_TYPES.has(patch.recipientType)) { res.status(400).json({ error: 'bad_recipient_type' }); return }
@@ -275,6 +283,56 @@ outreachRouter.patch('/prospects/:id', async (req, res) => {
   )
   if (rowCount === 0) { res.status(404).json({ error: 'not_found' }); return }
   res.json({ ok: true })
+})
+
+// ─── Recipient-email verification ───────────────────────────────────
+//
+// Runs the in-house MX + syntax check over every prospect in the show
+// that has an email and hasn't already been sent to. Saves the result
+// per prospect. The campaign sender (below) refuses to fire until every
+// Ready prospect has been checked, and skips any that came back invalid.
+outreachRouter.post('/projects/:projectId/verify-emails', async (req, res) => {
+  const projectId = req.params.projectId
+  const { rows } = await pool.query<{ id: string; email: string }>(
+    `SELECT id, email FROM outreach_prospects
+      WHERE project_id = $1
+        AND email IS NOT NULL
+        AND status NOT IN ('sent', 'replied', 'opted_out')
+      ORDER BY created_at ASC`,
+    [projectId],
+  )
+  if (rows.length === 0) {
+    res.json({ ok: true, checked: 0, valid: 0, risky: 0, invalid: 0 })
+    return
+  }
+  let valid = 0, risky = 0, invalid = 0
+  const CONCURRENCY = 8
+  const queue = [...rows]
+  await Promise.all(Array.from({ length: CONCURRENCY }, async () => {
+    while (queue.length > 0) {
+      const row = queue.shift()
+      if (!row) break
+      try {
+        const check = await checkEmail(row.email)
+        if (check.status === 'valid') valid += 1
+        else if (check.status === 'risky') risky += 1
+        else invalid += 1
+        await pool.query(
+          `UPDATE outreach_prospects
+              SET email_check_status = $1, email_check_detail = $2,
+                  email_checked_at = now(), updated_at = now()
+            WHERE id = $3`,
+          [check.status, check.detail, row.id],
+        )
+      } catch (err) {
+        logError('outreach: email verify failed for prospect', {
+          id: row.id, error: err instanceof Error ? err.message : String(err),
+        })
+      }
+    }
+  }))
+  logInfo('outreach: verified emails', { projectId, checked: rows.length, valid, risky, invalid })
+  res.json({ ok: true, checked: rows.length, valid, risky, invalid })
 })
 
 // ─── Campaign sender ─────────────────────────────────────────────────
@@ -446,8 +504,8 @@ outreachRouter.post('/projects/:projectId/send-campaign', async (req, res) => {
   // have an email, (c) have a unique_sentence, (d) are in 'ready'
   // status. Anything else the operator has to fix manually.
   const q = explicit && explicit.length > 0
-    ? await pool.query<{ id: string }>(
-        `SELECT id FROM outreach_prospects
+    ? await pool.query<{ id: string; email_check_status: string }>(
+        `SELECT id, email_check_status FROM outreach_prospects
           WHERE project_id = $1
             AND id = ANY($2::uuid[])
             AND email IS NOT NULL
@@ -455,8 +513,8 @@ outreachRouter.post('/projects/:projectId/send-campaign', async (req, res) => {
             AND status = 'ready'`,
         [projectId, explicit],
       )
-    : await pool.query<{ id: string }>(
-        `SELECT id FROM outreach_prospects
+    : await pool.query<{ id: string; email_check_status: string }>(
+        `SELECT id, email_check_status FROM outreach_prospects
           WHERE project_id = $1
             AND email IS NOT NULL
             AND unique_sentence IS NOT NULL AND trim(unique_sentence) <> ''
@@ -464,9 +522,29 @@ outreachRouter.post('/projects/:projectId/send-campaign', async (req, res) => {
           ORDER BY created_at ASC`,
         [projectId],
       )
-  const ids = q.rows.map((r) => r.id)
-  if (ids.length === 0) {
+  const eligible = q.rows
+  if (eligible.length === 0) {
     res.status(400).json({ error: 'no_eligible_prospects', detail: 'No prospects are Ready (need email + unique sentence).' })
+    return
+  }
+  // Gate: every Ready address must have been email-checked first. This is
+  // the "you can't send until you've verified" lock.
+  const unchecked = eligible.filter((r) => r.email_check_status === 'unchecked')
+  if (unchecked.length > 0) {
+    res.status(400).json({
+      error: 'verification_required',
+      detail: `${unchecked.length} Ready ${unchecked.length === 1 ? "address hasn't" : "addresses haven't"} been verified yet. Click “Verify emails” first, then send.`,
+      unchecked: unchecked.length,
+    })
+    return
+  }
+  // Drop addresses that came back undeliverable — they'd only bounce.
+  const ids = eligible.filter((r) => r.email_check_status !== 'invalid').map((r) => r.id)
+  if (ids.length === 0) {
+    res.status(400).json({
+      error: 'no_eligible_prospects',
+      detail: 'No deliverable prospects to send — every Ready address came back invalid. Fix or remove them.',
+    })
     return
   }
 
