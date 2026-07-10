@@ -64,6 +64,10 @@ export default function OutreachSection({ projectId }: { projectId: string }) {
   const [generatingAll, setGeneratingAll] = useState(false)
   const [sendingCampaign, setSendingCampaign] = useState(false)
   const [campaignResult, setCampaignResult] = useState<string | null>(null)
+  // Calm, non-error banner for the "Generate all sentences" outcome.
+  // Kept separate from `error` so a normal result (some written, some
+  // still needing a note) never renders in the red error banner.
+  const [generateResult, setGenerateResult] = useState<{ text: string; tone: 'success' | 'info' } | null>(null)
   // Test-send bar
   const [testTo, setTestTo] = useState(user?.email ?? 'ryan@strawhutmedia.com')
   const [testSending, setTestSending] = useState(false)
@@ -223,14 +227,42 @@ export default function OutreachSection({ projectId }: { projectId: string }) {
     if (!confirm('Generate a unique sentence for every prospect that doesn\'t already have one? Uses Claude and takes ~10s per 5 prospects.')) return
     setGeneratingAll(true)
     setError(null)
+    setGenerateResult(null)
     try {
       const r = await api.generateAllUniqueSentences(projectId)
-      setError(
-        `✓ Generated ${r.generated} sentence${r.generated === 1 ? '' : 's'}. ` +
-        (r.insufficientContext > 0 ? `${r.insufficientContext} skipped (not enough context — add a line to each and retry). ` : '') +
-        (r.failed > 0 ? `${r.failed} failed. ` : ''),
-      )
-      await loadProspects()
+      // Reload so the list — and the "who still needs a note" list
+      // below — reflects what actually got written.
+      const fresh = await api.outreachProspects(projectId)
+      setProspects(fresh.prospects)
+      // Anyone still without a sentence needs a one-line note (either
+      // none was given, or it was too thin for Claude to write anything
+      // specific). We name them so it's obvious who to click.
+      const needNote = fresh.prospects.filter((p) => !p.unique_sentence?.trim())
+      const parts: string[] = []
+      if (r.generated > 0) {
+        parts.push(`✓ Wrote ${r.generated} sentence${r.generated === 1 ? '' : 's'}.`)
+      }
+      if (needNote.length > 0) {
+        const names = needNote.slice(0, 3).map((p) => p.name).join(', ')
+        const more = needNote.length > 3 ? `, and ${needNote.length - 3} more` : ''
+        const who = needNote.length === 1 ? 'person needs' : 'people need'
+        const them = needNote.length === 1 ? 'that person' : 'each one'
+        parts.push(
+          `${needNote.length} ${who} a quick one-line note first: ${names}${more}. ` +
+          `Click ${them} in the list, add a sentence about who they are ` +
+          `(what they do + something recent), then press Generate again.`,
+        )
+      }
+      if (r.failed > 0) {
+        parts.push(`${r.failed} hit a snag — try Generate again in a moment.`)
+      }
+      if (parts.length === 0) {
+        parts.push('Everyone already has a sentence — nothing new to generate.')
+      }
+      setGenerateResult({
+        text: parts.join(' '),
+        tone: needNote.length === 0 && r.failed === 0 ? 'success' : 'info',
+      })
     } catch (err) {
       setError(err instanceof Error ? err.message : 'generate failed')
     } finally {
@@ -382,6 +414,18 @@ export default function OutreachSection({ projectId }: { projectId: string }) {
             </div>
           )}
 
+          {generateResult && (
+            <div
+              className={`rounded-lg border px-3 py-2 text-xs ${
+                generateResult.tone === 'success'
+                  ? 'border-emerald-500/40 bg-emerald-500/10 text-emerald-100'
+                  : 'border-sky-500/40 bg-sky-500/10 text-sky-100'
+              }`}
+            >
+              {generateResult.text}
+            </div>
+          )}
+
           <div className="flex items-baseline justify-between gap-2 flex-wrap">
             <h3 className="text-[10px] uppercase tracking-[0.2em] text-muted font-bold">Prospects</h3>
             <div className="flex items-center gap-2 flex-wrap">
@@ -480,8 +524,8 @@ export default function OutreachSection({ projectId }: { projectId: string }) {
                         {style.label}
                       </span>
                       {!hasSentence && !p.context && (
-                        <span className="text-[9px] uppercase tracking-wider font-bold px-2 py-0.5 rounded-full border border-urgent/50 bg-urgent/10 text-urgent">
-                          Add context to generate
+                        <span className="text-[9px] uppercase tracking-wider font-bold px-2 py-0.5 rounded-full border border-sky-500/40 bg-sky-500/10 text-sky-300">
+                          Add a note to generate
                         </span>
                       )}
                       {!hasSentence && p.context && (
