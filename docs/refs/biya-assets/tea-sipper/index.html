@@ -1,0 +1,212 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>TEA SIPPER &mdash; The Tea, Always Hot</title>
+<!--
+  BIYA / "Back In Your Arms" — screen prop
+  TEA SIPPER homepage — sits behind the Sc 16 article so a pan/scroll never reveals a dead site.
+  ART DEPT: real photos drop into elements marked  data-photo-slot  via background-image.
+  All copy fictional. Fictional celebrities used for filler so nothing needs clearance.
+-->
+<style>
+  :root{
+    color-scheme: light only;
+    --pink:#ff1466;--pink-deep:#c8004e;--ink:#17110f;--paper:#fff;
+    --cream:#fff3f6;--hot:#ffe500;--line:#f0d9e0;--muted:#9a848a;
+    --font-display:"Arial Black","Helvetica Neue",Helvetica,Arial,sans-serif;
+    --font-sans:"Helvetica Neue",Helvetica,Arial,sans-serif;
+    --font-serif:Georgia,"Times New Roman",Times,serif;
+  }
+  *{box-sizing:border-box}html,body{margin:0}
+  body{background:var(--cream);color:var(--ink);font-family:var(--font-sans);-webkit-font-smoothing:antialiased}
+  a{color:inherit;text-decoration:none}
+
+  .masthead{position:sticky;top:0;z-index:20;background:var(--pink);color:#fff;border-bottom:3px solid var(--ink)}
+  .masthead-inner{max-width:900px;margin:0 auto;display:flex;align-items:center;gap:14px;padding:10px 20px}
+  .logo{display:flex;align-items:center;gap:9px;font-family:var(--font-display)}
+  .logo .word{font-size:26px;font-weight:900;letter-spacing:-.02em;text-transform:uppercase;line-height:.9}
+  .logo .word small{display:block;font-size:8.5px;letter-spacing:.34em;font-weight:900;opacity:.9;margin-top:2px}
+  nav.top{margin-left:auto;display:flex;gap:16px}
+  nav.top a{font-size:12px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;opacity:.92}
+  nav.top a:hover{opacity:1;text-decoration:underline}
+  .search{width:30px;height:30px;border-radius:50%;background:rgba(255,255,255,.18);display:grid;place-items:center}
+  @media(max-width:660px){nav.top a:nth-child(n+4){display:none}}
+
+  .ticker{background:var(--ink);color:#fff;overflow:hidden;font-size:12px;letter-spacing:.04em;display:flex;align-items:center;white-space:nowrap}
+  .ticker b{background:var(--hot);color:var(--ink);font-weight:900;letter-spacing:.14em;text-transform:uppercase;padding:6px 12px;margin-right:14px;flex:none;font-size:11px;font-family:var(--font-display)}
+  .ticker span{padding:6px 0;opacity:.9}
+
+  .grid{max-width:900px;margin:18px auto 0;padding:0 20px;display:grid;grid-template-columns:1fr 300px;gap:26px}
+  @media(max-width:760px){.grid{grid-template-columns:1fr;gap:20px}}
+
+  /* photo slots */
+  .photo{position:relative;overflow:hidden;background:#2a1620;
+    background-image:linear-gradient(135deg,rgba(255,20,102,.55),rgba(20,10,15,.9)),repeating-linear-gradient(45deg,rgba(255,255,255,.04) 0 2px,transparent 2px 9px);
+    background-size:cover;background-position:center}
+  .photo::after{content:"TEA SIPPER";position:absolute;right:10px;bottom:8px;font-family:var(--font-display);font-weight:900;font-size:10px;letter-spacing:.14em;color:rgba(255,255,255,.5)}
+  .photo .subject{position:absolute;inset:0;display:grid;place-items:center;text-align:center;font-size:11px;letter-spacing:.2em;text-transform:uppercase;color:rgba(255,255,255,.5);font-weight:800;padding:0 10px}
+
+  /* lead story */
+  .lead{display:block;background:var(--paper);border:1px solid var(--line)}
+  .lead .photo{aspect-ratio:16/9}
+  .lead-body{padding:20px 24px 24px}
+  .kicker{font-size:11px;font-weight:800;letter-spacing:.16em;text-transform:uppercase;color:var(--pink-deep);display:inline-flex;align-items:center;gap:8px}
+  .kicker .dot{width:8px;height:8px;border-radius:50%;background:var(--pink);box-shadow:0 0 0 3px rgba(255,20,102,.2)}
+  .lead h1{font-family:var(--font-display);font-weight:900;font-size:38px;line-height:.99;letter-spacing:-.02em;text-wrap:balance;margin:12px 0 10px}
+  @media(max-width:660px){.lead h1{font-size:29px}}
+  .lead p{font-family:var(--font-serif);font-size:17px;line-height:1.5;color:#4a3d40;margin:0}
+  .lead .meta{margin-top:14px;font-size:11.5px;color:var(--muted);letter-spacing:.02em}
+
+  /* secondary river */
+  .river{margin-top:22px;display:grid;gap:2px;background:var(--line);border:1px solid var(--line)}
+  .story{display:flex;gap:14px;align-items:center;background:var(--paper);padding:14px 16px}
+  .story .thumb{width:120px;height:78px;flex:none}
+  .story .thumb .photo{width:100%;height:100%}
+  .story h3{font-family:var(--font-sans);font-weight:800;font-size:16px;line-height:1.2;margin:6px 0 0}
+  .story .kicker{font-size:10px}
+  @media(max-width:420px){.story .thumb{width:92px;height:62px}}
+
+  /* sidebar */
+  aside{display:grid;gap:22px;align-content:start}
+  .panel{background:var(--paper);border:1px solid var(--line)}
+  .panel h2{font-family:var(--font-display);font-weight:900;font-size:14px;letter-spacing:.14em;text-transform:uppercase;margin:0;padding:13px 16px;background:var(--ink);color:#fff;display:flex;align-items:center;gap:8px}
+  .panel h2 .cup{color:var(--hot)}
+  .trend{list-style:none;margin:0;padding:6px 4px 10px;counter-reset:t}
+  .trend li{counter-increment:t;display:flex;gap:12px;align-items:flex-start;padding:11px 14px;border-bottom:1px solid var(--line)}
+  .trend li:last-child{border-bottom:0}
+  .trend li::before{content:counter(t,decimal-leading-zero);font-family:var(--font-display);font-weight:900;font-size:22px;color:var(--pink);line-height:.9;flex:none;width:30px}
+  .trend a{font-weight:700;font-size:14px;line-height:1.24}
+  .trend .tag{display:block;font-size:9.5px;font-weight:800;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);margin-bottom:3px}
+
+  .ad{border:1px solid var(--line);position:relative;background:linear-gradient(120deg,#e9ddc4,#cdb98f);color:#3a2f1a;text-align:center;padding:30px 18px;overflow:hidden}
+  .ad .label{position:absolute;top:6px;left:8px;font-size:9px;letter-spacing:.18em;text-transform:uppercase;color:rgba(0,0,0,.35)}
+  .ad h4{font-family:var(--font-display);font-weight:900;margin:0;font-size:26px;letter-spacing:.02em;text-transform:uppercase;line-height:1}
+  .ad p{margin:8px 0 0;font-family:var(--font-serif);font-style:italic;font-size:14px;opacity:.85}
+
+  .newsletter{background:var(--pink);color:#fff;padding:22px 18px;text-align:center}
+  .newsletter h4{font-family:var(--font-display);font-weight:900;font-size:19px;margin:0 0 6px;text-transform:uppercase;letter-spacing:.02em}
+  .newsletter p{margin:0 0 12px;font-size:12.5px;opacity:.92}
+  .newsletter .field{display:flex;background:#fff;border-radius:2px;overflow:hidden}
+  .newsletter input{border:0;flex:1;padding:10px 12px;font-size:13px;font-family:var(--font-sans);min-width:0}
+  .newsletter button{border:0;background:var(--ink);color:#fff;font-family:var(--font-display);font-weight:900;font-size:12px;letter-spacing:.1em;text-transform:uppercase;padding:0 14px;cursor:pointer}
+
+  footer{background:var(--ink);color:#fff;margin-top:28px}
+  .foot-inner{max-width:900px;margin:0 auto;padding:26px 20px;display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap}
+  .foot-inner .logo .word{font-size:20px}
+  .foot-inner small{font-size:11px;color:#9a8f92;letter-spacing:.02em}
+  .foot-links{display:flex;gap:14px;font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;opacity:.85}
+</style>
+</head>
+<body>
+
+<header class="masthead">
+  <div class="masthead-inner">
+    <a class="logo" href="index.html" aria-label="Tea Sipper home">
+      <svg width="34" height="34" viewBox="0 0 34 34" fill="none" aria-hidden="true">
+        <path d="M6 15h18v5a8 8 0 0 1-8 8h-2a8 8 0 0 1-8-8v-5z" fill="#fff"/>
+        <path d="M24 16h3.2a3.3 3.3 0 0 1 0 6.6H23" stroke="#fff" stroke-width="2.4" fill="none"/>
+        <path d="M11 11c-1.6-1.6-1.6-3 0-4.6M17 11c-1.6-1.6-1.6-3 0-4.6" stroke="#fff" stroke-width="2.2" stroke-linecap="round" opacity=".85"/>
+      </svg>
+      <span class="word">Tea Sipper<small>the tea, always hot</small></span>
+    </a>
+    <nav class="top">
+      <a href="index.html">Celeb</a><a href="index.html">TV &amp; Film</a>
+      <a href="index.html">Music</a><a href="index.html">Fashion</a><a href="index.html">The Spill</a>
+    </nav>
+    <div class="search" aria-hidden="true">
+      <svg width="15" height="15" viewBox="0 0 16 16" fill="none"><circle cx="7" cy="7" r="5" stroke="#fff" stroke-width="2"/><path d="M11 11l4 4" stroke="#fff" stroke-width="2" stroke-linecap="round"/></svg>
+    </div>
+  </div>
+</header>
+
+<div class="ticker">
+  <b>Breaking</b>
+  <span>Kendrick &amp; Wright call it quits after three years &nbsp;&bull;&nbsp; Reps go silent &nbsp;&bull;&nbsp; Grid scrubbed &nbsp;&bull;&nbsp; Sippers, the tea is scalding &nbsp;&bull;&nbsp; More below</span>
+</div>
+
+<div class="grid">
+  <main>
+    <a class="lead" href="article-kendrick-wright-divorce.html">
+      <div class="photo" data-photo-slot="lead" role="img" aria-label="Jason Kendrick and Lilly Wright">
+        <div class="subject">[ paparazzi photo &mdash; Kendrick + Wright ]</div>
+      </div>
+      <div class="lead-body">
+        <span class="kicker"><span class="dot"></span> Exclusive &bull; Splitsville</span>
+        <h1>Jason Kendrick &amp; Lilly Wright Throw in the Towel on Their Three-Year Marriage</h1>
+        <p>The <em>XenoSouls</em> heartthrob and his actress wife are calling it quits &mdash; and a source says the cracks have been showing since his big-screen comeback went belly-up.</p>
+        <div class="meta">By Danni Vale &nbsp;&bull;&nbsp; Updated 2 hours ago</div>
+      </div>
+    </a>
+
+    <div class="river">
+      <a class="story" href="article-kendrick-wright-divorce.html">
+        <div class="thumb"><div class="photo" role="img" aria-label="XenoSouls set"></div></div>
+        <div><span class="kicker">TV &amp; Film</span><h3>Is <em>XenoSouls</em> Season 6 Cursed? Inside the Set Drama Nobody Will Go On Record About</h3></div>
+      </a>
+      <a class="story" href="article-kendrick-wright-divorce.html">
+        <div class="thumb"><div class="photo" role="img" aria-label="Remy Ocean"></div></div>
+        <div><span class="kicker">Exclusive</span><h3>Pop Princess Remy Oc&eacute;an Spotted at the Same Sleepy Wine-Country Retreat &mdash; Coincidence?</h3></div>
+      </a>
+      <a class="story" href="article-kendrick-wright-divorce.html">
+        <div class="thumb"><div class="photo" role="img" aria-label="Fan edit"></div></div>
+        <div><span class="kicker">The Spill</span><h3>13 Times Jason Kendrick Was the Entire Internet&rsquo;s Boyfriend (A Loving Eulogy)</h3></div>
+      </a>
+      <a class="story" href="article-kendrick-wright-divorce.html">
+        <div class="thumb"><div class="photo" role="img" aria-label="Reality couple"></div></div>
+        <div><span class="kicker">Reality</span><h3>&ldquo;Villa of Hearts&rdquo; Winners Announce Split Via Matching Notes App Statements</h3></div>
+      </a>
+      <a class="story" href="article-kendrick-wright-divorce.html">
+        <div class="thumb"><div class="photo" role="img" aria-label="Red carpet gown"></div></div>
+        <div><span class="kicker">Fashion</span><h3>The Met&rsquo;s Most Unhinged Looks, Ranked by How Loudly We Gasped</h3></div>
+      </a>
+    </div>
+  </main>
+
+  <aside>
+    <div class="panel">
+      <h2><span class="cup">&#127861;</span> Hottest Tea Today</h2>
+      <ol class="trend">
+        <li><a href="article-kendrick-wright-divorce.html"><span class="tag">Splitsville</span>Kendrick &amp; Wright officially throw in the towel</a></li>
+        <li><a href="index.html"><span class="tag">Music</span>Remy Oc&eacute;an&rsquo;s cryptic 3 a.m. post has everyone spiraling</a></li>
+        <li><a href="index.html"><span class="tag">TV &amp; Film</span>Was that a diss? The <em>XenoSouls</em> cast feud explained</a></li>
+        <li><a href="index.html"><span class="tag">Fashion</span>The naked dress that broke the internet (again)</a></li>
+        <li><a href="index.html"><span class="tag">The Spill</span>Which A-lister bought the whole restaurant to avoid us?</a></li>
+      </ol>
+    </div>
+
+    <div class="ad" role="complementary" aria-label="Advertisement">
+      <span class="label">Advertisement</span>
+      <h4>Visit Beautiful Solvang</h4>
+      <p>California&rsquo;s little slice of Denmark &mdash; wine, windmills, and room to breathe.</p>
+    </div>
+
+    <div class="newsletter">
+      <h4>Spill It Daily</h4>
+      <p>The hottest tea in your inbox every morning. We never cool down.</p>
+      <div class="field">
+        <input type="email" placeholder="your@email.com" aria-label="Email address">
+        <button type="button">Sip</button>
+      </div>
+    </div>
+  </aside>
+</div>
+
+<footer>
+  <div class="foot-inner">
+    <a class="logo" href="index.html" aria-label="Tea Sipper home">
+      <svg width="26" height="26" viewBox="0 0 34 34" fill="none" aria-hidden="true">
+        <path d="M6 15h18v5a8 8 0 0 1-8 8h-2a8 8 0 0 1-8-8v-5z" fill="#fff"/>
+        <path d="M24 16h3.2a3.3 3.3 0 0 1 0 6.6H23" stroke="#fff" stroke-width="2.4" fill="none"/>
+        <path d="M11 11c-1.6-1.6-1.6-3 0-4.6M17 11c-1.6-1.6-1.6-3 0-4.6" stroke="#fff" stroke-width="2.2" stroke-linecap="round" opacity=".85"/>
+      </svg>
+      <span class="word">Tea Sipper</span>
+    </a>
+    <div class="foot-links"><span>About</span><span>Tips</span><span>Privacy</span><span>Do Not Sell My Tea</span></div>
+    <small>&copy; TEA SIPPER Media. All rumors reserved.</small>
+  </div>
+</footer>
+
+</body>
+</html>
