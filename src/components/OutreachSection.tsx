@@ -257,7 +257,9 @@ export default function OutreachSection({ projectId }: { projectId: string }) {
       )
       await loadProspects()
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'campaign failed')
+      const raw = err instanceof Error ? err.message : 'campaign failed'
+      // Drop the "error_code: " prefix so the plain-English detail shows.
+      setError(raw.replace(/^[a-z0-9_]+:\s*/, ''))
     } finally {
       setSendingCampaign(false)
     }
@@ -568,14 +570,14 @@ export default function OutreachSection({ projectId }: { projectId: string }) {
           {bulkOpen && (
             <BulkImportPanel
               projectId={projectId}
-              onImported={() => { setBulkOpen(false); void loadProspects() }}
+              onImported={() => { setBulkOpen(false); setGenerateResult(null); void loadProspects() }}
             />
           )}
 
           {addOpen && (
             <AddProspectForm
               projectId={projectId}
-              onAdded={() => { setAddOpen(false); void loadProspects() }}
+              onAdded={() => { setAddOpen(false); setGenerateResult(null); void loadProspects() }}
             />
           )}
 
@@ -674,7 +676,7 @@ export default function OutreachSection({ projectId }: { projectId: string }) {
         <ProspectDetailModal
           prospect={openProspect}
           onClose={() => setOpenProspect(null)}
-          onChanged={() => { void loadProspects() }}
+          onChanged={() => { setGenerateResult(null); void loadProspects() }}
         />
       )}
     </section>
@@ -1027,6 +1029,9 @@ function AddProspectForm({
             <option value="manager">Their manager</option>
             <option value="other">Other (PR, assistant, unclear)</option>
           </select>
+          <span className="block text-[10px] text-muted/70 mt-1 leading-snug">
+            Not sure? Leave it on “The guest” — you don't have to know the role.
+          </span>
         </label>
         {(recipientType === 'agent' || recipientType === 'manager') && (
           <label className="block">
@@ -1042,15 +1047,18 @@ function AddProspectForm({
       </div>
       <label className="block">
         <span className="text-[10px] uppercase tracking-wider text-muted font-bold">
-          Context — Claude reads this to craft the unique sentence
+          Who are they? — Claude turns this into their personal line
         </span>
         <textarea
           value={context}
           onChange={(e) => setContext(e.target.value)}
           rows={3}
-          placeholder="e.g. Founder of X. Just launched Y. Recently guested on Diary of a CEO ep 342."
+          placeholder={'One line about them, e.g. "Founder of X, just guested on Diary of a CEO." Only have an email off their Instagram? Just say: "Email from their IG — not sure if it\'s them or their team."'}
           className="mt-1 w-full bg-ink/40 border border-line rounded-lg px-2 py-1 text-sm focus:outline-none focus:border-stage-mastering"
         />
+        <span className="block text-[10px] text-muted/70 mt-1 leading-snug">
+          One line is plenty. This is the only thing Claude needs to write their sentence.
+        </span>
       </label>
       {error && <p className="text-xs text-urgent">{error}</p>}
       <div className="flex justify-end">

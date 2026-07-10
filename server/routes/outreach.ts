@@ -562,7 +562,10 @@ outreachRouter.post('/projects/:projectId/send-campaign', async (req, res) => {
   )
   const domains = domRes.rows
   if (domains.length === 0) {
-    res.status(400).json({ error: 'no_verified_domain' })
+    res.status(400).json({
+      error: 'no_verified_domain',
+      detail: 'No verified sending domain yet — add and verify one under Sending domains before you can send. (Test sends need this too.)',
+    })
     return
   }
 
