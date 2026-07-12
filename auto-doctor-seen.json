@@ -411,5 +411,11 @@
     "outcome": "gave_up",
     "summary": "hit max iterations (20)",
     "iterations": 20
+  },
+  "sendFile failed::{\"error\":\"Request aborted\",\"clientDir\":\"/app/dist\"}": {
+    "attemptedAt": "2026-07-12T03:55:46.302Z",
+    "outcome": "fixed",
+    "summary": "Added client abort handling to sendFile callback to suppress \"Request aborted\" error logs when clients disconnect before receiving index.html, consistent with existing client abort handling elsewhere in the server.",
+    "iterations": 8
   }
 }
