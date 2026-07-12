@@ -143,6 +143,18 @@ app.get('*', (_req, res) => {
   res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate')
   res.sendFile(path.join(clientDir, 'index.html'), (err) => {
     if (err) {
+      // Ignore client-side connection errors (e.g., browser closed tab, request aborted)
+      // These are normal and shouldn't be logged as server errors
+      const isClientAbort = err.message === 'Request aborted' ||
+                            err.message === 'request aborted' ||
+                            (err as any).code === 'ECONNRESET' ||
+                            (err as any).code === 'ECONNABORTED'
+      
+      if (isClientAbort) {
+        // Silently ignore - no need to log or send response (client is gone)
+        return
+      }
+      
       logError('sendFile failed', { error: err.message, clientDir })
       res.status(500).send('Slate is running but the client bundle is missing. Check /api/_diag.')
     }
