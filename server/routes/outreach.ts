@@ -982,7 +982,7 @@ outreachRouter.post('/projects/:projectId/test-send', async (req, res) => {
   const preview = previewRes.rows[0]
   const previewName = preview?.name || 'Alex'
   const previewSentence = preview?.unique_sentence
-    || 'Your recent work jumped out to me — the way you framed it in your last piece is exactly the angle we chase on the show.'
+    || 'I love what you have been putting out lately and think our audience would really connect with you.'
 
   const oneSheetUrl = await getOneSheetUrl(projectId)
   const subject = mergeTemplate(tpl.subject, { name: previewName, uniqueSentence: previewSentence, oneSheetUrl })
