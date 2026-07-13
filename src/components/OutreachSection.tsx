@@ -41,7 +41,7 @@ I'm a producer at Straw Hut Media and we'd love to have you on the show.
 
 We record a full conversation — usually about an hour — then edit it down into a polished episode. You'll get the audio plus a highlight clip package to share wherever you'd like.
 
-If it sounds like a fit, just reply and we'll get you scheduled — no call needed.
+If it sounds like a fit, just reply and we'll get you booked in for this week or next — no call needed.
 
 More about the show: [one_sheet_url]
 
