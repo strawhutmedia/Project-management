@@ -35,13 +35,13 @@ const STATUS_STYLE: Record<ApiOutreachProspect['status'], { bg: string; label: s
 // customizes this to fit its actual format.
 const DEFAULT_TEMPLATE_BODY = `Hi [name],
 
-I'm producing a podcast at Straw Hut Media and we'd love to have you on.
+I'm a producer at Straw Hut Media and we'd love to have you on the show.
 
 [unique_sentence]
 
-Our episodes run about 45 minutes and are edited into a polished cut. Guests get the audio + a highlight clip package to share wherever they'd like.
+We record a full conversation — usually about an hour — then edit it down into a polished episode. You'll get the audio plus a highlight clip package to share wherever you'd like.
 
-Would you have 30 minutes this month or next to jump on a call and see if it's a fit?
+If it sounds like a fit, just reply and we'll get you scheduled — no call needed.
 
 More about the show: [one_sheet_url]
 
