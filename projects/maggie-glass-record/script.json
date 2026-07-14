@@ -1,0 +1,392 @@
+{
+  "project": {
+    "id": "3a941368-80ff-487a-a085-22dd78e4106f",
+    "name": "Maggie Glass — Record",
+    "subtitle": "13 songs · 14 tracks",
+    "kind": "album",
+    "filmPhase": "pre",
+    "dropboxFolder": "/2_CLIENTS/Maggie Glass Record",
+    "channelsSubfolder": null,
+    "coverArtUrl": null,
+    "brandAssetsFolder": null,
+    "socialsBrandVoice": null,
+    "socialsVocabulary": null,
+    "rssFeedUrl": null,
+    "createdAt": "2026-04-26T21:43:46.591Z"
+  },
+  "publishedAt": "2026-07-14T18:26:57.650Z",
+  "counts": {
+    "scenes": 0,
+    "lineItems": 0,
+    "sceneLevelItems": 0,
+    "projectLevelItems": 0,
+    "shootDays": 0,
+    "songs": 14,
+    "tasks": 10,
+    "comments": 1,
+    "links": 0,
+    "cuts": 0,
+    "cutNotes": 0,
+    "snapshots": 0,
+    "showChatMessages": 0
+  },
+  "members": [
+    {
+      "userId": "9d0e6095-5532-40ae-b6b2-14960a4df8d6",
+      "displayName": "Dillon",
+      "email": null,
+      "role": "user",
+      "projectRole": "user"
+    },
+    {
+      "userId": "7103b68b-4c38-4299-84c0-f9cef54647a1",
+      "displayName": "Kyle",
+      "email": null,
+      "role": "user",
+      "projectRole": "user"
+    },
+    {
+      "userId": "4f4b3ae9-5e96-4f00-846e-3be95a251070",
+      "displayName": "Mags",
+      "email": null,
+      "role": "user",
+      "projectRole": "user"
+    },
+    {
+      "userId": "c3f40b06-72b7-427d-bb08-8c5d5bee2f7e",
+      "displayName": "Michael",
+      "email": "michaelamicophoto@gmail.com",
+      "role": "user",
+      "projectRole": "user"
+    },
+    {
+      "userId": "e0afa8af-ef91-41b5-ad28-afc3189712f6",
+      "displayName": "Ryan",
+      "email": "ryan@strawhutmedia.com",
+      "role": "admin",
+      "projectRole": "admin"
+    }
+  ],
+  "shootDays": [],
+  "scenes": [],
+  "projectLevelItems": [],
+  "songs": [
+    {
+      "id": "48e39831-54a1-42f4-9e28-fbbd3512a98a",
+      "title": "Olive Juice",
+      "subtitle": null,
+      "stage": "overdubs",
+      "position": 1,
+      "dropboxFolder": "/Straw Hut Team Folder/2_CLIENTS/Maggie Glass Record/Olive Juice",
+      "releaseDate": null,
+      "processingState": null,
+      "createdAt": "2026-04-26T21:43:46.591Z",
+      "tasks": [
+        {
+          "id": "79034ea5-bf03-4b60-86c3-36161689a363",
+          "title": "Decide: add synth?",
+          "stage": "tracking",
+          "done": false,
+          "dueAt": "2026-04-28T15:53:00.000Z",
+          "assigneeId": "9d0e6095-5532-40ae-b6b2-14960a4df8d6",
+          "createdAt": "2026-04-26T21:43:46.591Z"
+        }
+      ],
+      "comments": [],
+      "links": [],
+      "cuts": []
+    },
+    {
+      "id": "0c046e19-0c49-48e3-95c5-f43d60a7a1f8",
+      "title": "I Know",
+      "subtitle": null,
+      "stage": "tracking",
+      "position": 2,
+      "dropboxFolder": "/Straw Hut Team Folder/2_CLIENTS/Maggie Glass Record/I Know",
+      "releaseDate": null,
+      "processingState": null,
+      "createdAt": "2026-04-26T21:43:46.591Z",
+      "tasks": [
+        {
+          "id": "64c2d7d9-9b87-4872-92c4-5864c9fc9890",
+          "title": "Track vocals",
+          "stage": "tracking",
+          "done": false,
+          "dueAt": null,
+          "assigneeId": null,
+          "createdAt": "2026-04-26T21:43:46.591Z"
+        },
+        {
+          "id": "0f451193-ce03-4f21-9b94-0a6542ad6701",
+          "title": "Guitar tracked",
+          "stage": "tracking",
+          "done": true,
+          "dueAt": null,
+          "assigneeId": null,
+          "createdAt": "2026-04-26T21:43:46.591Z"
+        }
+      ],
+      "comments": [],
+      "links": [],
+      "cuts": []
+    },
+    {
+      "id": "5ba11de5-7003-466d-8c3c-1e337078176d",
+      "title": "Lionheart",
+      "subtitle": null,
+      "stage": "tracking",
+      "position": 3,
+      "dropboxFolder": "/Straw Hut Team Folder/2_CLIENTS/Maggie Glass Record/Lionheart",
+      "releaseDate": null,
+      "processingState": null,
+      "createdAt": "2026-04-26T21:43:46.591Z",
+      "tasks": [
+        {
+          "id": "c5c79195-21fd-4806-a25f-dc020916b5b9",
+          "title": "Track vocals",
+          "stage": "tracking",
+          "done": false,
+          "dueAt": null,
+          "assigneeId": null,
+          "createdAt": "2026-04-26T21:43:46.591Z"
+        },
+        {
+          "id": "a58ce171-9a62-41b2-818e-728823a7ba0f",
+          "title": "Guitar tracked",
+          "stage": "tracking",
+          "done": true,
+          "dueAt": null,
+          "assigneeId": null,
+          "createdAt": "2026-04-26T21:43:46.591Z"
+        }
+      ],
+      "comments": [],
+      "links": [],
+      "cuts": []
+    },
+    {
+      "id": "f90a8753-6f73-4d96-afdc-801189fd6f9d",
+      "title": "Yellow-Billed Loon",
+      "subtitle": null,
+      "stage": "overdubs",
+      "position": 4,
+      "dropboxFolder": "/Straw Hut Team Folder/2_CLIENTS/Maggie Glass Record/Yellow-billed Loon",
+      "releaseDate": null,
+      "processingState": null,
+      "createdAt": "2026-04-26T21:43:46.591Z",
+      "tasks": [
+        {
+          "id": "44844c5f-f3b4-4d28-9c58-a47ff304147f",
+          "title": "Decide: track drums?",
+          "stage": "tracking",
+          "done": false,
+          "dueAt": null,
+          "assigneeId": null,
+          "createdAt": "2026-04-26T21:43:46.591Z"
+        }
+      ],
+      "comments": [],
+      "links": [],
+      "cuts": []
+    },
+    {
+      "id": "88624e67-ce3a-48fe-8fa6-607c698cefe8",
+      "title": "Ferocious Beasts",
+      "subtitle": null,
+      "stage": "producing",
+      "position": 5,
+      "dropboxFolder": "/Straw Hut Team Folder/2_CLIENTS/Maggie Glass Record/Ferocious Beasts",
+      "releaseDate": null,
+      "processingState": null,
+      "createdAt": "2026-04-26T21:43:46.591Z",
+      "tasks": [],
+      "comments": [
+        {
+          "id": "eeb56f4d-4368-431d-9d3c-7e02107d733d",
+          "content": "@michael you should have all the stems to start this bad boy!!",
+          "authorName": "Ryan",
+          "authorId": "e0afa8af-ef91-41b5-ad28-afc3189712f6",
+          "createdAt": "2026-04-27T17:15:10.730Z"
+        }
+      ],
+      "links": [],
+      "cuts": []
+    },
+    {
+      "id": "eafd1216-1340-4b02-9f53-514d1b2473e2",
+      "title": "I Hope That You Die",
+      "subtitle": null,
+      "stage": "producing",
+      "position": 6,
+      "dropboxFolder": "/Straw Hut Team Folder/2_CLIENTS/Maggie Glass Record/I Hope That You Die",
+      "releaseDate": null,
+      "processingState": null,
+      "createdAt": "2026-04-26T21:43:46.591Z",
+      "tasks": [],
+      "comments": [],
+      "links": [],
+      "cuts": []
+    },
+    {
+      "id": "f47fcc8e-e9cb-4a15-91c3-ae6698597a72",
+      "title": "Fake Plastic Trees",
+      "subtitle": null,
+      "stage": "overdubs",
+      "position": 7,
+      "dropboxFolder": "/Straw Hut Team Folder/2_CLIENTS/Maggie Glass Record/Fake Plastic Trees",
+      "releaseDate": null,
+      "processingState": null,
+      "createdAt": "2026-04-26T21:43:46.591Z",
+      "tasks": [
+        {
+          "id": "de9b89e3-4b1c-4d40-9b6e-7d88abf7e32a",
+          "title": "Decide: add synth or organ?",
+          "stage": "tracking",
+          "done": false,
+          "dueAt": null,
+          "assigneeId": null,
+          "createdAt": "2026-04-26T21:43:46.591Z"
+        }
+      ],
+      "comments": [],
+      "links": [],
+      "cuts": []
+    },
+    {
+      "id": "a189cdbd-8e06-4025-ac95-a529f79b8ad1",
+      "title": "500 Miles",
+      "subtitle": null,
+      "stage": "overdubs",
+      "position": 8,
+      "dropboxFolder": "/Straw Hut Team Folder/2_CLIENTS/Maggie Glass Record/500 Miles",
+      "releaseDate": null,
+      "processingState": null,
+      "createdAt": "2026-04-26T21:43:46.591Z",
+      "tasks": [
+        {
+          "id": "fea85392-bfcb-48df-b85a-e29519afbdf2",
+          "title": "Decide: track drums?",
+          "stage": "tracking",
+          "done": false,
+          "dueAt": null,
+          "assigneeId": null,
+          "createdAt": "2026-04-26T21:43:46.591Z"
+        }
+      ],
+      "comments": [],
+      "links": [],
+      "cuts": []
+    },
+    {
+      "id": "b363d1f4-652f-4eb2-8f4d-d1ff244a5a13",
+      "title": "Long Walk Home",
+      "subtitle": "2026 version",
+      "stage": "producing",
+      "position": 9,
+      "dropboxFolder": "/Straw Hut Team Folder/2_CLIENTS/Maggie Glass Record/Long Walk Home - 2026",
+      "releaseDate": null,
+      "processingState": null,
+      "createdAt": "2026-04-26T21:43:46.591Z",
+      "tasks": [
+        {
+          "id": "69746199-a2ed-4a82-9b23-32d719194ca4",
+          "title": "Decide: track drums?",
+          "stage": "tracking",
+          "done": false,
+          "dueAt": null,
+          "assigneeId": null,
+          "createdAt": "2026-04-26T21:43:46.591Z"
+        },
+        {
+          "id": "da022980-09ff-4a13-8eb8-4c8dfcac781f",
+          "title": "Decide: add synth?",
+          "stage": "tracking",
+          "done": false,
+          "dueAt": null,
+          "assigneeId": null,
+          "createdAt": "2026-04-26T21:43:46.591Z"
+        }
+      ],
+      "comments": [],
+      "links": [],
+      "cuts": []
+    },
+    {
+      "id": "a9a35101-67d6-464a-af4f-78f7d3814f4d",
+      "title": "Long Walk Home",
+      "subtitle": "2015 version",
+      "stage": "producing",
+      "position": 10,
+      "dropboxFolder": "/Straw Hut Team Folder/2_CLIENTS/Maggie Glass Record/Long Walk Home - 2015",
+      "releaseDate": null,
+      "processingState": null,
+      "createdAt": "2026-04-26T21:43:46.591Z",
+      "tasks": [],
+      "comments": [],
+      "links": [],
+      "cuts": []
+    },
+    {
+      "id": "106f4b06-1c36-4e95-84c6-1284c72c1100",
+      "title": "Mabel",
+      "subtitle": "That’s a cows name",
+      "stage": "producing",
+      "position": 11,
+      "dropboxFolder": "/Straw Hut Team Folder/2_CLIENTS/Maggie Glass Record/Mabel",
+      "releaseDate": null,
+      "processingState": null,
+      "createdAt": "2026-04-26T21:43:46.591Z",
+      "tasks": [],
+      "comments": [],
+      "links": [],
+      "cuts": []
+    },
+    {
+      "id": "cfa9821c-4392-4196-8043-54114dec3d61",
+      "title": "Oh Wood",
+      "subtitle": null,
+      "stage": "producing",
+      "position": 12,
+      "dropboxFolder": "/Straw Hut Team Folder/2_CLIENTS/Maggie Glass Record/Oh Wood",
+      "releaseDate": null,
+      "processingState": null,
+      "createdAt": "2026-04-26T21:43:46.591Z",
+      "tasks": [],
+      "comments": [],
+      "links": [],
+      "cuts": []
+    },
+    {
+      "id": "a6e65b65-bfbc-43e6-9e9c-158494ed8c63",
+      "title": "I Can't Explain",
+      "subtitle": null,
+      "stage": "done",
+      "position": 13,
+      "dropboxFolder": "/2_CLIENTS/Maggie Glass Record/I Can't Explain",
+      "releaseDate": null,
+      "processingState": null,
+      "createdAt": "2026-04-26T21:43:46.591Z",
+      "tasks": [],
+      "comments": [],
+      "links": [],
+      "cuts": []
+    },
+    {
+      "id": "a446eb2e-d350-43dd-9452-08f3889eff7f",
+      "title": "This Is It",
+      "subtitle": null,
+      "stage": "done",
+      "position": 14,
+      "dropboxFolder": "/2_CLIENTS/Maggie Glass Record/This Is It",
+      "releaseDate": null,
+      "processingState": null,
+      "createdAt": "2026-04-26T21:43:46.591Z",
+      "tasks": [],
+      "comments": [],
+      "links": [],
+      "cuts": []
+    }
+  ],
+  "scheduleSnapshots": [],
+  "showChatRecent": []
+}
