@@ -1791,7 +1791,7 @@ Rules:
 - Ground it in a SPECIFIC, REAL detail — name the actual thing (the project, the show they were on, the thing they built). NEVER vague filler like "your recent work", "what you've been putting out lately", or "the way you framed it".
 - Connect that detail to what THIS show is about, but do NOT describe or summarize the show back at them — there's a link in the email for that.
 - NEVER invent facts. State only what you actually found via search or were explicitly told. If search surfaces a different person who happens to share the name, do not use it — only use a detail you're confident belongs to THIS person.
-- If the recipient is an agent or manager, the sentence pitches WHY WE WANT THEIR CLIENT ON — search the client, address the agent as the sender, but make the reason about the client.
+- If the recipient is an agent or manager, the sentence pitches WHY WE WANT THEIR CLIENT ON — search the client, address the agent as the sender, but make the reason about the client. The FIRST time you name the client, use their FULL name exactly as given (e.g. "Amaya Espinal", not just "Amaya") — a bare first name for someone you've never emailed reads as oddly familiar.
 - If the recipient is the person themselves, address the reason to them directly.
 - No em-dashes if you can avoid them. Write like a person, not a brand.
 - If the note gives you ANY real detail about the person, you MUST write the sentence from it. NEVER return INSUFFICIENT_CONTEXT when you were handed real facts — use them.
