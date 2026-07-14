@@ -417,5 +417,11 @@
     "outcome": "fixed",
     "summary": "Added client abort handling to sendFile callback to suppress \"Request aborted\" error logs when clients disconnect before receiving index.html, consistent with existing client abort handling elsewhere in the server.",
     "iterations": 8
+  },
+  "magic link send failed::{\"email\":\"caroline@strawhutmedia.com\",\"error\":\"resend: validation_error: The str": {
+    "attemptedAt": "2026-07-14T02:08:50.549Z",
+    "outcome": "external",
+    "summary": "The MAIL_FROM environment variable is configured to use an unverified domain (strawhutmedia.com). According to the code comments in server/email.ts, only strawhutmedia.net is verified in Resend. The fix requires updating the MAIL_FROM environment variable in Railway to either be removed (to use the correct default of 'Slate <slate@strawhutmedia.net>') or set to a verified domain. This is an infrastructure/environment configuration issue, not a code issue.",
+    "iterations": 15
   }
 }
