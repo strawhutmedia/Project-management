@@ -34,13 +34,24 @@ outreachRouter.use(requireAdmin)
 // template writer controls which tokens exist; anything else stays.
 function mergeTemplate(
   text: string,
-  tokens: { name: string; uniqueSentence: string; oneSheetUrl: string; sender?: string },
+  tokens: { name: string; uniqueSentence: string; oneSheetUrl: string; sender?: string; guest?: string },
 ): string {
   return text
     .replace(/\[name\]/gi, tokens.name)
     .replace(/\[unique_sentence\]/gi, tokens.uniqueSentence)
     .replace(/\[one_sheet_url\]|\[onesheet_url\]|\[link\]/gi, tokens.oneSheetUrl)
     .replace(/\[sender\]|\[your_name\]/gi, tokens.sender ?? 'The team')
+    .replace(/\[guest\]/gi, tokens.guest ?? 'you')
+}
+
+// Who the interview is actually FOR. When the recipient is the guest, that's
+// "you". When they're a rep (agent/manager) with a named client, it's the
+// client — so "we'll get you booked" becomes "we'll get Amaya booked".
+function resolveGuest(recipientType: string | null | undefined, clientName: string | null | undefined): string {
+  if ((recipientType === 'agent' || recipientType === 'manager') && clientName?.trim()) {
+    return clientName.trim()
+  }
+  return 'you'
 }
 
 // Build the public one-sheet URL for a show. Returns empty string
@@ -353,8 +364,9 @@ async function sendOneProspect(prospectId: string): Promise<void> {
   const pRes = await pool.query<{
     project_id: string; name: string; email: string | null;
     unique_sentence: string | null; status: string;
+    recipient_type: string | null; client_name: string | null;
   }>(
-    `SELECT project_id, name, email, unique_sentence, status
+    `SELECT project_id, name, email, unique_sentence, status, recipient_type, client_name
        FROM outreach_prospects WHERE id = $1`,
     [prospectId],
   )
@@ -408,9 +420,10 @@ async function sendOneProspect(prospectId: string): Promise<void> {
   const replyTo = tpl.reply_to?.trim() || 'booking@strawhutmedia.com'
 
   const sender = tpl.sender_name?.trim() || tpl.from_name?.trim() || 'The team'
+  const guest = resolveGuest(p.recipient_type, p.client_name)
   const oneSheetUrl = await getOneSheetUrl(p.project_id)
-  const subject = mergeTemplate(tpl.subject, { name: p.name, uniqueSentence: p.unique_sentence, oneSheetUrl, sender })
-  const body = mergeTemplate(tpl.body, { name: p.name, uniqueSentence: p.unique_sentence, oneSheetUrl, sender })
+  const subject = mergeTemplate(tpl.subject, { name: p.name, uniqueSentence: p.unique_sentence, oneSheetUrl, sender, guest })
+  const body = mergeTemplate(tpl.body, { name: p.name, uniqueSentence: p.unique_sentence, oneSheetUrl, sender, guest })
 
   // Log the attempt (status: queued) before firing so we have a record
   // even if Resend errors mid-flight.
@@ -1004,8 +1017,8 @@ outreachRouter.post('/projects/:projectId/test-send', async (req, res) => {
   // Load a preview prospect — first ready one, else any prospect,
   // else fabricate. Priority: prospect with a unique_sentence, then
   // any with an email, then any at all, then fake.
-  const previewRes = await pool.query<{ name: string; unique_sentence: string | null }>(
-    `SELECT name, unique_sentence FROM outreach_prospects
+  const previewRes = await pool.query<{ name: string; unique_sentence: string | null; recipient_type: string | null; client_name: string | null }>(
+    `SELECT name, unique_sentence, recipient_type, client_name FROM outreach_prospects
       WHERE project_id = $1
       ORDER BY (unique_sentence IS NOT NULL) DESC, (email IS NOT NULL) DESC, created_at DESC
       LIMIT 1`,
@@ -1015,6 +1028,7 @@ outreachRouter.post('/projects/:projectId/test-send', async (req, res) => {
   const previewName = preview?.name || 'Alex'
   const previewSentence = preview?.unique_sentence
     || 'I love what you have been putting out lately and think our audience would really connect with you.'
+  const previewGuest = resolveGuest(preview?.recipient_type, preview?.client_name)
 
   // Sign with the account running the send. Persist it so the real
   // campaign (which sends in the background, with no request context)
@@ -1027,8 +1041,8 @@ outreachRouter.post('/projects/:projectId/test-send', async (req, res) => {
   )
 
   const oneSheetUrl = await getOneSheetUrl(projectId)
-  const subject = mergeTemplate(tpl.subject, { name: previewName, uniqueSentence: previewSentence, oneSheetUrl, sender })
-  const body = mergeTemplate(tpl.body, { name: previewName, uniqueSentence: previewSentence, oneSheetUrl, sender })
+  const subject = mergeTemplate(tpl.subject, { name: previewName, uniqueSentence: previewSentence, oneSheetUrl, sender, guest: previewGuest })
+  const body = mergeTemplate(tpl.body, { name: previewName, uniqueSentence: previewSentence, oneSheetUrl, sender, guest: previewGuest })
 
   // Pick a sending domain — first verified + active one in the pool.
   // Prefer the domain pinned to this show if one is set.

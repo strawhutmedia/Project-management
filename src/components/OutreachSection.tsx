@@ -41,7 +41,7 @@ I'm a producer at Straw Hut Media.
 
 We record a full conversation — usually about an hour — then edit it down into a polished episode. You'll get the audio plus a highlight clip package to share wherever you'd like.
 
-If it sounds like a fit, just reply and we'll get you booked in for this week or next.
+If it sounds like a fit, just reply and we'll get [guest] booked in for this week or next.
 
 More about the show: [one_sheet_url]
 
@@ -787,6 +787,7 @@ function TokenBar({ onInsert }: { onInsert: (token: string) => void }) {
     { token: '[unique_sentence]', label: '[unique_sentence]', hint: 'Claude-written personalized sentence per prospect' },
     { token: '[one_sheet_url]', label: '[one_sheet_url]', hint: 'Public one-sheet URL (blank if unpublished)' },
     { token: '[sender]', label: '[sender]', hint: 'Signs off with the name on the account that sends — e.g. "Caroline"' },
+    { token: '[guest]', label: '[guest]', hint: 'Who the interview is for — "you" for a direct guest, or the client\'s name when writing to their agent/manager' },
   ]
   return (
     <div className="flex items-center gap-1 flex-wrap">
