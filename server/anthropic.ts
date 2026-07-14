@@ -1787,6 +1787,7 @@ If the "Context on them" note already gives you a specific, usable fact (a role,
 
 Rules:
 - Write EXACTLY ONE sentence, 35 words max. Not two, not a paragraph.
+- NEVER open with a greeting, a salutation, or the recipient's name. Do NOT start with "Hi", "Hey", "Hello", "Dear", or "<name>," — the email template already opens with "Hi <name>,". Your sentence drops in AFTER that greeting, so it must start straight into the reason (e.g. "We'd love to have you on because…", "Your run on Love Island USA…"). A sentence that begins with a greeting produces a duplicated "Hi <name>" in the email.
 - Ground it in a SPECIFIC, REAL detail — name the actual thing (the project, the show they were on, the thing they built). NEVER vague filler like "your recent work", "what you've been putting out lately", or "the way you framed it".
 - Connect that detail to what THIS show is about, but do NOT describe or summarize the show back at them — there's a link in the email for that.
 - NEVER invent facts. State only what you actually found via search or were explicitly told. If search surfaces a different person who happens to share the name, do not use it — only use a detail you're confident belongs to THIS person.
@@ -1903,10 +1904,24 @@ export async function generateUniqueSentence(input: UniqueSentenceInput): Promis
   // The sentence is the LAST text block — earlier text blocks can be the
   // model reasoning out loud between searches.
   const texts = response.content.filter((b): b is Anthropic.TextBlock => b.type === 'text')
-  const raw = (texts.length ? texts[texts.length - 1].text : '').trim()
+  let raw = (texts.length ? texts[texts.length - 1].text : '').trim()
     .replace(/^["'`]|["'`]$/g, '')
     .replace(/^(sentence|response):\s*/i, '')
     .trim()
+  // Belt-and-suspenders: the email template already opens with "Hi <name>,".
+  // If the model still led with its own greeting/salutation, strip it so the
+  // recipient doesn't get a doubled "Hi <name>". Handles "Hi Steven, we'd…",
+  // "Hey there —", "Hello Dr. Lee:", etc. — remove the leading salutation and
+  // re-capitalize what's left.
+  {
+    const stripped = raw.replace(
+      /^(hi|hey|hello|dear|greetings|hi there|hey there)\b[^,:—-]*[,:—-]\s*/i,
+      '',
+    )
+    if (stripped && stripped !== raw) {
+      raw = stripped.charAt(0).toUpperCase() + stripped.slice(1)
+    }
+  }
   // Guard: the model sometimes narrates its search or hedges instead of
   // returning a clean sentence or the exact flag. Any such output would be
   // pasted verbatim into a real email, so reject it and flag the prospect

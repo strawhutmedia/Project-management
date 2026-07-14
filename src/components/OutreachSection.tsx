@@ -46,7 +46,7 @@ If it sounds like a fit, just reply and we'll get you booked in for this week or
 More about the show: [one_sheet_url]
 
 Best,
-Ryan`
+Caroline`
 
 export default function OutreachSection({ projectId }: { projectId: string }) {
   const { user } = useAuth()
