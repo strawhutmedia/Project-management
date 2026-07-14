@@ -95,7 +95,7 @@ showPageRouter.get('/shows/:slug', async (req: Request, res: Response) => {
           AND cover_art_url IS NOT NULL
           AND cover_art_url <> ''
         ORDER BY is_flagship DESC, created_at ASC
-        LIMIT 8`,
+        LIMIT 24`,
       [show.id, show.name],
     ),
   ])
@@ -423,7 +423,7 @@ ${coverUrl ? `<meta property="og:image" content="${escHtml(coverUrl)}">` : ''}
   ${sisters.length > 0 ? `<section class="sisters">
     <h2>Part of Straw Hut Media</h2>
     <p class="lead" style="margin-bottom: 28px; font-size: 16px;">
-      A few of the shows in the Straw Hut Media roster.
+      Just a sample of our roster — Straw Hut Media produces many more shows across comedy, culture, true crime, and beyond.
     </p>
     <div class="sister-grid">
       ${sisters.map((sh) => `<div class="sister">
