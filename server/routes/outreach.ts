@@ -874,9 +874,17 @@ outreachRouter.post('/prospects/:id/generate-sentence', async (req, res) => {
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err)
     if (msg === 'insufficient_context') {
+      // Clear any stale/garbage sentence so the prospect shows as flagged
+      // (blank), never leaves old hedging text sitting in the field.
+      await pool.query(
+        `UPDATE outreach_prospects
+            SET unique_sentence = NULL, unique_sentence_generated_at = NULL, updated_at = now()
+          WHERE id = $1`,
+        [req.params.id],
+      ).catch(() => {})
       res.status(422).json({
         error: 'insufficient_context',
-        detail: 'Not enough context on this prospect to write a specific sentence. Add a line about who they are + something recent they did, then try again.',
+        detail: 'Couldn\'t find a specific, verifiable fact about this person (online or in your note). Add a concrete detail — what they do + something recent — and generate again.',
       })
       return
     }
