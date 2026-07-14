@@ -35,7 +35,7 @@ const STATUS_STYLE: Record<ApiOutreachProspect['status'], { bg: string; label: s
 // customizes this to fit its actual format.
 const DEFAULT_TEMPLATE_BODY = `Hi [name],
 
-I'm a producer at Straw Hut Media and we'd love to have you on the show.
+I'm a producer at Straw Hut Media.
 
 [unique_sentence]
 
@@ -46,7 +46,7 @@ If it sounds like a fit, just reply and we'll get you booked in for this week or
 More about the show: [one_sheet_url]
 
 Best,
-Caroline`
+[sender]`
 
 export default function OutreachSection({ projectId }: { projectId: string }) {
   const { user } = useAuth()
@@ -786,6 +786,7 @@ function TokenBar({ onInsert }: { onInsert: (token: string) => void }) {
     { token: '[name]', label: '[name]', hint: 'Prospect first name — e.g. "Alex"' },
     { token: '[unique_sentence]', label: '[unique_sentence]', hint: 'Claude-written personalized sentence per prospect' },
     { token: '[one_sheet_url]', label: '[one_sheet_url]', hint: 'Public one-sheet URL (blank if unpublished)' },
+    { token: '[sender]', label: '[sender]', hint: 'Signs off with the name on the account that sends — e.g. "Caroline"' },
   ]
   return (
     <div className="flex items-center gap-1 flex-wrap">

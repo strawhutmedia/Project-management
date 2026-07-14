@@ -32,11 +32,15 @@ outreachRouter.use(requireAdmin)
 // Merge [name] and [unique_sentence] tokens in a template. Used by the
 // test-send preview + (later) the real sender. Kept minimal — the
 // template writer controls which tokens exist; anything else stays.
-function mergeTemplate(text: string, tokens: { name: string; uniqueSentence: string; oneSheetUrl: string }): string {
+function mergeTemplate(
+  text: string,
+  tokens: { name: string; uniqueSentence: string; oneSheetUrl: string; sender?: string },
+): string {
   return text
     .replace(/\[name\]/gi, tokens.name)
     .replace(/\[unique_sentence\]/gi, tokens.uniqueSentence)
     .replace(/\[one_sheet_url\]|\[onesheet_url\]|\[link\]/gi, tokens.oneSheetUrl)
+    .replace(/\[sender\]|\[your_name\]/gi, tokens.sender ?? 'The team')
 }
 
 // Build the public one-sheet URL for a show. Returns empty string
@@ -360,9 +364,9 @@ async function sendOneProspect(prospectId: string): Promise<void> {
   if (!p.unique_sentence?.trim()) throw new Error('prospect_missing_sentence')
 
   const tplRes = await pool.query<{
-    subject: string; body: string; reply_to: string | null; from_name: string | null;
+    subject: string; body: string; reply_to: string | null; from_name: string | null; sender_name: string | null;
   }>(
-    `SELECT subject, body, reply_to, from_name FROM outreach_templates WHERE project_id = $1`,
+    `SELECT subject, body, reply_to, from_name, sender_name FROM outreach_templates WHERE project_id = $1`,
     [p.project_id],
   )
   const tpl = tplRes.rows[0]
@@ -403,9 +407,10 @@ async function sendOneProspect(prospectId: string): Promise<void> {
   const from = `${fromName} <booking@${domain.name}>`
   const replyTo = tpl.reply_to?.trim() || 'booking@strawhutmedia.com'
 
+  const sender = tpl.sender_name?.trim() || tpl.from_name?.trim() || 'The team'
   const oneSheetUrl = await getOneSheetUrl(p.project_id)
-  const subject = mergeTemplate(tpl.subject, { name: p.name, uniqueSentence: p.unique_sentence, oneSheetUrl })
-  const body = mergeTemplate(tpl.body, { name: p.name, uniqueSentence: p.unique_sentence, oneSheetUrl })
+  const subject = mergeTemplate(tpl.subject, { name: p.name, uniqueSentence: p.unique_sentence, oneSheetUrl, sender })
+  const body = mergeTemplate(tpl.body, { name: p.name, uniqueSentence: p.unique_sentence, oneSheetUrl, sender })
 
   // Log the attempt (status: queued) before firing so we have a record
   // even if Resend errors mid-flight.
@@ -496,6 +501,16 @@ outreachRouter.post('/projects/:projectId/send-campaign', async (req, res) => {
   if (!resend) {
     res.status(503).json({ error: 'resend_not_configured' })
     return
+  }
+  // Record who launched this campaign so the background sender signs the
+  // emails with their name (the [sender] token).
+  const launcher = (req as typeof req & { user?: { display_name: string | null; name: string } }).user
+  const launcherName = launcher?.display_name?.trim() || launcher?.name?.trim()
+  if (launcherName) {
+    await pool.query(
+      `UPDATE outreach_templates SET sender_name = $1, updated_at = now() WHERE project_id = $2`,
+      [launcherName, projectId],
+    )
   }
   const rawIds = req.body?.prospectIds
   const explicit = Array.isArray(rawIds) ? rawIds.filter((x): x is string => typeof x === 'string') : null
@@ -1001,9 +1016,19 @@ outreachRouter.post('/projects/:projectId/test-send', async (req, res) => {
   const previewSentence = preview?.unique_sentence
     || 'I love what you have been putting out lately and think our audience would really connect with you.'
 
+  // Sign with the account running the send. Persist it so the real
+  // campaign (which sends in the background, with no request context)
+  // signs the same way.
+  const sessionUser = (req as typeof req & { user?: { display_name: string | null; name: string } }).user
+  const sender = sessionUser?.display_name?.trim() || sessionUser?.name?.trim() || 'The team'
+  await pool.query(
+    `UPDATE outreach_templates SET sender_name = $1, updated_at = now() WHERE project_id = $2`,
+    [sender, projectId],
+  )
+
   const oneSheetUrl = await getOneSheetUrl(projectId)
-  const subject = mergeTemplate(tpl.subject, { name: previewName, uniqueSentence: previewSentence, oneSheetUrl })
-  const body = mergeTemplate(tpl.body, { name: previewName, uniqueSentence: previewSentence, oneSheetUrl })
+  const subject = mergeTemplate(tpl.subject, { name: previewName, uniqueSentence: previewSentence, oneSheetUrl, sender })
+  const body = mergeTemplate(tpl.body, { name: previewName, uniqueSentence: previewSentence, oneSheetUrl, sender })
 
   // Pick a sending domain — first verified + active one in the pool.
   // Prefer the domain pinned to this show if one is set.
