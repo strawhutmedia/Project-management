@@ -677,6 +677,25 @@ function extractEmails(s: string | undefined): string[] {
   return out
 }
 
+// A line with no email is only a real contact if its first field actually
+// looks like a person's name. Without this, pasting prose/notes (headings,
+// sentences, "How old is X?") turns every line into a junk prospect.
+const NAME_STOPWORDS = new Set([
+  'is', 'are', 'was', 'were', 'the', 'a', 'an', 'of', 'from', 'to', 'in', 'on',
+  'old', 'years', 'year', 'how', 'where', 'what', 'who', 'why', 'when', 'here',
+  'this', 'that', 'and', 'with', 'about', 'everything', 'know', 'born',
+])
+function looksLikeName(s: string): boolean {
+  const t = s.trim()
+  if (!t || t.length > 40) return false
+  if (/[.?!]$/.test(t)) return false          // sentence-like ending
+  if (/\d/.test(t)) return false              // real names don't carry digits
+  const words = t.split(/\s+/)
+  if (words.length > 4) return false          // too many words for a name
+  if (words.some((w) => NAME_STOPWORDS.has(w.toLowerCase()))) return false
+  return true
+}
+
 function parseBulk(text: string): ParsedRow[] {
   const lines = text.split(/\r?\n/).map((l) => l.trim()).filter(Boolean)
   const rows: ParsedRow[] = []
@@ -742,11 +761,19 @@ function parseBulk(text: string): ParsedRow[] {
       continue
     }
 
-    // Only a name, no email. That's fine — status will be needs_email.
-    rows.push({
-      name: c0 || '(unknown)',
-      error: c0 ? undefined : 'name_required',
-    })
+    // No email in an email column. Accept ONLY if the first field actually
+    // looks like a person's name — otherwise it's pasted prose/notes, not a
+    // contact, so flag it (it won't be imported). Keep any trailing fields
+    // as the facts/context.
+    if (looksLikeName(c0)) {
+      const restContext = parts.slice(1).map((s) => s.trim()).filter(Boolean).join(', ')
+      rows.push({ name: c0, context: restContext || undefined })
+    } else {
+      rows.push({
+        name: c0 || '(unknown)',
+        error: c0 ? 'not_a_contact — looks like a note, not a person (skipped)' : 'name_required',
+      })
+    }
   }
   return rows
 }
