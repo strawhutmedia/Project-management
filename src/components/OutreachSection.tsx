@@ -267,8 +267,8 @@ export default function OutreachSection({ projectId }: { projectId: string }) {
 
   async function generateAllSentences(overwrite = false) {
     const confirmMsg = overwrite
-      ? 'Rewrite the sentence for EVERY prospect with the latest AI? This replaces what\'s there now (including any you edited by hand).'
-      : 'Generate a unique sentence for every prospect that doesn\'t already have one? Uses Claude and takes ~10s per 5 prospects.'
+      ? 'Rewrite the sentence for EVERY prospect with the latest AI? Claude researches each person on the web, so this replaces what\'s there now (including any you edited by hand) and takes ~15-20s per prospect.'
+      : 'Generate a unique sentence for every prospect that doesn\'t already have one? Claude researches each person on the web to find something specific — about ~15-20s per prospect.'
     if (!confirm(confirmMsg)) return
     setGeneratingAll(true)
     setError(null)

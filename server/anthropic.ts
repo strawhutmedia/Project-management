@@ -1769,6 +1769,7 @@ export type UniqueSentenceInput = {
     recipientType: 'person' | 'agent' | 'manager' | 'other'
     clientName: string | null
     context: string | null         // Free-form facts about the prospect
+    email?: string | null          // Domain is a strong search disambiguator
   }
 }
 
@@ -1780,21 +1781,21 @@ export type UniqueSentenceResult = {
   }
 }
 
-const UNIQUE_SENTENCE_SYSTEM = `You write ONE sentence — exactly one — that goes in a cold-outreach email to a potential podcast guest. That sentence is the *reason we're reaching out to THIS person for THIS show*, and nothing else. No greeting, no signature, no lead-in, no "I hope this finds you well." Just the one specific sentence.
+const UNIQUE_SENTENCE_SYSTEM = `You write ONE sentence for a cold-outreach email to a potential podcast guest — the *reason we're reaching out to THIS person for THIS show*, and nothing else.
+
+You have a web_search tool. USE IT before writing. Search for the recipient by their full name plus any employer, handle, title, or detail you're given — the email address's domain is a strong hint about who they are and where they work. Find something concrete and recent about them: a project, a launch, a role, a book, a talk, a piece, a recent appearance. Run 1 to 4 searches; stop as soon as you have one specific, real, verifiable detail.
 
 Rules:
-- Write EXACTLY ONE sentence. Not two, not a paragraph. 35 words maximum. This is the most important rule.
-- Be SPECIFIC. If the context names something real about them — a project, a piece, a role, a launch, a moment — name that actual thing. NEVER vague filler like "your recent work jumped out" or "the way you framed it in your last piece". If you can't name it, don't gesture at it.
-- The best sentence links something real about THEM to what this show is about. But do NOT describe or summarize the show back to them — there's a link in the email for that. The sentence is about why we want THEM.
-- NEVER invent facts about the recipient — awards, projects, numbers, appearances — that aren't in the context. If you weren't told it, don't claim it.
-- Thin or procedural context is fine. If all you have is how we found them (e.g. "email listed on their Instagram"), write a short, warm, honest line about wanting them on — without inventing specifics and without padding it with show description.
-- If the recipient is an agent or manager, the sentence pitches WHY WE WANT THEIR CLIENT ON — address the agent as the sender, but the reason is about the client.
+- Write EXACTLY ONE sentence, 35 words max. Not two, not a paragraph.
+- Ground it in a SPECIFIC, REAL detail — name the actual thing (the project, the show they were on, the thing they built). NEVER vague filler like "your recent work", "what you've been putting out lately", or "the way you framed it".
+- Connect that detail to what THIS show is about, but do NOT describe or summarize the show back at them — there's a link in the email for that.
+- NEVER invent facts. State only what you actually found via search or were explicitly told. If search surfaces a different person who happens to share the name, do not use it — only use a detail you're confident belongs to THIS person.
+- If the recipient is an agent or manager, the sentence pitches WHY WE WANT THEIR CLIENT ON — search the client, address the agent as the sender, but make the reason about the client.
 - If the recipient is the person themselves, address the reason to them directly.
-- Don't name-drop past guests unless it's a genuinely natural fit.
 - No em-dashes if you can avoid them. Write like a person, not a brand.
-- ONLY if the recipient context is literally "(none provided)" — nothing at all — return the exact string "INSUFFICIENT_CONTEXT". Never return it when any context is present, no matter how thin.
+- If, after searching, you genuinely cannot find AND were not given one specific real thing about this exact person, return the exact string "INSUFFICIENT_CONTEXT". Do NOT fall back to generic praise — a flagged prospect is better than a vague email.
 
-Return ONLY the one sentence (or, only in that no-context case, the exact string INSUFFICIENT_CONTEXT). No greeting, no wrapping quotes, no commentary.`
+Return ONLY the one sentence, or the exact string INSUFFICIENT_CONTEXT. No preamble, no quotes, no commentary about your search.`
 
 function uniqueSentenceUserBlock(input: UniqueSentenceInput): string {
   const s = input.show
@@ -1819,8 +1820,9 @@ function uniqueSentenceUserBlock(input: UniqueSentenceInput): string {
   lines.push(`First name (for greeting): ${p.name}`)
   if (p.fullName) lines.push(`Full name: ${p.fullName}`)
   lines.push(`Who they are: ${p.recipientType}${p.clientName ? ` for ${p.clientName}` : ''}`)
+  if (p.email) lines.push(`Email (the domain is a strong hint for who/where they are): ${p.email}`)
   if (p.context) lines.push(`Context on them: ${p.context}`)
-  else lines.push(`Context on them: (none provided)`)
+  else lines.push(`Context on them: (none provided — rely on web search)`)
   lines.push('')
   lines.push('Write the one sentence now.')
   return lines.join('\n')
@@ -1832,31 +1834,42 @@ export async function generateUniqueSentence(input: UniqueSentenceInput): Promis
     prospect: input.prospect.fullName || input.prospect.name,
     recipientType: input.prospect.recipientType,
     contextChars: input.prospect.context?.length ?? 0,
+    hasEmail: Boolean(input.prospect.email),
   })
-  const response = await client.messages.create({
+  // The model researches the recipient with the server-side web_search tool
+  // (Anthropic-hosted — no egress from our box) so the sentence can cite a
+  // real, specific detail instead of generic filler.
+  const messages: Anthropic.MessageParam[] = [{
+    role: 'user',
+    content: [{ type: 'text', text: uniqueSentenceUserBlock(input) }],
+  }]
+  const params = (): Anthropic.MessageCreateParamsNonStreaming => ({
     model: MODEL,
-    max_tokens: 300,
+    max_tokens: 4096,
     system: UNIQUE_SENTENCE_SYSTEM,
-    messages: [{
-      role: 'user',
-      content: [{
-        type: 'text',
-        text: uniqueSentenceUserBlock(input),
-        cache_control: { type: 'ephemeral' },
-      }],
-    }],
+    tools: [{ type: 'web_search_20260209', name: 'web_search', max_uses: 4 }],
+    messages,
   })
-  const textBlock = response.content.find((b) => b.type === 'text')
-  if (!textBlock || textBlock.type !== 'text') {
-    throw new Error('outreach: claude returned no text block')
+
+  let response = await client.messages.create(params())
+  // web_search runs a server-side tool loop; if it exceeds the internal
+  // iteration cap the turn pauses — re-send to let it finish. Bounded so a
+  // misbehaving turn can't loop forever.
+  let guard = 0
+  while (response.stop_reason === 'pause_turn' && guard < 5) {
+    guard += 1
+    messages.push({ role: 'assistant', content: response.content })
+    response = await client.messages.create(params())
   }
-  // Strip common junk: leading/trailing quotes, "Sentence:" prefix,
-  // trailing period trimming, etc. Keep it tight.
-  const raw = textBlock.text.trim()
+
+  // The sentence is the LAST text block — earlier text blocks can be the
+  // model reasoning out loud between searches.
+  const texts = response.content.filter((b): b is Anthropic.TextBlock => b.type === 'text')
+  const raw = (texts.length ? texts[texts.length - 1].text : '').trim()
     .replace(/^["'`]|["'`]$/g, '')
     .replace(/^(sentence|response):\s*/i, '')
     .trim()
-  if (raw === 'INSUFFICIENT_CONTEXT') {
+  if (!raw || raw === 'INSUFFICIENT_CONTEXT') {
     throw new Error('insufficient_context')
   }
   return {

@@ -800,9 +800,9 @@ async function buildSentenceInput(prospectId: string): Promise<{ input: UniqueSe
   const prospectRes = await pool.query<{
     id: string; project_id: string; name: string; full_name: string | null;
     recipient_type: 'person' | 'agent' | 'manager' | 'other';
-    client_name: string | null; context: string | null;
+    client_name: string | null; context: string | null; email: string | null;
   }>(
-    `SELECT id, project_id, name, full_name, recipient_type, client_name, context
+    `SELECT id, project_id, name, full_name, recipient_type, client_name, context, email
        FROM outreach_prospects WHERE id = $1`,
     [prospectId],
   )
@@ -844,6 +844,7 @@ async function buildSentenceInput(prospectId: string): Promise<{ input: UniqueSe
         recipientType: prospect.recipient_type,
         clientName: prospect.client_name,
         context: prospect.context,
+        email: prospect.email,
       },
     },
   }
