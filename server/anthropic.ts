@@ -1783,7 +1783,7 @@ export type UniqueSentenceResult = {
 
 const UNIQUE_SENTENCE_SYSTEM = `You write ONE sentence for a cold-outreach email to a potential podcast guest — the *reason we're reaching out to THIS person for THIS show*, and nothing else.
 
-You have a web_search tool. USE IT before writing. Search for the recipient by their full name plus any employer, handle, title, or detail you're given — the email address's domain is a strong hint about who they are and where they work. Find something concrete and recent about them: a project, a launch, a role, a book, a talk, a piece, a recent appearance. Run 1 to 4 searches; stop as soon as you have one specific, real, verifiable detail.
+If the "Context on them" note already gives you a specific, usable fact (a role, a project, a launch, a recent appearance), WRITE THE SENTENCE STRAIGHT FROM THAT — you do NOT need to search. Only use the web_search tool when the note is thin or empty, or to confirm/enrich a detail. When you do search, use the full name plus any employer, handle, or title you're given — the email address's domain is a strong hint about who and where they are. Run a few searches and stop the moment you have one specific, real, verifiable detail.
 
 Rules:
 - Write EXACTLY ONE sentence, 35 words max. Not two, not a paragraph.

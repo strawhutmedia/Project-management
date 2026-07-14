@@ -983,7 +983,7 @@ function ProspectCard({
           onChange={(e) => setNote(e.target.value)}
           onBlur={() => void persistNote()}
           rows={2}
-          placeholder="Facts about them — what they do + something recent. Claude also searches the web. Leave blank to let it research from just the name/email."
+          placeholder="Type a fact or two here… e.g. Founder of Acme, just raised a Series A"
           className="w-full bg-ink/40 border border-line rounded-lg px-2 py-1.5 text-[11px] focus:outline-none focus:border-stage-mastering"
         />
         <div className="flex items-center gap-2 flex-wrap">
