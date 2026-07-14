@@ -602,84 +602,15 @@ export default function OutreachSection({ projectId }: { projectId: string }) {
           )}
           {prospects && prospects.length > 0 && (
             <div className="space-y-2 max-h-[600px] overflow-y-auto pr-1">
-              {prospects.map((p) => {
-                const style = STATUS_STYLE[p.status]
-                const hasSentence = !!p.unique_sentence?.trim()
-                return (
-                  <button
-                    key={p.id}
-                    type="button"
-                    onClick={() => setOpenProspect(p)}
-                    className="w-full text-left rounded-lg border border-line bg-ink/30 hover:border-stage-mastering/60 hover:bg-ink/50 transition p-3 space-y-1 cursor-pointer group"
-                  >
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <span className="font-bold text-sm group-hover:text-stage-mastering transition">{p.name}</span>
-                      {p.full_name && p.full_name !== p.name && (
-                        <span className="text-xs text-muted">({p.full_name})</span>
-                      )}
-                      <span className={`text-[9px] uppercase tracking-wider font-bold px-2 py-0.5 rounded-full border ${style.bg}`}>
-                        {style.label}
-                      </span>
-                      {!hasSentence && !p.context && (
-                        <span className="text-[9px] uppercase tracking-wider font-bold px-2 py-0.5 rounded-full border border-sky-500/40 bg-sky-500/10 text-sky-300">
-                          Add a note to generate
-                        </span>
-                      )}
-                      {!hasSentence && p.context && (
-                        <span className="text-[9px] uppercase tracking-wider font-bold px-2 py-0.5 rounded-full border border-amber-500/40 bg-amber-500/10 text-amber-300">
-                          Ready to generate
-                        </span>
-                      )}
-                      {p.email && p.email_check_status === 'invalid' && (
-                        <span
-                          title={p.email_check_detail ?? 'Undeliverable — this address won\'t be sent to'}
-                          className="text-[9px] uppercase tracking-wider font-bold px-2 py-0.5 rounded-full border border-urgent/50 bg-urgent/10 text-urgent"
-                        >
-                          ✕ Undeliverable
-                        </span>
-                      )}
-                      {p.email && p.email_check_status === 'risky' && (
-                        <span
-                          title={p.email_check_detail ?? 'Domain has no mail server — delivery not guaranteed'}
-                          className="text-[9px] uppercase tracking-wider font-bold px-2 py-0.5 rounded-full border border-amber-500/40 bg-amber-500/10 text-amber-300"
-                        >
-                          ⚠ Risky
-                        </span>
-                      )}
-                      {p.email && p.email_check_status === 'valid' && (
-                        <span
-                          title={p.email_check_detail ?? 'Domain accepts mail'}
-                          className="text-[9px] uppercase tracking-wider font-bold px-2 py-0.5 rounded-full border border-emerald-500/40 bg-emerald-500/10 text-emerald-300"
-                        >
-                          ✓ Email ok
-                        </span>
-                      )}
-                      <div className="flex-1" />
-                      <span
-                        onClick={(e) => { e.stopPropagation(); void removeProspect(p) }}
-                        role="button"
-                        className="text-[10px] text-muted hover:text-urgent cursor-pointer opacity-0 group-hover:opacity-100"
-                        title="Remove prospect"
-                      >
-                        ✕
-                      </span>
-                    </div>
-                    <div className="text-[11px] text-muted space-y-0.5">
-                      {p.email
-                        ? <div>📧 <code>{p.email}</code></div>
-                        : <div className="italic text-amber-300/80">📧 email not found yet — click to add</div>}
-                      <div>👤 {RECIPIENT_LABEL[p.recipient_type]}{p.client_name ? ` · ${p.client_name}` : ''}</div>
-                      {p.context && <div className="text-muted/80 italic truncate">💬 {p.context}</div>}
-                      {hasSentence && (
-                        <div className="mt-1 pt-1 border-t border-line/40">
-                          <span className="text-[9px] uppercase tracking-wider text-emerald-400 font-bold">Unique sentence:</span>
-                          <div className="text-emerald-100/80 italic">"{p.unique_sentence}"</div>
-                        </div>
-                      )}
-                    </div>
-                  </button>
-                )
-              })}
+              {prospects.map((p) => (
+                <ProspectCard
+                  key={p.id}
+                  prospect={p}
+                  onOpen={() => setOpenProspect(p)}
+                  onRemove={() => void removeProspect(p)}
+                  onChanged={() => { setGenerateResult(null); void loadProspects() }}
+                />
+              ))}
             </div>
           )}
         </div>
@@ -954,6 +885,126 @@ function BulkImportPanel({
         </div>
       )}
       {error && <p className="text-xs text-urgent">{error}</p>}
+    </div>
+  )
+}
+
+// A single prospect row. The header (name/email/type) opens the full editor
+// modal; the inline facts box + Generate button let you add a fact and write
+// the researched sentence for this one person without leaving the list.
+function ProspectCard({
+  prospect: p, onOpen, onRemove, onChanged,
+}: {
+  prospect: ApiOutreachProspect
+  onOpen: () => void
+  onRemove: () => void
+  onChanged: () => void
+}) {
+  const [note, setNote] = useState(p.context ?? '')
+  const [busy, setBusy] = useState(false)
+  const [err, setErr] = useState<string | null>(null)
+  const style = STATUS_STYLE[p.status]
+  const hasSentence = !!p.unique_sentence?.trim()
+
+  // Re-sync the note if the underlying prospect changes (e.g. after reload).
+  useEffect(() => { setNote(p.context ?? '') }, [p.context])
+
+  async function persistNote() {
+    if ((note.trim() || null) === (p.context ?? null)) return
+    try {
+      await api.updateOutreachProspect(p.id, { context: note.trim() || null })
+      onChanged()
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : 'save failed')
+    }
+  }
+
+  async function generate() {
+    setBusy(true)
+    setErr(null)
+    try {
+      // Save the fact first so the researcher reads the freshest note.
+      if ((note.trim() || null) !== (p.context ?? null)) {
+        await api.updateOutreachProspect(p.id, { context: note.trim() || null })
+      }
+      await api.generateUniqueSentence(p.id)
+      onChanged()
+    } catch (e) {
+      const raw = e instanceof Error ? e.message : 'generate failed'
+      setErr(raw.replace(/^[a-z0-9_]+:\s*/, ''))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <div className="rounded-lg border border-line bg-ink/30 p-3 space-y-2">
+      {/* Header — click to open the full editor */}
+      <div className="group cursor-pointer" onClick={onOpen}>
+        <div className="flex items-center gap-2 flex-wrap">
+          <span className="font-bold text-sm group-hover:text-stage-mastering transition">{p.name}</span>
+          {p.full_name && p.full_name !== p.name && (
+            <span className="text-xs text-muted">({p.full_name})</span>
+          )}
+          <span className={`text-[9px] uppercase tracking-wider font-bold px-2 py-0.5 rounded-full border ${style.bg}`}>
+            {style.label}
+          </span>
+          {p.email && p.email_check_status === 'invalid' && (
+            <span title={p.email_check_detail ?? 'Undeliverable'} className="text-[9px] uppercase tracking-wider font-bold px-2 py-0.5 rounded-full border border-urgent/50 bg-urgent/10 text-urgent">✕ Undeliverable</span>
+          )}
+          {p.email && p.email_check_status === 'risky' && (
+            <span title={p.email_check_detail ?? 'No mail server'} className="text-[9px] uppercase tracking-wider font-bold px-2 py-0.5 rounded-full border border-amber-500/40 bg-amber-500/10 text-amber-300">⚠ Risky</span>
+          )}
+          {p.email && p.email_check_status === 'valid' && (
+            <span title={p.email_check_detail ?? 'Domain accepts mail'} className="text-[9px] uppercase tracking-wider font-bold px-2 py-0.5 rounded-full border border-emerald-500/40 bg-emerald-500/10 text-emerald-300">✓ Email ok</span>
+          )}
+          <div className="flex-1" />
+          <span
+            onClick={(e) => { e.stopPropagation(); onRemove() }}
+            role="button"
+            className="text-[10px] text-muted hover:text-urgent cursor-pointer opacity-0 group-hover:opacity-100"
+            title="Remove prospect"
+          >
+            ✕
+          </span>
+        </div>
+        <div className="text-[11px] text-muted space-y-0.5 mt-1">
+          {p.email
+            ? <div>📧 <code>{p.email}</code></div>
+            : <div className="italic text-amber-300/80">📧 email not found yet — click to add</div>}
+          <div>👤 {RECIPIENT_LABEL[p.recipient_type]}{p.client_name ? ` · ${p.client_name}` : ''}</div>
+        </div>
+      </div>
+
+      {/* Inline facts + generate — no need to open the modal */}
+      <div className="space-y-1.5">
+        <textarea
+          value={note}
+          onChange={(e) => setNote(e.target.value)}
+          onBlur={() => void persistNote()}
+          rows={2}
+          placeholder="Facts about them — what they do + something recent. Claude also searches the web. Leave blank to let it research from just the name/email."
+          className="w-full bg-ink/40 border border-line rounded-lg px-2 py-1.5 text-[11px] focus:outline-none focus:border-stage-mastering"
+        />
+        <div className="flex items-center gap-2 flex-wrap">
+          <button
+            onClick={() => void generate()}
+            disabled={busy}
+            className="text-[10px] uppercase tracking-wider text-emerald-950 bg-emerald-400 rounded-full px-3 py-1 hover:bg-emerald-300 disabled:opacity-40 font-bold"
+            title="Save this note and write a researched sentence for just this person."
+          >
+            {busy ? 'Researching…' : hasSentence ? '🔄 Regenerate sentence' : '✨ Generate sentence'}
+          </button>
+          {err && <span className="text-[10px] text-urgent">{err}</span>}
+        </div>
+      </div>
+
+      {hasSentence && (
+        <div className="pt-1 border-t border-line/40">
+          <span className="text-[9px] uppercase tracking-wider text-emerald-400 font-bold">Unique sentence:</span>
+          <div className="text-emerald-100/80 italic text-[11px]">"{p.unique_sentence}"</div>
+        </div>
+      )}
     </div>
   )
 }
