@@ -14,7 +14,7 @@
     "rssFeedUrl": null,
     "createdAt": "2026-04-26T21:43:46.591Z"
   },
-  "publishedAt": "2026-07-14T18:26:57.650Z",
+  "publishedAt": "2026-07-14T18:28:28.104Z",
   "counts": {
     "scenes": 0,
     "lineItems": 0,
@@ -22,7 +22,7 @@
     "projectLevelItems": 0,
     "shootDays": 0,
     "songs": 14,
-    "tasks": 10,
+    "tasks": 12,
     "comments": 1,
     "links": 0,
     "cuts": 0,
@@ -87,9 +87,27 @@
           "title": "Decide: add synth?",
           "stage": "tracking",
           "done": false,
-          "dueAt": "2026-04-28T15:53:00.000Z",
-          "assigneeId": "9d0e6095-5532-40ae-b6b2-14960a4df8d6",
+          "dueAt": "2026-07-28T15:53:00.000Z",
+          "assigneeId": "c3f40b06-72b7-427d-bb08-8c5d5bee2f7e",
           "createdAt": "2026-04-26T21:43:46.591Z"
+        },
+        {
+          "id": "8e6353ec-c364-4d0e-b986-93ccc8b44767",
+          "title": "@michael to record bass",
+          "stage": "overdubs",
+          "done": false,
+          "dueAt": "2026-07-21T18:26:00.000Z",
+          "assigneeId": "c3f40b06-72b7-427d-bb08-8c5d5bee2f7e",
+          "createdAt": "2026-07-14T18:27:02.661Z"
+        },
+        {
+          "id": "008420ee-6c67-49ca-9d57-21bc60e42ef8",
+          "title": "@dillon to find someone to record drums",
+          "stage": "overdubs",
+          "done": false,
+          "dueAt": "2026-07-21T18:27:00.000Z",
+          "assigneeId": "9d0e6095-5532-40ae-b6b2-14960a4df8d6",
+          "createdAt": "2026-07-14T18:27:19.577Z"
         }
       ],
       "comments": [],
