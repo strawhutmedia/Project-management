@@ -4,7 +4,13 @@ import { pool } from './db'
 const apiKey = process.env.RESEND_API_KEY
 const resend = apiKey ? new Resend(apiKey) : null
 
-const FROM = process.env.MAIL_FROM || 'Slate <slate@strawhutmedia.com>'
+// System email (magic links, invites, alerts, notifications) sends from a
+// domain that must be VERIFIED under RESEND_API_KEY's Resend team. The
+// key's team has strawhutmedia.net verified but NOT strawhutmedia.com, so
+// the default sends from strawhutmedia.net — sending from an unverified
+// domain fails the send and locks everyone out of magic-link sign-in.
+// Override with MAIL_FROM only if that address's domain is verified too.
+const FROM = process.env.MAIL_FROM || 'Slate <slate@strawhutmedia.net>'
 const ADMIN_EMAIL = process.env.ADMIN_EMAIL || 'ryan@strawhutmedia.com'
 
 // Persistent admin-alert dedupe via the sent_admin_alerts table. An
