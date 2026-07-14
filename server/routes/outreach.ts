@@ -893,11 +893,19 @@ outreachRouter.post('/projects/:projectId/generate-all-sentences', async (req, r
     return
   }
   const projectId = req.params.projectId
+  // overwrite=true → rewrite EVERY prospect's sentence (the "Regenerate
+  // all" button). Default → only fill prospects that don't have one yet.
+  const overwrite = req.body?.overwrite === true
   const targets = await pool.query<{ id: string }>(
-    `SELECT id FROM outreach_prospects
-      WHERE project_id = $1
-        AND unique_sentence IS NULL
-      ORDER BY created_at ASC`,
+    overwrite
+      ? `SELECT id FROM outreach_prospects
+          WHERE project_id = $1
+            AND status NOT IN ('sent', 'replied', 'opted_out')
+          ORDER BY created_at ASC`
+      : `SELECT id FROM outreach_prospects
+          WHERE project_id = $1
+            AND unique_sentence IS NULL
+          ORDER BY created_at ASC`,
     [projectId],
   )
   const ids = targets.rows.map((r) => r.id)
