@@ -1364,10 +1364,10 @@ export const api = {
     request<{ ok: true; sentence: string }>(`/api/outreach/prospects/${prospectId}/generate-sentence`, {
       method: 'POST', body: JSON.stringify({}),
     }),
-  generateAllUniqueSentences: (projectId: string) =>
+  generateAllUniqueSentences: (projectId: string, overwrite = false) =>
     request<{ ok: true; generated: number; failed: number; insufficientContext: number }>(
       `/api/outreach/projects/${projectId}/generate-all-sentences`,
-      { method: 'POST', body: JSON.stringify({}) },
+      { method: 'POST', body: JSON.stringify({ overwrite }) },
     ),
   syncRssCovers: () =>
     request<{ ok: true; synced: number; skipped: number }>(

@@ -265,13 +265,16 @@ export default function OutreachSection({ projectId }: { projectId: string }) {
     }
   }
 
-  async function generateAllSentences() {
-    if (!confirm('Generate a unique sentence for every prospect that doesn\'t already have one? Uses Claude and takes ~10s per 5 prospects.')) return
+  async function generateAllSentences(overwrite = false) {
+    const confirmMsg = overwrite
+      ? 'Rewrite the sentence for EVERY prospect with the latest AI? This replaces what\'s there now (including any you edited by hand).'
+      : 'Generate a unique sentence for every prospect that doesn\'t already have one? Uses Claude and takes ~10s per 5 prospects.'
+    if (!confirm(confirmMsg)) return
     setGeneratingAll(true)
     setError(null)
     setGenerateResult(null)
     try {
-      const r = await api.generateAllUniqueSentences(projectId)
+      const r = await api.generateAllUniqueSentences(projectId, overwrite)
       // Reload so the list — and the "who still needs a note" list
       // below — reflects what actually got written.
       const fresh = await api.outreachProspects(projectId)
@@ -527,12 +530,22 @@ export default function OutreachSection({ projectId }: { projectId: string }) {
               )}
               {prospects && prospects.some((p) => !p.unique_sentence) && (
                 <button
-                  onClick={() => void generateAllSentences()}
+                  onClick={() => void generateAllSentences(false)}
                   disabled={generatingAll}
                   className="text-[10px] uppercase tracking-wider text-emerald-950 bg-emerald-400 rounded-full px-3 py-1 hover:bg-emerald-300 disabled:opacity-40 font-bold"
                   title="Generate a Claude-written sentence for every prospect that's missing one."
                 >
                   {generatingAll ? 'Generating…' : `✨ Generate all sentences (${prospects.filter((p) => !p.unique_sentence).length})`}
+                </button>
+              )}
+              {prospects && prospects.some((p) => p.unique_sentence?.trim()) && (
+                <button
+                  onClick={() => void generateAllSentences(true)}
+                  disabled={generatingAll}
+                  className="text-[10px] uppercase tracking-wider text-emerald-300 border border-emerald-500/40 rounded-full px-3 py-1 hover:bg-emerald-500/10 disabled:opacity-40 font-bold"
+                  title="Rewrite the sentence for every prospect using the latest AI — replaces what's there now."
+                >
+                  {generatingAll ? 'Working…' : `🔄 Regenerate all (${prospects.filter((p) => p.unique_sentence?.trim()).length})`}
                 </button>
               )}
               <button
