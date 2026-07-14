@@ -996,6 +996,10 @@ outreachRouter.post('/projects/:projectId/generate-all-sentences', async (req, r
 outreachRouter.post('/projects/:projectId/test-send', async (req, res) => {
   const projectId = req.params.projectId
   const to = String(req.body?.to || '').trim().toLowerCase()
+  // Optional: preview using a SPECIFIC prospect the operator picked. Without
+  // it we fall back to auto-picking the best-populated prospect below.
+  const wantProspectId = typeof req.body?.prospectId === 'string' && req.body.prospectId.trim()
+    ? req.body.prospectId.trim() : null
   if (!/^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$/.test(to)) {
     res.status(400).json({ error: 'invalid_to_email' })
     return
@@ -1021,13 +1025,20 @@ outreachRouter.post('/projects/:projectId/test-send', async (req, res) => {
   // Load a preview prospect — first ready one, else any prospect,
   // else fabricate. Priority: prospect with a unique_sentence, then
   // any with an email, then any at all, then fake.
-  const previewRes = await pool.query<{ name: string; unique_sentence: string | null; recipient_type: string | null; client_name: string | null }>(
-    `SELECT name, unique_sentence, recipient_type, client_name FROM outreach_prospects
-      WHERE project_id = $1
-      ORDER BY (unique_sentence IS NOT NULL) DESC, (email IS NOT NULL) DESC, created_at DESC
-      LIMIT 1`,
-    [projectId],
-  )
+  const previewRes = wantProspectId
+    ? await pool.query<{ name: string; unique_sentence: string | null; recipient_type: string | null; client_name: string | null }>(
+        `SELECT name, unique_sentence, recipient_type, client_name FROM outreach_prospects
+          WHERE project_id = $1 AND id = $2
+          LIMIT 1`,
+        [projectId, wantProspectId],
+      )
+    : await pool.query<{ name: string; unique_sentence: string | null; recipient_type: string | null; client_name: string | null }>(
+        `SELECT name, unique_sentence, recipient_type, client_name FROM outreach_prospects
+          WHERE project_id = $1
+          ORDER BY (unique_sentence IS NOT NULL) DESC, (email IS NOT NULL) DESC, created_at DESC
+          LIMIT 1`,
+        [projectId],
+      )
   const preview = previewRes.rows[0]
   const previewName = preview?.name || 'Alex'
   const previewSentence = preview?.unique_sentence

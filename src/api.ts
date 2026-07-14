@@ -1392,10 +1392,10 @@ export const api = {
       `/api/outreach/projects/${projectId}/send-campaign`,
       { method: 'POST', body: JSON.stringify({ prospectIds: prospectIds ?? null }) },
     ),
-  testSendOutreach: (projectId: string, to: string) =>
+  testSendOutreach: (projectId: string, to: string, prospectId?: string) =>
     request<{ ok: true; from: string; to: string; subject: string; previewName: string }>(
       `/api/outreach/projects/${projectId}/test-send`,
-      { method: 'POST', body: JSON.stringify({ to }) },
+      { method: 'POST', body: JSON.stringify({ to, prospectId }) },
     ),
   bulkImportProspects: (projectId: string, rows: Array<{
     name: string; fullName?: string; email?: string;

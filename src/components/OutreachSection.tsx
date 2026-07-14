@@ -75,6 +75,9 @@ export default function OutreachSection({ projectId }: { projectId: string }) {
   const [testTo, setTestTo] = useState(user?.email ?? 'ryan@strawhutmedia.com')
   const [testSending, setTestSending] = useState(false)
   const [testResult, setTestResult] = useState<string | null>(null)
+  // Which contact the test email is built from. Defaults to the first
+  // prospect once the list loads; if there's only one, it's simply selected.
+  const [testProspectId, setTestProspectId] = useState<string | null>(null)
   // Refs so token-insert buttons can drop a token at the current cursor
   // position rather than always appending to the end.
   const subjectRef = useRef<HTMLInputElement | null>(null)
@@ -102,14 +105,26 @@ export default function OutreachSection({ projectId }: { projectId: string }) {
     if (user?.email) setTestTo(user.email)
   }, [user?.email])
 
+  // Default the "preview using" contact to the first prospect once the list
+  // loads (prefer one that already has a written sentence). If the current
+  // pick is gone (deleted), fall back to the first available.
+  useEffect(() => {
+    if (!prospects || prospects.length === 0) { setTestProspectId(null); return }
+    setTestProspectId((cur) => {
+      if (cur && prospects.some((p) => p.id === cur)) return cur
+      const withSentence = prospects.find((p) => p.unique_sentence && p.unique_sentence.trim())
+      return (withSentence ?? prospects[0]).id
+    })
+  }, [prospects])
+
   async function sendTest() {
     if (!testTo.trim()) return
     setTestSending(true)
     setTestResult(null)
     setError(null)
     try {
-      const r = await api.testSendOutreach(projectId, testTo.trim())
-      setTestResult(`✓ Sent to ${r.to} · using preview name "${r.previewName}" · check your inbox in a moment.`)
+      const r = await api.testSendOutreach(projectId, testTo.trim(), testProspectId ?? undefined)
+      setTestResult(`✓ Sent to ${r.to} · using ${r.previewName}'s email · check your inbox in a moment.`)
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'test send failed'
       setTestResult(`✕ ${msg}`)
@@ -436,10 +451,32 @@ export default function OutreachSection({ projectId }: { projectId: string }) {
                 <div className="flex-1">
                   <div className="text-[10px] uppercase tracking-wider text-amber-300 font-bold">Send test</div>
                   <div className="text-[10px] text-amber-100/70">
-                    Fires a real email so you can see exactly what recipients will get. Uses the first prospect's context (or a stand-in if none).
+                    Fires a real email so you can see exactly what recipients will get. Pick which contact to preview, then where to send it.
                   </div>
                 </div>
               </div>
+              {prospects && prospects.length > 0 && (
+                <label className="block">
+                  <span className="text-[10px] uppercase tracking-wider text-amber-200/80 font-bold">Preview which contact</span>
+                  {prospects.length === 1 ? (
+                    <div className="mt-1 text-sm text-amber-50">
+                      {prospects[0].name}{prospects[0].email ? ` · ${prospects[0].email}` : ''}
+                    </div>
+                  ) : (
+                    <select
+                      value={testProspectId ?? ''}
+                      onChange={(e) => setTestProspectId(e.target.value || null)}
+                      className="mt-1 w-full bg-ink/40 border border-amber-400/40 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:border-amber-300"
+                    >
+                      {prospects.map((p) => (
+                        <option key={p.id} value={p.id}>
+                          {p.name}{p.client_name ? ` (for ${p.client_name})` : ''}{p.email ? ` · ${p.email}` : ''}{p.unique_sentence?.trim() ? '' : ' — no sentence yet'}
+                        </option>
+                      ))}
+                    </select>
+                  )}
+                </label>
+              )}
               <div className="flex items-center gap-2 flex-wrap">
                 <input
                   type="email"
