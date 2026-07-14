@@ -188,9 +188,9 @@ export default function ProspectDetailModal({
             <textarea
               value={context}
               onChange={(e) => setContext(e.target.value)}
-              rows={4}
-              placeholder={'One line about them. Examples:\n• Comedian with 2M followers, just dropped a Netflix special.\n• Only have an email off their Instagram? Just say: “Email listed on their IG — not sure if it\'s them or their team.”'}
-              className="mt-1 w-full bg-ink/40 border border-line rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-stage-mastering whitespace-pre-wrap"
+              rows={3}
+              placeholder="Type a fact or two here… e.g. Comedian, just dropped a Netflix special on burnout"
+              className="mt-1 w-full bg-ink/40 border border-line rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-stage-mastering"
             />
             <span className="block text-[10px] text-muted/70 mt-1 leading-snug">
               One line is plenty. Found the email on their Instagram and don't know whose it is? Say exactly that — Claude keeps it general.
