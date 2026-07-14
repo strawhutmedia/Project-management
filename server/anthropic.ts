@@ -1793,7 +1793,8 @@ Rules:
 - If the recipient is an agent or manager, the sentence pitches WHY WE WANT THEIR CLIENT ON — search the client, address the agent as the sender, but make the reason about the client.
 - If the recipient is the person themselves, address the reason to them directly.
 - No em-dashes if you can avoid them. Write like a person, not a brand.
-- If, after searching, you genuinely cannot find AND were not given one specific real thing about this exact person, do NOT fall back to generic praise — flag it (see the output contract).
+- If the note gives you ANY real detail about the person, you MUST write the sentence from it. NEVER return INSUFFICIENT_CONTEXT when you were handed real facts — use them.
+- Only when the note is empty or vague AND (if you searched) search turned up nothing specific may you flag it. Never fall back to generic praise instead of flagging.
 
 OUTPUT CONTRACT — CRITICAL. Your entire reply is pasted VERBATIM into an email to a real person, so it must be EXACTLY ONE of:
   (a) the single outreach sentence, nothing else — no quotes, no lead-in; OR
@@ -1866,20 +1867,27 @@ export async function generateUniqueSentence(input: UniqueSentenceInput): Promis
     contextChars: input.prospect.context?.length ?? 0,
     hasEmail: Boolean(input.prospect.email),
   })
-  // The model researches the recipient with the server-side web_search tool
-  // (Anthropic-hosted — no egress from our box) so the sentence can cite a
-  // real, specific detail instead of generic filler.
+  // If the operator gave us facts, write the sentence STRAIGHT from them —
+  // no web search at all. That removes the "search failed → rambled" failure
+  // mode entirely. Only reach for search when the note is empty and we have
+  // to find something ourselves.
+  const hasFacts = (input.prospect.context ?? '').trim().length > 0
   const messages: Anthropic.MessageParam[] = [{
     role: 'user',
     content: [{ type: 'text', text: uniqueSentenceUserBlock(input) }],
   }]
-  const params = (): Anthropic.MessageCreateParamsNonStreaming => ({
-    model: MODEL,
-    max_tokens: 4096,
-    system: UNIQUE_SENTENCE_SYSTEM,
-    tools: [{ type: 'web_search_20260209', name: 'web_search', max_uses: 6 }],
-    messages,
-  })
+  const params = (): Anthropic.MessageCreateParamsNonStreaming => {
+    const p: Anthropic.MessageCreateParamsNonStreaming = {
+      model: MODEL,
+      max_tokens: hasFacts ? 512 : 4096,
+      system: UNIQUE_SENTENCE_SYSTEM,
+      messages,
+    }
+    if (!hasFacts) {
+      p.tools = [{ type: 'web_search_20260209', name: 'web_search', max_uses: 6 }]
+    }
+    return p
+  }
 
   let response = await client.messages.create(params())
   // web_search runs a server-side tool loop; if it exceeds the internal
