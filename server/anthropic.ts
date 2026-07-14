@@ -1793,9 +1793,12 @@ Rules:
 - If the recipient is an agent or manager, the sentence pitches WHY WE WANT THEIR CLIENT ON — search the client, address the agent as the sender, but make the reason about the client.
 - If the recipient is the person themselves, address the reason to them directly.
 - No em-dashes if you can avoid them. Write like a person, not a brand.
-- If, after searching, you genuinely cannot find AND were not given one specific real thing about this exact person, return the exact string "INSUFFICIENT_CONTEXT". Do NOT fall back to generic praise — a flagged prospect is better than a vague email.
+- If, after searching, you genuinely cannot find AND were not given one specific real thing about this exact person, do NOT fall back to generic praise — flag it (see the output contract).
 
-Return ONLY the one sentence, or the exact string INSUFFICIENT_CONTEXT. No preamble, no quotes, no commentary about your search.`
+OUTPUT CONTRACT — CRITICAL. Your entire reply is pasted VERBATIM into an email to a real person, so it must be EXACTLY ONE of:
+  (a) the single outreach sentence, nothing else — no quotes, no lead-in; OR
+  (b) the exact string INSUFFICIENT_CONTEXT, nothing else.
+NEVER describe your search, what you did or didn't find, your confidence, or your reasoning. NEVER write things like "based on what I found", "I couldn't verify", "I don't have", "search limit", or "this exact person". If you are not fully confident you hold one specific, real, verifiable detail about THIS person — including if you run out of searches or find only a vague/uncertain match — reply with exactly INSUFFICIENT_CONTEXT and nothing else. A flagged prospect is fine; a hedging paragraph landing in a real person's inbox is a disaster.`
 
 function uniqueSentenceUserBlock(input: UniqueSentenceInput): string {
   const s = input.show
@@ -1828,6 +1831,33 @@ function uniqueSentenceUserBlock(input: UniqueSentenceInput): string {
   return lines.join('\n')
 }
 
+// Phrases that only appear when the model is narrating its search or
+// hedging about uncertainty — never in a genuine one-line compliment. If
+// any show up (or the text runs long), it's not a usable sentence.
+const SENTENCE_META_MARKERS = [
+  'insufficient', 'search tool', 'search limit', 'tool limit', 'searches',
+  "i don't have", 'i do not have', "i couldn't", 'i could not',
+  "couldn't verify", 'could not verify', "couldn't find", 'could not find',
+  "couldn't confirm", 'could not confirm', 'unable to verify', 'unable to find',
+  'unable to confirm', "i wasn't able", 'i was not able',
+  'based on what i found', 'based on my search', 'from my search',
+  'not a concrete', "isn't a concrete", 'no concrete', 'concrete accomplishment',
+  'specific, verifiable', 'verifiable project', 'verifiable credit',
+  'not enough context', "don't have enough", 'not confident', 'cannot confirm',
+  "can't confirm", 'as an ai', 'i apologize', 'this exact person',
+]
+
+function isUnusableSentence(raw: string): boolean {
+  const lc = raw.toLowerCase()
+  if (raw.toUpperCase().includes('INSUFFICIENT_CONTEXT')) return true
+  if (SENTENCE_META_MARKERS.some((m) => lc.includes(m))) return true
+  // A real outreach line is one tight sentence (prompt caps it at 35 words).
+  // Anything much longer is the model narrating, not writing the line.
+  const words = raw.split(/\s+/).filter(Boolean).length
+  if (words > 45) return true
+  return false
+}
+
 export async function generateUniqueSentence(input: UniqueSentenceInput): Promise<UniqueSentenceResult> {
   logInfo('outreach: generating unique sentence', {
     show: input.show.name,
@@ -1847,7 +1877,7 @@ export async function generateUniqueSentence(input: UniqueSentenceInput): Promis
     model: MODEL,
     max_tokens: 4096,
     system: UNIQUE_SENTENCE_SYSTEM,
-    tools: [{ type: 'web_search_20260209', name: 'web_search', max_uses: 4 }],
+    tools: [{ type: 'web_search_20260209', name: 'web_search', max_uses: 6 }],
     messages,
   })
 
@@ -1869,7 +1899,12 @@ export async function generateUniqueSentence(input: UniqueSentenceInput): Promis
     .replace(/^["'`]|["'`]$/g, '')
     .replace(/^(sentence|response):\s*/i, '')
     .trim()
-  if (!raw || raw === 'INSUFFICIENT_CONTEXT') {
+  // Guard: the model sometimes narrates its search or hedges instead of
+  // returning a clean sentence or the exact flag. Any such output would be
+  // pasted verbatim into a real email, so reject it and flag the prospect
+  // rather than let a "based on what I found, I couldn't verify…" paragraph
+  // go out. Better a flagged prospect than an embarrassing send.
+  if (!raw || isUnusableSentence(raw)) {
     throw new Error('insufficient_context')
   }
   return {
