@@ -37,6 +37,9 @@ export default function OneSheetCard({ project, onSaved }: { project: ApiProject
   // the project.slug-derived URL so producers see the View button the
   // instant the API returns, not after a separate refetch round-trip.
   const [overrideUrl, setOverrideUrl] = useState<string | null>(null)
+  // Once published/approved, the card collapses to a compact strip so the
+  // outreach work below is the focus. Editing reopens the full form.
+  const [editing, setEditing] = useState(false)
 
   async function autoPopulate() {
     const ok = confirm(
@@ -58,6 +61,7 @@ export default function OneSheetCard({ project, onSaved }: { project: ApiProject
         oneSheetPublished: true,
       })
       if (r.url) setOverrideUrl(r.url)
+      setEditing(true) // keep the card open so the drafted copy can be reviewed
       setSavedAt(Date.now())
       onSaved()
     } catch (err) {
@@ -98,6 +102,51 @@ export default function OneSheetCard({ project, onSaved }: { project: ApiProject
   async function saveField<K extends keyof Fields>(key: K, value: Fields[K]) {
     setFields((f) => ({ ...f, [key]: value }))
     await save({ [key]: value } as Partial<Fields>)
+  }
+
+  // Approved + not actively editing → compact strip, so the outreach work
+  // below is what the producer sees. Everything is one Edit click away.
+  if (fields.oneSheetPublished && !editing) {
+    return (
+      <section className="rounded-2xl border border-emerald-500/30 bg-emerald-500/5 px-4 py-3">
+        <div className="flex items-center gap-3 flex-wrap">
+          <span className="text-[10px] uppercase tracking-[0.2em] text-emerald-300 font-bold shrink-0">
+            📄 One-sheet · Published
+          </span>
+          {url && (
+            <a href={url} target="_blank" rel="noreferrer" className="font-mono text-[11px] text-emerald-100 underline break-all min-w-0">
+              {url}
+            </a>
+          )}
+          <div className="flex-1" />
+          {url && (
+            <>
+              <button
+                onClick={() => { void navigator.clipboard.writeText(url) }}
+                className="text-[10px] uppercase tracking-wider text-emerald-200 border border-emerald-500/40 rounded-full px-2.5 py-1 hover:bg-emerald-500/10 font-bold"
+              >
+                Copy link
+              </button>
+              <a
+                href={url}
+                target="_blank"
+                rel="noreferrer"
+                className="text-[10px] uppercase tracking-wider font-bold text-emerald-950 bg-emerald-400 rounded-full px-2.5 py-1 hover:bg-emerald-300"
+              >
+                ↗ View
+              </a>
+            </>
+          )}
+          <button
+            onClick={() => setEditing(true)}
+            className="text-[10px] uppercase tracking-wider text-muted border border-line rounded-full px-2.5 py-1 hover:bg-ink/40 font-bold"
+          >
+            Edit
+          </button>
+        </div>
+        {error && <p className="text-xs text-urgent mt-2">{error}</p>}
+      </section>
+    )
   }
 
   return (
@@ -144,6 +193,15 @@ export default function OneSheetCard({ project, onSaved }: { project: ApiProject
               className="text-[10px] uppercase tracking-wider font-bold border rounded-full px-3 py-1.5 disabled:opacity-40 text-muted border-line hover:bg-ink/40"
             >
               Publish one-sheet
+            </button>
+          )}
+          {fields.oneSheetPublished && (
+            <button
+              onClick={() => setEditing(false)}
+              className="text-[10px] uppercase tracking-wider text-muted border border-line rounded-full px-3 py-1.5 hover:bg-ink/40 font-bold"
+              title="Collapse the one-sheet — it stays published"
+            >
+              ✓ Collapse
             </button>
           )}
         </div>
