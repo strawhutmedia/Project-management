@@ -270,6 +270,12 @@ export default function OutreachSection({ projectId }: { projectId: string }) {
       ? 'Rewrite the sentence for EVERY prospect with the latest AI? Claude researches each person on the web, so this replaces what\'s there now (including any you edited by hand) and takes ~15-20s per prospect.'
       : 'Generate a unique sentence for every prospect that doesn\'t already have one? Claude researches each person on the web to find something specific — about ~15-20s per prospect.'
     if (!confirm(confirmMsg)) return
+    await runGenerate(overwrite)
+  }
+
+  // Core generation (no confirm) — also reused by the bulk-import
+  // "generate after importing" flow so an upload goes straight to sentences.
+  async function runGenerate(overwrite: boolean) {
     setGeneratingAll(true)
     setError(null)
     setGenerateResult(null)
@@ -583,7 +589,12 @@ export default function OutreachSection({ projectId }: { projectId: string }) {
           {bulkOpen && (
             <BulkImportPanel
               projectId={projectId}
-              onImported={() => { setBulkOpen(false); setGenerateResult(null); void loadProspects() }}
+              onImported={(generate: boolean) => {
+                setBulkOpen(false)
+                setGenerateResult(null)
+                if (generate) void runGenerate(false)
+                else void loadProspects()
+              }}
             />
           )}
 
@@ -779,10 +790,11 @@ function BulkImportPanel({
   projectId, onImported,
 }: {
   projectId: string
-  onImported: () => void
+  onImported: (generate: boolean) => void
 }) {
   const [text, setText] = useState('')
   const [importing, setImporting] = useState(false)
+  const [genAfter, setGenAfter] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const parsed = text.trim() ? parseBulk(text) : []
   const validCount = parsed.filter((r) => !r.error).length
@@ -807,7 +819,7 @@ function BulkImportPanel({
       if (result.failed > 0) {
         setError(`Imported ${result.imported}, ${result.failed} failed. Reload to see what stuck.`)
       }
-      onImported()
+      onImported(genAfter && result.imported > 0)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'bulk import failed')
     } finally {
@@ -829,7 +841,7 @@ function BulkImportPanel({
           </a>
           <span className="text-muted/70"> — fill in Excel/Sheets, copy the rows (header optional — we skip it), paste above.</span>
         </p>
-        <p className="pt-1"><strong className="text-emerald-300">Only 3 fields matter:</strong> name, email, context. Everything else is optional.</p>
+        <p className="pt-1"><strong className="text-emerald-300">Only 3 columns matter:</strong> name, email, and <strong className="text-emerald-300">facts</strong> (their role + something recent — this is what becomes their unique sentence). Everything else is optional.</p>
         <ul className="list-disc list-inside pl-2 space-y-0.5 text-[10px]">
           <li><code>alex@company.com</code> — email only, name auto-derived</li>
           <li><code>Alex, alex@company.com</code> — name, email</li>
@@ -848,6 +860,18 @@ function BulkImportPanel({
         placeholder={'Alex, alex@company.com, Alex Rodriguez, person, , founder of X\nsarah@agency.com\nTom, tom@bigfilm.com, , agent, Emily Blunt, Emily Blunt\'s booking agent'}
         className="w-full bg-ink/40 border border-line rounded-lg px-3 py-2 text-sm font-mono focus:outline-none focus:border-stage-tracking"
       />
+      <label className="flex items-start gap-2 text-[11px] text-emerald-100 cursor-pointer">
+        <input
+          type="checkbox"
+          checked={genAfter}
+          onChange={(e) => setGenAfter(e.target.checked)}
+          className="mt-0.5 accent-emerald-400"
+        />
+        <span>
+          <strong className="text-emerald-300">Write all the sentences right after importing</strong> — Claude turns the
+          facts column into each person's unique line automatically, so you don't do them one by one.
+        </span>
+      </label>
       <div className="flex items-center justify-between gap-2 flex-wrap">
         <div className="text-[11px] text-muted">
           {parsed.length === 0 ? (
@@ -866,7 +890,11 @@ function BulkImportPanel({
           disabled={importing || validCount === 0}
           className="text-[10px] uppercase tracking-wider text-stage-tracking border border-stage-tracking/40 rounded-full px-3 py-1.5 hover:bg-stage-tracking/10 disabled:opacity-40 font-bold"
         >
-          {importing ? 'Importing…' : `Import ${validCount} prospect${validCount === 1 ? '' : 's'}`}
+          {importing
+            ? 'Importing…'
+            : genAfter
+              ? `Import + write ${validCount} sentence${validCount === 1 ? '' : 's'}`
+              : `Import ${validCount} prospect${validCount === 1 ? '' : 's'}`}
         </button>
       </div>
       {parsed.length > 0 && parsed.length <= 20 && (
