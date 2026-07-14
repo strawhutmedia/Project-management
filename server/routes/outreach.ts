@@ -49,7 +49,11 @@ function mergeTemplate(
 // client — so "we'll get you booked" becomes "we'll get Amaya booked".
 function resolveGuest(recipientType: string | null | undefined, clientName: string | null | undefined): string {
   if ((recipientType === 'agent' || recipientType === 'manager') && clientName?.trim()) {
-    return clientName.trim()
+    // Use the client's first name so the booking line ("we'll get Amaya
+    // booked in") matches the warmer tone of the sentence above it, which
+    // also uses the first name. Falls back to the whole value if there's
+    // no space (single-word name or a band).
+    return clientName.trim().split(/\s+/)[0]
   }
   return 'you'
 }
