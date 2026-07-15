@@ -233,27 +233,34 @@ export default function OutreachSection({ projectId }: { projectId: string }) {
   }
 
   async function sendCampaign() {
-    // Only count addresses that will actually send: Ready, with a
-    // sentence, verified, and not flagged undeliverable.
-    const readyList = (prospects ?? []).filter(
-      (p) => p.status === 'ready' && p.email && p.unique_sentence?.trim()
-        && p.email_check_status !== 'invalid' && p.email_check_status !== 'unchecked',
-    )
-    if (readyList.length === 0) {
-      const needVerify = (prospects ?? []).filter(
-        (p) => p.status === 'ready' && p.email && p.email_check_status === 'unchecked',
-      ).length
-      setError(
-        needVerify > 0
-          ? `Verify emails first — ${needVerify} Ready ${needVerify === 1 ? 'address hasn\'t' : 'addresses haven\'t'} been checked. Click “✅ Verify emails”.`
-          : 'No prospects are Ready. Each needs an email + a unique sentence.',
-      )
+    // NO SKIPPING (Ryan's rule): every live contact must be fully filled out
+    // — email + facts + sentence — and verified + deliverable, or we don't
+    // send at all. This mirrors the server gate for instant feedback; the
+    // server enforces it for real.
+    const active = (prospects ?? []).filter((p) => !CAMPAIGN_DONE.includes(p.status))
+    if (active.length === 0) { setError('No contacts to send yet — add prospects first.'); return }
+    const noFacts = active.filter((p) => !p.context?.trim())
+    const noSentence = active.filter((p) => !p.unique_sentence?.trim())
+    const noEmail = active.filter((p) => !p.email)
+    const notVerified = active.filter((p) => p.email && p.email_check_status === 'unchecked')
+    const badEmail = active.filter((p) => p.email && p.email_check_status === 'invalid')
+    const problems: string[] = []
+    if (noFacts.length) problems.push(`${noFacts.length} missing facts`)
+    if (noSentence.length) problems.push(`${noSentence.length} missing a sentence`)
+    if (noEmail.length) problems.push(`${noEmail.length} missing an email`)
+    if (notVerified.length) problems.push(`${notVerified.length} not verified — click “✅ Verify emails”`)
+    if (badEmail.length) problems.push(`${badEmail.length} with a bad email address`)
+    if (problems.length > 0) {
+      const names = Array.from(new Set(
+        [...noFacts, ...noSentence, ...noEmail, ...notVerified, ...badEmail].map((p) => p.name),
+      )).slice(0, 15)
+      setError(`Can't send yet — every contact has to be filled out first (${problems.join(', ')}). Fix these: ${names.join(', ')}${names.length >= 15 ? '…' : ''}.`)
       return
     }
     const ok = confirm(
-      `Send ${readyList.length} outreach emails?\n\n` +
+      `Send ${active.length} outreach emails?\n\n` +
       `Slate will jitter them 90-180s apart via your verified sending domains. ` +
-      `Estimated wall-clock time: ${Math.round((readyList.length * 135) / 60)} minutes.\n\n` +
+      `Estimated wall-clock time: ${Math.round((active.length * 135) / 60)} minutes.\n\n` +
       `You can't stop the campaign once it starts. Test one to yourself first?`,
     )
     if (!ok) return
@@ -345,11 +352,16 @@ export default function OutreachSection({ projectId }: { projectId: string }) {
     (p) => p.email && p.email_check_status === 'unchecked'
       && p.status !== 'sent' && p.status !== 'replied' && p.status !== 'opted_out',
   ).length ?? 0
-  // Ready prospects whose address hasn't been verified — these BLOCK the
-  // campaign send until they're checked.
-  const readyUncheckedCount = prospects?.filter(
-    (p) => p.status === 'ready' && p.email && p.email_check_status === 'unchecked',
-  ).length ?? 0
+  // Live outreach targets (not already sent/replied/opted-out/bounced or
+  // in-flight). NO SKIPPING: every one must be fully filled out — facts +
+  // sentence + email — and verified + deliverable before the campaign can
+  // go. incompleteCount > 0 BLOCKS the send button entirely.
+  const CAMPAIGN_DONE = ['sent', 'replied', 'opted_out', 'bounced', 'queued']
+  const activeProspects = (prospects ?? []).filter((p) => !CAMPAIGN_DONE.includes(p.status))
+  const incompleteCount = activeProspects.filter(
+    (p) => !p.context?.trim() || !p.unique_sentence?.trim() || !p.email
+      || p.email_check_status === 'unchecked' || p.email_check_status === 'invalid',
+  ).length
 
   return (
     <section className="rounded-2xl border border-line bg-panel/60 p-4 sm:p-5 space-y-5">
@@ -543,22 +555,22 @@ export default function OutreachSection({ projectId }: { projectId: string }) {
             <div className="flex items-center gap-2 flex-wrap">
               {/* Ryan's ship-it button. Big, obvious, red-pink so it
                   reads as "irreversible action". */}
-              {readyCount > 0 && (
+              {activeProspects.length > 0 && (
                 <button
                   onClick={() => void sendCampaign()}
-                  disabled={sendingCampaign || readyUncheckedCount > 0}
+                  disabled={sendingCampaign || incompleteCount > 0}
                   className="text-[10px] uppercase tracking-wider text-white bg-gradient-to-r from-urgent to-stage-mastering rounded-full px-3 py-1 hover:opacity-90 disabled:opacity-40 font-bold shadow-lg"
                   title={
-                    readyUncheckedCount > 0
-                      ? `Verify emails before sending — ${readyUncheckedCount} Ready address${readyUncheckedCount === 1 ? '' : 'es'} not checked yet.`
-                      : `Send ${readyCount} outreach emails now, jittered across your verified sending domains.`
+                    incompleteCount > 0
+                      ? `${incompleteCount} contact${incompleteCount === 1 ? ' is' : 's are'} not filled out yet (facts, sentence, email, or verification). Every contact must be complete before you can send — nobody gets skipped.`
+                      : `Send ${activeProspects.length} outreach emails now, jittered across your verified sending domains.`
                   }
                 >
                   {sendingCampaign
                     ? 'Queueing…'
-                    : readyUncheckedCount > 0
-                      ? '🔒 Verify emails to send'
-                      : `🚀 Send campaign (${readyCount})`}
+                    : incompleteCount > 0
+                      ? `🔒 ${incompleteCount} to finish before sending`
+                      : `🚀 Send campaign (${activeProspects.length})`}
                 </button>
               )}
               {uncheckedCount > 0 && (

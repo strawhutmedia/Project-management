@@ -44,6 +44,16 @@ function mergeTemplate(
     .replace(/\[guest\]/gi, tokens.guest ?? 'you')
 }
 
+// One row of the pre-send completeness check (see send-campaign).
+type ScopeRow = {
+  id: string
+  name: string
+  email: string | null
+  context: string | null
+  unique_sentence: string | null
+  email_check_status: string
+}
+
 // Who the interview is actually FOR. When the recipient is the guest, that's
 // "you". When they're a rep (agent/manager) with a named client, it's the
 // client — so "we'll get you booked" becomes "we'll get Amaya booked".
@@ -532,53 +542,68 @@ outreachRouter.post('/projects/:projectId/send-campaign', async (req, res) => {
   const rawIds = req.body?.prospectIds
   const explicit = Array.isArray(rawIds) ? rawIds.filter((x): x is string => typeof x === 'string') : null
 
-  // Only send to prospects that are (a) belong to this project, (b)
-  // have an email, (c) have a unique_sentence, (d) are in 'ready'
-  // status. Anything else the operator has to fix manually.
-  const q = explicit && explicit.length > 0
-    ? await pool.query<{ id: string; email_check_status: string }>(
-        `SELECT id, email_check_status FROM outreach_prospects
-          WHERE project_id = $1
-            AND id = ANY($2::uuid[])
-            AND email IS NOT NULL
-            AND unique_sentence IS NOT NULL AND trim(unique_sentence) <> ''
-            AND status = 'ready'`,
+  // NO SKIPPING. Every contact that's still a live outreach target must be
+  // fully filled out — email + facts (context) + a written sentence — AND
+  // verified + deliverable, before ANY email goes out. If even one is
+  // incomplete we refuse the WHOLE send and name exactly who to fix, rather
+  // than quietly leaving them behind. Contacts that are already done
+  // (sent / replied / opted-out / bounced) or in-flight (queued) don't count.
+  const scopeRes = explicit && explicit.length > 0
+    ? await pool.query<ScopeRow>(
+        `SELECT id, name, email, context, unique_sentence, email_check_status
+           FROM outreach_prospects
+          WHERE project_id = $1 AND id = ANY($2::uuid[])
+            AND status NOT IN ('sent','replied','opted_out','bounced','queued')`,
         [projectId, explicit],
       )
-    : await pool.query<{ id: string; email_check_status: string }>(
-        `SELECT id, email_check_status FROM outreach_prospects
+    : await pool.query<ScopeRow>(
+        `SELECT id, name, email, context, unique_sentence, email_check_status
+           FROM outreach_prospects
           WHERE project_id = $1
-            AND email IS NOT NULL
-            AND unique_sentence IS NOT NULL AND trim(unique_sentence) <> ''
-            AND status = 'ready'
+            AND status NOT IN ('sent','replied','opted_out','bounced','queued')
           ORDER BY created_at ASC`,
         [projectId],
       )
-  const eligible = q.rows
-  if (eligible.length === 0) {
-    res.status(400).json({ error: 'no_eligible_prospects', detail: 'No prospects are Ready (need email + unique sentence).' })
+  const scope = scopeRes.rows
+  if (scope.length === 0) {
+    res.status(400).json({ error: 'no_eligible_prospects', detail: 'No contacts to send yet — add prospects first.' })
     return
   }
-  // Gate: every Ready address must have been email-checked first. This is
-  // the "you can't send until you've verified" lock.
-  const unchecked = eligible.filter((r) => r.email_check_status === 'unchecked')
-  if (unchecked.length > 0) {
+
+  const noFacts = scope.filter((r) => !r.context || !r.context.trim())
+  const noSentence = scope.filter((r) => !r.unique_sentence || !r.unique_sentence.trim())
+  const noEmail = scope.filter((r) => !r.email)
+  const notVerified = scope.filter((r) => r.email && r.email_check_status === 'unchecked')
+  const badEmail = scope.filter((r) => r.email && r.email_check_status === 'invalid')
+
+  const problems: string[] = []
+  if (noFacts.length) problems.push(`${noFacts.length} missing facts`)
+  if (noSentence.length) problems.push(`${noSentence.length} missing a sentence`)
+  if (noEmail.length) problems.push(`${noEmail.length} missing an email`)
+  if (notVerified.length) problems.push(`${notVerified.length} not verified`)
+  if (badEmail.length) problems.push(`${badEmail.length} with an undeliverable email`)
+
+  if (problems.length > 0) {
+    const names = Array.from(new Set(
+      [...noFacts, ...noSentence, ...noEmail, ...notVerified, ...badEmail].map((r) => r.name),
+    )).slice(0, 15)
     res.status(400).json({
-      error: 'verification_required',
-      detail: `${unchecked.length} Ready ${unchecked.length === 1 ? "address hasn't" : "addresses haven't"} been verified yet. Click “Verify emails” first, then send.`,
-      unchecked: unchecked.length,
+      error: 'incomplete_prospects',
+      detail: `Can't send yet — every contact has to be filled out first (${problems.join(', ')}). Fix these before sending: ${names.join(', ')}${names.length >= 15 ? '…' : ''}.`,
+      counts: {
+        missingFacts: noFacts.length,
+        missingSentence: noSentence.length,
+        missingEmail: noEmail.length,
+        notVerified: notVerified.length,
+        badEmail: badEmail.length,
+      },
+      names,
     })
     return
   }
-  // Drop addresses that came back undeliverable — they'd only bounce.
-  const ids = eligible.filter((r) => r.email_check_status !== 'invalid').map((r) => r.id)
-  if (ids.length === 0) {
-    res.status(400).json({
-      error: 'no_eligible_prospects',
-      detail: 'No deliverable prospects to send — every Ready address came back invalid. Fix or remove them.',
-    })
-    return
-  }
+
+  // Everyone in scope is complete + verified + deliverable — send to ALL.
+  const ids = scope.map((r) => r.id)
 
   // Load the full pool of verified + active domains. Pinned domain
   // (if any) comes first, then oldest-created — that keeps show-owned
