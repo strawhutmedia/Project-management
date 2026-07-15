@@ -176,6 +176,10 @@ export default function OutreachSection({ projectId }: { projectId: string }) {
     void loadTemplate()
     void loadProspects()
     void loadOneSheetApproval()
+    // The one-sheet is approved in a sibling card on the same screen, so poll
+    // its status to keep the send gate live without a page refresh.
+    const t = setInterval(() => { void loadOneSheetApproval() }, 15_000)
+    return () => clearInterval(t)
   }, [projectId])
 
   async function saveTemplate() {
@@ -276,6 +280,15 @@ export default function OutreachSection({ projectId }: { projectId: string }) {
         [...noFacts, ...noSentence, ...noEmail, ...notVerified, ...badEmail].map((p) => p.name),
       )).slice(0, 15)
       setError(`Can't send yet — every contact has to be filled out first (${problems.join(', ')}). Fix these: ${names.join(', ')}${names.length >= 15 ? '…' : ''}.`)
+      return
+    }
+    // Hard gate: one-sheet must be approved and unedited since.
+    if (!(oneSheetApproval?.approvedAt && !oneSheetApproval.editedSinceApproval)) {
+      setError(
+        oneSheetApproval?.approvedAt
+          ? 'The one-sheet was edited since it was approved — re-approve it before sending (One-sheet card → “Approve for blasts”).'
+          : 'Approve the one-sheet before sending — open the One-sheet card and click “Approve for blasts.”',
+      )
       return
     }
     const when = mode === '5am_pt' ? 'starting at the next 5 AM PT'
@@ -401,6 +414,10 @@ export default function OutreachSection({ projectId }: { projectId: string }) {
     (p) => !p.context?.trim() || !p.unique_sentence?.trim() || !p.email
       || p.email_check_status === 'unchecked' || p.email_check_status === 'invalid',
   ).length
+  // One-sheet must be approved and unedited since to send. Null (not loaded /
+  // fetch failed) is treated as not-ok — the server enforces it regardless.
+  const oneSheetOk = Boolean(oneSheetApproval?.approvedAt && !oneSheetApproval.editedSinceApproval)
+  const sendBlocked = incompleteCount > 0 || !oneSheetOk
 
   return (
     <section className="rounded-2xl border border-line bg-panel/60 p-4 sm:p-5 space-y-5">
@@ -630,21 +647,25 @@ export default function OutreachSection({ projectId }: { projectId: string }) {
                 <>
                   <button
                     onClick={() => void sendCampaign('now')}
-                    disabled={sendingCampaign || incompleteCount > 0}
+                    disabled={sendingCampaign || sendBlocked}
                     className="text-[10px] uppercase tracking-wider text-white bg-gradient-to-r from-urgent to-stage-mastering rounded-full px-3 py-1 hover:opacity-90 disabled:opacity-40 font-bold shadow-lg"
                     title={
                       incompleteCount > 0
                         ? `${incompleteCount} contact${incompleteCount === 1 ? ' is' : 's are'} not filled out yet (facts, sentence, email, or verification). Every contact must be complete before you can send — nobody gets skipped.`
-                        : `Send ${activeProspects.length} outreach emails now, jittered across your verified sending domains.`
+                        : !oneSheetOk
+                          ? 'The one-sheet must be approved before you can send. Open the One-sheet card and click “Approve for blasts.”'
+                          : `Send ${activeProspects.length} outreach emails now, jittered across your verified sending domains.`
                     }
                   >
                     {sendingCampaign
                       ? 'Queueing…'
                       : incompleteCount > 0
                         ? `🔒 ${incompleteCount} to finish before sending`
-                        : `🚀 Send now (${activeProspects.length})`}
+                        : !oneSheetOk
+                          ? '🔒 Approve one-sheet to send'
+                          : `🚀 Send now (${activeProspects.length})`}
                   </button>
-                  {incompleteCount === 0 && (
+                  {!sendBlocked && (
                     <button
                       onClick={() => void sendCampaign('5am_pt')}
                       disabled={sendingCampaign}
@@ -654,7 +675,7 @@ export default function OutreachSection({ projectId }: { projectId: string }) {
                       {sendingCampaign ? 'Scheduling…' : '🕔 Schedule 5 AM PT'}
                     </button>
                   )}
-                  {incompleteCount === 0 && (
+                  {!sendBlocked && (
                     <span className="inline-flex items-center gap-1">
                       <input
                         type="datetime-local"

@@ -921,6 +921,25 @@ outreachRouter.post('/projects/:projectId/send-campaign', async (req, res) => {
   // Everyone in scope is complete + verified + deliverable — send to ALL.
   const ids = scope.map((r) => r.id)
 
+  // Hard gate: the one-sheet every email links to must be APPROVED and
+  // unchanged since approval. No approval (or edited since) → refuse the send.
+  const osRes = await pool.query<{ one_sheet_approved_at: string | null; one_sheet_approved_snapshot: Record<string, unknown> | null }>(
+    `SELECT one_sheet_approved_at, one_sheet_approved_snapshot FROM projects WHERE id = $1`,
+    [projectId],
+  )
+  const os = osRes.rows[0]
+  const curOneSheet = await currentOneSheet(projectId)
+  const oneSheetApproved = Boolean(os?.one_sheet_approved_at) && !oneSheetChanged(curOneSheet, os?.one_sheet_approved_snapshot ?? null)
+  if (!oneSheetApproved) {
+    res.status(400).json({
+      error: 'one_sheet_not_approved',
+      detail: os?.one_sheet_approved_at
+        ? 'The one-sheet was edited since it was approved. Re-approve it (One-sheet card → “Approve for blasts”) before sending.'
+        : 'Approve the one-sheet before sending — open the One-sheet card and click “Approve for blasts.”',
+    })
+    return
+  }
+
   // Load the full pool of verified + active domains. Pinned domain
   // (if any) comes first, then oldest-created — that keeps show-owned
   // domains as the "anchor" of the rotation without giving them 100%
