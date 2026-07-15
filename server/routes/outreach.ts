@@ -375,6 +375,101 @@ async function fileProspectInRolodex(prospectId: string): Promise<void> {
   logInfo('rolodex: filed responder', { prospectId, email: p.email })
 }
 
+// ─── One-sheet approval + version history ───────────────────────────
+// The content fields that make up a one-sheet. Snapshotted on approval and
+// compared field-by-field to detect "edited since approval" (order-independent,
+// unlike JSON.stringify on a jsonb round-trip).
+const ONE_SHEET_FIELDS = [
+  'hero_tagline', 'guest_pitch', 'contact_email', 'brand_hex',
+  'subtitle', 'notable_guests', 'notable_topics', 'cover_art_url',
+] as const
+
+async function currentOneSheet(projectId: string): Promise<Record<string, unknown> | null> {
+  const { rows } = await pool.query(
+    `SELECT ${ONE_SHEET_FIELDS.join(', ')} FROM projects WHERE id = $1`,
+    [projectId],
+  )
+  return rows[0] ?? null
+}
+
+function oneSheetChanged(cur: Record<string, unknown> | null, snap: Record<string, unknown> | null): boolean {
+  if (!cur || !snap) return true
+  return ONE_SHEET_FIELDS.some((f) => (cur[f] ?? null) !== (snap[f] ?? null))
+}
+
+// Approve the current one-sheet: stamp the date, snapshot the content, and
+// append to the history so it can be restored later.
+outreachRouter.post('/projects/:projectId/one-sheet/approve', async (req, res) => {
+  const user = (req as typeof req & { user: SessionUser }).user
+  const projectId = req.params.projectId
+  const snap = await currentOneSheet(projectId)
+  if (!snap) { res.status(404).json({ error: 'not_found' }); return }
+  const ins = await pool.query<{ approved_at: string }>(
+    `INSERT INTO one_sheet_approvals (project_id, approved_by, snapshot)
+     VALUES ($1, $2, $3) RETURNING approved_at`,
+    [projectId, user.id, JSON.stringify(snap)],
+  )
+  await pool.query(
+    `UPDATE projects SET one_sheet_approved_at = $1, one_sheet_approved_by = $2, one_sheet_approved_snapshot = $3 WHERE id = $4`,
+    [ins.rows[0].approved_at, user.id, JSON.stringify(snap), projectId],
+  )
+  res.json({ ok: true, approvedAt: ins.rows[0].approved_at })
+})
+
+// Approval status for the show — used by the one-sheet card AND the outreach
+// send surface so you see the approval date before a blast.
+outreachRouter.get('/projects/:projectId/one-sheet/status', async (req, res) => {
+  const projectId = req.params.projectId
+  const projRes = await pool.query<{ one_sheet_approved_at: string | null; one_sheet_approved_snapshot: Record<string, unknown> | null }>(
+    `SELECT one_sheet_approved_at, one_sheet_approved_snapshot FROM projects WHERE id = $1`,
+    [projectId],
+  )
+  const proj = projRes.rows[0]
+  if (!proj) { res.status(404).json({ error: 'not_found' }); return }
+  const cur = await currentOneSheet(projectId)
+  const histRes = await pool.query<{ id: string; approved_at: string; name: string | null; display_name: string | null }>(
+    `SELECT a.id, a.approved_at, u.name, u.display_name
+       FROM one_sheet_approvals a LEFT JOIN users u ON u.id = a.approved_by
+      WHERE a.project_id = $1 ORDER BY a.approved_at DESC LIMIT 20`,
+    [projectId],
+  )
+  res.json({
+    approvedAt: proj.one_sheet_approved_at,
+    editedSinceApproval: proj.one_sheet_approved_at ? oneSheetChanged(cur, proj.one_sheet_approved_snapshot) : false,
+    history: histRes.rows.map((r) => ({
+      id: r.id,
+      approvedAt: r.approved_at,
+      approvedByName: r.display_name || r.name || null,
+    })),
+  })
+})
+
+// Roll the one-sheet back to a previously-approved version. Content is
+// restored and the show is re-marked approved as of that version.
+outreachRouter.post('/projects/:projectId/one-sheet/restore/:approvalId', async (req, res) => {
+  const { projectId, approvalId } = req.params
+  const { rows } = await pool.query<{ approved_at: string; approved_by: string | null; snapshot: Record<string, unknown> }>(
+    `SELECT approved_at, approved_by, snapshot FROM one_sheet_approvals WHERE id = $1 AND project_id = $2`,
+    [approvalId, projectId],
+  )
+  const a = rows[0]
+  if (!a) { res.status(404).json({ error: 'not_found' }); return }
+  const snap = a.snapshot
+  await pool.query(
+    `UPDATE projects SET
+        hero_tagline = $1, guest_pitch = $2, contact_email = $3, brand_hex = $4,
+        subtitle = $5, notable_guests = $6, notable_topics = $7, cover_art_url = $8,
+        one_sheet_approved_at = $9, one_sheet_approved_by = $10, one_sheet_approved_snapshot = $11
+      WHERE id = $12`,
+    [
+      snap.hero_tagline ?? null, snap.guest_pitch ?? null, snap.contact_email ?? null, snap.brand_hex ?? null,
+      snap.subtitle ?? null, snap.notable_guests ?? null, snap.notable_topics ?? null, snap.cover_art_url ?? null,
+      a.approved_at, a.approved_by, JSON.stringify(snap), projectId,
+    ],
+  )
+  res.json({ ok: true })
+})
+
 // ─── Rolodex (workspace-wide contact book) ──────────────────────────
 outreachRouter.get('/rolodex', async (_req, res) => {
   const { rows } = await pool.query(

@@ -1361,6 +1361,20 @@ export const api = {
     request<{ ok: true }>(`/api/notes/${noteId}`, { method: 'DELETE' }),
 
   // Guest outreach — per-show template + prospects
+  oneSheetStatus: (projectId: string) =>
+    request<{
+      approvedAt: string | null
+      editedSinceApproval: boolean
+      history: Array<{ id: string; approvedAt: string; approvedByName: string | null }>
+    }>(`/api/outreach/projects/${projectId}/one-sheet/status`),
+  approveOneSheet: (projectId: string) =>
+    request<{ ok: true; approvedAt: string }>(
+      `/api/outreach/projects/${projectId}/one-sheet/approve`, { method: 'POST' },
+    ),
+  restoreOneSheet: (projectId: string, approvalId: string) =>
+    request<{ ok: true }>(
+      `/api/outreach/projects/${projectId}/one-sheet/restore/${approvalId}`, { method: 'POST' },
+    ),
   getRolodex: () =>
     request<{ contacts: ApiRolodexContact[] }>(`/api/outreach/rolodex`),
   addRolodexBulk: (contacts: Array<{

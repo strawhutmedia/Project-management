@@ -40,6 +40,13 @@ export default function OneSheetCard({ project, onSaved }: { project: ApiProject
   // Once published/approved, the card collapses to a compact strip so the
   // outreach work below is the focus. Editing reopens the full form.
   const [editing, setEditing] = useState(false)
+  const [approval, setApproval] = useState<{
+    approvedAt: string | null
+    editedSinceApproval: boolean
+    history: Array<{ id: string; approvedAt: string; approvedByName: string | null }>
+  } | null>(null)
+  const [approving, setApproving] = useState(false)
+  const [showHistory, setShowHistory] = useState(false)
 
   async function autoPopulate() {
     const ok = confirm(
@@ -104,6 +111,88 @@ export default function OneSheetCard({ project, onSaved }: { project: ApiProject
     await save({ [key]: value } as Partial<Fields>)
   }
 
+  async function loadApproval() {
+    try { setApproval(await api.oneSheetStatus(project.id)) } catch { /* non-fatal */ }
+  }
+  // Refetch on load and after any save (so "edited since approval" is live).
+  useEffect(() => { void loadApproval() }, [project.id, savedAt])
+
+  async function approveNow() {
+    setApproving(true)
+    setError(null)
+    try {
+      await api.approveOneSheet(project.id)
+      await loadApproval()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'approve failed')
+    } finally {
+      setApproving(false)
+    }
+  }
+
+  async function restoreVersion(id: string) {
+    if (!confirm('Restore this approved version? It replaces the current one-sheet content with what was approved then.')) return
+    try {
+      await api.restoreOneSheet(project.id, id)
+      setShowHistory(false)
+      onSaved()
+      await loadApproval()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'restore failed')
+    }
+  }
+
+  // Approval badge + approve/history controls, shown in both the compact strip
+  // and the full editor. "Safe to blast" only when approved AND unedited since.
+  function renderApproval() {
+    if (!approval) return null
+    const dateStr = approval.approvedAt ? new Date(approval.approvedAt).toLocaleDateString() : null
+    const safe = approval.approvedAt && !approval.editedSinceApproval
+    return (
+      <div className="flex items-center gap-2 flex-wrap">
+        {safe ? (
+          <span className="text-[10px] uppercase tracking-wider text-emerald-300 font-bold">✓ Approved {dateStr} — safe to blast</span>
+        ) : approval.approvedAt ? (
+          <span className="text-[10px] uppercase tracking-wider text-amber-300 font-bold">⚠ Edited since approval ({dateStr}) — re-approve before blasting</span>
+        ) : (
+          <span className="text-[10px] uppercase tracking-wider text-amber-300 font-bold">⚠ Not approved yet — approve before blasting</span>
+        )}
+        <button
+          onClick={() => void approveNow()}
+          disabled={approving}
+          className="text-[10px] uppercase tracking-wider text-emerald-950 bg-emerald-400 rounded-full px-2.5 py-1 hover:bg-emerald-300 disabled:opacity-40 font-bold"
+        >
+          {approving ? 'Approving…' : safe ? '✓ Re-approve' : '✓ Approve for blasts'}
+        </button>
+        {approval.history.length > 0 && (
+          <button
+            onClick={() => setShowHistory((v) => !v)}
+            className="text-[10px] uppercase tracking-wider text-muted border border-line rounded-full px-2.5 py-1 hover:bg-ink/40 font-bold"
+          >
+            {showHistory ? 'Hide history' : `History (${approval.history.length})`}
+          </button>
+        )}
+        {showHistory && (
+          <div className="w-full mt-1 rounded-lg border border-line divide-y divide-line/60">
+            {approval.history.map((h) => (
+              <div key={h.id} className="flex items-center justify-between gap-2 px-2 py-1 text-[11px]">
+                <span className="text-muted">
+                  Approved {new Date(h.approvedAt).toLocaleString()}{h.approvedByName ? ` · ${h.approvedByName}` : ''}
+                </span>
+                <button
+                  onClick={() => void restoreVersion(h.id)}
+                  className="text-[10px] uppercase tracking-wider text-stage-mastering border border-stage-mastering/40 rounded-full px-2 py-0.5 hover:bg-stage-mastering/10 font-bold"
+                >
+                  Restore
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    )
+  }
+
   // Approved + not actively editing → compact strip, so the outreach work
   // below is what the producer sees. Everything is one Edit click away.
   if (fields.oneSheetPublished && !editing) {
@@ -144,6 +233,7 @@ export default function OneSheetCard({ project, onSaved }: { project: ApiProject
             Edit
           </button>
         </div>
+        <div className="mt-2">{renderApproval()}</div>
         {error && <p className="text-xs text-urgent mt-2">{error}</p>}
       </section>
     )
@@ -158,6 +248,7 @@ export default function OneSheetCard({ project, onSaved }: { project: ApiProject
             A branded, single-page pitch that every outreach email links to. Publishes at a public URL you can share
             anywhere. Elegant, mobile-friendly, uses the show's cover art.
           </p>
+          <div className="mt-2">{renderApproval()}</div>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
           <button

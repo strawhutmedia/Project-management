@@ -65,6 +65,7 @@ export default function OutreachSection({ projectId }: { projectId: string }) {
   const [addOpen, setAddOpen] = useState(false)
   const [bulkOpen, setBulkOpen] = useState(false)
   const [rolodexOpen, setRolodexOpen] = useState(false)
+  const [oneSheetApproval, setOneSheetApproval] = useState<{ approvedAt: string | null; editedSinceApproval: boolean } | null>(null)
   const [openProspect, setOpenProspect] = useState<ApiOutreachProspect | null>(null)
   const [generatingAll, setGeneratingAll] = useState(false)
   const [sendingCampaign, setSendingCampaign] = useState(false)
@@ -164,9 +165,17 @@ export default function OutreachSection({ projectId }: { projectId: string }) {
     }
   }
 
+  async function loadOneSheetApproval() {
+    try {
+      const s = await api.oneSheetStatus(projectId)
+      setOneSheetApproval({ approvedAt: s.approvedAt, editedSinceApproval: s.editedSinceApproval })
+    } catch { /* non-fatal */ }
+  }
+
   useEffect(() => {
     void loadTemplate()
     void loadProspects()
+    void loadOneSheetApproval()
   }, [projectId])
 
   async function saveTemplate() {
@@ -273,8 +282,14 @@ export default function OutreachSection({ projectId }: { projectId: string }) {
       : mode === 'custom' ? `starting ${new Date(customIso!).toLocaleString()}`
       : 'starting now'
     const spread = Math.round((active.length * 135) / 60)
+    const osNote = oneSheetApproval?.approvedAt && !oneSheetApproval.editedSinceApproval
+      ? `One-sheet approved ${new Date(oneSheetApproval.approvedAt).toLocaleDateString()}. `
+      : oneSheetApproval?.approvedAt
+        ? `⚠ Heads up — the one-sheet was EDITED since it was approved (${new Date(oneSheetApproval.approvedAt).toLocaleDateString()}). You may want to re-approve it before blasting. `
+        : `⚠ Heads up — the one-sheet hasn't been approved yet. `
     const ok = confirm(
       `Send ${active.length} outreach emails, ${when}?\n\n` +
+      osNote + '\n\n' +
       `Slate will jitter them 90-180s apart via your verified sending domains. ` +
       (mode === 'now'
         ? `Estimated wall-clock time: ${spread} minutes.\n\n`
@@ -597,6 +612,20 @@ export default function OutreachSection({ projectId }: { projectId: string }) {
             <div className="flex items-center gap-2 flex-wrap">
               {/* Ryan's ship-it button. Big, obvious, red-pink so it
                   reads as "irreversible action". */}
+              {activeProspects.length > 0 && oneSheetApproval && (
+                <span
+                  className={`text-[10px] uppercase tracking-wider font-bold ${
+                    oneSheetApproval.approvedAt && !oneSheetApproval.editedSinceApproval ? 'text-emerald-300' : 'text-amber-300'
+                  }`}
+                  title="The one-sheet every email links to. Approve it (in the One-sheet card) so you know it's safe to blast."
+                >
+                  {oneSheetApproval.approvedAt && !oneSheetApproval.editedSinceApproval
+                    ? `📄 ✓ approved ${new Date(oneSheetApproval.approvedAt).toLocaleDateString()}`
+                    : oneSheetApproval.approvedAt
+                      ? '📄 ⚠ edited since approval'
+                      : '📄 ⚠ not approved'}
+                </span>
+              )}
               {activeProspects.length > 0 && (
                 <>
                   <button
