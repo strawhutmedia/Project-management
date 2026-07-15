@@ -41,7 +41,7 @@ I'm a producer at Straw Hut Media.
 
 We record a full conversation — usually about an hour — then edit it down into a polished episode. You'll get the audio plus a highlight clip package to share wherever you'd like.
 
-We tape in person at our LA or New York studio whenever we can — that's always our preference — and we can make it work remotely if that's the only way to fit your schedule.
+[location]
 
 If it sounds like a fit, just reply and we'll get [guest] booked in for this week or next.
 
@@ -56,6 +56,7 @@ export default function OutreachSection({ projectId }: { projectId: string }) {
   const [subject, setSubject] = useState('Guesting on our podcast — [name]')
   const [body, setBody] = useState(DEFAULT_TEMPLATE_BODY)
   const [replyTo, setReplyTo] = useState('booking@strawhutmedia.com')
+  const [location, setLocation] = useState('either')
   const [saving, setSaving] = useState(false)
   const [savedAt, setSavedAt] = useState<number | null>(null)
   const [prospects, setProspects] = useState<ApiOutreachProspect[] | null>(null)
@@ -145,6 +146,7 @@ export default function OutreachSection({ projectId }: { projectId: string }) {
         setSubject(r.template.subject || 'Guesting on our podcast — [name]')
         setBody(r.template.body || DEFAULT_TEMPLATE_BODY)
         setReplyTo(r.template.reply_to || 'booking@strawhutmedia.com')
+        setLocation(r.template.location || 'either')
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'template load failed')
@@ -169,7 +171,7 @@ export default function OutreachSection({ projectId }: { projectId: string }) {
     setSaving(true)
     setError(null)
     try {
-      await api.saveOutreachTemplate(projectId, { subject, body, replyTo })
+      await api.saveOutreachTemplate(projectId, { subject, body, replyTo, location })
       setSavedAt(Date.now())
       await loadTemplate()
     } catch (err) {
@@ -458,14 +460,32 @@ export default function OutreachSection({ projectId }: { projectId: string }) {
                 className="mt-1 w-full bg-ink/40 border border-line rounded-lg px-3 py-2 text-sm font-mono focus:outline-none focus:border-stage-mastering"
               />
             </label>
-            <label className="block">
-              <span className="text-[10px] uppercase tracking-wider text-muted font-bold">Reply-to</span>
-              <input
-                value={replyTo}
-                onChange={(e) => setReplyTo(e.target.value)}
-                className="mt-1 w-full bg-ink/40 border border-line rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-stage-mastering"
-              />
-            </label>
+            <div className="grid grid-cols-2 gap-3">
+              <label className="block">
+                <span className="text-[10px] uppercase tracking-wider text-muted font-bold">Reply-to</span>
+                <input
+                  value={replyTo}
+                  onChange={(e) => setReplyTo(e.target.value)}
+                  className="mt-1 w-full bg-ink/40 border border-line rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-stage-mastering"
+                />
+              </label>
+              <label className="block">
+                <span className="text-[10px] uppercase tracking-wider text-muted font-bold">Recording location <span className="text-stage-mastering">(fills [location])</span></span>
+                <select
+                  value={location}
+                  onChange={(e) => setLocation(e.target.value)}
+                  className="mt-1 w-full bg-ink/40 border border-line rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-stage-mastering"
+                >
+                  <option value="either">LA or New York studio — in person preferred</option>
+                  <option value="la">LA studio — in person preferred</option>
+                  <option value="ny">New York studio — in person preferred</option>
+                  <option value="remote">Remote only (video)</option>
+                </select>
+                <span className="block text-[10px] text-muted/70 mt-1 leading-snug">
+                  Pick where this show tapes before you blast — it sets what the [location] line says in every email. Save the template to apply.
+                </span>
+              </label>
+            </div>
             <button
               onClick={() => void saveTemplate()}
               disabled={saving}
@@ -888,6 +908,7 @@ function TokenBar({ onInsert }: { onInsert: (token: string) => void }) {
     { token: '[one_sheet_url]', label: '[one_sheet_url]', hint: 'Public one-sheet URL (blank if unpublished)' },
     { token: '[sender]', label: '[sender]', hint: 'Signs off with the name on the account that sends — e.g. "Caroline"' },
     { token: '[guest]', label: '[guest]', hint: 'Who the interview is for — "you" for a direct guest, or the client\'s name when writing to their agent/manager' },
+    { token: '[location]', label: '[location]', hint: 'Where you record — set by the Location dropdown (LA / New York / either / remote)' },
   ]
   return (
     <div className="flex items-center gap-1 flex-wrap">

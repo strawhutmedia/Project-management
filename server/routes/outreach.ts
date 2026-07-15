@@ -32,9 +32,22 @@ outreachRouter.use(requireAdmin)
 // Merge [name] and [unique_sentence] tokens in a template. Used by the
 // test-send preview + (later) the real sender. Kept minimal — the
 // template writer controls which tokens exist; anything else stays.
+// Recording-location copy, chosen per show via a dropdown. In-person is
+// framed as the preference for the studio options; remote-only shows skip
+// that. The [location] token in the body renders one of these.
+const LOCATION_LINES: Record<string, string> = {
+  either: "We tape in person at our LA or New York studio whenever we can — that's always our preference — and we can make it work remotely if that's the only way to fit your schedule.",
+  la: "We tape in person at our LA studio whenever we can — that's how we love to do it — and we can make it work remotely if that's the only way to fit your schedule.",
+  ny: "We tape in person at our New York studio whenever we can — that's how we love to do it — and we can make it work remotely if that's the only way to fit your schedule.",
+  remote: "We record remotely over video, so you can join from wherever you are.",
+}
+function locationLine(loc: string | null | undefined): string {
+  return LOCATION_LINES[(loc ?? 'either')] ?? LOCATION_LINES.either
+}
+
 function mergeTemplate(
   text: string,
-  tokens: { name: string; uniqueSentence: string; oneSheetUrl: string; sender?: string; guest?: string },
+  tokens: { name: string; uniqueSentence: string; oneSheetUrl: string; sender?: string; guest?: string; location?: string },
 ): string {
   return text
     .replace(/\[name\]/gi, tokens.name)
@@ -42,6 +55,7 @@ function mergeTemplate(
     .replace(/\[one_sheet_url\]|\[onesheet_url\]|\[link\]/gi, tokens.oneSheetUrl)
     .replace(/\[sender\]|\[your_name\]/gi, tokens.sender ?? 'The team')
     .replace(/\[guest\]/gi, tokens.guest ?? 'you')
+    .replace(/\[location\]/gi, tokens.location ?? locationLine('either'))
 }
 
 // One row of the pre-send completeness check (see send-campaign).
@@ -108,7 +122,7 @@ outreachRouter.get('/template.csv', (_req, res) => {
 // ─── Templates ──────────────────────────────────────────────────────
 outreachRouter.get('/projects/:projectId/template', async (req, res) => {
   const { rows } = await pool.query(
-    `SELECT project_id, subject, body, from_name, reply_to, updated_at
+    `SELECT project_id, subject, body, from_name, reply_to, location, updated_at
        FROM outreach_templates WHERE project_id = $1`,
     [req.params.projectId],
   )
@@ -124,18 +138,20 @@ outreachRouter.put('/projects/:projectId/template', async (req, res) => {
     ? req.body.fromName.trim() : null
   const replyTo = typeof req.body?.replyTo === 'string' && req.body.replyTo.trim()
     ? req.body.replyTo.trim() : null
+  const location = LOCATION_LINES[req.body?.location] ? String(req.body.location) : 'either'
   await pool.query(
     `INSERT INTO outreach_templates
-       (project_id, subject, body, from_name, reply_to, updated_by, updated_at)
-     VALUES ($1, $2, $3, $4, $5, $6, now())
+       (project_id, subject, body, from_name, reply_to, location, updated_by, updated_at)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, now())
      ON CONFLICT (project_id) DO UPDATE SET
        subject = EXCLUDED.subject,
        body = EXCLUDED.body,
        from_name = EXCLUDED.from_name,
        reply_to = EXCLUDED.reply_to,
+       location = EXCLUDED.location,
        updated_by = EXCLUDED.updated_by,
        updated_at = now()`,
-    [projectId, subject, body, fromName, replyTo, user.id],
+    [projectId, subject, body, fromName, replyTo, location, user.id],
   )
   res.json({ ok: true })
 })
@@ -390,9 +406,9 @@ async function sendOneProspect(prospectId: string): Promise<void> {
   if (!p.unique_sentence?.trim()) throw new Error('prospect_missing_sentence')
 
   const tplRes = await pool.query<{
-    subject: string; body: string; reply_to: string | null; from_name: string | null; sender_name: string | null;
+    subject: string; body: string; reply_to: string | null; from_name: string | null; sender_name: string | null; location: string | null;
   }>(
-    `SELECT subject, body, reply_to, from_name, sender_name FROM outreach_templates WHERE project_id = $1`,
+    `SELECT subject, body, reply_to, from_name, sender_name, location FROM outreach_templates WHERE project_id = $1`,
     [p.project_id],
   )
   const tpl = tplRes.rows[0]
@@ -435,9 +451,10 @@ async function sendOneProspect(prospectId: string): Promise<void> {
 
   const sender = tpl.sender_name?.trim() || tpl.from_name?.trim() || 'The team'
   const guest = resolveGuest(p.recipient_type, p.client_name)
+  const location = locationLine(tpl.location)
   const oneSheetUrl = await getOneSheetUrl(p.project_id)
-  const subject = mergeTemplate(tpl.subject, { name: p.name, uniqueSentence: p.unique_sentence, oneSheetUrl, sender, guest })
-  const body = mergeTemplate(tpl.body, { name: p.name, uniqueSentence: p.unique_sentence, oneSheetUrl, sender, guest })
+  const subject = mergeTemplate(tpl.subject, { name: p.name, uniqueSentence: p.unique_sentence, oneSheetUrl, sender, guest, location })
+  const body = mergeTemplate(tpl.body, { name: p.name, uniqueSentence: p.unique_sentence, oneSheetUrl, sender, guest, location })
 
   // Log the attempt (status: queued) before firing so we have a record
   // even if Resend errors mid-flight.
@@ -1113,9 +1130,9 @@ outreachRouter.post('/projects/:projectId/test-send', async (req, res) => {
 
   // Load template
   const tplRes = await pool.query<{
-    subject: string; body: string; reply_to: string | null; from_name: string | null;
+    subject: string; body: string; reply_to: string | null; from_name: string | null; location: string | null;
   }>(
-    `SELECT subject, body, reply_to, from_name FROM outreach_templates WHERE project_id = $1`,
+    `SELECT subject, body, reply_to, from_name, location FROM outreach_templates WHERE project_id = $1`,
     [projectId],
   )
   const tpl = tplRes.rows[0]
@@ -1157,9 +1174,10 @@ outreachRouter.post('/projects/:projectId/test-send', async (req, res) => {
     [sender, projectId],
   )
 
+  const location = locationLine(tpl.location)
   const oneSheetUrl = await getOneSheetUrl(projectId)
-  const subject = mergeTemplate(tpl.subject, { name: previewName, uniqueSentence: previewSentence, oneSheetUrl, sender, guest: previewGuest })
-  const body = mergeTemplate(tpl.body, { name: previewName, uniqueSentence: previewSentence, oneSheetUrl, sender, guest: previewGuest })
+  const subject = mergeTemplate(tpl.subject, { name: previewName, uniqueSentence: previewSentence, oneSheetUrl, sender, guest: previewGuest, location })
+  const body = mergeTemplate(tpl.body, { name: previewName, uniqueSentence: previewSentence, oneSheetUrl, sender, guest: previewGuest, location })
 
   // Pick a sending domain — first verified + active one in the pool.
   // Prefer the domain pinned to this show if one is set.

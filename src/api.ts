@@ -621,6 +621,7 @@ export type ApiOutreachTemplate = {
   body: string
   from_name: string | null
   reply_to: string | null
+  location: string | null
   updated_at: string
 }
 
@@ -1346,7 +1347,7 @@ export const api = {
   // Guest outreach — per-show template + prospects
   outreachTemplate: (projectId: string) =>
     request<{ template: ApiOutreachTemplate | null }>(`/api/outreach/projects/${projectId}/template`),
-  saveOutreachTemplate: (projectId: string, body: { subject: string; body: string; fromName?: string; replyTo?: string }) =>
+  saveOutreachTemplate: (projectId: string, body: { subject: string; body: string; fromName?: string; replyTo?: string; location?: string }) =>
     request<{ ok: true }>(`/api/outreach/projects/${projectId}/template`, {
       method: 'PUT', body: JSON.stringify(body),
     }),
