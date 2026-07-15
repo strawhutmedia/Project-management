@@ -500,27 +500,80 @@ async function sendOneProspect(prospectId: string): Promise<void> {
   }
 }
 
-// In-memory scheduler — simplest thing that works. Each queued send is
-// a setTimeout that fires N minutes from now. Queue is not persisted
-// across Railway restarts; on redeploy any queued (not-yet-sent)
-// prospects revert to 'ready' status via the resume-queue block at
-// module load (see bottom of file).
-const scheduledSends = new Set<string>()
+// Durable scheduler. Every queued prospect carries a scheduled_send_at; a
+// 60s loop fires the ones whose time has come. This survives Railway
+// restarts/deploys (a campaign scheduled for 5 AM PT still goes at 5 AM),
+// and since the loop is the ONLY driver, a prospect can't double-send.
+// Single process + an overlap guard means no concurrent ticks.
+let outreachTicking = false
 
-function scheduleSend(prospectId: string, delayMs: number): void {
-  if (scheduledSends.has(prospectId)) return
-  scheduledSends.add(prospectId)
-  setTimeout(async () => {
-    scheduledSends.delete(prospectId)
-    try {
-      await sendOneProspect(prospectId)
-    } catch (err) {
-      logError('outreach: scheduled send failed', {
-        prospectId,
-        error: err instanceof Error ? err.message : String(err),
-      })
+async function runOutreachTick(): Promise<void> {
+  if (outreachTicking) return
+  outreachTicking = true
+  try {
+    // Claim a small batch of due sends. Small cap keeps the 90-180s spacing
+    // in steady state and gently catches up after any downtime rather than
+    // firing a burst.
+    const due = await pool.query<{ id: string }>(
+      `SELECT id FROM outreach_prospects
+        WHERE status = 'queued'
+          AND scheduled_send_at IS NOT NULL
+          AND scheduled_send_at <= now()
+        ORDER BY scheduled_send_at ASC
+        LIMIT 5`,
+    )
+    for (const { id } of due.rows) {
+      try {
+        await sendOneProspect(id)
+      } catch (err) {
+        logError('outreach: scheduled send failed', {
+          prospectId: id,
+          error: err instanceof Error ? err.message : String(err),
+        })
+      }
     }
-  }, delayMs).unref()
+  } catch (err) {
+    logError('outreach: send tick failed', { error: err instanceof Error ? err.message : String(err) })
+  } finally {
+    outreachTicking = false
+  }
+}
+
+// Wired from index.ts on boot. Drives all outreach sends (immediate and
+// scheduled) off scheduled_send_at.
+export function startOutreachSendLoop(): void {
+  setInterval(() => { void runOutreachTick() }, 60_000).unref()
+  void runOutreachTick() // don't wait a full minute for the first pass
+}
+
+// The next 5:00 AM Pacific as a concrete UTC instant. Handles PST/PDT
+// correctly by asking Intl for Pacific's offset on the target day.
+function nextFiveAmPT(): Date {
+  const now = new Date()
+  const ptParts = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'America/Los_Angeles', hour12: false,
+    year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit',
+  }).formatToParts(now)
+  const num = (t: string) => Number(ptParts.find((p) => p.type === t)?.value)
+  let y = num('year'), mo = num('month'), d = num('day')
+  if (num('hour') >= 5) {
+    // It's already 5 AM PT or later today — aim for tomorrow.
+    const roll = new Date(Date.UTC(y, mo - 1, d))
+    roll.setUTCDate(roll.getUTCDate() + 1)
+    y = roll.getUTCFullYear(); mo = roll.getUTCMonth() + 1; d = roll.getUTCDate()
+  }
+  // Pacific wall-clock 05:00 on y-mo-d → UTC instant.
+  const guess = new Date(Date.UTC(y, mo - 1, d, 5, 0, 0))
+  const asPT = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'America/Los_Angeles', hour12: false,
+    year: 'numeric', month: '2-digit', day: '2-digit',
+    hour: '2-digit', minute: '2-digit', second: '2-digit',
+  }).formatToParts(guess)
+  const g = (t: string) => Number(asPT.find((p) => p.type === t)?.value)
+  const offsetMin = Math.round(
+    (Date.UTC(g('year'), g('month') - 1, g('day'), g('hour'), g('minute'), g('second')) - guess.getTime()) / 60_000,
+  )
+  return new Date(guess.getTime() - offsetMin * 60_000)
 }
 
 outreachRouter.post('/projects/:projectId/send-campaign', async (req, res) => {
@@ -649,53 +702,75 @@ outreachRouter.post('/projects/:projectId/send-campaign', async (req, res) => {
     arr.push(a.id)
     byDomain.set(a.domainId, arr)
   }
-  for (const [domainId, prospectIds] of byDomain) {
-    await pool.query(
-      `UPDATE outreach_prospects
-          SET status = 'queued', sending_domain_id = $1, updated_at = now()
-        WHERE id = ANY($2::uuid[])`,
-      [domainId, prospectIds],
-    )
-  }
+  // When should this batch start? Default is now. A scheduled campaign
+  // passes startPreset '5am_pt' (next 5 AM Pacific) or an explicit future
+  // startAt ISO. Sends are still jittered 90-180s apart from that start.
+  const startPreset = typeof req.body?.startPreset === 'string' ? req.body.startPreset : 'now'
+  const startAtRaw = typeof req.body?.startAt === 'string' ? new Date(req.body.startAt) : null
+  const nowMs = Date.now()
+  let startMs = nowMs
+  if (startPreset === '5am_pt') startMs = nextFiveAmPT().getTime()
+  else if (startAtRaw && !Number.isNaN(startAtRaw.getTime()) && startAtRaw.getTime() > nowMs) startMs = startAtRaw.getTime()
 
-  // Schedule each send 90-180s apart. Cursor advances by a fresh
-  // random jitter for each prospect so the pattern isn't deterministic.
+  // Give each prospect a concrete scheduled_send_at: start point plus a
+  // running 90-180s jitter. The durable loop fires each when due.
   let cursorMs = 0
-  for (const { id } of assignments) {
-    const jitter = 90_000 + Math.floor(Math.random() * 90_000) // 90-180s
-    cursorMs += jitter
-    scheduleSend(id, cursorMs)
-  }
+  const sendAts = assignments.map(() => {
+    cursorMs += 90_000 + Math.floor(Math.random() * 90_000) // 90-180s apart
+    return new Date(startMs + cursorMs).toISOString()
+  })
+  await pool.query(
+    `UPDATE outreach_prospects AS p
+        SET status = 'queued',
+            sending_domain_id = a.domain_id::uuid,
+            scheduled_send_at = a.send_at::timestamptz,
+            updated_at = now()
+       FROM unnest($1::uuid[], $2::uuid[], $3::timestamptz[]) AS a(pid, domain_id, send_at)
+      WHERE p.id = a.pid`,
+    [assignments.map((a) => a.id), assignments.map((a) => a.domainId), sendAts],
+  )
+  // Nudge the loop so an immediate campaign doesn't wait for the next tick.
+  // (Scheduled campaigns just sit as 'queued' until their time comes.)
+  void runOutreachTick()
+
   const perDomainCount = Array.from(byDomain.values()).map((v) => v.length)
-  logInfo('outreach: campaign started', {
+  const scheduled = startMs > nowMs + 60_000
+  const firstAtMs = startMs + 90_000
+  const lastAtMs = startMs + cursorMs
+  logInfo('outreach: campaign queued', {
     projectId,
     count: ids.length,
     domains: domains.length,
     perDomain: perDomainCount,
-    estimatedMinutes: Math.round(cursorMs / 60_000),
+    scheduled,
+    startAt: new Date(startMs).toISOString(),
   })
   res.json({
     ok: true,
     queued: ids.length,
+    scheduled,
+    startAt: new Date(startMs).toISOString(),
     domainsUsed: domains.length,
     perDomain: perDomainCount,
-    estimatedMinutes: Math.round(cursorMs / 60_000),
-    firstAt: new Date(Date.now() + 90_000).toISOString(),
-    lastAt: new Date(Date.now() + cursorMs).toISOString(),
+    estimatedMinutes: Math.round((lastAtMs - nowMs) / 60_000),
+    firstAt: new Date(firstAtMs).toISOString(),
+    lastAt: new Date(lastAtMs).toISOString(),
   })
 })
 
-// On boot, resume any prospects that were mid-queue when the process
-// died. They flip back to 'ready' so the operator can rerun the send
-// button — otherwise they'd sit stuck as 'queued' forever.
+// On boot, only rescue prospects that are stuck 'queued' with NO
+// scheduled_send_at — those are legacy/orphaned and would sit forever.
+// Anything with a scheduled_send_at is durable: the send loop will pick it
+// up when due (including a campaign scheduled for hours from now), so we
+// leave it queued instead of bouncing it back to 'ready'.
 ;(async () => {
   try {
     const { rowCount } = await pool.query(
       `UPDATE outreach_prospects SET status = 'ready', updated_at = now()
-        WHERE status = 'queued'`,
+        WHERE status = 'queued' AND scheduled_send_at IS NULL`,
     )
     if (rowCount && rowCount > 0) {
-      logInfo('outreach: reset stuck queued prospects on boot', { count: rowCount })
+      logInfo('outreach: reset orphaned queued prospects on boot', { count: rowCount })
     }
   } catch (err) {
     logError('outreach: boot reset failed', { error: err instanceof Error ? err.message : String(err) })

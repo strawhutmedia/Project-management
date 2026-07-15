@@ -24,7 +24,7 @@ import { episodeCutsRouter } from './routes/episode_cuts'
 import { exportsRouter } from './routes/exports'
 import { showPageRouter } from './routes/show_page'
 import { outreachDomainsRouter } from './routes/outreach_domains'
-import { outreachRouter } from './routes/outreach'
+import { outreachRouter, startOutreachSendLoop } from './routes/outreach'
 import { handleResendWebhook } from './routes/outreach_webhook'
 import { seedBackInYourArms } from './seeds/back_in_your_arms'
 import { ensureRyanIsPodcastEp } from './routes/projects'
@@ -211,6 +211,7 @@ async function start() {
     scheduleBootBiyaScriptDump()
     void reportStatus()
     startScheduler()
+    startOutreachSendLoop()
     // Pick up any breakdown runs that were killed by the previous
     // shutdown (deploy / crash). Producers don't have to click
     // "re-analyze" after every Railway redeploy.

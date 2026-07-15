@@ -1383,14 +1383,20 @@ export const api = {
       `/api/outreach/projects/${projectId}/verify-emails`,
       { method: 'POST', body: JSON.stringify({}) },
     ),
-  sendOutreachCampaign: (projectId: string, prospectIds?: string[]) =>
+  sendOutreachCampaign: (
+    projectId: string,
+    opts?: { prospectIds?: string[]; startPreset?: 'now' | '5am_pt' },
+  ) =>
     request<{
-      ok: true; queued: number; estimatedMinutes: number;
-      firstAt: string; lastAt: string;
+      ok: true; queued: number; scheduled: boolean; startAt: string;
+      estimatedMinutes: number; firstAt: string; lastAt: string;
       domainsUsed: number; perDomain: number[];
     }>(
       `/api/outreach/projects/${projectId}/send-campaign`,
-      { method: 'POST', body: JSON.stringify({ prospectIds: prospectIds ?? null }) },
+      { method: 'POST', body: JSON.stringify({
+        prospectIds: opts?.prospectIds ?? null,
+        startPreset: opts?.startPreset ?? 'now',
+      }) },
     ),
   testSendOutreach: (projectId: string, to: string, prospectId?: string) =>
     request<{ ok: true; from: string; to: string; subject: string; previewName: string }>(

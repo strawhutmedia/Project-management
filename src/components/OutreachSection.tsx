@@ -232,7 +232,7 @@ export default function OutreachSection({ projectId }: { projectId: string }) {
     }
   }
 
-  async function sendCampaign() {
+  async function sendCampaign(startPreset: 'now' | '5am_pt' = 'now') {
     // NO SKIPPING (Ryan's rule): every live contact must be fully filled out
     // — email + facts + sentence — and verified + deliverable, or we don't
     // send at all. This mirrors the server gate for instant feedback; the
@@ -257,10 +257,13 @@ export default function OutreachSection({ projectId }: { projectId: string }) {
       setError(`Can't send yet — every contact has to be filled out first (${problems.join(', ')}). Fix these: ${names.join(', ')}${names.length >= 15 ? '…' : ''}.`)
       return
     }
+    const when = startPreset === '5am_pt' ? 'starting at 5 AM PT' : 'starting now'
     const ok = confirm(
-      `Send ${active.length} outreach emails?\n\n` +
+      `Send ${active.length} outreach emails, ${when}?\n\n` +
       `Slate will jitter them 90-180s apart via your verified sending domains. ` +
-      `Estimated wall-clock time: ${Math.round((active.length * 135) / 60)} minutes.\n\n` +
+      (startPreset === '5am_pt'
+        ? `They'll begin at the next 5 AM Pacific and trickle out over ~${Math.round((active.length * 135) / 60)} minutes from there.\n\n`
+        : `Estimated wall-clock time: ${Math.round((active.length * 135) / 60)} minutes.\n\n`) +
       `You can't stop the campaign once it starts. Test one to yourself first?`,
     )
     if (!ok) return
@@ -268,14 +271,17 @@ export default function OutreachSection({ projectId }: { projectId: string }) {
     setError(null)
     setCampaignResult(null)
     try {
-      const r = await api.sendOutreachCampaign(projectId)
+      const r = await api.sendOutreachCampaign(projectId, { startPreset })
       const split = r.perDomain.length > 1
         ? ` Rotating across ${r.domainsUsed} domains (~${r.perDomain.join('/')} sends each) to protect reputation.`
         : ` Sending from ${r.domainsUsed} verified domain. Add more in Sending domains to spread load.`
       setCampaignResult(
-        `✓ Campaign queued: ${r.queued} emails will send over the next ~${r.estimatedMinutes} min. ` +
-        `First fires around ${new Date(r.firstAt).toLocaleTimeString()}, last around ${new Date(r.lastAt).toLocaleTimeString()}.` +
-        split,
+        r.scheduled
+          ? `✓ Campaign scheduled: ${r.queued} emails will start ${new Date(r.startAt).toLocaleString()} ` +
+            `and finish around ${new Date(r.lastAt).toLocaleTimeString()}.` + split
+          : `✓ Campaign queued: ${r.queued} emails will send over the next ~${r.estimatedMinutes} min. ` +
+            `First fires around ${new Date(r.firstAt).toLocaleTimeString()}, last around ${new Date(r.lastAt).toLocaleTimeString()}.` +
+            split,
       )
       await loadProspects()
     } catch (err) {
@@ -556,22 +562,34 @@ export default function OutreachSection({ projectId }: { projectId: string }) {
               {/* Ryan's ship-it button. Big, obvious, red-pink so it
                   reads as "irreversible action". */}
               {activeProspects.length > 0 && (
-                <button
-                  onClick={() => void sendCampaign()}
-                  disabled={sendingCampaign || incompleteCount > 0}
-                  className="text-[10px] uppercase tracking-wider text-white bg-gradient-to-r from-urgent to-stage-mastering rounded-full px-3 py-1 hover:opacity-90 disabled:opacity-40 font-bold shadow-lg"
-                  title={
-                    incompleteCount > 0
-                      ? `${incompleteCount} contact${incompleteCount === 1 ? ' is' : 's are'} not filled out yet (facts, sentence, email, or verification). Every contact must be complete before you can send — nobody gets skipped.`
-                      : `Send ${activeProspects.length} outreach emails now, jittered across your verified sending domains.`
-                  }
-                >
-                  {sendingCampaign
-                    ? 'Queueing…'
-                    : incompleteCount > 0
-                      ? `🔒 ${incompleteCount} to finish before sending`
-                      : `🚀 Send campaign (${activeProspects.length})`}
-                </button>
+                <>
+                  <button
+                    onClick={() => void sendCampaign('now')}
+                    disabled={sendingCampaign || incompleteCount > 0}
+                    className="text-[10px] uppercase tracking-wider text-white bg-gradient-to-r from-urgent to-stage-mastering rounded-full px-3 py-1 hover:opacity-90 disabled:opacity-40 font-bold shadow-lg"
+                    title={
+                      incompleteCount > 0
+                        ? `${incompleteCount} contact${incompleteCount === 1 ? ' is' : 's are'} not filled out yet (facts, sentence, email, or verification). Every contact must be complete before you can send — nobody gets skipped.`
+                        : `Send ${activeProspects.length} outreach emails now, jittered across your verified sending domains.`
+                    }
+                  >
+                    {sendingCampaign
+                      ? 'Queueing…'
+                      : incompleteCount > 0
+                        ? `🔒 ${incompleteCount} to finish before sending`
+                        : `🚀 Send now (${activeProspects.length})`}
+                  </button>
+                  {incompleteCount === 0 && (
+                    <button
+                      onClick={() => void sendCampaign('5am_pt')}
+                      disabled={sendingCampaign}
+                      className="text-[10px] uppercase tracking-wider text-stage-mastering border border-stage-mastering/40 rounded-full px-3 py-1 hover:bg-stage-mastering/10 disabled:opacity-40 font-bold"
+                      title={`Schedule all ${activeProspects.length} emails to start going out at the next 5 AM Pacific, then trickle out from there.`}
+                    >
+                      {sendingCampaign ? 'Scheduling…' : '🕔 Schedule 5 AM PT'}
+                    </button>
+                  )}
+                </>
               )}
               {uncheckedCount > 0 && (
                 <button
