@@ -1206,6 +1206,20 @@ function ProspectCard({
           {p.email && p.email_check_status === 'valid' && (
             <span title={p.email_check_detail ?? 'Domain accepts mail'} className="text-[9px] uppercase tracking-wider font-bold px-2 py-0.5 rounded-full border border-emerald-500/40 bg-emerald-500/10 text-emerald-300">✓ Email ok</span>
           )}
+          {(p.status === 'sent' || p.status === 'replied') && (
+            p.open_count > 0 ? (
+              <span
+                title={p.last_opened_at ? `Last viewed ${new Date(p.last_opened_at).toLocaleString()}` : 'Opened'}
+                className="text-[9px] uppercase tracking-wider font-bold px-2 py-0.5 rounded-full border border-sky-500/40 bg-sky-500/10 text-sky-300"
+              >
+                👁 Viewed {p.open_count}×
+              </span>
+            ) : (
+              <span className="text-[9px] uppercase tracking-wider font-bold px-2 py-0.5 rounded-full border border-line bg-ink/40 text-muted">
+                Not viewed yet
+              </span>
+            )
+          )}
           <div className="flex-1" />
           <span
             onClick={(e) => { e.stopPropagation(); onRemove() }}

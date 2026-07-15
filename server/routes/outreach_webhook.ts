@@ -116,6 +116,32 @@ async function handleNegativeEvent(type: string, messageId: string | null): Prom
   if (send.sending_domain_id) await maybePauseDomain(send.sending_domain_id)
 }
 
+// Count an email open against its prospect. Resend fires one event per open,
+// so we increment on each — that's how "viewed N times" works. Opens are
+// approximate (Apple Mail preloads the pixel), but useful as a signal.
+async function handleOpenEvent(messageId: string | null): Promise<void> {
+  if (!messageId) return
+  const sendRes = await pool.query<{ prospect_id: string }>(
+    `SELECT prospect_id FROM outreach_sends WHERE resend_message_id = $1 LIMIT 1`,
+    [messageId],
+  )
+  const send = sendRes.rows[0]
+  if (!send) {
+    logInfo('outreach webhook: no matching send for open', { messageId })
+    return
+  }
+  await pool.query(
+    `UPDATE outreach_prospects
+        SET open_count = open_count + 1,
+            first_opened_at = COALESCE(first_opened_at, now()),
+            last_opened_at = now(),
+            updated_at = now()
+      WHERE id = $1`,
+    [send.prospect_id],
+  )
+  logInfo('outreach webhook: recorded open', { messageId, prospectId: send.prospect_id })
+}
+
 export async function handleResendWebhook(req: Request, res: Response): Promise<void> {
   const raw: Buffer = Buffer.isBuffer(req.body)
     ? req.body
@@ -147,9 +173,10 @@ export async function handleResendWebhook(req: Request, res: Response): Promise<
   try {
     if (type === 'email.bounced' || type === 'email.complained') {
       await handleNegativeEvent(type, messageId)
+    } else if (type === 'email.opened') {
+      await handleOpenEvent(messageId)
     }
-    // Other event types (delivered, opened, clicked) are acknowledged
-    // but not acted on yet.
+    // Other event types (delivered, clicked) are acknowledged, not acted on.
   } catch (err) {
     logError('outreach webhook: handler threw', {
       type,

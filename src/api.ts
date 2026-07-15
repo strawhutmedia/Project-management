@@ -659,6 +659,9 @@ export type ApiOutreachProspect = {
   sent_at: string | null
   replied_at: string | null
   bounced_at: string | null
+  open_count: number
+  first_opened_at: string | null
+  last_opened_at: string | null
   sending_domain_id: string | null
   created_at: string
   updated_at: string

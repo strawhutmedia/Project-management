@@ -168,7 +168,8 @@ outreachRouter.get('/projects/:projectId/prospects', async (req, res) => {
     `SELECT id, project_id, name, full_name, email, recipient_type, client_name,
             context, unique_sentence, unique_sentence_generated_at, status,
             email_check_status, email_checked_at, email_check_detail,
-            sent_at, replied_at, bounced_at, sending_domain_id, created_at, updated_at
+            sent_at, replied_at, bounced_at, open_count, first_opened_at, last_opened_at,
+            sending_domain_id, created_at, updated_at
        FROM outreach_prospects
       WHERE project_id = $1
       ORDER BY created_at DESC`,
@@ -807,6 +808,28 @@ async function resetOrphanedQueued(): Promise<void> {
 export function startOutreachSendLoop(): void {
   void resetOrphanedQueued().then(() => runOutreachTick()) // catch up immediately
   setInterval(() => { void runOutreachTick() }, 60_000).unref()
+}
+
+// Turn on open tracking for every verified sending domain via the Resend API,
+// so email.opened events actually fire (otherwise no pixel is injected and we
+// see zero opens). Idempotent — safe to run on every boot. Best-effort.
+export async function enableDomainOpenTracking(): Promise<void> {
+  if (!resend) return
+  try {
+    const { rows } = await pool.query<{ resend_id: string; name: string }>(
+      `SELECT resend_id, name FROM sending_domains WHERE resend_id IS NOT NULL AND status = 'verified'`,
+    )
+    for (const d of rows) {
+      try {
+        await resend.domains.update({ id: d.resend_id, openTracking: true })
+        logInfo('outreach: ensured open tracking on domain', { domain: d.name })
+      } catch (err) {
+        logError('outreach: enable open tracking failed', { domain: d.name, error: err instanceof Error ? err.message : String(err) })
+      }
+    }
+  } catch (err) {
+    logError('outreach: enable open tracking query failed', { error: err instanceof Error ? err.message : String(err) })
+  }
 }
 
 // The next 5:00 AM Pacific as a concrete UTC instant. Handles PST/PDT
