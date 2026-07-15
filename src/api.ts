@@ -1378,6 +1378,10 @@ export const api = {
     request<{ ok: true }>(
       `/api/outreach/projects/${projectId}/one-sheet/restore/${approvalId}`, { method: 'POST' },
     ),
+  enableOpenTracking: () =>
+    request<{ ok: true; results: Array<{ domain: string; ok: boolean; detail?: string }> }>(
+      `/api/outreach/enable-open-tracking`, { method: 'POST' },
+    ),
   getRolodex: () =>
     request<{ contacts: ApiRolodexContact[] }>(`/api/outreach/rolodex`),
   addRolodexBulk: (contacts: Array<{

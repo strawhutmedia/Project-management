@@ -165,6 +165,23 @@ export default function OutreachSection({ projectId }: { projectId: string }) {
     }
   }
 
+  const [trackingMsg, setTrackingMsg] = useState<string | null>(null)
+  async function enableTracking() {
+    setTrackingMsg('Turning on open tracking…')
+    try {
+      const r = await api.enableOpenTracking()
+      const ok = r.results.filter((x) => x.ok).map((x) => x.domain)
+      const bad = r.results.filter((x) => !x.ok)
+      setTrackingMsg(
+        (ok.length ? `✓ Open tracking on for ${ok.join(', ')}. ` : '') +
+        (bad.length ? `⚠ ${bad.map((b) => `${b.domain} (${b.detail})`).join('; ')}` : '') +
+        (r.results.length === 0 ? 'No verified sending domains found.' : ''),
+      )
+    } catch (e) {
+      setTrackingMsg(e instanceof Error ? e.message : 'failed')
+    }
+  }
+
   async function loadOneSheetApproval() {
     try {
       const s = await api.oneSheetStatus(projectId)
@@ -598,6 +615,12 @@ export default function OutreachSection({ projectId }: { projectId: string }) {
             </div>
           )}
 
+          {trackingMsg && (
+            <div className="rounded-lg border border-sky-500/40 bg-sky-500/10 px-3 py-2 text-xs text-sky-100">
+              {trackingMsg}
+            </div>
+          )}
+
           {generateResult && (
             <div
               className={`rounded-lg border px-3 py-2 text-xs ${
@@ -756,6 +779,13 @@ export default function OutreachSection({ projectId }: { projectId: string }) {
                 title="The Straw Hut Rolodex — everyone who's replied, plus contacts you add. Pull them into this show."
               >
                 {rolodexOpen ? 'Hide Rolodex' : '📇 Rolodex'}
+              </button>
+              <button
+                onClick={() => void enableTracking()}
+                className="text-[10px] uppercase tracking-wider text-sky-300 border border-sky-500/40 rounded-full px-3 py-1 hover:bg-sky-500/10 font-bold"
+                title="Turn on open tracking for your sending domains (so 'Viewed N×' works). Safe to click anytime; confirms it's on."
+              >
+                👁 Enable open tracking
               </button>
               {prospects && prospects.length > 0 && (
                 <button

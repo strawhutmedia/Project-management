@@ -812,25 +812,66 @@ export function startOutreachSendLoop(): void {
 
 // Turn on open tracking for every verified sending domain via the Resend API,
 // so email.opened events actually fire (otherwise no pixel is injected and we
-// see zero opens). Idempotent — safe to run on every boot. Best-effort.
-export async function enableDomainOpenTracking(): Promise<void> {
-  if (!resend) return
+// see zero opens). Resolves the Resend domain id from the API if we don't have
+// it stored. Idempotent — safe to run on every boot or on demand. Returns a
+// per-domain result so the UI can confirm it's actually on.
+export async function ensureOpenTracking(): Promise<Array<{ domain: string; ok: boolean; detail?: string }>> {
+  const results: Array<{ domain: string; ok: boolean; detail?: string }> = []
+  if (!resend) return results
+  const { rows } = await pool.query<{ id: string; resend_id: string | null; name: string }>(
+    `SELECT id, resend_id, name FROM sending_domains WHERE status = 'verified'`,
+  )
+  if (rows.length === 0) return results
+  // One list call to resolve any missing Resend ids by name.
+  let byName = new Map<string, string>()
   try {
-    const { rows } = await pool.query<{ resend_id: string; name: string }>(
-      `SELECT resend_id, name FROM sending_domains WHERE resend_id IS NOT NULL AND status = 'verified'`,
-    )
-    for (const d of rows) {
-      try {
-        await resend.domains.update({ id: d.resend_id, openTracking: true })
-        logInfo('outreach: ensured open tracking on domain', { domain: d.name })
-      } catch (err) {
-        logError('outreach: enable open tracking failed', { domain: d.name, error: err instanceof Error ? err.message : String(err) })
+    const list = await resend.domains.list()
+    const raw = list.data as unknown
+    const arr = Array.isArray(raw) ? raw : ((raw as { data?: Array<{ id: string; name: string }> })?.data ?? [])
+    byName = new Map((arr as Array<{ id: string; name: string }>).map((d) => [d.name.toLowerCase(), d.id]))
+  } catch { /* fall back to stored ids */ }
+
+  for (const d of rows) {
+    let resendId = d.resend_id
+    if (!resendId) {
+      resendId = byName.get(d.name.toLowerCase()) ?? null
+      if (resendId) {
+        await pool.query(`UPDATE sending_domains SET resend_id = $1 WHERE id = $2`, [resendId, d.id])
       }
     }
-  } catch (err) {
-    logError('outreach: enable open tracking query failed', { error: err instanceof Error ? err.message : String(err) })
+    if (!resendId) {
+      results.push({ domain: d.name, ok: false, detail: 'no Resend id — run “Sync with Resend” on the domain' })
+      continue
+    }
+    try {
+      const upd = await resend.domains.update({ id: resendId, openTracking: true })
+      if (upd.error) {
+        results.push({ domain: d.name, ok: false, detail: upd.error.message ?? String(upd.error) })
+      } else {
+        results.push({ domain: d.name, ok: true })
+        logInfo('outreach: ensured open tracking on domain', { domain: d.name })
+      }
+    } catch (err) {
+      results.push({ domain: d.name, ok: false, detail: err instanceof Error ? err.message : String(err) })
+    }
+  }
+  return results
+}
+
+// Back-compat name used by boot wiring; best-effort, ignores the result.
+export async function enableDomainOpenTracking(): Promise<void> {
+  try { await ensureOpenTracking() } catch (err) {
+    logError('outreach: enable open tracking failed', { error: err instanceof Error ? err.message : String(err) })
   }
 }
+
+// On-demand: enable + confirm open tracking. Gives Caroline a button so it's
+// never dependent on a boot having run.
+outreachRouter.post('/enable-open-tracking', async (_req, res) => {
+  if (!resend) { res.status(503).json({ error: 'resend_not_configured' }); return }
+  const results = await ensureOpenTracking()
+  res.json({ ok: true, results })
+})
 
 // The next 5:00 AM Pacific as a concrete UTC instant. Handles PST/PDT
 // correctly by asking Intl for Pacific's offset on the target day.
