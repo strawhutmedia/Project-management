@@ -1,9 +1,9 @@
 {
   "version": "0.2.2",
-  "now": "2026-07-15T00:22:30.495Z",
+  "now": "2026-07-15T00:33:54.085Z",
   "boot": {
-    "startedAt": "2026-07-15T00:22:30.076Z",
-    "completedAt": "2026-07-15T00:22:30.484Z",
+    "startedAt": "2026-07-15T00:33:53.796Z",
+    "completedAt": "2026-07-15T00:33:54.072Z",
     "error": null
   },
   "env": {
@@ -104,7 +104,8 @@
       "068_private_talk_template_signature.sql",
       "069_outreach_guest_clarity_and_sender.sql",
       "070_outreach_guest_token.sql",
-      "071_outreach_full_name_first_mention.sql"
+      "071_outreach_full_name_first_mention.sql",
+      "072_outreach_scheduled_send.sql"
     ],
     "userCount": 12,
     "projectCount": 16
@@ -112,7 +113,7 @@
   "recentLog": [
     {
       "level": "info",
-      "ts": "2026-07-15T00:22:30.074Z",
+      "ts": "2026-07-15T00:33:53.793Z",
       "msg": "serving client from",
       "data": {
         "clientDir": "/app/dist"
@@ -120,7 +121,7 @@
     },
     {
       "level": "info",
-      "ts": "2026-07-15T00:22:30.076Z",
+      "ts": "2026-07-15T00:33:53.796Z",
       "msg": "boot starting",
       "data": {
         "cwd": "/app",
@@ -130,13 +131,21 @@
       }
     },
     {
+      "level": "error",
+      "ts": "2026-07-15T00:33:53.828Z",
+      "msg": "outreach: boot reset failed",
+      "data": {
+        "error": "column \"scheduled_send_at\" does not exist"
+      }
+    },
+    {
       "level": "info",
-      "ts": "2026-07-15T00:22:30.342Z",
+      "ts": "2026-07-15T00:33:53.991Z",
       "msg": "migrations complete"
     },
     {
       "level": "info",
-      "ts": "2026-07-15T00:22:30.475Z",
+      "ts": "2026-07-15T00:33:54.065Z",
       "msg": "BIYA seed: project already exists, ensured shoot days",
       "data": {
         "projectId": "12f53ed1-c6c7-4c11-8d7b-06d91744c9af"
@@ -144,12 +153,12 @@
     },
     {
       "level": "info",
-      "ts": "2026-07-15T00:22:30.484Z",
+      "ts": "2026-07-15T00:33:54.072Z",
       "msg": "listening on :8080"
     },
     {
       "level": "info",
-      "ts": "2026-07-15T00:22:30.484Z",
+      "ts": "2026-07-15T00:33:54.072Z",
       "msg": "scheduler started (every 5 min)"
     }
   ]
