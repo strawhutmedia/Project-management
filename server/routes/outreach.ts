@@ -327,7 +327,137 @@ outreachRouter.patch('/prospects/:id', async (req, res) => {
     values,
   )
   if (rowCount === 0) { res.status(404).json({ error: 'not_found' }); return }
+  // Auto-file responders into the Rolodex. Only on a genuine reply — never
+  // for bounced / opted_out / wrong-email, which never reach 'replied'.
+  if (patch.status === 'replied') {
+    void fileProspectInRolodex(id).catch((err) =>
+      logError('rolodex: auto-file on reply failed', { prospectId: id, error: err instanceof Error ? err.message : String(err) }),
+    )
+  }
   res.json({ ok: true })
+})
+
+// Copy a prospect into the workspace Rolodex, deduped by email. Refreshes the
+// facts we know and tags them 'responded'. No email → nothing to dedup on, so
+// we skip (a contact with no address isn't reusable for a future blast).
+async function fileProspectInRolodex(prospectId: string): Promise<void> {
+  const { rows } = await pool.query<{
+    name: string; full_name: string | null; email: string | null;
+    recipient_type: string | null; client_name: string | null; context: string | null;
+    project_id: string; created_by: string | null;
+  }>(
+    `SELECT p.name, p.full_name, p.email, p.recipient_type, p.client_name, p.context,
+            p.project_id, p.created_by
+       FROM outreach_prospects p WHERE p.id = $1`,
+    [prospectId],
+  )
+  const p = rows[0]
+  if (!p || !p.email) return
+  const showRes = await pool.query<{ name: string }>(`SELECT name FROM projects WHERE id = $1`, [p.project_id])
+  const showName = showRes.rows[0]?.name ?? null
+  await pool.query(
+    `INSERT INTO rolodex_contacts
+       (email, name, full_name, recipient_type, client_name, context, tags, source, source_show, added_by)
+     VALUES (lower($1), $2, $3, $4, $5, $6, ARRAY['responded'], 'replied', $7, $8)
+     ON CONFLICT (email) DO UPDATE SET
+       name = EXCLUDED.name,
+       full_name = COALESCE(EXCLUDED.full_name, rolodex_contacts.full_name),
+       recipient_type = COALESCE(EXCLUDED.recipient_type, rolodex_contacts.recipient_type),
+       client_name = COALESCE(EXCLUDED.client_name, rolodex_contacts.client_name),
+       context = COALESCE(EXCLUDED.context, rolodex_contacts.context),
+       tags = (
+         SELECT ARRAY(SELECT DISTINCT unnest(rolodex_contacts.tags || ARRAY['responded']))
+       ),
+       source_show = COALESCE(rolodex_contacts.source_show, EXCLUDED.source_show),
+       updated_at = now()`,
+    [p.email, p.name, p.full_name, p.recipient_type, p.client_name, p.context, showName, p.created_by],
+  )
+  logInfo('rolodex: filed responder', { prospectId, email: p.email })
+}
+
+// ─── Rolodex (workspace-wide contact book) ──────────────────────────
+outreachRouter.get('/rolodex', async (_req, res) => {
+  const { rows } = await pool.query(
+    `SELECT id, email, name, full_name, recipient_type, client_name, context,
+            tags, notes, source, source_show, created_at, updated_at
+       FROM rolodex_contacts ORDER BY created_at DESC`,
+  )
+  res.json({ contacts: rows })
+})
+
+outreachRouter.post('/rolodex/bulk', async (req, res) => {
+  const user = (req as typeof req & { user: SessionUser }).user
+  const rows: unknown = req.body?.contacts
+  if (!Array.isArray(rows) || rows.length === 0) { res.status(400).json({ error: 'contacts_required' }); return }
+  if (rows.length > 1000) { res.status(400).json({ error: 'too_many', detail: 'max 1000 at once' }); return }
+  let added = 0, skipped = 0
+  for (const raw of rows) {
+    const r = (raw ?? {}) as Record<string, unknown>
+    const email = typeof r.email === 'string' ? r.email.trim().toLowerCase() : ''
+    const name = typeof r.name === 'string' ? r.name.trim() : ''
+    if (!name || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) { skipped += 1; continue }
+    const fullName = typeof r.fullName === 'string' && r.fullName.trim() ? r.fullName.trim() : null
+    const recipientType = typeof r.recipientType === 'string' && RECIPIENT_TYPES.has(r.recipientType) ? r.recipientType : null
+    const clientName = typeof r.clientName === 'string' && r.clientName.trim() ? r.clientName.trim() : null
+    const context = typeof r.context === 'string' && r.context.trim() ? r.context.trim() : null
+    const notes = typeof r.notes === 'string' && r.notes.trim() ? r.notes.trim() : null
+    await pool.query(
+      `INSERT INTO rolodex_contacts (email, name, full_name, recipient_type, client_name, context, notes, source, added_by)
+       VALUES (lower($1), $2, $3, $4, $5, $6, $7, 'manual', $8)
+       ON CONFLICT (email) DO UPDATE SET
+         name = EXCLUDED.name,
+         full_name = COALESCE(EXCLUDED.full_name, rolodex_contacts.full_name),
+         recipient_type = COALESCE(EXCLUDED.recipient_type, rolodex_contacts.recipient_type),
+         client_name = COALESCE(EXCLUDED.client_name, rolodex_contacts.client_name),
+         context = COALESCE(EXCLUDED.context, rolodex_contacts.context),
+         notes = COALESCE(EXCLUDED.notes, rolodex_contacts.notes),
+         updated_at = now()`,
+      [email, name, fullName, recipientType, clientName, context, notes, user.id],
+    )
+    added += 1
+  }
+  res.json({ ok: true, added, skipped })
+})
+
+outreachRouter.delete('/rolodex/:id', async (req, res) => {
+  const { rowCount } = await pool.query(`DELETE FROM rolodex_contacts WHERE id = $1`, [req.params.id])
+  if (rowCount === 0) { res.status(404).json({ error: 'not_found' }); return }
+  res.json({ ok: true })
+})
+
+// Pull selected Rolodex contacts into this show's outreach as fresh prospects.
+// Dedups against prospects already in the project (by email). They land as
+// 'ready' with their known facts, awaiting a sentence + verification.
+outreachRouter.post('/projects/:projectId/rolodex-import', async (req, res) => {
+  const user = (req as typeof req & { user: SessionUser }).user
+  const projectId = req.params.projectId
+  const ids: unknown = req.body?.contactIds
+  const list = Array.isArray(ids) ? ids.filter((x): x is string => typeof x === 'string') : []
+  if (list.length === 0) { res.status(400).json({ error: 'contact_ids_required' }); return }
+  const { rows: contacts } = await pool.query<{
+    email: string; name: string; full_name: string | null; recipient_type: string | null;
+    client_name: string | null; context: string | null;
+  }>(
+    `SELECT email, name, full_name, recipient_type, client_name, context
+       FROM rolodex_contacts WHERE id = ANY($1::uuid[])`,
+    [list],
+  )
+  let imported = 0, dupes = 0
+  for (const c of contacts) {
+    const exists = await pool.query(
+      `SELECT 1 FROM outreach_prospects WHERE project_id = $1 AND lower(email) = lower($2) LIMIT 1`,
+      [projectId, c.email],
+    )
+    if (exists.rowCount && exists.rowCount > 0) { dupes += 1; continue }
+    await pool.query(
+      `INSERT INTO outreach_prospects
+         (project_id, name, full_name, email, recipient_type, client_name, context, status, created_by)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, 'ready', $8)`,
+      [projectId, c.name, c.full_name, c.email, c.recipient_type ?? 'person', c.client_name, c.context, user.id],
+    )
+    imported += 1
+  }
+  res.json({ ok: true, imported, dupes })
 })
 
 // ─── Recipient-email verification ───────────────────────────────────

@@ -615,6 +615,22 @@ export type ApiCarouselDeckResult = {
   }
 }
 
+export type ApiRolodexContact = {
+  id: string
+  email: string
+  name: string
+  full_name: string | null
+  recipient_type: string | null
+  client_name: string | null
+  context: string | null
+  tags: string[]
+  notes: string | null
+  source: string
+  source_show: string | null
+  created_at: string
+  updated_at: string
+}
+
 export type ApiOutreachTemplate = {
   project_id: string
   subject: string
@@ -1345,6 +1361,23 @@ export const api = {
     request<{ ok: true }>(`/api/notes/${noteId}`, { method: 'DELETE' }),
 
   // Guest outreach — per-show template + prospects
+  getRolodex: () =>
+    request<{ contacts: ApiRolodexContact[] }>(`/api/outreach/rolodex`),
+  addRolodexBulk: (contacts: Array<{
+    name: string; email: string; fullName?: string;
+    recipientType?: 'person' | 'agent' | 'manager' | 'other'; clientName?: string;
+    context?: string; notes?: string;
+  }>) =>
+    request<{ ok: true; added: number; skipped: number }>(`/api/outreach/rolodex/bulk`, {
+      method: 'POST', body: JSON.stringify({ contacts }),
+    }),
+  deleteRolodexContact: (id: string) =>
+    request<{ ok: true }>(`/api/outreach/rolodex/${id}`, { method: 'DELETE' }),
+  importRolodexToProject: (projectId: string, contactIds: string[]) =>
+    request<{ ok: true; imported: number; dupes: number }>(
+      `/api/outreach/projects/${projectId}/rolodex-import`,
+      { method: 'POST', body: JSON.stringify({ contactIds }) },
+    ),
   outreachTemplate: (projectId: string) =>
     request<{ template: ApiOutreachTemplate | null }>(`/api/outreach/projects/${projectId}/template`),
   saveOutreachTemplate: (projectId: string, body: { subject: string; body: string; fromName?: string; replyTo?: string; location?: string }) =>

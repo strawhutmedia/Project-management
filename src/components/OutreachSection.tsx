@@ -10,6 +10,7 @@ import { useEffect, useRef, useState } from 'react'
 import { api, type ApiOutreachProspect, type ApiOutreachTemplate } from '../api'
 import { useAuth } from '../auth'
 import ProspectDetailModal from './ProspectDetailModal'
+import RolodexPanel from './RolodexPanel'
 
 const RECIPIENT_LABEL: Record<ApiOutreachProspect['recipient_type'], string> = {
   person: 'The guest',
@@ -63,6 +64,7 @@ export default function OutreachSection({ projectId }: { projectId: string }) {
   const [error, setError] = useState<string | null>(null)
   const [addOpen, setAddOpen] = useState(false)
   const [bulkOpen, setBulkOpen] = useState(false)
+  const [rolodexOpen, setRolodexOpen] = useState(false)
   const [openProspect, setOpenProspect] = useState<ApiOutreachProspect | null>(null)
   const [generatingAll, setGeneratingAll] = useState(false)
   const [sendingCampaign, setSendingCampaign] = useState(false)
@@ -694,6 +696,17 @@ export default function OutreachSection({ projectId }: { projectId: string }) {
               >
                 {addOpen ? 'Cancel' : '+ Add one'}
               </button>
+              <button
+                onClick={() => setRolodexOpen((v) => !v)}
+                className={`text-[10px] uppercase tracking-wider border rounded-full px-3 py-1 font-bold ${
+                  rolodexOpen
+                    ? 'text-muted border-line'
+                    : 'text-stage-tracking border-stage-tracking/40 hover:bg-stage-tracking/10'
+                }`}
+                title="The Straw Hut Rolodex — everyone who's replied, plus contacts you add. Pull them into this show."
+              >
+                {rolodexOpen ? 'Hide Rolodex' : '📇 Rolodex'}
+              </button>
               {prospects && prospects.length > 0 && (
                 <button
                   onClick={() => void clearAll()}
@@ -705,6 +718,13 @@ export default function OutreachSection({ projectId }: { projectId: string }) {
               )}
             </div>
           </div>
+
+          {rolodexOpen && (
+            <RolodexPanel
+              projectId={projectId}
+              onImported={() => { void loadProspects() }}
+            />
+          )}
 
           {bulkOpen && (
             <BulkImportPanel
