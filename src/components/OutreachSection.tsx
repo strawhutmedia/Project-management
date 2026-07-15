@@ -41,6 +41,8 @@ I'm a producer at Straw Hut Media.
 
 We record a full conversation — usually about an hour — then edit it down into a polished episode. You'll get the audio plus a highlight clip package to share wherever you'd like.
 
+We tape in person at our LA or New York studio whenever we can — that's always our preference — and we can make it work remotely if that's the only way to fit your schedule.
+
 If it sounds like a fit, just reply and we'll get [guest] booked in for this week or next.
 
 More about the show: [one_sheet_url]
