@@ -1,9 +1,9 @@
 {
   "version": "0.2.2",
-  "now": "2026-07-15T00:33:54.085Z",
+  "now": "2026-07-15T00:39:11.591Z",
   "boot": {
-    "startedAt": "2026-07-15T00:33:53.796Z",
-    "completedAt": "2026-07-15T00:33:54.072Z",
+    "startedAt": "2026-07-15T00:39:11.383Z",
+    "completedAt": "2026-07-15T00:39:11.585Z",
     "error": null
   },
   "env": {
@@ -113,7 +113,7 @@
   "recentLog": [
     {
       "level": "info",
-      "ts": "2026-07-15T00:33:53.793Z",
+      "ts": "2026-07-15T00:39:11.380Z",
       "msg": "serving client from",
       "data": {
         "clientDir": "/app/dist"
@@ -121,7 +121,7 @@
     },
     {
       "level": "info",
-      "ts": "2026-07-15T00:33:53.796Z",
+      "ts": "2026-07-15T00:39:11.383Z",
       "msg": "boot starting",
       "data": {
         "cwd": "/app",
@@ -131,21 +131,13 @@
       }
     },
     {
-      "level": "error",
-      "ts": "2026-07-15T00:33:53.828Z",
-      "msg": "outreach: boot reset failed",
-      "data": {
-        "error": "column \"scheduled_send_at\" does not exist"
-      }
-    },
-    {
       "level": "info",
-      "ts": "2026-07-15T00:33:53.991Z",
+      "ts": "2026-07-15T00:39:11.532Z",
       "msg": "migrations complete"
     },
     {
       "level": "info",
-      "ts": "2026-07-15T00:33:54.065Z",
+      "ts": "2026-07-15T00:39:11.580Z",
       "msg": "BIYA seed: project already exists, ensured shoot days",
       "data": {
         "projectId": "12f53ed1-c6c7-4c11-8d7b-06d91744c9af"
@@ -153,12 +145,12 @@
     },
     {
       "level": "info",
-      "ts": "2026-07-15T00:33:54.072Z",
+      "ts": "2026-07-15T00:39:11.585Z",
       "msg": "listening on :8080"
     },
     {
       "level": "info",
-      "ts": "2026-07-15T00:33:54.072Z",
+      "ts": "2026-07-15T00:39:11.585Z",
       "msg": "scheduler started (every 5 min)"
     }
   ]
