@@ -121,13 +121,23 @@ async function handleNegativeEvent(type: string, messageId: string | null): Prom
 // approximate (Apple Mail preloads the pixel), but useful as a signal.
 async function handleOpenEvent(messageId: string | null): Promise<void> {
   if (!messageId) return
-  const sendRes = await pool.query<{ prospect_id: string }>(
-    `SELECT prospect_id FROM outreach_sends WHERE resend_message_id = $1 LIMIT 1`,
+  const sendRes = await pool.query<{ id: string; prospect_id: string; is_test: boolean }>(
+    `SELECT id, prospect_id, is_test FROM outreach_sends WHERE resend_message_id = $1 LIMIT 1`,
     [messageId],
   )
   const send = sendRes.rows[0]
   if (!send) {
     logInfo('outreach webhook: no matching send for open', { messageId })
+    return
+  }
+  if (send.is_test) {
+    // A test-send: count it on the send row so we can confirm tracking works,
+    // WITHOUT inflating the real contact's "Viewed N×".
+    await pool.query(
+      `UPDATE outreach_sends SET open_count = open_count + 1, last_opened_at = now() WHERE id = $1`,
+      [send.id],
+    )
+    logInfo('outreach webhook: recorded TEST open', { messageId, sendId: send.id })
     return
   }
   await pool.query(

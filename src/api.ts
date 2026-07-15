@@ -1378,6 +1378,10 @@ export const api = {
     request<{ ok: true }>(
       `/api/outreach/projects/${projectId}/one-sheet/restore/${approvalId}`, { method: 'POST' },
     ),
+  testOpenStatus: (projectId: string) =>
+    request<{ test: { to: string; openCount: number; lastOpenedAt: string | null; sentAt: string | null } | null }>(
+      `/api/outreach/projects/${projectId}/test-open-status`,
+    ),
   enableOpenTracking: () =>
     request<{ ok: true; results: Array<{ domain: string; ok: boolean; detail?: string }> }>(
       `/api/outreach/enable-open-tracking`, { method: 'POST' },

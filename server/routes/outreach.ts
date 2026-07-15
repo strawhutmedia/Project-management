@@ -1453,14 +1453,14 @@ outreachRouter.post('/projects/:projectId/test-send', async (req, res) => {
   // else fabricate. Priority: prospect with a unique_sentence, then
   // any with an email, then any at all, then fake.
   const previewRes = wantProspectId
-    ? await pool.query<{ name: string; unique_sentence: string | null; recipient_type: string | null; client_name: string | null }>(
-        `SELECT name, unique_sentence, recipient_type, client_name FROM outreach_prospects
+    ? await pool.query<{ id: string; name: string; unique_sentence: string | null; recipient_type: string | null; client_name: string | null }>(
+        `SELECT id, name, unique_sentence, recipient_type, client_name FROM outreach_prospects
           WHERE project_id = $1 AND id = $2
           LIMIT 1`,
         [projectId, wantProspectId],
       )
-    : await pool.query<{ name: string; unique_sentence: string | null; recipient_type: string | null; client_name: string | null }>(
-        `SELECT name, unique_sentence, recipient_type, client_name FROM outreach_prospects
+    : await pool.query<{ id: string; name: string; unique_sentence: string | null; recipient_type: string | null; client_name: string | null }>(
+        `SELECT id, name, unique_sentence, recipient_type, client_name FROM outreach_prospects
           WHERE project_id = $1
           ORDER BY (unique_sentence IS NOT NULL) DESC, (email IS NOT NULL) DESC, created_at DESC
           LIMIT 1`,
@@ -1534,10 +1534,37 @@ outreachRouter.post('/projects/:projectId/test-send', async (req, res) => {
       res.status(502).json({ error: 'send_failed', detail: errorMsg })
       return
     }
+    // Log the test send so its opens can be tracked (flagged is_test, so they
+    // count on the send row — not the real contact's "Viewed N×"). Needs a
+    // prospect to attach to (FK); if the list is empty we just skip logging.
+    if (preview?.id && send.data?.id) {
+      await pool.query(
+        `INSERT INTO outreach_sends
+           (prospect_id, from_email, to_email, subject, body, status, resend_message_id, sent_at, is_test)
+         VALUES ($1, $2, $3, $4, $5, 'sent', $6, now(), true)`,
+        [preview.id, from, to, `[TEST] ${subject}`, body, send.data.id],
+      )
+    }
     logInfo('outreach test-send ok', { projectId, to, domain })
     res.json({ ok: true, from, to, subject: `[TEST] ${subject}`, previewName })
   } catch (err) {
     logError('outreach test-send threw', { projectId, error: err instanceof Error ? err.message : String(err) })
     res.status(500).json({ error: 'send_threw', detail: err instanceof Error ? err.message : String(err) })
   }
+})
+
+// Open count of the most recent TEST send for this show — lets the UI confirm
+// open tracking is actually working ("your test was opened N×").
+outreachRouter.get('/projects/:projectId/test-open-status', async (req, res) => {
+  const { rows } = await pool.query<{ to_email: string; open_count: number; last_opened_at: string | null; sent_at: string | null }>(
+    `SELECT s.to_email, s.open_count, s.last_opened_at, s.sent_at
+       FROM outreach_sends s
+       JOIN outreach_prospects p ON p.id = s.prospect_id
+      WHERE p.project_id = $1 AND s.is_test = true
+      ORDER BY s.sent_at DESC NULLS LAST, s.created_at DESC
+      LIMIT 1`,
+    [req.params.projectId],
+  )
+  const r = rows[0]
+  res.json({ test: r ? { to: r.to_email, openCount: r.open_count, lastOpenedAt: r.last_opened_at, sentAt: r.sent_at } : null })
 })

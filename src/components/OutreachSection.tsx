@@ -81,6 +81,7 @@ export default function OutreachSection({ projectId }: { projectId: string }) {
   const [testTo, setTestTo] = useState(user?.email ?? 'ryan@strawhutmedia.com')
   const [testSending, setTestSending] = useState(false)
   const [testResult, setTestResult] = useState<string | null>(null)
+  const [testOpens, setTestOpens] = useState<number | null>(null)
   // Which contact the test email is built from. Defaults to the first
   // prospect once the list loads; if there's only one, it's simply selected.
   const [testProspectId, setTestProspectId] = useState<string | null>(null)
@@ -129,10 +130,21 @@ export default function OutreachSection({ projectId }: { projectId: string }) {
     if (!testTo.trim()) return
     setTestSending(true)
     setTestResult(null)
+    setTestOpens(null)
     setError(null)
     try {
       const r = await api.testSendOutreach(projectId, testTo.trim(), testProspectId ?? undefined)
-      setTestResult(`✓ Sent to ${r.to} · using ${r.previewName}'s email · check your inbox in a moment.`)
+      setTestResult(`✓ Sent to ${r.to} · using ${r.previewName}'s email · open it and watch the counter below.`)
+      // Poll the test's open count so you can SEE tracking work live.
+      let ticks = 0
+      const poll = setInterval(async () => {
+        ticks += 1
+        try {
+          const s = await api.testOpenStatus(projectId)
+          if (s.test) setTestOpens(s.test.openCount)
+        } catch { /* ignore */ }
+        if (ticks >= 40) clearInterval(poll) // ~4 min then stop
+      }, 6000)
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'test send failed'
       setTestResult(`✕ ${msg}`)
@@ -599,6 +611,13 @@ export default function OutreachSection({ projectId }: { projectId: string }) {
               {testResult && (
                 <div className={`text-[11px] ${testResult.startsWith('✓') ? 'text-emerald-300' : 'text-urgent'}`}>
                   {testResult}
+                </div>
+              )}
+              {testOpens !== null && (
+                <div className={`text-[11px] font-bold ${testOpens > 0 ? 'text-sky-300' : 'text-muted'}`}>
+                  {testOpens > 0
+                    ? `👁 Your test has been opened ${testOpens}× — open tracking is working!`
+                    : '👁 Waiting for an open… open the test email in your inbox (can take a minute).'}
                 </div>
               )}
             </div>
