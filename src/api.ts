@@ -1385,7 +1385,7 @@ export const api = {
     ),
   sendOutreachCampaign: (
     projectId: string,
-    opts?: { prospectIds?: string[]; startPreset?: 'now' | '5am_pt' },
+    opts?: { prospectIds?: string[]; startPreset?: 'now' | '5am_pt'; startAt?: string },
   ) =>
     request<{
       ok: true; queued: number; scheduled: boolean; startAt: string;
@@ -1396,6 +1396,7 @@ export const api = {
       { method: 'POST', body: JSON.stringify({
         prospectIds: opts?.prospectIds ?? null,
         startPreset: opts?.startPreset ?? 'now',
+        startAt: opts?.startAt ?? null,
       }) },
     ),
   testSendOutreach: (projectId: string, to: string, prospectId?: string) =>

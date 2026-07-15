@@ -539,11 +539,32 @@ async function runOutreachTick(): Promise<void> {
   }
 }
 
-// Wired from index.ts on boot. Drives all outreach sends (immediate and
-// scheduled) off scheduled_send_at.
+// Rescue prospects stuck 'queued' with NO scheduled_send_at — legacy/orphaned
+// rows that would otherwise sit forever. Anything WITH a scheduled_send_at is
+// durable and the loop will fire it when due, so leave those alone. Runs after
+// migrations (see startOutreachSendLoop), so scheduled_send_at is guaranteed
+// to exist by now.
+async function resetOrphanedQueued(): Promise<void> {
+  try {
+    const { rowCount } = await pool.query(
+      `UPDATE outreach_prospects SET status = 'ready', updated_at = now()
+        WHERE status = 'queued' AND scheduled_send_at IS NULL`,
+    )
+    if (rowCount && rowCount > 0) {
+      logInfo('outreach: reset orphaned queued prospects on boot', { count: rowCount })
+    }
+  } catch (err) {
+    logError('outreach: boot reset failed', { error: err instanceof Error ? err.message : String(err) })
+  }
+}
+
+// Wired from index.ts inside the listen callback — i.e. AFTER runMigrations()
+// completes — so it's safe to touch scheduled_send_at here. (The previous
+// version ran this at module-import time, which raced ahead of the migration
+// that adds the column and fired a spurious boot-error email.)
 export function startOutreachSendLoop(): void {
+  void resetOrphanedQueued().then(() => runOutreachTick()) // catch up immediately
   setInterval(() => { void runOutreachTick() }, 60_000).unref()
-  void runOutreachTick() // don't wait a full minute for the first pass
 }
 
 // The next 5:00 AM Pacific as a concrete UTC instant. Handles PST/PDT
@@ -757,25 +778,6 @@ outreachRouter.post('/projects/:projectId/send-campaign', async (req, res) => {
     lastAt: new Date(lastAtMs).toISOString(),
   })
 })
-
-// On boot, only rescue prospects that are stuck 'queued' with NO
-// scheduled_send_at — those are legacy/orphaned and would sit forever.
-// Anything with a scheduled_send_at is durable: the send loop will pick it
-// up when due (including a campaign scheduled for hours from now), so we
-// leave it queued instead of bouncing it back to 'ready'.
-;(async () => {
-  try {
-    const { rowCount } = await pool.query(
-      `UPDATE outreach_prospects SET status = 'ready', updated_at = now()
-        WHERE status = 'queued' AND scheduled_send_at IS NULL`,
-    )
-    if (rowCount && rowCount > 0) {
-      logInfo('outreach: reset orphaned queued prospects on boot', { count: rowCount })
-    }
-  } catch (err) {
-    logError('outreach: boot reset failed', { error: err instanceof Error ? err.message : String(err) })
-  }
-})()
 
 // Trigger the RSS cover sync on demand. Producer clicks this after
 // registering a new podcast + RSS feed to fetch the cover art without

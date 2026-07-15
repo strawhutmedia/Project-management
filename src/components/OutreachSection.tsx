@@ -78,6 +78,8 @@ export default function OutreachSection({ projectId }: { projectId: string }) {
   // Which contact the test email is built from. Defaults to the first
   // prospect once the list loads; if there's only one, it's simply selected.
   const [testProspectId, setTestProspectId] = useState<string | null>(null)
+  // Custom campaign start time (datetime-local, in the operator's local tz).
+  const [customStart, setCustomStart] = useState('')
   // Refs so token-insert buttons can drop a token at the current cursor
   // position rather than always appending to the end.
   const subjectRef = useRef<HTMLInputElement | null>(null)
@@ -232,7 +234,11 @@ export default function OutreachSection({ projectId }: { projectId: string }) {
     }
   }
 
-  async function sendCampaign(startPreset: 'now' | '5am_pt' = 'now') {
+  async function sendCampaign(mode: 'now' | '5am_pt' | 'custom' = 'now', customIso?: string) {
+    if (mode === 'custom') {
+      if (!customIso) { setError('Pick a date and time to schedule.'); return }
+      if (new Date(customIso).getTime() <= Date.now()) { setError('Pick a time in the future to schedule.'); return }
+    }
     // NO SKIPPING (Ryan's rule): every live contact must be fully filled out
     // — email + facts + sentence — and verified + deliverable, or we don't
     // send at all. This mirrors the server gate for instant feedback; the
@@ -257,13 +263,16 @@ export default function OutreachSection({ projectId }: { projectId: string }) {
       setError(`Can't send yet — every contact has to be filled out first (${problems.join(', ')}). Fix these: ${names.join(', ')}${names.length >= 15 ? '…' : ''}.`)
       return
     }
-    const when = startPreset === '5am_pt' ? 'starting at 5 AM PT' : 'starting now'
+    const when = mode === '5am_pt' ? 'starting at the next 5 AM PT'
+      : mode === 'custom' ? `starting ${new Date(customIso!).toLocaleString()}`
+      : 'starting now'
+    const spread = Math.round((active.length * 135) / 60)
     const ok = confirm(
       `Send ${active.length} outreach emails, ${when}?\n\n` +
       `Slate will jitter them 90-180s apart via your verified sending domains. ` +
-      (startPreset === '5am_pt'
-        ? `They'll begin at the next 5 AM Pacific and trickle out over ~${Math.round((active.length * 135) / 60)} minutes from there.\n\n`
-        : `Estimated wall-clock time: ${Math.round((active.length * 135) / 60)} minutes.\n\n`) +
+      (mode === 'now'
+        ? `Estimated wall-clock time: ${spread} minutes.\n\n`
+        : `They'll begin at the scheduled time and trickle out over ~${spread} minutes from there.\n\n`) +
       `You can't stop the campaign once it starts. Test one to yourself first?`,
     )
     if (!ok) return
@@ -271,7 +280,10 @@ export default function OutreachSection({ projectId }: { projectId: string }) {
     setError(null)
     setCampaignResult(null)
     try {
-      const r = await api.sendOutreachCampaign(projectId, { startPreset })
+      const r = await api.sendOutreachCampaign(
+        projectId,
+        mode === 'custom' ? { startAt: customIso } : { startPreset: mode },
+      )
       const split = r.perDomain.length > 1
         ? ` Rotating across ${r.domainsUsed} domains (~${r.perDomain.join('/')} sends each) to protect reputation.`
         : ` Sending from ${r.domainsUsed} verified domain. Add more in Sending domains to spread load.`
@@ -588,6 +600,25 @@ export default function OutreachSection({ projectId }: { projectId: string }) {
                     >
                       {sendingCampaign ? 'Scheduling…' : '🕔 Schedule 5 AM PT'}
                     </button>
+                  )}
+                  {incompleteCount === 0 && (
+                    <span className="inline-flex items-center gap-1">
+                      <input
+                        type="datetime-local"
+                        value={customStart}
+                        onChange={(e) => setCustomStart(e.target.value)}
+                        className="bg-ink/40 border border-line rounded-lg px-2 py-1 text-[10px] focus:outline-none focus:border-stage-mastering"
+                        title="Pick your own start date and time (your local time)."
+                      />
+                      <button
+                        onClick={() => void sendCampaign('custom', customStart ? new Date(customStart).toISOString() : undefined)}
+                        disabled={sendingCampaign || !customStart}
+                        className="text-[10px] uppercase tracking-wider text-stage-mastering border border-stage-mastering/40 rounded-full px-3 py-1 hover:bg-stage-mastering/10 disabled:opacity-40 font-bold"
+                        title="Schedule the campaign to start at the date/time you picked."
+                      >
+                        🗓 Schedule
+                      </button>
+                    </span>
                   )}
                 </>
               )}
