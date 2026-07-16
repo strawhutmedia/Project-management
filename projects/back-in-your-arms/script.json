@@ -14,7 +14,7 @@
     "rssFeedUrl": null,
     "createdAt": "2026-04-29T22:31:46.421Z"
   },
-  "publishedAt": "2026-07-16T03:26:04.186Z",
+  "publishedAt": "2026-07-16T03:47:14.209Z",
   "counts": {
     "scenes": 157,
     "lineItems": 1766,
@@ -11150,10 +11150,10 @@
           "id": "dbdf2749-b448-4c89-9cc0-0564e6ab5711",
           "category": "PROPS",
           "description": "upside-down potted plant",
-          "amt": 0,
+          "amt": 1,
           "x": 1,
-          "rate": 0,
-          "total": 0,
+          "rate": 30,
+          "total": 30,
           "notes": "Must be practical and lift-able by actress; conceals key underneath.",
           "vendor": null,
           "datedAt": null,
