@@ -227,11 +227,12 @@ export async function runSceneBreakdown(sceneId: string, userId: string): Promis
   const hasActionText = !!sc.action_text && sc.action_text.trim().length >= 30
 
   // Wipe previous breakdown rows for this scene so re-running gives a clean
-  // result. Items the producer already attached numbers to (amt > 0) are
-  // preserved — only zero-cost auto-suggestions get blown away.
+  // result. Untouched auto-suggestions have the exact default shape
+  // (days=1, x=1, cost=0); anything the producer priced or adjusted has a
+  // different shape and is preserved.
   await pool.query(
     `DELETE FROM budget_line_items
-     WHERE scene_id = $1 AND amt = 0 AND x = 1 AND rate = 0`,
+     WHERE scene_id = $1 AND amt = 1 AND x = 1 AND rate = 0`,
     [sceneId],
   )
 
@@ -294,7 +295,7 @@ export async function runSceneBreakdown(sceneId: string, userId: string): Promis
     await pool.query(
       `INSERT INTO budget_line_items
         (account_id, scene_id, code, description, amt, x, rate, units, notes, position, created_by)
-       VALUES ($1, $2, $3, $4, 0, 1, 0, NULL, $5, $6, $7)`,
+       VALUES ($1, $2, $3, $4, 1, 1, 0, NULL, $5, $6, $7)`,
       [
         accountId,
         sceneId,
