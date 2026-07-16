@@ -196,6 +196,7 @@ outreachRouter.post('/projects/:projectId/prospects/bulk', async (req, res) => {
   type Result = { row: number; ok: boolean; error?: string; id?: string }
   const results: Result[] = []
   const client = await pool.connect()
+  const seenEmails = new Set<string>()
   try {
     await client.query('BEGIN')
     for (let i = 0; i < rows.length; i++) {
@@ -207,6 +208,24 @@ outreachRouter.post('/projects/:projectId/prospects/bulk', async (req, res) => {
       }
       const fullName = typeof raw?.fullName === 'string' && raw.fullName.trim() ? raw.fullName.trim() : null
       const email = typeof raw?.email === 'string' && raw.email.trim() ? raw.email.trim().toLowerCase() : null
+      // Never import someone already on this show's list (whether they were
+      // already emailed or are a dupe within this same paste). This is what
+      // makes "add the next batch, keep the old" safe — nobody gets re-emailed.
+      if (email) {
+        if (seenEmails.has(email)) {
+          results.push({ row: i, ok: false, error: 'duplicate_email' })
+          continue
+        }
+        const dup = await client.query(
+          `SELECT 1 FROM outreach_prospects WHERE project_id = $1 AND lower(email) = $2 LIMIT 1`,
+          [projectId, email],
+        )
+        if (dup.rowCount && dup.rowCount > 0) {
+          results.push({ row: i, ok: false, error: 'duplicate_email' })
+          continue
+        }
+        seenEmails.add(email)
+      }
       const recipientType = typeof raw?.recipientType === 'string' && RECIPIENT_TYPES.has(raw.recipientType)
         ? raw.recipientType : 'person'
       const clientName = typeof raw?.clientName === 'string' && raw.clientName.trim() ? raw.clientName.trim() : null
@@ -231,8 +250,9 @@ outreachRouter.post('/projects/:projectId/prospects/bulk', async (req, res) => {
     client.release()
   }
   const imported = results.filter((r) => r.ok).length
-  const failed = results.filter((r) => !r.ok).length
-  res.json({ imported, failed, results })
+  const duplicates = results.filter((r) => !r.ok && r.error === 'duplicate_email').length
+  const failed = results.filter((r) => !r.ok && r.error !== 'duplicate_email').length
+  res.json({ imported, failed, duplicates, results })
 })
 
 outreachRouter.post('/projects/:projectId/prospects', async (req, res) => {

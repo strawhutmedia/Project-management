@@ -1482,7 +1482,7 @@ export const api = {
     recipientType?: 'person' | 'agent' | 'manager' | 'other';
     clientName?: string; context?: string;
   }>) =>
-    request<{ imported: number; failed: number; results: Array<{ row: number; ok: boolean; error?: string; id?: string }> }>(
+    request<{ imported: number; failed: number; duplicates: number; results: Array<{ row: number; ok: boolean; error?: string; id?: string }> }>(
       `/api/outreach/projects/${projectId}/prospects/bulk`,
       { method: 'POST', body: JSON.stringify({ rows }) },
     ),

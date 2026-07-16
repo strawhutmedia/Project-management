@@ -1085,8 +1085,13 @@ function BulkImportPanel({
           context: r.context,
         }))
       const result = await api.bulkImportProspects(projectId, rows)
+      const dupeNote = result.duplicates > 0
+        ? ` Skipped ${result.duplicates} already on this list (already emailed or duplicates) — they won't be re-contacted.`
+        : ''
       if (result.failed > 0) {
-        setError(`Imported ${result.imported}, ${result.failed} failed. Reload to see what stuck.`)
+        setError(`Imported ${result.imported}, ${result.failed} failed.${dupeNote} Reload to see what stuck.`)
+      } else if (result.duplicates > 0) {
+        setError(`Imported ${result.imported} new contact${result.imported === 1 ? '' : 's'}.${dupeNote}`)
       }
       onImported(genAfter && result.imported > 0)
     } catch (err) {
