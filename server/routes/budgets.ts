@@ -509,13 +509,16 @@ budgetsRouter.get('/shoot-days/:shootDayId/items', async (req, res) => {
   const crewPayrollPct = Number(s?.crew_payroll_pct ?? 15)
   const castPerDiemDaily = Number(s?.cast_per_diem_daily ?? 0)
   const crewPerDiemDaily = Number(s?.crew_per_diem_daily ?? 0)
-  const castPerDiemHeadcount = Number(s?.cast_per_diem_headcount ?? 0)
-  const crewPerDiemHeadcount = Number(s?.crew_per_diem_headcount ?? 0)
+  // Headcount auto-derives from who's actually on THIS day — each CAST /
+  // CREW day-item line is a person. No separate per-diem headcount config:
+  // per diem, hotels, and mileage all scale by these live counts.
+  const castCount = rows.filter((r) => r.code === 'CAST').length
+  const crewCount = rows.filter((r) => r.code === 'CREW').length
   // Per diem for THIS day is only paid if the day is away from home.
   // Same rule as hotels — if the day's location tag differs from
   // home_location_tag, cast/crew get per diem.
-  const castPerDiemPerDayIfAway = castPerDiemDaily * castPerDiemHeadcount
-  const crewPerDiemPerDayIfAway = crewPerDiemDaily * crewPerDiemHeadcount
+  const castPerDiemPerDayIfAway = castPerDiemDaily * castCount
+  const crewPerDiemPerDayIfAway = crewPerDiemDaily * crewCount
 
   // Hotel + per diem cost for THIS day. Compare the day's location_tag
   // to the budget's home_location_tag — if they don't match (and the
@@ -538,7 +541,7 @@ budgetsRouter.get('/shoot-days/:shootDayId/items', async (req, res) => {
   const hotelCrewNightly = Number(s?.hotel_crew_nightly ?? 0)
   const hotelContingencyPct = Number(s?.hotel_contingency_pct ?? 10)
   const dayHotelBase = needsHotels
-    ? (hotelCastNightly * castPerDiemHeadcount) + (hotelCrewNightly * crewPerDiemHeadcount)
+    ? (hotelCastNightly * castCount) + (hotelCrewNightly * crewCount)
     : 0
   const dayHotelCost = dayHotelBase * (1 + hotelContingencyPct / 100)
 
@@ -547,7 +550,10 @@ budgetsRouter.get('/shoot-days/:shootDayId/items', async (req, res) => {
   const mileageRate = Number(s?.mileage_rate_per_mi ?? 0.70)
   const isTravelDay = dayRow?.is_travel ?? false
   const travelMiles = Number(dayRow?.travel_miles ?? 0)
-  const mileageHeadcount = castPerDiemHeadcount + crewPerDiemHeadcount
+  // Mileage covers everyone actually on the travel day — count the cast +
+  // crew day-item lines (each line is a person), so it self-populates as
+  // the producer adds people, no separate headcount config needed.
+  const mileageHeadcount = rows.filter((r) => r.code === 'CAST' || r.code === 'CREW').length
   const dayMileage = isTravelDay ? mileageRate * travelMiles * mileageHeadcount : 0
 
   // Crew travel-day pay rule: a short move (< 4 hr one-way) is a half day
@@ -606,15 +612,15 @@ budgetsRouter.get('/shoot-days/:shootDayId/items', async (req, res) => {
       crewPayrollPct,
       castPerDiemPerDay: needsHotels ? castPerDiemPerDayIfAway : 0,
       crewPerDiemPerDay: needsHotels ? crewPerDiemPerDayIfAway : 0,
-      castHotelPerDay: needsHotels ? hotelCastNightly * castPerDiemHeadcount : 0,
-      crewHotelPerDay: needsHotels ? hotelCrewNightly * crewPerDiemHeadcount : 0,
+      castHotelPerDay: needsHotels ? hotelCastNightly * castCount : 0,
+      crewHotelPerDay: needsHotels ? hotelCrewNightly * crewCount : 0,
       hotelContingencyPct,
       // Raw inputs — the day dropdown shows the formula so the operator
       // sees where each number comes from.
       castPerDiemDaily,
       crewPerDiemDaily,
-      castHeadcount: castPerDiemHeadcount,
-      crewHeadcount: crewPerDiemHeadcount,
+      castHeadcount: castCount,
+      crewHeadcount: crewCount,
       hotelCastNightly,
       hotelCrewNightly,
       dayHotelCost,

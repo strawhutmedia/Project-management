@@ -1388,7 +1388,7 @@ function TravelLegInput({ day, onChanged }: { day: ApiShootDay; onChanged?: () =
         type="number" min="0" value={day.travelMiles ?? ''}
         onChange={(e) => { const n = Number(e.target.value); void save({ travelMiles: e.target.value === '' ? null : (Number.isFinite(n) && n >= 0 ? n : null) }) }}
         placeholder="mi"
-        className="w-14 text-[10px] font-mono px-2 py-0.5 rounded-full border border-sky-500/50 bg-sky-500/10 text-sky-700 focus:outline-none focus:border-sky-500"
+        className="w-16 text-[10px] font-mono px-2 py-0.5 rounded-full border border-sky-500/50 bg-sky-500/10 text-sky-700 focus:outline-none focus:border-sky-500 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
         title="Round-trip miles (auto-filled between known cities)"
       />
       <span className="text-muted/60 text-[10px] normal-case">mi RT</span>
@@ -1396,10 +1396,10 @@ function TravelLegInput({ day, onChanged }: { day: ApiShootDay; onChanged?: () =
         type="number" min="0" step="0.5" value={day.travelHours ?? ''}
         onChange={(e) => { const n = Number(e.target.value); void save({ travelHours: e.target.value === '' ? null : (Number.isFinite(n) && n >= 0 ? n : null) }) }}
         placeholder="hr"
-        className="w-12 text-[10px] font-mono px-2 py-0.5 rounded-full border border-sky-500/50 bg-sky-500/10 text-sky-700 focus:outline-none focus:border-sky-500"
+        className="w-16 text-[10px] font-mono px-2 py-0.5 rounded-full border border-sky-500/50 bg-sky-500/10 text-sky-700 focus:outline-none focus:border-sky-500 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
         title="One-way drive time. Under 4hr → crew paid half day; 4hr+ → full day."
       />
-      <span className={`text-[10px] normal-case font-bold ${(day.travelHours ?? 99) < 4 ? 'text-sky-700' : 'text-muted/60'}`}>
+      <span className={`text-[10px] normal-case font-bold whitespace-nowrap ${(day.travelHours ?? 99) < 4 ? 'text-sky-700' : 'text-muted/60'}`}>
         hr {day.travelHours != null && (day.travelHours < 4 ? '· crew ½' : '· crew full')}
       </span>
     </span>
@@ -1741,7 +1741,9 @@ function DayCostsSection({
                       <span className="text-sky-300 font-bold font-mono text-sm">${Math.round(dayPerDiem).toLocaleString()}</span>
                     ) : (
                       <span className="text-[11px] text-muted/70 italic">
-                        {fringes.dayLocationTag ? `Home — no per diem` : 'Tag location to auto-calc'}
+                        {!fringes.dayLocationTag ? 'Tag location to auto-calc'
+                          : fringes.needsHotels ? `${fringes.dayLocationTag} · set per-diem rate in Budget`
+                          : 'Home — no per diem'}
                       </span>
                     )}
                   </div>
@@ -1764,7 +1766,9 @@ function DayCostsSection({
                       <span className="text-amber-300 font-bold font-mono text-sm">${Math.round(dayHotelCost).toLocaleString()}</span>
                     ) : (
                       <span className="text-[11px] text-muted/70 italic">
-                        {fringes.dayLocationTag ? `Home — no hotels` : 'Tag location to auto-calc'}
+                        {!fringes.dayLocationTag ? 'Tag location to auto-calc'
+                          : fringes.needsHotels ? `${fringes.dayLocationTag} · set hotel rate in Budget`
+                          : 'Home — no hotels'}
                       </span>
                     )}
                   </div>

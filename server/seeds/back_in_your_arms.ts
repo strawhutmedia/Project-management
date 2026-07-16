@@ -145,7 +145,8 @@ export async function seedBackInYourArms(): Promise<void> {
       await pool.query(
         `UPDATE budgets SET production_target = 500000, post_target = 150000,
                             marketing_target = 50000, total_target = 700000,
-                            shoot_days = 18, bond_pct = 3, contingency_pct = 10
+                            shoot_days = 18, bond_pct = 3, contingency_pct = 10,
+                            home_location_tag = COALESCE(home_location_tag, 'LA')
          WHERE project_id = $1`,
         [projId],
       )
