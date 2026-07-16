@@ -1861,6 +1861,32 @@ function isUnusableSentence(raw: string): boolean {
   return false
 }
 
+// Retry a message create through transient API hiccups — Anthropic 529
+// "Overloaded", 429 rate limits, and 5xx blips — with exponential backoff.
+// Non-transient errors (bad request, auth) throw immediately.
+async function createWithRetry(
+  params: Anthropic.MessageCreateParamsNonStreaming,
+  maxAttempts = 4,
+): Promise<Anthropic.Message> {
+  let lastErr: unknown
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      return await client.messages.create(params)
+    } catch (err) {
+      lastErr = err
+      const status = (err as { status?: number })?.status
+      const msg = (err instanceof Error ? err.message : String(err)).toLowerCase()
+      const transient = status === 429 || status === 529 || status === 500 || status === 503
+        || msg.includes('overloaded') || msg.includes('rate limit') || msg.includes('rate_limit')
+      if (!transient || attempt === maxAttempts) throw err
+      const delay = 1000 * 2 ** (attempt - 1) + Math.floor(Math.random() * 500) // ~1s, 2s, 4s + jitter
+      logInfo('anthropic: transient error, retrying', { attempt, status, delayMs: delay })
+      await new Promise((r) => setTimeout(r, delay))
+    }
+  }
+  throw lastErr
+}
+
 export async function generateUniqueSentence(input: UniqueSentenceInput): Promise<UniqueSentenceResult> {
   logInfo('outreach: generating unique sentence', {
     show: input.show.name,
@@ -1891,7 +1917,7 @@ export async function generateUniqueSentence(input: UniqueSentenceInput): Promis
     return p
   }
 
-  let response = await client.messages.create(params())
+  let response = await createWithRetry(params())
   // web_search runs a server-side tool loop; if it exceeds the internal
   // iteration cap the turn pauses — re-send to let it finish. Bounded so a
   // misbehaving turn can't loop forever.
@@ -1899,7 +1925,7 @@ export async function generateUniqueSentence(input: UniqueSentenceInput): Promis
   while (response.stop_reason === 'pause_turn' && guard < 5) {
     guard += 1
     messages.push({ role: 'assistant', content: response.content })
-    response = await client.messages.create(params())
+    response = await createWithRetry(params())
   }
 
   // The sentence is the LAST text block — earlier text blocks can be the
