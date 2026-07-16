@@ -423,5 +423,10 @@
     "outcome": "external",
     "summary": "The MAIL_FROM environment variable is configured to use an unverified domain (strawhutmedia.com). According to the code comments in server/email.ts, only strawhutmedia.net is verified in Resend. The fix requires updating the MAIL_FROM environment variable in Railway to either be removed (to use the correct default of 'Slate <slate@strawhutmedia.net>') or set to a verified domain. This is an infrastructure/environment configuration issue, not a code issue.",
     "iterations": 15
+  },
+  "outreach: bulk sentence failed::{\"id\":\"6f0b82d6-fffd-4d5e-86db-d2a571ef5177\",\"error\":\"529 {\\\"type\\\":\\\"error\\\",\\\"": {
+    "attemptedAt": "2026-07-16T19:40:04.327Z",
+    "error": "Anthropic 529: {\"type\":\"error\",\"error\":{\"type\":\"overloaded_error\",\"message\":\"Overloaded\"},\"request_id\":\"req_011Cd6JapZ5TYmeTTADJ2Ruz\"}",
+    "iterations": 0
   }
 }
