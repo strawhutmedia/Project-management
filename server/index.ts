@@ -24,7 +24,8 @@ import { episodeCutsRouter } from './routes/episode_cuts'
 import { exportsRouter } from './routes/exports'
 import { showPageRouter } from './routes/show_page'
 import { outreachDomainsRouter } from './routes/outreach_domains'
-import { outreachRouter } from './routes/outreach'
+import { outreachRouter, startOutreachSendLoop, enableDomainOpenTracking } from './routes/outreach'
+import { handleResendWebhook } from './routes/outreach_webhook'
 import { seedBackInYourArms } from './seeds/back_in_your_arms'
 import { ensureRyanIsPodcastEp } from './routes/projects'
 import { startScheduler } from './scheduler'
@@ -61,6 +62,14 @@ app.use((req, res, next) => {
       next(err)
     }
   }
+})
+
+// Resend delivery webhook — must read the RAW body to verify the Svix
+// signature, so it's registered BEFORE the global JSON parser consumes
+// it. Public endpoint (Resend can't authenticate as an admin); it
+// verifies the signature instead.
+app.post('/api/outreach/resend-webhook', express.raw({ type: () => true }), (req, res) => {
+  void handleResendWebhook(req, res)
 })
 
 app.use(express.json({ limit: '20mb' }))
@@ -134,6 +143,18 @@ app.get('*', (_req, res) => {
   res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate')
   res.sendFile(path.join(clientDir, 'index.html'), (err) => {
     if (err) {
+      // Ignore client-side connection errors (e.g., browser closed tab, request aborted)
+      // These are normal and shouldn't be logged as server errors
+      const isClientAbort = err.message === 'Request aborted' ||
+                            err.message === 'request aborted' ||
+                            (err as any).code === 'ECONNRESET' ||
+                            (err as any).code === 'ECONNABORTED'
+      
+      if (isClientAbort) {
+        // Silently ignore - no need to log or send response (client is gone)
+        return
+      }
+      
       logError('sendFile failed', { error: err.message, clientDir })
       res.status(500).send('Slate is running but the client bundle is missing. Check /api/_diag.')
     }
@@ -190,6 +211,8 @@ async function start() {
     scheduleBootBiyaScriptDump()
     void reportStatus()
     startScheduler()
+    startOutreachSendLoop()
+    void enableDomainOpenTracking()
     // Pick up any breakdown runs that were killed by the previous
     // shutdown (deploy / crash). Producers don't have to click
     // "re-analyze" after every Railway redeploy.

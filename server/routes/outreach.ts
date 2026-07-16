@@ -21,6 +21,7 @@ import { generateUniqueSentence, generateOneSheetAuto, hasAnthropicKey, type Uni
 import { loadShowBrief } from './show_brief'
 import { syncMissingCoversFromRss } from '../rss_cover_sync'
 import { seedFlagshipPodcasts } from '../seeds/flagship_podcasts'
+import { checkEmail } from '../email_verify'
 
 const resendKey = process.env.RESEND_API_KEY
 const resend = resendKey ? new Resend(resendKey) : null
@@ -31,11 +32,54 @@ outreachRouter.use(requireAdmin)
 // Merge [name] and [unique_sentence] tokens in a template. Used by the
 // test-send preview + (later) the real sender. Kept minimal — the
 // template writer controls which tokens exist; anything else stays.
-function mergeTemplate(text: string, tokens: { name: string; uniqueSentence: string; oneSheetUrl: string }): string {
+// Recording-location copy, chosen per show via a dropdown. In-person is
+// framed as the preference for the studio options; remote-only shows skip
+// that. The [location] token in the body renders one of these.
+const LOCATION_LINES: Record<string, string> = {
+  either: "We tape in person at our LA or New York studio whenever we can — that's always our preference — and we can make it work remotely if that's the only way to fit your schedule.",
+  la: "We tape in person at our LA studio whenever we can — that's how we love to do it — and we can make it work remotely if that's the only way to fit your schedule.",
+  ny: "We tape in person at our New York studio whenever we can — that's how we love to do it — and we can make it work remotely if that's the only way to fit your schedule.",
+  remote: "We record remotely over video, so you can join from wherever you are.",
+}
+function locationLine(loc: string | null | undefined): string {
+  return LOCATION_LINES[(loc ?? 'either')] ?? LOCATION_LINES.either
+}
+
+function mergeTemplate(
+  text: string,
+  tokens: { name: string; uniqueSentence: string; oneSheetUrl: string; sender?: string; guest?: string; location?: string },
+): string {
   return text
     .replace(/\[name\]/gi, tokens.name)
     .replace(/\[unique_sentence\]/gi, tokens.uniqueSentence)
     .replace(/\[one_sheet_url\]|\[onesheet_url\]|\[link\]/gi, tokens.oneSheetUrl)
+    .replace(/\[sender\]|\[your_name\]/gi, tokens.sender ?? 'The team')
+    .replace(/\[guest\]/gi, tokens.guest ?? 'you')
+    .replace(/\[location\]/gi, tokens.location ?? locationLine('either'))
+}
+
+// One row of the pre-send completeness check (see send-campaign).
+type ScopeRow = {
+  id: string
+  name: string
+  email: string | null
+  context: string | null
+  unique_sentence: string | null
+  email_check_status: string
+}
+
+// Who the interview is actually FOR. When the recipient is the guest, that's
+// "you". When they're a rep (agent/manager) with a named client, it's the
+// client — so "we'll get you booked" becomes "we'll get Amaya booked".
+function resolveGuest(recipientType: string | null | undefined, clientName: string | null | undefined): string {
+  if ((recipientType === 'agent' || recipientType === 'manager') && clientName?.trim()) {
+    // Use the client's first name so the booking line ("we'll get Amaya
+    // booked in") matches the warmer tone of the sentence above it, which
+    // also uses the first name. Falls back to the whole value if there's
+    // no space (single-word name or a band).
+    return clientName.trim().split(/\s+/)[0]
+  }
+  return 'you'
 }
 
 // Build the public one-sheet URL for a show. Returns empty string
@@ -78,7 +122,7 @@ outreachRouter.get('/template.csv', (_req, res) => {
 // ─── Templates ──────────────────────────────────────────────────────
 outreachRouter.get('/projects/:projectId/template', async (req, res) => {
   const { rows } = await pool.query(
-    `SELECT project_id, subject, body, from_name, reply_to, updated_at
+    `SELECT project_id, subject, body, from_name, reply_to, location, updated_at
        FROM outreach_templates WHERE project_id = $1`,
     [req.params.projectId],
   )
@@ -94,18 +138,20 @@ outreachRouter.put('/projects/:projectId/template', async (req, res) => {
     ? req.body.fromName.trim() : null
   const replyTo = typeof req.body?.replyTo === 'string' && req.body.replyTo.trim()
     ? req.body.replyTo.trim() : null
+  const location = LOCATION_LINES[req.body?.location] ? String(req.body.location) : 'either'
   await pool.query(
     `INSERT INTO outreach_templates
-       (project_id, subject, body, from_name, reply_to, updated_by, updated_at)
-     VALUES ($1, $2, $3, $4, $5, $6, now())
+       (project_id, subject, body, from_name, reply_to, location, updated_by, updated_at)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, now())
      ON CONFLICT (project_id) DO UPDATE SET
        subject = EXCLUDED.subject,
        body = EXCLUDED.body,
        from_name = EXCLUDED.from_name,
        reply_to = EXCLUDED.reply_to,
+       location = EXCLUDED.location,
        updated_by = EXCLUDED.updated_by,
        updated_at = now()`,
-    [projectId, subject, body, fromName, replyTo, user.id],
+    [projectId, subject, body, fromName, replyTo, location, user.id],
   )
   res.json({ ok: true })
 })
@@ -121,7 +167,9 @@ outreachRouter.get('/projects/:projectId/prospects', async (req, res) => {
   const { rows } = await pool.query(
     `SELECT id, project_id, name, full_name, email, recipient_type, client_name,
             context, unique_sentence, unique_sentence_generated_at, status,
-            sent_at, replied_at, bounced_at, sending_domain_id, created_at, updated_at
+            email_check_status, email_checked_at, email_check_detail,
+            sent_at, replied_at, bounced_at, open_count, first_opened_at, last_opened_at,
+            sending_domain_id, created_at, updated_at
        FROM outreach_prospects
       WHERE project_id = $1
       ORDER BY created_at DESC`,
@@ -218,8 +266,9 @@ outreachRouter.post('/projects/:projectId/prospects', async (req, res) => {
        (project_id, name, full_name, email, recipient_type, client_name,
         context, status, created_by)
      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-     RETURNING id, name, full_name, email, recipient_type, client_name,
+     RETURNING id, project_id, name, full_name, email, recipient_type, client_name,
                context, unique_sentence, unique_sentence_generated_at, status,
+               email_check_status, email_checked_at, email_check_detail,
                sent_at, replied_at, bounced_at, sending_domain_id, created_at, updated_at`,
     [projectId, name, fullName, email, recipientType, clientName, context, initialStatus, user.id],
   )
@@ -246,6 +295,11 @@ outreachRouter.patch('/prospects/:id', async (req, res) => {
   }
   if ('email' in patch) {
     addField('email', typeof patch.email === 'string' && patch.email.trim() ? patch.email.trim().toLowerCase() : null)
+    // Address changed → the old verification no longer applies. Reset so
+    // it must be re-checked before the campaign will send to it.
+    addField('email_check_status', 'unchecked')
+    addField('email_check_detail', null)
+    addField('email_checked_at', null)
   }
   if (typeof patch.recipientType === 'string') {
     if (!RECIPIENT_TYPES.has(patch.recipientType)) { res.status(400).json({ error: 'bad_recipient_type' }); return }
@@ -274,7 +328,282 @@ outreachRouter.patch('/prospects/:id', async (req, res) => {
     values,
   )
   if (rowCount === 0) { res.status(404).json({ error: 'not_found' }); return }
+  // Auto-file responders into the Rolodex. Only on a genuine reply — never
+  // for bounced / opted_out / wrong-email, which never reach 'replied'.
+  if (patch.status === 'replied') {
+    void fileProspectInRolodex(id).catch((err) =>
+      logError('rolodex: auto-file on reply failed', { prospectId: id, error: err instanceof Error ? err.message : String(err) }),
+    )
+  }
   res.json({ ok: true })
+})
+
+// Copy a prospect into the workspace Rolodex, deduped by email. Refreshes the
+// facts we know and tags them 'responded'. No email → nothing to dedup on, so
+// we skip (a contact with no address isn't reusable for a future blast).
+async function fileProspectInRolodex(prospectId: string): Promise<void> {
+  const { rows } = await pool.query<{
+    name: string; full_name: string | null; email: string | null;
+    recipient_type: string | null; client_name: string | null; context: string | null;
+    project_id: string; created_by: string | null;
+  }>(
+    `SELECT p.name, p.full_name, p.email, p.recipient_type, p.client_name, p.context,
+            p.project_id, p.created_by
+       FROM outreach_prospects p WHERE p.id = $1`,
+    [prospectId],
+  )
+  const p = rows[0]
+  if (!p || !p.email) return
+  const showRes = await pool.query<{ name: string }>(`SELECT name FROM projects WHERE id = $1`, [p.project_id])
+  const showName = showRes.rows[0]?.name ?? null
+  await pool.query(
+    `INSERT INTO rolodex_contacts
+       (email, name, full_name, recipient_type, client_name, context, tags, source, source_show, added_by)
+     VALUES (lower($1), $2, $3, $4, $5, $6, ARRAY['responded'], 'replied', $7, $8)
+     ON CONFLICT (email) DO UPDATE SET
+       name = EXCLUDED.name,
+       full_name = COALESCE(EXCLUDED.full_name, rolodex_contacts.full_name),
+       recipient_type = COALESCE(EXCLUDED.recipient_type, rolodex_contacts.recipient_type),
+       client_name = COALESCE(EXCLUDED.client_name, rolodex_contacts.client_name),
+       context = COALESCE(EXCLUDED.context, rolodex_contacts.context),
+       tags = (
+         SELECT ARRAY(SELECT DISTINCT unnest(rolodex_contacts.tags || ARRAY['responded']))
+       ),
+       source_show = COALESCE(rolodex_contacts.source_show, EXCLUDED.source_show),
+       updated_at = now()`,
+    [p.email, p.name, p.full_name, p.recipient_type, p.client_name, p.context, showName, p.created_by],
+  )
+  logInfo('rolodex: filed responder', { prospectId, email: p.email })
+}
+
+// ─── One-sheet approval + version history ───────────────────────────
+// The content fields that make up a one-sheet. Snapshotted on approval and
+// compared field-by-field to detect "edited since approval" (order-independent,
+// unlike JSON.stringify on a jsonb round-trip).
+const ONE_SHEET_FIELDS = [
+  'hero_tagline', 'guest_pitch', 'contact_email', 'brand_hex',
+  'subtitle', 'notable_guests', 'notable_topics', 'cover_art_url',
+] as const
+
+async function currentOneSheet(projectId: string): Promise<Record<string, unknown> | null> {
+  const { rows } = await pool.query(
+    `SELECT ${ONE_SHEET_FIELDS.join(', ')} FROM projects WHERE id = $1`,
+    [projectId],
+  )
+  return rows[0] ?? null
+}
+
+function oneSheetChanged(cur: Record<string, unknown> | null, snap: Record<string, unknown> | null): boolean {
+  if (!cur || !snap) return true
+  return ONE_SHEET_FIELDS.some((f) => (cur[f] ?? null) !== (snap[f] ?? null))
+}
+
+// Approve the current one-sheet: stamp the date, snapshot the content, and
+// append to the history so it can be restored later.
+outreachRouter.post('/projects/:projectId/one-sheet/approve', async (req, res) => {
+  const user = (req as typeof req & { user: SessionUser }).user
+  const projectId = req.params.projectId
+  const snap = await currentOneSheet(projectId)
+  if (!snap) { res.status(404).json({ error: 'not_found' }); return }
+  const ins = await pool.query<{ approved_at: string }>(
+    `INSERT INTO one_sheet_approvals (project_id, approved_by, snapshot)
+     VALUES ($1, $2, $3) RETURNING approved_at`,
+    [projectId, user.id, JSON.stringify(snap)],
+  )
+  await pool.query(
+    `UPDATE projects SET one_sheet_approved_at = $1, one_sheet_approved_by = $2, one_sheet_approved_snapshot = $3 WHERE id = $4`,
+    [ins.rows[0].approved_at, user.id, JSON.stringify(snap), projectId],
+  )
+  res.json({ ok: true, approvedAt: ins.rows[0].approved_at })
+})
+
+// Approval status for the show — used by the one-sheet card AND the outreach
+// send surface so you see the approval date before a blast.
+outreachRouter.get('/projects/:projectId/one-sheet/status', async (req, res) => {
+  const projectId = req.params.projectId
+  const projRes = await pool.query<{ one_sheet_approved_at: string | null; one_sheet_approved_snapshot: Record<string, unknown> | null }>(
+    `SELECT one_sheet_approved_at, one_sheet_approved_snapshot FROM projects WHERE id = $1`,
+    [projectId],
+  )
+  const proj = projRes.rows[0]
+  if (!proj) { res.status(404).json({ error: 'not_found' }); return }
+  const cur = await currentOneSheet(projectId)
+  const histRes = await pool.query<{ id: string; approved_at: string; name: string | null; display_name: string | null }>(
+    `SELECT a.id, a.approved_at, u.name, u.display_name
+       FROM one_sheet_approvals a LEFT JOIN users u ON u.id = a.approved_by
+      WHERE a.project_id = $1 ORDER BY a.approved_at DESC LIMIT 20`,
+    [projectId],
+  )
+  res.json({
+    approvedAt: proj.one_sheet_approved_at,
+    editedSinceApproval: proj.one_sheet_approved_at ? oneSheetChanged(cur, proj.one_sheet_approved_snapshot) : false,
+    history: histRes.rows.map((r) => ({
+      id: r.id,
+      approvedAt: r.approved_at,
+      approvedByName: r.display_name || r.name || null,
+    })),
+  })
+})
+
+// Roll the one-sheet back to a previously-approved version. Content is
+// restored and the show is re-marked approved as of that version.
+outreachRouter.post('/projects/:projectId/one-sheet/restore/:approvalId', async (req, res) => {
+  const { projectId, approvalId } = req.params
+  const { rows } = await pool.query<{ approved_at: string; approved_by: string | null; snapshot: Record<string, unknown> }>(
+    `SELECT approved_at, approved_by, snapshot FROM one_sheet_approvals WHERE id = $1 AND project_id = $2`,
+    [approvalId, projectId],
+  )
+  const a = rows[0]
+  if (!a) { res.status(404).json({ error: 'not_found' }); return }
+  const snap = a.snapshot
+  await pool.query(
+    `UPDATE projects SET
+        hero_tagline = $1, guest_pitch = $2, contact_email = $3, brand_hex = $4,
+        subtitle = $5, notable_guests = $6, notable_topics = $7, cover_art_url = $8,
+        one_sheet_approved_at = $9, one_sheet_approved_by = $10, one_sheet_approved_snapshot = $11
+      WHERE id = $12`,
+    [
+      snap.hero_tagline ?? null, snap.guest_pitch ?? null, snap.contact_email ?? null, snap.brand_hex ?? null,
+      snap.subtitle ?? null, snap.notable_guests ?? null, snap.notable_topics ?? null, snap.cover_art_url ?? null,
+      a.approved_at, a.approved_by, JSON.stringify(snap), projectId,
+    ],
+  )
+  res.json({ ok: true })
+})
+
+// ─── Rolodex (workspace-wide contact book) ──────────────────────────
+outreachRouter.get('/rolodex', async (_req, res) => {
+  const { rows } = await pool.query(
+    `SELECT id, email, name, full_name, recipient_type, client_name, context,
+            tags, notes, source, source_show, created_at, updated_at
+       FROM rolodex_contacts ORDER BY created_at DESC`,
+  )
+  res.json({ contacts: rows })
+})
+
+outreachRouter.post('/rolodex/bulk', async (req, res) => {
+  const user = (req as typeof req & { user: SessionUser }).user
+  const rows: unknown = req.body?.contacts
+  if (!Array.isArray(rows) || rows.length === 0) { res.status(400).json({ error: 'contacts_required' }); return }
+  if (rows.length > 1000) { res.status(400).json({ error: 'too_many', detail: 'max 1000 at once' }); return }
+  let added = 0, skipped = 0
+  for (const raw of rows) {
+    const r = (raw ?? {}) as Record<string, unknown>
+    const email = typeof r.email === 'string' ? r.email.trim().toLowerCase() : ''
+    const name = typeof r.name === 'string' ? r.name.trim() : ''
+    if (!name || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) { skipped += 1; continue }
+    const fullName = typeof r.fullName === 'string' && r.fullName.trim() ? r.fullName.trim() : null
+    const recipientType = typeof r.recipientType === 'string' && RECIPIENT_TYPES.has(r.recipientType) ? r.recipientType : null
+    const clientName = typeof r.clientName === 'string' && r.clientName.trim() ? r.clientName.trim() : null
+    const context = typeof r.context === 'string' && r.context.trim() ? r.context.trim() : null
+    const notes = typeof r.notes === 'string' && r.notes.trim() ? r.notes.trim() : null
+    await pool.query(
+      `INSERT INTO rolodex_contacts (email, name, full_name, recipient_type, client_name, context, notes, source, added_by)
+       VALUES (lower($1), $2, $3, $4, $5, $6, $7, 'manual', $8)
+       ON CONFLICT (email) DO UPDATE SET
+         name = EXCLUDED.name,
+         full_name = COALESCE(EXCLUDED.full_name, rolodex_contacts.full_name),
+         recipient_type = COALESCE(EXCLUDED.recipient_type, rolodex_contacts.recipient_type),
+         client_name = COALESCE(EXCLUDED.client_name, rolodex_contacts.client_name),
+         context = COALESCE(EXCLUDED.context, rolodex_contacts.context),
+         notes = COALESCE(EXCLUDED.notes, rolodex_contacts.notes),
+         updated_at = now()`,
+      [email, name, fullName, recipientType, clientName, context, notes, user.id],
+    )
+    added += 1
+  }
+  res.json({ ok: true, added, skipped })
+})
+
+outreachRouter.delete('/rolodex/:id', async (req, res) => {
+  const { rowCount } = await pool.query(`DELETE FROM rolodex_contacts WHERE id = $1`, [req.params.id])
+  if (rowCount === 0) { res.status(404).json({ error: 'not_found' }); return }
+  res.json({ ok: true })
+})
+
+// Pull selected Rolodex contacts into this show's outreach as fresh prospects.
+// Dedups against prospects already in the project (by email). They land as
+// 'ready' with their known facts, awaiting a sentence + verification.
+outreachRouter.post('/projects/:projectId/rolodex-import', async (req, res) => {
+  const user = (req as typeof req & { user: SessionUser }).user
+  const projectId = req.params.projectId
+  const ids: unknown = req.body?.contactIds
+  const list = Array.isArray(ids) ? ids.filter((x): x is string => typeof x === 'string') : []
+  if (list.length === 0) { res.status(400).json({ error: 'contact_ids_required' }); return }
+  const { rows: contacts } = await pool.query<{
+    email: string; name: string; full_name: string | null; recipient_type: string | null;
+    client_name: string | null; context: string | null;
+  }>(
+    `SELECT email, name, full_name, recipient_type, client_name, context
+       FROM rolodex_contacts WHERE id = ANY($1::uuid[])`,
+    [list],
+  )
+  let imported = 0, dupes = 0
+  for (const c of contacts) {
+    const exists = await pool.query(
+      `SELECT 1 FROM outreach_prospects WHERE project_id = $1 AND lower(email) = lower($2) LIMIT 1`,
+      [projectId, c.email],
+    )
+    if (exists.rowCount && exists.rowCount > 0) { dupes += 1; continue }
+    await pool.query(
+      `INSERT INTO outreach_prospects
+         (project_id, name, full_name, email, recipient_type, client_name, context, status, created_by)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, 'ready', $8)`,
+      [projectId, c.name, c.full_name, c.email, c.recipient_type ?? 'person', c.client_name, c.context, user.id],
+    )
+    imported += 1
+  }
+  res.json({ ok: true, imported, dupes })
+})
+
+// ─── Recipient-email verification ───────────────────────────────────
+//
+// Runs the in-house MX + syntax check over every prospect in the show
+// that has an email and hasn't already been sent to. Saves the result
+// per prospect. The campaign sender (below) refuses to fire until every
+// Ready prospect has been checked, and skips any that came back invalid.
+outreachRouter.post('/projects/:projectId/verify-emails', async (req, res) => {
+  const projectId = req.params.projectId
+  const { rows } = await pool.query<{ id: string; email: string }>(
+    `SELECT id, email FROM outreach_prospects
+      WHERE project_id = $1
+        AND email IS NOT NULL
+        AND status NOT IN ('sent', 'replied', 'opted_out')
+      ORDER BY created_at ASC`,
+    [projectId],
+  )
+  if (rows.length === 0) {
+    res.json({ ok: true, checked: 0, valid: 0, risky: 0, invalid: 0 })
+    return
+  }
+  let valid = 0, risky = 0, invalid = 0
+  const CONCURRENCY = 8
+  const queue = [...rows]
+  await Promise.all(Array.from({ length: CONCURRENCY }, async () => {
+    while (queue.length > 0) {
+      const row = queue.shift()
+      if (!row) break
+      try {
+        const check = await checkEmail(row.email)
+        if (check.status === 'valid') valid += 1
+        else if (check.status === 'risky') risky += 1
+        else invalid += 1
+        await pool.query(
+          `UPDATE outreach_prospects
+              SET email_check_status = $1, email_check_detail = $2,
+                  email_checked_at = now(), updated_at = now()
+            WHERE id = $3`,
+          [check.status, check.detail, row.id],
+        )
+      } catch (err) {
+        logError('outreach: email verify failed for prospect', {
+          id: row.id, error: err instanceof Error ? err.message : String(err),
+        })
+      }
+    }
+  }))
+  logInfo('outreach: verified emails', { projectId, checked: rows.length, valid, risky, invalid })
+  res.json({ ok: true, checked: rows.length, valid, risky, invalid })
 })
 
 // ─── Campaign sender ─────────────────────────────────────────────────
@@ -291,8 +620,9 @@ async function sendOneProspect(prospectId: string): Promise<void> {
   const pRes = await pool.query<{
     project_id: string; name: string; email: string | null;
     unique_sentence: string | null; status: string;
+    recipient_type: string | null; client_name: string | null;
   }>(
-    `SELECT project_id, name, email, unique_sentence, status
+    `SELECT project_id, name, email, unique_sentence, status, recipient_type, client_name
        FROM outreach_prospects WHERE id = $1`,
     [prospectId],
   )
@@ -302,9 +632,9 @@ async function sendOneProspect(prospectId: string): Promise<void> {
   if (!p.unique_sentence?.trim()) throw new Error('prospect_missing_sentence')
 
   const tplRes = await pool.query<{
-    subject: string; body: string; reply_to: string | null; from_name: string | null;
+    subject: string; body: string; reply_to: string | null; from_name: string | null; sender_name: string | null; location: string | null;
   }>(
-    `SELECT subject, body, reply_to, from_name FROM outreach_templates WHERE project_id = $1`,
+    `SELECT subject, body, reply_to, from_name, sender_name, location FROM outreach_templates WHERE project_id = $1`,
     [p.project_id],
   )
   const tpl = tplRes.rows[0]
@@ -345,9 +675,12 @@ async function sendOneProspect(prospectId: string): Promise<void> {
   const from = `${fromName} <booking@${domain.name}>`
   const replyTo = tpl.reply_to?.trim() || 'booking@strawhutmedia.com'
 
+  const sender = tpl.sender_name?.trim() || tpl.from_name?.trim() || 'The team'
+  const guest = resolveGuest(p.recipient_type, p.client_name)
+  const location = locationLine(tpl.location)
   const oneSheetUrl = await getOneSheetUrl(p.project_id)
-  const subject = mergeTemplate(tpl.subject, { name: p.name, uniqueSentence: p.unique_sentence, oneSheetUrl })
-  const body = mergeTemplate(tpl.body, { name: p.name, uniqueSentence: p.unique_sentence, oneSheetUrl })
+  const subject = mergeTemplate(tpl.subject, { name: p.name, uniqueSentence: p.unique_sentence, oneSheetUrl, sender, guest, location })
+  const body = mergeTemplate(tpl.body, { name: p.name, uniqueSentence: p.unique_sentence, oneSheetUrl, sender, guest, location })
 
   // Log the attempt (status: queued) before firing so we have a record
   // even if Resend errors mid-flight.
@@ -410,27 +743,164 @@ async function sendOneProspect(prospectId: string): Promise<void> {
   }
 }
 
-// In-memory scheduler — simplest thing that works. Each queued send is
-// a setTimeout that fires N minutes from now. Queue is not persisted
-// across Railway restarts; on redeploy any queued (not-yet-sent)
-// prospects revert to 'ready' status via the resume-queue block at
-// module load (see bottom of file).
-const scheduledSends = new Set<string>()
+// Durable scheduler. Every queued prospect carries a scheduled_send_at; a
+// 60s loop fires the ones whose time has come. This survives Railway
+// restarts/deploys (a campaign scheduled for 5 AM PT still goes at 5 AM),
+// and since the loop is the ONLY driver, a prospect can't double-send.
+// Single process + an overlap guard means no concurrent ticks.
+let outreachTicking = false
 
-function scheduleSend(prospectId: string, delayMs: number): void {
-  if (scheduledSends.has(prospectId)) return
-  scheduledSends.add(prospectId)
-  setTimeout(async () => {
-    scheduledSends.delete(prospectId)
-    try {
-      await sendOneProspect(prospectId)
-    } catch (err) {
-      logError('outreach: scheduled send failed', {
-        prospectId,
-        error: err instanceof Error ? err.message : String(err),
-      })
+async function runOutreachTick(): Promise<void> {
+  if (outreachTicking) return
+  outreachTicking = true
+  try {
+    // Claim a small batch of due sends. Small cap keeps the 90-180s spacing
+    // in steady state and gently catches up after any downtime rather than
+    // firing a burst.
+    const due = await pool.query<{ id: string }>(
+      `SELECT id FROM outreach_prospects
+        WHERE status = 'queued'
+          AND scheduled_send_at IS NOT NULL
+          AND scheduled_send_at <= now()
+        ORDER BY scheduled_send_at ASC
+        LIMIT 5`,
+    )
+    for (const { id } of due.rows) {
+      try {
+        await sendOneProspect(id)
+      } catch (err) {
+        logError('outreach: scheduled send failed', {
+          prospectId: id,
+          error: err instanceof Error ? err.message : String(err),
+        })
+      }
     }
-  }, delayMs).unref()
+  } catch (err) {
+    logError('outreach: send tick failed', { error: err instanceof Error ? err.message : String(err) })
+  } finally {
+    outreachTicking = false
+  }
+}
+
+// Rescue prospects stuck 'queued' with NO scheduled_send_at — legacy/orphaned
+// rows that would otherwise sit forever. Anything WITH a scheduled_send_at is
+// durable and the loop will fire it when due, so leave those alone. Runs after
+// migrations (see startOutreachSendLoop), so scheduled_send_at is guaranteed
+// to exist by now.
+async function resetOrphanedQueued(): Promise<void> {
+  try {
+    const { rowCount } = await pool.query(
+      `UPDATE outreach_prospects SET status = 'ready', updated_at = now()
+        WHERE status = 'queued' AND scheduled_send_at IS NULL`,
+    )
+    if (rowCount && rowCount > 0) {
+      logInfo('outreach: reset orphaned queued prospects on boot', { count: rowCount })
+    }
+  } catch (err) {
+    logError('outreach: boot reset failed', { error: err instanceof Error ? err.message : String(err) })
+  }
+}
+
+// Wired from index.ts inside the listen callback — i.e. AFTER runMigrations()
+// completes — so it's safe to touch scheduled_send_at here. (The previous
+// version ran this at module-import time, which raced ahead of the migration
+// that adds the column and fired a spurious boot-error email.)
+export function startOutreachSendLoop(): void {
+  void resetOrphanedQueued().then(() => runOutreachTick()) // catch up immediately
+  setInterval(() => { void runOutreachTick() }, 60_000).unref()
+}
+
+// Turn on open tracking for every verified sending domain via the Resend API,
+// so email.opened events actually fire (otherwise no pixel is injected and we
+// see zero opens). Resolves the Resend domain id from the API if we don't have
+// it stored. Idempotent — safe to run on every boot or on demand. Returns a
+// per-domain result so the UI can confirm it's actually on.
+export async function ensureOpenTracking(): Promise<Array<{ domain: string; ok: boolean; detail?: string }>> {
+  const results: Array<{ domain: string; ok: boolean; detail?: string }> = []
+  if (!resend) return results
+  const { rows } = await pool.query<{ id: string; resend_id: string | null; name: string }>(
+    `SELECT id, resend_id, name FROM sending_domains WHERE status = 'verified'`,
+  )
+  if (rows.length === 0) return results
+  // One list call to resolve any missing Resend ids by name.
+  let byName = new Map<string, string>()
+  try {
+    const list = await resend.domains.list()
+    const raw = list.data as unknown
+    const arr = Array.isArray(raw) ? raw : ((raw as { data?: Array<{ id: string; name: string }> })?.data ?? [])
+    byName = new Map((arr as Array<{ id: string; name: string }>).map((d) => [d.name.toLowerCase(), d.id]))
+  } catch { /* fall back to stored ids */ }
+
+  for (const d of rows) {
+    let resendId = d.resend_id
+    if (!resendId) {
+      resendId = byName.get(d.name.toLowerCase()) ?? null
+      if (resendId) {
+        await pool.query(`UPDATE sending_domains SET resend_id = $1 WHERE id = $2`, [resendId, d.id])
+      }
+    }
+    if (!resendId) {
+      results.push({ domain: d.name, ok: false, detail: 'no Resend id — run “Sync with Resend” on the domain' })
+      continue
+    }
+    try {
+      const upd = await resend.domains.update({ id: resendId, openTracking: true })
+      if (upd.error) {
+        results.push({ domain: d.name, ok: false, detail: upd.error.message ?? String(upd.error) })
+      } else {
+        results.push({ domain: d.name, ok: true })
+        logInfo('outreach: ensured open tracking on domain', { domain: d.name })
+      }
+    } catch (err) {
+      results.push({ domain: d.name, ok: false, detail: err instanceof Error ? err.message : String(err) })
+    }
+  }
+  return results
+}
+
+// Back-compat name used by boot wiring; best-effort, ignores the result.
+export async function enableDomainOpenTracking(): Promise<void> {
+  try { await ensureOpenTracking() } catch (err) {
+    logError('outreach: enable open tracking failed', { error: err instanceof Error ? err.message : String(err) })
+  }
+}
+
+// On-demand: enable + confirm open tracking. Gives Caroline a button so it's
+// never dependent on a boot having run.
+outreachRouter.post('/enable-open-tracking', async (_req, res) => {
+  if (!resend) { res.status(503).json({ error: 'resend_not_configured' }); return }
+  const results = await ensureOpenTracking()
+  res.json({ ok: true, results })
+})
+
+// The next 5:00 AM Pacific as a concrete UTC instant. Handles PST/PDT
+// correctly by asking Intl for Pacific's offset on the target day.
+function nextFiveAmPT(): Date {
+  const now = new Date()
+  const ptParts = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'America/Los_Angeles', hour12: false,
+    year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit',
+  }).formatToParts(now)
+  const num = (t: string) => Number(ptParts.find((p) => p.type === t)?.value)
+  let y = num('year'), mo = num('month'), d = num('day')
+  if (num('hour') >= 5) {
+    // It's already 5 AM PT or later today — aim for tomorrow.
+    const roll = new Date(Date.UTC(y, mo - 1, d))
+    roll.setUTCDate(roll.getUTCDate() + 1)
+    y = roll.getUTCFullYear(); mo = roll.getUTCMonth() + 1; d = roll.getUTCDate()
+  }
+  // Pacific wall-clock 05:00 on y-mo-d → UTC instant.
+  const guess = new Date(Date.UTC(y, mo - 1, d, 5, 0, 0))
+  const asPT = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'America/Los_Angeles', hour12: false,
+    year: 'numeric', month: '2-digit', day: '2-digit',
+    hour: '2-digit', minute: '2-digit', second: '2-digit',
+  }).formatToParts(guess)
+  const g = (t: string) => Number(asPT.find((p) => p.type === t)?.value)
+  const offsetMin = Math.round(
+    (Date.UTC(g('year'), g('month') - 1, g('day'), g('hour'), g('minute'), g('second')) - guess.getTime()) / 60_000,
+  )
+  return new Date(guess.getTime() - offsetMin * 60_000)
 }
 
 outreachRouter.post('/projects/:projectId/send-campaign', async (req, res) => {
@@ -439,34 +909,98 @@ outreachRouter.post('/projects/:projectId/send-campaign', async (req, res) => {
     res.status(503).json({ error: 'resend_not_configured' })
     return
   }
+  // Record who launched this campaign so the background sender signs the
+  // emails with their name (the [sender] token).
+  const launcher = (req as typeof req & { user?: { display_name: string | null; name: string } }).user
+  const launcherName = launcher?.display_name?.trim() || launcher?.name?.trim()
+  if (launcherName) {
+    await pool.query(
+      `UPDATE outreach_templates SET sender_name = $1, updated_at = now() WHERE project_id = $2`,
+      [launcherName, projectId],
+    )
+  }
   const rawIds = req.body?.prospectIds
   const explicit = Array.isArray(rawIds) ? rawIds.filter((x): x is string => typeof x === 'string') : null
 
-  // Only send to prospects that are (a) belong to this project, (b)
-  // have an email, (c) have a unique_sentence, (d) are in 'ready'
-  // status. Anything else the operator has to fix manually.
-  const q = explicit && explicit.length > 0
-    ? await pool.query<{ id: string }>(
-        `SELECT id FROM outreach_prospects
-          WHERE project_id = $1
-            AND id = ANY($2::uuid[])
-            AND email IS NOT NULL
-            AND unique_sentence IS NOT NULL AND trim(unique_sentence) <> ''
-            AND status = 'ready'`,
+  // NO SKIPPING. Every contact that's still a live outreach target must be
+  // fully filled out — email + facts (context) + a written sentence — AND
+  // verified + deliverable, before ANY email goes out. If even one is
+  // incomplete we refuse the WHOLE send and name exactly who to fix, rather
+  // than quietly leaving them behind. Contacts that are already done
+  // (sent / replied / opted-out / bounced) or in-flight (queued) don't count.
+  const scopeRes = explicit && explicit.length > 0
+    ? await pool.query<ScopeRow>(
+        `SELECT id, name, email, context, unique_sentence, email_check_status
+           FROM outreach_prospects
+          WHERE project_id = $1 AND id = ANY($2::uuid[])
+            AND status NOT IN ('sent','replied','opted_out','bounced','queued')`,
         [projectId, explicit],
       )
-    : await pool.query<{ id: string }>(
-        `SELECT id FROM outreach_prospects
+    : await pool.query<ScopeRow>(
+        `SELECT id, name, email, context, unique_sentence, email_check_status
+           FROM outreach_prospects
           WHERE project_id = $1
-            AND email IS NOT NULL
-            AND unique_sentence IS NOT NULL AND trim(unique_sentence) <> ''
-            AND status = 'ready'
+            AND status NOT IN ('sent','replied','opted_out','bounced','queued')
           ORDER BY created_at ASC`,
         [projectId],
       )
-  const ids = q.rows.map((r) => r.id)
-  if (ids.length === 0) {
-    res.status(400).json({ error: 'no_eligible_prospects', detail: 'No prospects are Ready (need email + unique sentence).' })
+  const scope = scopeRes.rows
+  if (scope.length === 0) {
+    res.status(400).json({ error: 'no_eligible_prospects', detail: 'No contacts to send yet — add prospects first.' })
+    return
+  }
+
+  const noFacts = scope.filter((r) => !r.context || !r.context.trim())
+  const noSentence = scope.filter((r) => !r.unique_sentence || !r.unique_sentence.trim())
+  const noEmail = scope.filter((r) => !r.email)
+  const notVerified = scope.filter((r) => r.email && r.email_check_status === 'unchecked')
+  const badEmail = scope.filter((r) => r.email && r.email_check_status === 'invalid')
+
+  const problems: string[] = []
+  if (noFacts.length) problems.push(`${noFacts.length} missing facts`)
+  if (noSentence.length) problems.push(`${noSentence.length} missing a sentence`)
+  if (noEmail.length) problems.push(`${noEmail.length} missing an email`)
+  if (notVerified.length) problems.push(`${notVerified.length} not verified`)
+  if (badEmail.length) problems.push(`${badEmail.length} with an undeliverable email`)
+
+  if (problems.length > 0) {
+    const names = Array.from(new Set(
+      [...noFacts, ...noSentence, ...noEmail, ...notVerified, ...badEmail].map((r) => r.name),
+    )).slice(0, 15)
+    res.status(400).json({
+      error: 'incomplete_prospects',
+      detail: `Can't send yet — every contact has to be filled out first (${problems.join(', ')}). Fix these before sending: ${names.join(', ')}${names.length >= 15 ? '…' : ''}.`,
+      counts: {
+        missingFacts: noFacts.length,
+        missingSentence: noSentence.length,
+        missingEmail: noEmail.length,
+        notVerified: notVerified.length,
+        badEmail: badEmail.length,
+      },
+      names,
+    })
+    return
+  }
+
+  // Everyone in scope is complete + verified + deliverable — send to ALL.
+  const ids = scope.map((r) => r.id)
+
+  // Hard gate: the one-sheet every email links to must be APPROVED and
+  // unchanged since approval. No approval (or edited since) → refuse the send.
+  const osRes = await pool.query<{ one_sheet_approved_at: string | null; one_sheet_approved_snapshot: Record<string, unknown> | null }>(
+    `SELECT one_sheet_approved_at, one_sheet_approved_snapshot FROM projects WHERE id = $1`,
+    [projectId],
+  )
+  const os = osRes.rows[0]
+  const curOneSheet = await currentOneSheet(projectId)
+  const oneSheetApproved = Boolean(os?.one_sheet_approved_at) && !oneSheetChanged(curOneSheet, os?.one_sheet_approved_snapshot ?? null)
+  if (!oneSheetApproved) {
+    res.status(400).json({
+      error: 'one_sheet_not_approved',
+      detail: os?.one_sheet_approved_at
+        ? 'The one-sheet was edited since it was approved. Re-approve it (One-sheet card → “Approve for blasts”) before sending.'
+        : 'Approve the one-sheet before sending — open the One-sheet card and click “Approve for blasts.”',
+    })
     return
   }
 
@@ -484,7 +1018,10 @@ outreachRouter.post('/projects/:projectId/send-campaign', async (req, res) => {
   )
   const domains = domRes.rows
   if (domains.length === 0) {
-    res.status(400).json({ error: 'no_verified_domain' })
+    res.status(400).json({
+      error: 'no_verified_domain',
+      detail: 'No verified sending domain yet — add and verify one under Sending domains before you can send. (Test sends need this too.)',
+    })
     return
   }
 
@@ -511,58 +1048,61 @@ outreachRouter.post('/projects/:projectId/send-campaign', async (req, res) => {
     arr.push(a.id)
     byDomain.set(a.domainId, arr)
   }
-  for (const [domainId, prospectIds] of byDomain) {
-    await pool.query(
-      `UPDATE outreach_prospects
-          SET status = 'queued', sending_domain_id = $1, updated_at = now()
-        WHERE id = ANY($2::uuid[])`,
-      [domainId, prospectIds],
-    )
-  }
+  // When should this batch start? Default is now. A scheduled campaign
+  // passes startPreset '5am_pt' (next 5 AM Pacific) or an explicit future
+  // startAt ISO. Sends are still jittered 90-180s apart from that start.
+  const startPreset = typeof req.body?.startPreset === 'string' ? req.body.startPreset : 'now'
+  const startAtRaw = typeof req.body?.startAt === 'string' ? new Date(req.body.startAt) : null
+  const nowMs = Date.now()
+  let startMs = nowMs
+  if (startPreset === '5am_pt') startMs = nextFiveAmPT().getTime()
+  else if (startAtRaw && !Number.isNaN(startAtRaw.getTime()) && startAtRaw.getTime() > nowMs) startMs = startAtRaw.getTime()
 
-  // Schedule each send 90-180s apart. Cursor advances by a fresh
-  // random jitter for each prospect so the pattern isn't deterministic.
+  // Give each prospect a concrete scheduled_send_at: start point plus a
+  // running 90-180s jitter. The durable loop fires each when due.
   let cursorMs = 0
-  for (const { id } of assignments) {
-    const jitter = 90_000 + Math.floor(Math.random() * 90_000) // 90-180s
-    cursorMs += jitter
-    scheduleSend(id, cursorMs)
-  }
+  const sendAts = assignments.map(() => {
+    cursorMs += 90_000 + Math.floor(Math.random() * 90_000) // 90-180s apart
+    return new Date(startMs + cursorMs).toISOString()
+  })
+  await pool.query(
+    `UPDATE outreach_prospects AS p
+        SET status = 'queued',
+            sending_domain_id = a.domain_id::uuid,
+            scheduled_send_at = a.send_at::timestamptz,
+            updated_at = now()
+       FROM unnest($1::uuid[], $2::uuid[], $3::timestamptz[]) AS a(pid, domain_id, send_at)
+      WHERE p.id = a.pid`,
+    [assignments.map((a) => a.id), assignments.map((a) => a.domainId), sendAts],
+  )
+  // Nudge the loop so an immediate campaign doesn't wait for the next tick.
+  // (Scheduled campaigns just sit as 'queued' until their time comes.)
+  void runOutreachTick()
+
   const perDomainCount = Array.from(byDomain.values()).map((v) => v.length)
-  logInfo('outreach: campaign started', {
+  const scheduled = startMs > nowMs + 60_000
+  const firstAtMs = startMs + 90_000
+  const lastAtMs = startMs + cursorMs
+  logInfo('outreach: campaign queued', {
     projectId,
     count: ids.length,
     domains: domains.length,
     perDomain: perDomainCount,
-    estimatedMinutes: Math.round(cursorMs / 60_000),
+    scheduled,
+    startAt: new Date(startMs).toISOString(),
   })
   res.json({
     ok: true,
     queued: ids.length,
+    scheduled,
+    startAt: new Date(startMs).toISOString(),
     domainsUsed: domains.length,
     perDomain: perDomainCount,
-    estimatedMinutes: Math.round(cursorMs / 60_000),
-    firstAt: new Date(Date.now() + 90_000).toISOString(),
-    lastAt: new Date(Date.now() + cursorMs).toISOString(),
+    estimatedMinutes: Math.round((lastAtMs - nowMs) / 60_000),
+    firstAt: new Date(firstAtMs).toISOString(),
+    lastAt: new Date(lastAtMs).toISOString(),
   })
 })
-
-// On boot, resume any prospects that were mid-queue when the process
-// died. They flip back to 'ready' so the operator can rerun the send
-// button — otherwise they'd sit stuck as 'queued' forever.
-;(async () => {
-  try {
-    const { rowCount } = await pool.query(
-      `UPDATE outreach_prospects SET status = 'ready', updated_at = now()
-        WHERE status = 'queued'`,
-    )
-    if (rowCount && rowCount > 0) {
-      logInfo('outreach: reset stuck queued prospects on boot', { count: rowCount })
-    }
-  } catch (err) {
-    logError('outreach: boot reset failed', { error: err instanceof Error ? err.message : String(err) })
-  }
-})()
 
 // Trigger the RSS cover sync on demand. Producer clicks this after
 // registering a new podcast + RSS feed to fetch the cover art without
@@ -719,9 +1259,9 @@ async function buildSentenceInput(prospectId: string): Promise<{ input: UniqueSe
   const prospectRes = await pool.query<{
     id: string; project_id: string; name: string; full_name: string | null;
     recipient_type: 'person' | 'agent' | 'manager' | 'other';
-    client_name: string | null; context: string | null;
+    client_name: string | null; context: string | null; email: string | null;
   }>(
-    `SELECT id, project_id, name, full_name, recipient_type, client_name, context
+    `SELECT id, project_id, name, full_name, recipient_type, client_name, context, email
        FROM outreach_prospects WHERE id = $1`,
     [prospectId],
   )
@@ -763,6 +1303,7 @@ async function buildSentenceInput(prospectId: string): Promise<{ input: UniqueSe
         recipientType: prospect.recipient_type,
         clientName: prospect.client_name,
         context: prospect.context,
+        email: prospect.email,
       },
     },
   }
@@ -792,9 +1333,17 @@ outreachRouter.post('/prospects/:id/generate-sentence', async (req, res) => {
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err)
     if (msg === 'insufficient_context') {
+      // Clear any stale/garbage sentence so the prospect shows as flagged
+      // (blank), never leaves old hedging text sitting in the field.
+      await pool.query(
+        `UPDATE outreach_prospects
+            SET unique_sentence = NULL, unique_sentence_generated_at = NULL, updated_at = now()
+          WHERE id = $1`,
+        [req.params.id],
+      ).catch(() => {})
       res.status(422).json({
         error: 'insufficient_context',
-        detail: 'Not enough context on this prospect to write a specific sentence. Add a line about who they are + something recent they did, then try again.',
+        detail: 'Couldn\'t find a specific, verifiable fact about this person (online or in your note). Add a concrete detail — what they do + something recent — and generate again.',
       })
       return
     }
@@ -812,11 +1361,19 @@ outreachRouter.post('/projects/:projectId/generate-all-sentences', async (req, r
     return
   }
   const projectId = req.params.projectId
+  // overwrite=true → rewrite EVERY prospect's sentence (the "Regenerate
+  // all" button). Default → only fill prospects that don't have one yet.
+  const overwrite = req.body?.overwrite === true
   const targets = await pool.query<{ id: string }>(
-    `SELECT id FROM outreach_prospects
-      WHERE project_id = $1
-        AND unique_sentence IS NULL
-      ORDER BY created_at ASC`,
+    overwrite
+      ? `SELECT id FROM outreach_prospects
+          WHERE project_id = $1
+            AND status NOT IN ('sent', 'replied', 'opted_out')
+          ORDER BY created_at ASC`
+      : `SELECT id FROM outreach_prospects
+          WHERE project_id = $1
+            AND unique_sentence IS NULL
+          ORDER BY created_at ASC`,
     [projectId],
   )
   const ids = targets.rows.map((r) => r.id)
@@ -866,6 +1423,10 @@ outreachRouter.post('/projects/:projectId/generate-all-sentences', async (req, r
 outreachRouter.post('/projects/:projectId/test-send', async (req, res) => {
   const projectId = req.params.projectId
   const to = String(req.body?.to || '').trim().toLowerCase()
+  // Optional: preview using a SPECIFIC prospect the operator picked. Without
+  // it we fall back to auto-picking the best-populated prospect below.
+  const wantProspectId = typeof req.body?.prospectId === 'string' && req.body.prospectId.trim()
+    ? req.body.prospectId.trim() : null
   if (!/^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$/.test(to)) {
     res.status(400).json({ error: 'invalid_to_email' })
     return
@@ -877,9 +1438,9 @@ outreachRouter.post('/projects/:projectId/test-send', async (req, res) => {
 
   // Load template
   const tplRes = await pool.query<{
-    subject: string; body: string; reply_to: string | null; from_name: string | null;
+    subject: string; body: string; reply_to: string | null; from_name: string | null; location: string | null;
   }>(
-    `SELECT subject, body, reply_to, from_name FROM outreach_templates WHERE project_id = $1`,
+    `SELECT subject, body, reply_to, from_name, location FROM outreach_templates WHERE project_id = $1`,
     [projectId],
   )
   const tpl = tplRes.rows[0]
@@ -891,21 +1452,40 @@ outreachRouter.post('/projects/:projectId/test-send', async (req, res) => {
   // Load a preview prospect — first ready one, else any prospect,
   // else fabricate. Priority: prospect with a unique_sentence, then
   // any with an email, then any at all, then fake.
-  const previewRes = await pool.query<{ name: string; unique_sentence: string | null }>(
-    `SELECT name, unique_sentence FROM outreach_prospects
-      WHERE project_id = $1
-      ORDER BY (unique_sentence IS NOT NULL) DESC, (email IS NOT NULL) DESC, created_at DESC
-      LIMIT 1`,
-    [projectId],
-  )
+  const previewRes = wantProspectId
+    ? await pool.query<{ id: string; name: string; unique_sentence: string | null; recipient_type: string | null; client_name: string | null }>(
+        `SELECT id, name, unique_sentence, recipient_type, client_name FROM outreach_prospects
+          WHERE project_id = $1 AND id = $2
+          LIMIT 1`,
+        [projectId, wantProspectId],
+      )
+    : await pool.query<{ id: string; name: string; unique_sentence: string | null; recipient_type: string | null; client_name: string | null }>(
+        `SELECT id, name, unique_sentence, recipient_type, client_name FROM outreach_prospects
+          WHERE project_id = $1
+          ORDER BY (unique_sentence IS NOT NULL) DESC, (email IS NOT NULL) DESC, created_at DESC
+          LIMIT 1`,
+        [projectId],
+      )
   const preview = previewRes.rows[0]
   const previewName = preview?.name || 'Alex'
   const previewSentence = preview?.unique_sentence
-    || 'Your recent work jumped out to me — the way you framed it in your last piece is exactly the angle we chase on the show.'
+    || 'I love what you have been putting out lately and think our audience would really connect with you.'
+  const previewGuest = resolveGuest(preview?.recipient_type, preview?.client_name)
 
+  // Sign with the account running the send. Persist it so the real
+  // campaign (which sends in the background, with no request context)
+  // signs the same way.
+  const sessionUser = (req as typeof req & { user?: { display_name: string | null; name: string } }).user
+  const sender = sessionUser?.display_name?.trim() || sessionUser?.name?.trim() || 'The team'
+  await pool.query(
+    `UPDATE outreach_templates SET sender_name = $1, updated_at = now() WHERE project_id = $2`,
+    [sender, projectId],
+  )
+
+  const location = locationLine(tpl.location)
   const oneSheetUrl = await getOneSheetUrl(projectId)
-  const subject = mergeTemplate(tpl.subject, { name: previewName, uniqueSentence: previewSentence, oneSheetUrl })
-  const body = mergeTemplate(tpl.body, { name: previewName, uniqueSentence: previewSentence, oneSheetUrl })
+  const subject = mergeTemplate(tpl.subject, { name: previewName, uniqueSentence: previewSentence, oneSheetUrl, sender, guest: previewGuest, location })
+  const body = mergeTemplate(tpl.body, { name: previewName, uniqueSentence: previewSentence, oneSheetUrl, sender, guest: previewGuest, location })
 
   // Pick a sending domain — first verified + active one in the pool.
   // Prefer the domain pinned to this show if one is set.
@@ -954,10 +1534,37 @@ outreachRouter.post('/projects/:projectId/test-send', async (req, res) => {
       res.status(502).json({ error: 'send_failed', detail: errorMsg })
       return
     }
+    // Log the test send so its opens can be tracked (flagged is_test, so they
+    // count on the send row — not the real contact's "Viewed N×"). Needs a
+    // prospect to attach to (FK); if the list is empty we just skip logging.
+    if (preview?.id && send.data?.id) {
+      await pool.query(
+        `INSERT INTO outreach_sends
+           (prospect_id, from_email, to_email, subject, body, status, resend_message_id, sent_at, is_test)
+         VALUES ($1, $2, $3, $4, $5, 'sent', $6, now(), true)`,
+        [preview.id, from, to, `[TEST] ${subject}`, body, send.data.id],
+      )
+    }
     logInfo('outreach test-send ok', { projectId, to, domain })
     res.json({ ok: true, from, to, subject: `[TEST] ${subject}`, previewName })
   } catch (err) {
     logError('outreach test-send threw', { projectId, error: err instanceof Error ? err.message : String(err) })
     res.status(500).json({ error: 'send_threw', detail: err instanceof Error ? err.message : String(err) })
   }
+})
+
+// Open count of the most recent TEST send for this show — lets the UI confirm
+// open tracking is actually working ("your test was opened N×").
+outreachRouter.get('/projects/:projectId/test-open-status', async (req, res) => {
+  const { rows } = await pool.query<{ to_email: string; open_count: number; last_opened_at: string | null; sent_at: string | null }>(
+    `SELECT s.to_email, s.open_count, s.last_opened_at, s.sent_at
+       FROM outreach_sends s
+       JOIN outreach_prospects p ON p.id = s.prospect_id
+      WHERE p.project_id = $1 AND s.is_test = true
+      ORDER BY s.sent_at DESC NULLS LAST, s.created_at DESC
+      LIMIT 1`,
+    [req.params.projectId],
+  )
+  const r = rows[0]
+  res.json({ test: r ? { to: r.to_email, openCount: r.open_count, lastOpenedAt: r.last_opened_at, sentAt: r.sent_at } : null })
 })

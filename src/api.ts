@@ -616,12 +616,29 @@ export type ApiCarouselDeckResult = {
   }
 }
 
+export type ApiRolodexContact = {
+  id: string
+  email: string
+  name: string
+  full_name: string | null
+  recipient_type: string | null
+  client_name: string | null
+  context: string | null
+  tags: string[]
+  notes: string | null
+  source: string
+  source_show: string | null
+  created_at: string
+  updated_at: string
+}
+
 export type ApiOutreachTemplate = {
   project_id: string
   subject: string
   body: string
   from_name: string | null
   reply_to: string | null
+  location: string | null
   updated_at: string
 }
 
@@ -637,9 +654,15 @@ export type ApiOutreachProspect = {
   unique_sentence: string | null
   unique_sentence_generated_at: string | null
   status: 'needs_email' | 'ready' | 'queued' | 'sent' | 'replied' | 'bounced' | 'opted_out' | 'failed'
+  email_check_status: 'unchecked' | 'valid' | 'risky' | 'invalid'
+  email_checked_at: string | null
+  email_check_detail: string | null
   sent_at: string | null
   replied_at: string | null
   bounced_at: string | null
+  open_count: number
+  first_opened_at: string | null
+  last_opened_at: string | null
   sending_domain_id: string | null
   created_at: string
   updated_at: string
@@ -1342,9 +1365,48 @@ export const api = {
     request<{ ok: true }>(`/api/notes/${noteId}`, { method: 'DELETE' }),
 
   // Guest outreach — per-show template + prospects
+  oneSheetStatus: (projectId: string) =>
+    request<{
+      approvedAt: string | null
+      editedSinceApproval: boolean
+      history: Array<{ id: string; approvedAt: string; approvedByName: string | null }>
+    }>(`/api/outreach/projects/${projectId}/one-sheet/status`),
+  approveOneSheet: (projectId: string) =>
+    request<{ ok: true; approvedAt: string }>(
+      `/api/outreach/projects/${projectId}/one-sheet/approve`, { method: 'POST' },
+    ),
+  restoreOneSheet: (projectId: string, approvalId: string) =>
+    request<{ ok: true }>(
+      `/api/outreach/projects/${projectId}/one-sheet/restore/${approvalId}`, { method: 'POST' },
+    ),
+  testOpenStatus: (projectId: string) =>
+    request<{ test: { to: string; openCount: number; lastOpenedAt: string | null; sentAt: string | null } | null }>(
+      `/api/outreach/projects/${projectId}/test-open-status`,
+    ),
+  enableOpenTracking: () =>
+    request<{ ok: true; results: Array<{ domain: string; ok: boolean; detail?: string }> }>(
+      `/api/outreach/enable-open-tracking`, { method: 'POST' },
+    ),
+  getRolodex: () =>
+    request<{ contacts: ApiRolodexContact[] }>(`/api/outreach/rolodex`),
+  addRolodexBulk: (contacts: Array<{
+    name: string; email: string; fullName?: string;
+    recipientType?: 'person' | 'agent' | 'manager' | 'other'; clientName?: string;
+    context?: string; notes?: string;
+  }>) =>
+    request<{ ok: true; added: number; skipped: number }>(`/api/outreach/rolodex/bulk`, {
+      method: 'POST', body: JSON.stringify({ contacts }),
+    }),
+  deleteRolodexContact: (id: string) =>
+    request<{ ok: true }>(`/api/outreach/rolodex/${id}`, { method: 'DELETE' }),
+  importRolodexToProject: (projectId: string, contactIds: string[]) =>
+    request<{ ok: true; imported: number; dupes: number }>(
+      `/api/outreach/projects/${projectId}/rolodex-import`,
+      { method: 'POST', body: JSON.stringify({ contactIds }) },
+    ),
   outreachTemplate: (projectId: string) =>
     request<{ template: ApiOutreachTemplate | null }>(`/api/outreach/projects/${projectId}/template`),
-  saveOutreachTemplate: (projectId: string, body: { subject: string; body: string; fromName?: string; replyTo?: string }) =>
+  saveOutreachTemplate: (projectId: string, body: { subject: string; body: string; fromName?: string; replyTo?: string; location?: string }) =>
     request<{ ok: true }>(`/api/outreach/projects/${projectId}/template`, {
       method: 'PUT', body: JSON.stringify(body),
     }),
@@ -1362,10 +1424,10 @@ export const api = {
     request<{ ok: true; sentence: string }>(`/api/outreach/prospects/${prospectId}/generate-sentence`, {
       method: 'POST', body: JSON.stringify({}),
     }),
-  generateAllUniqueSentences: (projectId: string) =>
+  generateAllUniqueSentences: (projectId: string, overwrite = false) =>
     request<{ ok: true; generated: number; failed: number; insufficientContext: number }>(
       `/api/outreach/projects/${projectId}/generate-all-sentences`,
-      { method: 'POST', body: JSON.stringify({}) },
+      { method: 'POST', body: JSON.stringify({ overwrite }) },
     ),
   syncRssCovers: () =>
     request<{ ok: true; synced: number; skipped: number }>(
@@ -1376,19 +1438,31 @@ export const api = {
       `/api/outreach/projects/${projectId}/auto-populate-one-sheet`,
       { method: 'POST', body: JSON.stringify({}) },
     ),
-  sendOutreachCampaign: (projectId: string, prospectIds?: string[]) =>
+  verifyOutreachEmails: (projectId: string) =>
+    request<{ ok: true; checked: number; valid: number; risky: number; invalid: number }>(
+      `/api/outreach/projects/${projectId}/verify-emails`,
+      { method: 'POST', body: JSON.stringify({}) },
+    ),
+  sendOutreachCampaign: (
+    projectId: string,
+    opts?: { prospectIds?: string[]; startPreset?: 'now' | '5am_pt'; startAt?: string },
+  ) =>
     request<{
-      ok: true; queued: number; estimatedMinutes: number;
-      firstAt: string; lastAt: string;
+      ok: true; queued: number; scheduled: boolean; startAt: string;
+      estimatedMinutes: number; firstAt: string; lastAt: string;
       domainsUsed: number; perDomain: number[];
     }>(
       `/api/outreach/projects/${projectId}/send-campaign`,
-      { method: 'POST', body: JSON.stringify({ prospectIds: prospectIds ?? null }) },
+      { method: 'POST', body: JSON.stringify({
+        prospectIds: opts?.prospectIds ?? null,
+        startPreset: opts?.startPreset ?? 'now',
+        startAt: opts?.startAt ?? null,
+      }) },
     ),
-  testSendOutreach: (projectId: string, to: string) =>
+  testSendOutreach: (projectId: string, to: string, prospectId?: string) =>
     request<{ ok: true; from: string; to: string; subject: string; previewName: string }>(
       `/api/outreach/projects/${projectId}/test-send`,
-      { method: 'POST', body: JSON.stringify({ to }) },
+      { method: 'POST', body: JSON.stringify({ to, prospectId }) },
     ),
   bulkImportProspects: (projectId: string, rows: Array<{
     name: string; fullName?: string; email?: string;

@@ -165,6 +165,9 @@ export default function ProspectDetailModal({
                   <option key={o.value} value={o.value}>{o.label}</option>
                 ))}
               </select>
+              <span className="block text-[10px] text-muted/70 mt-1 leading-snug">
+                Not sure? Leave it on “The guest.” You don't have to know if it's their PR, agent, or manager.
+              </span>
             </label>
             {(recipientType === 'agent' || recipientType === 'manager') && (
               <label className="block">
@@ -180,22 +183,25 @@ export default function ProspectDetailModal({
 
           <label className="block">
             <span className="text-[10px] uppercase tracking-wider text-muted font-bold">
-              Context — Claude reads this to write the unique sentence
+              Who are they? — Claude turns this into their personal line
             </span>
             <textarea
               value={context}
               onChange={(e) => setContext(e.target.value)}
-              rows={4}
-              placeholder="Founder of X. Just launched Y. Recently guested on Diary of a CEO ep 342."
+              rows={3}
+              placeholder="Type a fact or two here… e.g. Comedian, just dropped a Netflix special on burnout"
               className="mt-1 w-full bg-ink/40 border border-line rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-stage-mastering"
             />
+            <span className="block text-[10px] text-muted/70 mt-1 leading-snug">
+              One line is plenty. Found the email on their Instagram and don't know whose it is? Say exactly that — Claude keeps it general.
+            </span>
           </label>
 
           <div className="rounded-xl border-2 border-emerald-500/40 bg-emerald-500/5 p-3 space-y-2">
             <div className="flex items-center justify-between gap-2">
               <div>
                 <div className="text-[10px] uppercase tracking-wider text-emerald-300 font-bold">Unique sentence</div>
-                <div className="text-[10px] text-emerald-100/70">Goes where [unique_sentence] appears in the template.</div>
+                <div className="text-[10px] text-emerald-100/70">Add a note above, then click Generate → it fills the [unique_sentence] spot in the email.</div>
               </div>
               <button
                 onClick={() => void generateSentence()}

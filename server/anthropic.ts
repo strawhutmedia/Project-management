@@ -1769,6 +1769,7 @@ export type UniqueSentenceInput = {
     recipientType: 'person' | 'agent' | 'manager' | 'other'
     clientName: string | null
     context: string | null         // Free-form facts about the prospect
+    email?: string | null          // Domain is a strong search disambiguator
   }
 }
 
@@ -1780,18 +1781,27 @@ export type UniqueSentenceResult = {
   }
 }
 
-const UNIQUE_SENTENCE_SYSTEM = `You write ONE sentence — exactly one — that goes in a cold-outreach email to a potential podcast guest. That sentence is the *reason we're reaching out to THIS person for THIS show*, and nothing else. No greeting, no signature, no lead-in, no "I hope this finds you well." Just the one specific sentence.
+const UNIQUE_SENTENCE_SYSTEM = `You write ONE sentence for a cold-outreach email to a potential podcast guest — the *reason we're reaching out to THIS person for THIS show*, and nothing else.
+
+If the "Context on them" note already gives you a specific, usable fact (a role, a project, a launch, a recent appearance), WRITE THE SENTENCE STRAIGHT FROM THAT — you do NOT need to search. Only use the web_search tool when the note is thin or empty, or to confirm/enrich a detail. When you do search, use the full name plus any employer, handle, or title you're given — the email address's domain is a strong hint about who and where they are. Run a few searches and stop the moment you have one specific, real, verifiable detail.
 
 Rules:
-- Reference something concrete about the recipient (their work, a talk, a piece, a role, a founding, a recent appearance) — NEVER generic praise.
-- Tie it to what THIS show actually is (its niche, its audience, its brand voice) — NOT a generic podcast pitch.
-- If the recipient is an agent or manager, the sentence pitches WHY WE WANT THEIR CLIENT ON — not the agent themselves. Address the agent as the sender, but the reason is about the client.
+- Write EXACTLY ONE sentence, 35 words max. Not two, not a paragraph.
+- NEVER open with a greeting, a salutation, or the recipient's name. Do NOT start with "Hi", "Hey", "Hello", "Dear", or "<name>," — the email template already opens with "Hi <name>,". Your sentence drops in AFTER that greeting, so it must start straight into the reason (e.g. "We'd love to have you on because…", "Your run on Love Island USA…"). A sentence that begins with a greeting produces a duplicated "Hi <name>" in the email.
+- Ground it in a SPECIFIC, REAL detail — name the actual thing (the project, the show they were on, the thing they built). NEVER vague filler like "your recent work", "what you've been putting out lately", or "the way you framed it".
+- Pick a FLATTERING hook, not just any true fact. NEVER build the pitch around a loss or a low placement — "finishing fourth", "runner-up", "came in second", "eliminated", "sent home", "didn't win". That reads as a backhanded compliment and kills the pitch. Name a competition placement ONLY if they actually WON or it's a genuine flex; otherwise frame around their story, their relationships, their personality, or the moment they're known for — the reason an audience wants to hear THEM — not the scoreboard. (E.g. for a reality-show cast member who didn't win, lead with their journey / a relationship / who they are, not their ranking.)
+- Connect that detail to what THIS show is about, but do NOT describe or summarize the show back at them — there's a link in the email for that.
+- NEVER invent facts. State only what you actually found via search or were explicitly told. If search surfaces a different person who happens to share the name, do not use it — only use a detail you're confident belongs to THIS person.
+- If the recipient is an agent or manager, the sentence pitches WHY WE WANT THEIR CLIENT ON — search the client, address the agent as the sender, but make the reason about the client. The FIRST time you name the client, use their FULL name exactly as given (e.g. "Amaya Espinal", not just "Amaya") — a bare first name for someone you've never emailed reads as oddly familiar.
 - If the recipient is the person themselves, address the reason to them directly.
-- Do not name-drop notable past guests unless it's a natural fit ("You'd be in good company alongside X" only if the pitch fits).
-- Keep it to a single sentence, ideally under 40 words. No em-dashes if you can avoid them; write conversationally.
-- If the operator context is thin and you'd have to invent facts, return the literal string "INSUFFICIENT_CONTEXT" — do NOT fabricate.
+- No em-dashes if you can avoid them. Write like a person, not a brand.
+- If the note gives you ANY real detail about the person, you MUST write the sentence from it. NEVER return INSUFFICIENT_CONTEXT when you were handed real facts — use them.
+- Only when the note is empty or vague AND (if you searched) search turned up nothing specific may you flag it. Never fall back to generic praise instead of flagging.
 
-Return ONLY the sentence (or the exact string INSUFFICIENT_CONTEXT). No wrapping quotes, no commentary.`
+OUTPUT CONTRACT — CRITICAL. Your entire reply is pasted VERBATIM into an email to a real person, so it must be EXACTLY ONE of:
+  (a) the single outreach sentence, nothing else — no quotes, no lead-in; OR
+  (b) the exact string INSUFFICIENT_CONTEXT, nothing else.
+NEVER describe your search, what you did or didn't find, your confidence, or your reasoning. NEVER write things like "based on what I found", "I couldn't verify", "I don't have", "search limit", or "this exact person". If you are not fully confident you hold one specific, real, verifiable detail about THIS person — including if you run out of searches or find only a vague/uncertain match — reply with exactly INSUFFICIENT_CONTEXT and nothing else. A flagged prospect is fine; a hedging paragraph landing in a real person's inbox is a disaster.`
 
 function uniqueSentenceUserBlock(input: UniqueSentenceInput): string {
   const s = input.show
@@ -1816,11 +1826,39 @@ function uniqueSentenceUserBlock(input: UniqueSentenceInput): string {
   lines.push(`First name (for greeting): ${p.name}`)
   if (p.fullName) lines.push(`Full name: ${p.fullName}`)
   lines.push(`Who they are: ${p.recipientType}${p.clientName ? ` for ${p.clientName}` : ''}`)
+  if (p.email) lines.push(`Email (the domain is a strong hint for who/where they are): ${p.email}`)
   if (p.context) lines.push(`Context on them: ${p.context}`)
-  else lines.push(`Context on them: (none provided)`)
+  else lines.push(`Context on them: (none provided — rely on web search)`)
   lines.push('')
   lines.push('Write the one sentence now.')
   return lines.join('\n')
+}
+
+// Phrases that only appear when the model is narrating its search or
+// hedging about uncertainty — never in a genuine one-line compliment. If
+// any show up (or the text runs long), it's not a usable sentence.
+const SENTENCE_META_MARKERS = [
+  'insufficient', 'search tool', 'search limit', 'tool limit', 'searches',
+  "i don't have", 'i do not have', "i couldn't", 'i could not',
+  "couldn't verify", 'could not verify', "couldn't find", 'could not find',
+  "couldn't confirm", 'could not confirm', 'unable to verify', 'unable to find',
+  'unable to confirm', "i wasn't able", 'i was not able',
+  'based on what i found', 'based on my search', 'from my search',
+  'not a concrete', "isn't a concrete", 'no concrete', 'concrete accomplishment',
+  'specific, verifiable', 'verifiable project', 'verifiable credit',
+  'not enough context', "don't have enough", 'not confident', 'cannot confirm',
+  "can't confirm", 'as an ai', 'i apologize', 'this exact person',
+]
+
+function isUnusableSentence(raw: string): boolean {
+  const lc = raw.toLowerCase()
+  if (raw.toUpperCase().includes('INSUFFICIENT_CONTEXT')) return true
+  if (SENTENCE_META_MARKERS.some((m) => lc.includes(m))) return true
+  // A real outreach line is one tight sentence (prompt caps it at 35 words).
+  // Anything much longer is the model narrating, not writing the line.
+  const words = raw.split(/\s+/).filter(Boolean).length
+  if (words > 45) return true
+  return false
 }
 
 export async function generateUniqueSentence(input: UniqueSentenceInput): Promise<UniqueSentenceResult> {
@@ -1829,31 +1867,68 @@ export async function generateUniqueSentence(input: UniqueSentenceInput): Promis
     prospect: input.prospect.fullName || input.prospect.name,
     recipientType: input.prospect.recipientType,
     contextChars: input.prospect.context?.length ?? 0,
+    hasEmail: Boolean(input.prospect.email),
   })
-  const response = await client.messages.create({
-    model: MODEL,
-    max_tokens: 300,
-    system: UNIQUE_SENTENCE_SYSTEM,
-    messages: [{
-      role: 'user',
-      content: [{
-        type: 'text',
-        text: uniqueSentenceUserBlock(input),
-        cache_control: { type: 'ephemeral' },
-      }],
-    }],
-  })
-  const textBlock = response.content.find((b) => b.type === 'text')
-  if (!textBlock || textBlock.type !== 'text') {
-    throw new Error('outreach: claude returned no text block')
+  // If the operator gave us facts, write the sentence STRAIGHT from them —
+  // no web search at all. That removes the "search failed → rambled" failure
+  // mode entirely. Only reach for search when the note is empty and we have
+  // to find something ourselves.
+  const hasFacts = (input.prospect.context ?? '').trim().length > 0
+  const messages: Anthropic.MessageParam[] = [{
+    role: 'user',
+    content: [{ type: 'text', text: uniqueSentenceUserBlock(input) }],
+  }]
+  const params = (): Anthropic.MessageCreateParamsNonStreaming => {
+    const p: Anthropic.MessageCreateParamsNonStreaming = {
+      model: MODEL,
+      max_tokens: hasFacts ? 512 : 4096,
+      system: UNIQUE_SENTENCE_SYSTEM,
+      messages,
+    }
+    if (!hasFacts) {
+      p.tools = [{ type: 'web_search_20260209', name: 'web_search', max_uses: 6 }]
+    }
+    return p
   }
-  // Strip common junk: leading/trailing quotes, "Sentence:" prefix,
-  // trailing period trimming, etc. Keep it tight.
-  const raw = textBlock.text.trim()
+
+  let response = await client.messages.create(params())
+  // web_search runs a server-side tool loop; if it exceeds the internal
+  // iteration cap the turn pauses — re-send to let it finish. Bounded so a
+  // misbehaving turn can't loop forever.
+  let guard = 0
+  while (response.stop_reason === 'pause_turn' && guard < 5) {
+    guard += 1
+    messages.push({ role: 'assistant', content: response.content })
+    response = await client.messages.create(params())
+  }
+
+  // The sentence is the LAST text block — earlier text blocks can be the
+  // model reasoning out loud between searches.
+  const texts = response.content.filter((b): b is Anthropic.TextBlock => b.type === 'text')
+  let raw = (texts.length ? texts[texts.length - 1].text : '').trim()
     .replace(/^["'`]|["'`]$/g, '')
     .replace(/^(sentence|response):\s*/i, '')
     .trim()
-  if (raw === 'INSUFFICIENT_CONTEXT') {
+  // Belt-and-suspenders: the email template already opens with "Hi <name>,".
+  // If the model still led with its own greeting/salutation, strip it so the
+  // recipient doesn't get a doubled "Hi <name>". Handles "Hi Steven, we'd…",
+  // "Hey there —", "Hello Dr. Lee:", etc. — remove the leading salutation and
+  // re-capitalize what's left.
+  {
+    const stripped = raw.replace(
+      /^(hi|hey|hello|dear|greetings|hi there|hey there)\b[^,:—-]*[,:—-]\s*/i,
+      '',
+    )
+    if (stripped && stripped !== raw) {
+      raw = stripped.charAt(0).toUpperCase() + stripped.slice(1)
+    }
+  }
+  // Guard: the model sometimes narrates its search or hedges instead of
+  // returning a clean sentence or the exact flag. Any such output would be
+  // pasted verbatim into a real email, so reject it and flag the prospect
+  // rather than let a "based on what I found, I couldn't verify…" paragraph
+  // go out. Better a flagged prospect than an embarrassing send.
+  if (!raw || isUnusableSentence(raw)) {
     throw new Error('insufficient_context')
   }
   return {

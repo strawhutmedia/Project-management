@@ -10,6 +10,7 @@ import { useEffect, useRef, useState } from 'react'
 import { api, type ApiOutreachProspect, type ApiOutreachTemplate } from '../api'
 import { useAuth } from '../auth'
 import ProspectDetailModal from './ProspectDetailModal'
+import RolodexPanel from './RolodexPanel'
 
 const RECIPIENT_LABEL: Record<ApiOutreachProspect['recipient_type'], string> = {
   person: 'The guest',
@@ -35,18 +36,20 @@ const STATUS_STYLE: Record<ApiOutreachProspect['status'], { bg: string; label: s
 // customizes this to fit its actual format.
 const DEFAULT_TEMPLATE_BODY = `Hi [name],
 
-I'm producing a podcast at Straw Hut Media and we'd love to have you on.
+I'm a producer at Straw Hut Media.
 
 [unique_sentence]
 
-Our episodes run about 45 minutes and are edited into a polished cut. Guests get the audio + a highlight clip package to share wherever they'd like.
+We record a full conversation — usually about an hour — then edit it down into a polished episode. You'll get the audio plus a highlight clip package to share wherever you'd like.
 
-Would you have 30 minutes this month or next to jump on a call and see if it's a fit?
+[location]
+
+If it sounds like a fit, just reply and we'll get [guest] booked in for this week or next.
 
 More about the show: [one_sheet_url]
 
 Best,
-Ryan`
+[sender]`
 
 export default function OutreachSection({ projectId }: { projectId: string }) {
   const { user } = useAuth()
@@ -54,20 +57,36 @@ export default function OutreachSection({ projectId }: { projectId: string }) {
   const [subject, setSubject] = useState('Guesting on our podcast — [name]')
   const [body, setBody] = useState(DEFAULT_TEMPLATE_BODY)
   const [replyTo, setReplyTo] = useState('booking@strawhutmedia.com')
+  const [location, setLocation] = useState('either')
   const [saving, setSaving] = useState(false)
   const [savedAt, setSavedAt] = useState<number | null>(null)
   const [prospects, setProspects] = useState<ApiOutreachProspect[] | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [addOpen, setAddOpen] = useState(false)
   const [bulkOpen, setBulkOpen] = useState(false)
+  const [rolodexOpen, setRolodexOpen] = useState(false)
+  const [oneSheetApproval, setOneSheetApproval] = useState<{ approvedAt: string | null; editedSinceApproval: boolean } | null>(null)
   const [openProspect, setOpenProspect] = useState<ApiOutreachProspect | null>(null)
   const [generatingAll, setGeneratingAll] = useState(false)
   const [sendingCampaign, setSendingCampaign] = useState(false)
   const [campaignResult, setCampaignResult] = useState<string | null>(null)
+  // Calm, non-error banner for the "Generate all sentences" outcome.
+  // Kept separate from `error` so a normal result (some written, some
+  // still needing a note) never renders in the red error banner.
+  const [generateResult, setGenerateResult] = useState<{ text: string; tone: 'success' | 'info' } | null>(null)
+  // Email-verification (MX check) state + its own calm result banner.
+  const [verifying, setVerifying] = useState(false)
+  const [verifyResult, setVerifyResult] = useState<{ text: string; tone: 'success' | 'info' | 'warn' } | null>(null)
   // Test-send bar
   const [testTo, setTestTo] = useState(user?.email ?? 'ryan@strawhutmedia.com')
   const [testSending, setTestSending] = useState(false)
   const [testResult, setTestResult] = useState<string | null>(null)
+  const [testOpens, setTestOpens] = useState<number | null>(null)
+  // Which contact the test email is built from. Defaults to the first
+  // prospect once the list loads; if there's only one, it's simply selected.
+  const [testProspectId, setTestProspectId] = useState<string | null>(null)
+  // Custom campaign start time (datetime-local, in the operator's local tz).
+  const [customStart, setCustomStart] = useState('')
   // Refs so token-insert buttons can drop a token at the current cursor
   // position rather than always appending to the end.
   const subjectRef = useRef<HTMLInputElement | null>(null)
@@ -95,14 +114,37 @@ export default function OutreachSection({ projectId }: { projectId: string }) {
     if (user?.email) setTestTo(user.email)
   }, [user?.email])
 
+  // Default the "preview using" contact to the first prospect once the list
+  // loads (prefer one that already has a written sentence). If the current
+  // pick is gone (deleted), fall back to the first available.
+  useEffect(() => {
+    if (!prospects || prospects.length === 0) { setTestProspectId(null); return }
+    setTestProspectId((cur) => {
+      if (cur && prospects.some((p) => p.id === cur)) return cur
+      const withSentence = prospects.find((p) => p.unique_sentence && p.unique_sentence.trim())
+      return (withSentence ?? prospects[0]).id
+    })
+  }, [prospects])
+
   async function sendTest() {
     if (!testTo.trim()) return
     setTestSending(true)
     setTestResult(null)
+    setTestOpens(null)
     setError(null)
     try {
-      const r = await api.testSendOutreach(projectId, testTo.trim())
-      setTestResult(`✓ Sent to ${r.to} · using preview name "${r.previewName}" · check your inbox in a moment.`)
+      const r = await api.testSendOutreach(projectId, testTo.trim(), testProspectId ?? undefined)
+      setTestResult(`✓ Sent to ${r.to} · using ${r.previewName}'s email · open it and watch the counter below.`)
+      // Poll the test's open count so you can SEE tracking work live.
+      let ticks = 0
+      const poll = setInterval(async () => {
+        ticks += 1
+        try {
+          const s = await api.testOpenStatus(projectId)
+          if (s.test) setTestOpens(s.test.openCount)
+        } catch { /* ignore */ }
+        if (ticks >= 40) clearInterval(poll) // ~4 min then stop
+      }, 6000)
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'test send failed'
       setTestResult(`✕ ${msg}`)
@@ -119,6 +161,7 @@ export default function OutreachSection({ projectId }: { projectId: string }) {
         setSubject(r.template.subject || 'Guesting on our podcast — [name]')
         setBody(r.template.body || DEFAULT_TEMPLATE_BODY)
         setReplyTo(r.template.reply_to || 'booking@strawhutmedia.com')
+        setLocation(r.template.location || 'either')
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'template load failed')
@@ -134,16 +177,45 @@ export default function OutreachSection({ projectId }: { projectId: string }) {
     }
   }
 
+  const [trackingMsg, setTrackingMsg] = useState<string | null>(null)
+  async function enableTracking() {
+    setTrackingMsg('Turning on open tracking…')
+    try {
+      const r = await api.enableOpenTracking()
+      const ok = r.results.filter((x) => x.ok).map((x) => x.domain)
+      const bad = r.results.filter((x) => !x.ok)
+      setTrackingMsg(
+        (ok.length ? `✓ Open tracking on for ${ok.join(', ')}. ` : '') +
+        (bad.length ? `⚠ ${bad.map((b) => `${b.domain} (${b.detail})`).join('; ')}` : '') +
+        (r.results.length === 0 ? 'No verified sending domains found.' : ''),
+      )
+    } catch (e) {
+      setTrackingMsg(e instanceof Error ? e.message : 'failed')
+    }
+  }
+
+  async function loadOneSheetApproval() {
+    try {
+      const s = await api.oneSheetStatus(projectId)
+      setOneSheetApproval({ approvedAt: s.approvedAt, editedSinceApproval: s.editedSinceApproval })
+    } catch { /* non-fatal */ }
+  }
+
   useEffect(() => {
     void loadTemplate()
     void loadProspects()
+    void loadOneSheetApproval()
+    // The one-sheet is approved in a sibling card on the same screen, so poll
+    // its status to keep the send gate live without a page refresh.
+    const t = setInterval(() => { void loadOneSheetApproval() }, 15_000)
+    return () => clearInterval(t)
   }, [projectId])
 
   async function saveTemplate() {
     setSaving(true)
     setError(null)
     try {
-      await api.saveOutreachTemplate(projectId, { subject, body, replyTo })
+      await api.saveOutreachTemplate(projectId, { subject, body, replyTo, location })
       setSavedAt(Date.now())
       await loadTemplate()
     } catch (err) {
@@ -183,18 +255,87 @@ export default function OutreachSection({ projectId }: { projectId: string }) {
     }
   }
 
-  async function sendCampaign() {
-    const readyList = (prospects ?? []).filter(
-      (p) => p.status === 'ready' && p.email && p.unique_sentence?.trim(),
-    )
-    if (readyList.length === 0) {
-      setError('No prospects are Ready. Each needs an email + a unique sentence.')
+  async function verifyEmails() {
+    setVerifying(true)
+    setError(null)
+    setVerifyResult(null)
+    try {
+      const r = await api.verifyOutreachEmails(projectId)
+      const fresh = await api.outreachProspects(projectId)
+      setProspects(fresh.prospects)
+      if (r.checked === 0) {
+        setVerifyResult({ text: 'No addresses to check yet — add some prospects with emails first.', tone: 'info' })
+        return
+      }
+      const parts = [`✓ Checked ${r.checked} address${r.checked === 1 ? '' : 'es'}: ${r.valid} good`]
+      if (r.risky > 0) parts.push(`${r.risky} risky (no mail server — may not deliver)`)
+      if (r.invalid > 0) parts.push(`${r.invalid} undeliverable (won't be sent)`)
+      const tone: 'success' | 'warn' = r.invalid > 0 || r.risky > 0 ? 'warn' : 'success'
+      const tail = r.invalid > 0
+        ? ' Look for the red tags below — fix or remove those before sending.'
+        : ''
+      setVerifyResult({ text: parts.join(' · ') + '.' + tail, tone })
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'verify failed')
+    } finally {
+      setVerifying(false)
+    }
+  }
+
+  async function sendCampaign(mode: 'now' | '5am_pt' | 'custom' = 'now', customIso?: string) {
+    if (mode === 'custom') {
+      if (!customIso) { setError('Pick a date and time to schedule.'); return }
+      if (new Date(customIso).getTime() <= Date.now()) { setError('Pick a time in the future to schedule.'); return }
+    }
+    // NO SKIPPING (Ryan's rule): every live contact must be fully filled out
+    // — email + facts + sentence — and verified + deliverable, or we don't
+    // send at all. This mirrors the server gate for instant feedback; the
+    // server enforces it for real.
+    const active = (prospects ?? []).filter((p) => !CAMPAIGN_DONE.includes(p.status))
+    if (active.length === 0) { setError('No contacts to send yet — add prospects first.'); return }
+    const noFacts = active.filter((p) => !p.context?.trim())
+    const noSentence = active.filter((p) => !p.unique_sentence?.trim())
+    const noEmail = active.filter((p) => !p.email)
+    const notVerified = active.filter((p) => p.email && p.email_check_status === 'unchecked')
+    const badEmail = active.filter((p) => p.email && p.email_check_status === 'invalid')
+    const problems: string[] = []
+    if (noFacts.length) problems.push(`${noFacts.length} missing facts`)
+    if (noSentence.length) problems.push(`${noSentence.length} missing a sentence`)
+    if (noEmail.length) problems.push(`${noEmail.length} missing an email`)
+    if (notVerified.length) problems.push(`${notVerified.length} not verified — click “✅ Verify emails”`)
+    if (badEmail.length) problems.push(`${badEmail.length} with a bad email address`)
+    if (problems.length > 0) {
+      const names = Array.from(new Set(
+        [...noFacts, ...noSentence, ...noEmail, ...notVerified, ...badEmail].map((p) => p.name),
+      )).slice(0, 15)
+      setError(`Can't send yet — every contact has to be filled out first (${problems.join(', ')}). Fix these: ${names.join(', ')}${names.length >= 15 ? '…' : ''}.`)
       return
     }
+    // Hard gate: one-sheet must be approved and unedited since.
+    if (!(oneSheetApproval?.approvedAt && !oneSheetApproval.editedSinceApproval)) {
+      setError(
+        oneSheetApproval?.approvedAt
+          ? 'The one-sheet was edited since it was approved — re-approve it before sending (One-sheet card → “Approve for blasts”).'
+          : 'Approve the one-sheet before sending — open the One-sheet card and click “Approve for blasts.”',
+      )
+      return
+    }
+    const when = mode === '5am_pt' ? 'starting at the next 5 AM PT'
+      : mode === 'custom' ? `starting ${new Date(customIso!).toLocaleString()}`
+      : 'starting now'
+    const spread = Math.round((active.length * 135) / 60)
+    const osNote = oneSheetApproval?.approvedAt && !oneSheetApproval.editedSinceApproval
+      ? `One-sheet approved ${new Date(oneSheetApproval.approvedAt).toLocaleDateString()}. `
+      : oneSheetApproval?.approvedAt
+        ? `⚠ Heads up — the one-sheet was EDITED since it was approved (${new Date(oneSheetApproval.approvedAt).toLocaleDateString()}). You may want to re-approve it before blasting. `
+        : `⚠ Heads up — the one-sheet hasn't been approved yet. `
     const ok = confirm(
-      `Send ${readyList.length} outreach emails?\n\n` +
+      `Send ${active.length} outreach emails, ${when}?\n\n` +
+      osNote + '\n\n' +
       `Slate will jitter them 90-180s apart via your verified sending domains. ` +
-      `Estimated wall-clock time: ${Math.round((readyList.length * 135) / 60)} minutes.\n\n` +
+      (mode === 'now'
+        ? `Estimated wall-clock time: ${spread} minutes.\n\n`
+        : `They'll begin at the scheduled time and trickle out over ~${spread} minutes from there.\n\n`) +
       `You can't stop the campaign once it starts. Test one to yourself first?`,
     )
     if (!ok) return
@@ -202,35 +343,80 @@ export default function OutreachSection({ projectId }: { projectId: string }) {
     setError(null)
     setCampaignResult(null)
     try {
-      const r = await api.sendOutreachCampaign(projectId)
+      const r = await api.sendOutreachCampaign(
+        projectId,
+        mode === 'custom' ? { startAt: customIso } : { startPreset: mode },
+      )
       const split = r.perDomain.length > 1
         ? ` Rotating across ${r.domainsUsed} domains (~${r.perDomain.join('/')} sends each) to protect reputation.`
         : ` Sending from ${r.domainsUsed} verified domain. Add more in Sending domains to spread load.`
       setCampaignResult(
-        `✓ Campaign queued: ${r.queued} emails will send over the next ~${r.estimatedMinutes} min. ` +
-        `First fires around ${new Date(r.firstAt).toLocaleTimeString()}, last around ${new Date(r.lastAt).toLocaleTimeString()}.` +
-        split,
+        r.scheduled
+          ? `✓ Campaign scheduled: ${r.queued} emails will start ${new Date(r.startAt).toLocaleString()} ` +
+            `and finish around ${new Date(r.lastAt).toLocaleTimeString()}.` + split
+          : `✓ Campaign queued: ${r.queued} emails will send over the next ~${r.estimatedMinutes} min. ` +
+            `First fires around ${new Date(r.firstAt).toLocaleTimeString()}, last around ${new Date(r.lastAt).toLocaleTimeString()}.` +
+            split,
       )
       await loadProspects()
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'campaign failed')
+      const raw = err instanceof Error ? err.message : 'campaign failed'
+      // Drop the "error_code: " prefix so the plain-English detail shows.
+      setError(raw.replace(/^[a-z0-9_]+:\s*/, ''))
     } finally {
       setSendingCampaign(false)
     }
   }
 
-  async function generateAllSentences() {
-    if (!confirm('Generate a unique sentence for every prospect that doesn\'t already have one? Uses Claude and takes ~10s per 5 prospects.')) return
+  async function generateAllSentences(overwrite = false) {
+    const confirmMsg = overwrite
+      ? 'Rewrite the sentence for EVERY prospect with the latest AI? Claude researches each person on the web, so this replaces what\'s there now (including any you edited by hand) and takes ~15-20s per prospect.'
+      : 'Generate a unique sentence for every prospect that doesn\'t already have one? Claude researches each person on the web to find something specific — about ~15-20s per prospect.'
+    if (!confirm(confirmMsg)) return
+    await runGenerate(overwrite)
+  }
+
+  // Core generation (no confirm) — also reused by the bulk-import
+  // "generate after importing" flow so an upload goes straight to sentences.
+  async function runGenerate(overwrite: boolean) {
     setGeneratingAll(true)
     setError(null)
+    setGenerateResult(null)
     try {
-      const r = await api.generateAllUniqueSentences(projectId)
-      setError(
-        `✓ Generated ${r.generated} sentence${r.generated === 1 ? '' : 's'}. ` +
-        (r.insufficientContext > 0 ? `${r.insufficientContext} skipped (not enough context — add a line to each and retry). ` : '') +
-        (r.failed > 0 ? `${r.failed} failed. ` : ''),
-      )
-      await loadProspects()
+      const r = await api.generateAllUniqueSentences(projectId, overwrite)
+      // Reload so the list — and the "who still needs a note" list
+      // below — reflects what actually got written.
+      const fresh = await api.outreachProspects(projectId)
+      setProspects(fresh.prospects)
+      // Anyone still without a sentence needs a one-line note (either
+      // none was given, or it was too thin for Claude to write anything
+      // specific). We name them so it's obvious who to click.
+      const needNote = fresh.prospects.filter((p) => !p.unique_sentence?.trim())
+      const parts: string[] = []
+      if (r.generated > 0) {
+        parts.push(`✓ Wrote ${r.generated} sentence${r.generated === 1 ? '' : 's'}.`)
+      }
+      if (needNote.length > 0) {
+        const names = needNote.slice(0, 3).map((p) => p.name).join(', ')
+        const more = needNote.length > 3 ? `, and ${needNote.length - 3} more` : ''
+        const who = needNote.length === 1 ? 'person needs' : 'people need'
+        const them = needNote.length === 1 ? 'that person' : 'each one'
+        parts.push(
+          `${needNote.length} ${who} a quick one-line note first: ${names}${more}. ` +
+          `Click ${them} in the list, add a sentence about who they are ` +
+          `(what they do + something recent), then press Generate again.`,
+        )
+      }
+      if (r.failed > 0) {
+        parts.push(`${r.failed} hit a snag — try Generate again in a moment.`)
+      }
+      if (parts.length === 0) {
+        parts.push('Everyone already has a sentence — nothing new to generate.')
+      }
+      setGenerateResult({
+        text: parts.join(' '),
+        tone: needNote.length === 0 && r.failed === 0 ? 'success' : 'info',
+      })
     } catch (err) {
       setError(err instanceof Error ? err.message : 'generate failed')
     } finally {
@@ -242,6 +428,25 @@ export default function OutreachSection({ projectId }: { projectId: string }) {
   const needsEmailCount = prospects?.filter((p) => p.status === 'needs_email').length ?? 0
   const sentCount = prospects?.filter((p) => p.status === 'sent').length ?? 0
   const repliedCount = prospects?.filter((p) => p.status === 'replied').length ?? 0
+  // Addresses with an email that still need the deliverability check.
+  const uncheckedCount = prospects?.filter(
+    (p) => p.email && p.email_check_status === 'unchecked'
+      && p.status !== 'sent' && p.status !== 'replied' && p.status !== 'opted_out',
+  ).length ?? 0
+  // Live outreach targets (not already sent/replied/opted-out/bounced or
+  // in-flight). NO SKIPPING: every one must be fully filled out — facts +
+  // sentence + email — and verified + deliverable before the campaign can
+  // go. incompleteCount > 0 BLOCKS the send button entirely.
+  const CAMPAIGN_DONE = ['sent', 'replied', 'opted_out', 'bounced', 'queued']
+  const activeProspects = (prospects ?? []).filter((p) => !CAMPAIGN_DONE.includes(p.status))
+  const incompleteCount = activeProspects.filter(
+    (p) => !p.context?.trim() || !p.unique_sentence?.trim() || !p.email
+      || p.email_check_status === 'unchecked' || p.email_check_status === 'invalid',
+  ).length
+  // One-sheet must be approved and unedited since to send. Null (not loaded /
+  // fetch failed) is treated as not-ok — the server enforces it regardless.
+  const oneSheetOk = Boolean(oneSheetApproval?.approvedAt && !oneSheetApproval.editedSinceApproval)
+  const sendBlocked = incompleteCount > 0 || !oneSheetOk
 
   return (
     <section className="rounded-2xl border border-line bg-panel/60 p-4 sm:p-5 space-y-5">
@@ -318,14 +523,32 @@ export default function OutreachSection({ projectId }: { projectId: string }) {
                 className="mt-1 w-full bg-ink/40 border border-line rounded-lg px-3 py-2 text-sm font-mono focus:outline-none focus:border-stage-mastering"
               />
             </label>
-            <label className="block">
-              <span className="text-[10px] uppercase tracking-wider text-muted font-bold">Reply-to</span>
-              <input
-                value={replyTo}
-                onChange={(e) => setReplyTo(e.target.value)}
-                className="mt-1 w-full bg-ink/40 border border-line rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-stage-mastering"
-              />
-            </label>
+            <div className="grid grid-cols-2 gap-3">
+              <label className="block">
+                <span className="text-[10px] uppercase tracking-wider text-muted font-bold">Reply-to</span>
+                <input
+                  value={replyTo}
+                  onChange={(e) => setReplyTo(e.target.value)}
+                  className="mt-1 w-full bg-ink/40 border border-line rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-stage-mastering"
+                />
+              </label>
+              <label className="block">
+                <span className="text-[10px] uppercase tracking-wider text-muted font-bold">Recording location <span className="text-stage-mastering">(fills [location])</span></span>
+                <select
+                  value={location}
+                  onChange={(e) => setLocation(e.target.value)}
+                  className="mt-1 w-full bg-ink/40 border border-line rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-stage-mastering"
+                >
+                  <option value="either">LA or New York studio — in person preferred</option>
+                  <option value="la">LA studio — in person preferred</option>
+                  <option value="ny">New York studio — in person preferred</option>
+                  <option value="remote">Remote only (video)</option>
+                </select>
+                <span className="block text-[10px] text-muted/70 mt-1 leading-snug">
+                  Pick where this show tapes before you blast — it sets what the [location] line says in every email. Save the template to apply.
+                </span>
+              </label>
+            </div>
             <button
               onClick={() => void saveTemplate()}
               disabled={saving}
@@ -343,10 +566,32 @@ export default function OutreachSection({ projectId }: { projectId: string }) {
                 <div className="flex-1">
                   <div className="text-[10px] uppercase tracking-wider text-amber-300 font-bold">Send test</div>
                   <div className="text-[10px] text-amber-100/70">
-                    Fires a real email so you can see exactly what recipients will get. Uses the first prospect's context (or a stand-in if none).
+                    Fires a real email so you can see exactly what recipients will get. Pick which contact to preview, then where to send it.
                   </div>
                 </div>
               </div>
+              {prospects && prospects.length > 0 && (
+                <label className="block">
+                  <span className="text-[10px] uppercase tracking-wider text-amber-200/80 font-bold">Preview which contact</span>
+                  {prospects.length === 1 ? (
+                    <div className="mt-1 text-sm text-amber-50">
+                      {prospects[0].name}{prospects[0].email ? ` · ${prospects[0].email}` : ''}
+                    </div>
+                  ) : (
+                    <select
+                      value={testProspectId ?? ''}
+                      onChange={(e) => setTestProspectId(e.target.value || null)}
+                      className="mt-1 w-full bg-ink/40 border border-amber-400/40 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:border-amber-300"
+                    >
+                      {prospects.map((p) => (
+                        <option key={p.id} value={p.id}>
+                          {p.name}{p.client_name ? ` (for ${p.client_name})` : ''}{p.email ? ` · ${p.email}` : ''}{p.unique_sentence?.trim() ? '' : ' — no sentence yet'}
+                        </option>
+                      ))}
+                    </select>
+                  )}
+                </label>
+              )}
               <div className="flex items-center gap-2 flex-wrap">
                 <input
                   type="email"
@@ -368,6 +613,13 @@ export default function OutreachSection({ projectId }: { projectId: string }) {
                   {testResult}
                 </div>
               )}
+              {testOpens !== null && (
+                <div className={`text-[11px] font-bold ${testOpens > 0 ? 'text-sky-300' : 'text-muted'}`}>
+                  {testOpens > 0
+                    ? `👁 Your test has been opened ${testOpens}× — open tracking is working!`
+                    : '👁 Waiting for an open… open the test email in your inbox (can take a minute).'}
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -382,29 +634,138 @@ export default function OutreachSection({ projectId }: { projectId: string }) {
             </div>
           )}
 
+          {trackingMsg && (
+            <div className="rounded-lg border border-sky-500/40 bg-sky-500/10 px-3 py-2 text-xs text-sky-100">
+              {trackingMsg}
+            </div>
+          )}
+
+          {generateResult && (
+            <div
+              className={`rounded-lg border px-3 py-2 text-xs ${
+                generateResult.tone === 'success'
+                  ? 'border-emerald-500/40 bg-emerald-500/10 text-emerald-100'
+                  : 'border-sky-500/40 bg-sky-500/10 text-sky-100'
+              }`}
+            >
+              {generateResult.text}
+            </div>
+          )}
+
+          {verifyResult && (
+            <div
+              className={`rounded-lg border px-3 py-2 text-xs ${
+                verifyResult.tone === 'success'
+                  ? 'border-emerald-500/40 bg-emerald-500/10 text-emerald-100'
+                  : verifyResult.tone === 'warn'
+                    ? 'border-amber-500/40 bg-amber-500/10 text-amber-100'
+                    : 'border-sky-500/40 bg-sky-500/10 text-sky-100'
+              }`}
+            >
+              {verifyResult.text}
+            </div>
+          )}
+
           <div className="flex items-baseline justify-between gap-2 flex-wrap">
             <h3 className="text-[10px] uppercase tracking-[0.2em] text-muted font-bold">Prospects</h3>
             <div className="flex items-center gap-2 flex-wrap">
               {/* Ryan's ship-it button. Big, obvious, red-pink so it
                   reads as "irreversible action". */}
-              {readyCount > 0 && (
-                <button
-                  onClick={() => void sendCampaign()}
-                  disabled={sendingCampaign}
-                  className="text-[10px] uppercase tracking-wider text-white bg-gradient-to-r from-urgent to-stage-mastering rounded-full px-3 py-1 hover:opacity-90 disabled:opacity-40 font-bold shadow-lg"
-                  title={`Send ${readyCount} outreach emails now, jittered across your verified sending domains.`}
+              {activeProspects.length > 0 && oneSheetApproval && (
+                <span
+                  className={`text-[10px] uppercase tracking-wider font-bold ${
+                    oneSheetApproval.approvedAt && !oneSheetApproval.editedSinceApproval ? 'text-emerald-300' : 'text-amber-300'
+                  }`}
+                  title="The one-sheet every email links to. Approve it (in the One-sheet card) so you know it's safe to blast."
                 >
-                  {sendingCampaign ? 'Queueing…' : `🚀 Send campaign (${readyCount})`}
+                  {oneSheetApproval.approvedAt && !oneSheetApproval.editedSinceApproval
+                    ? `📄 ✓ approved ${new Date(oneSheetApproval.approvedAt).toLocaleDateString()}`
+                    : oneSheetApproval.approvedAt
+                      ? '📄 ⚠ edited since approval'
+                      : '📄 ⚠ not approved'}
+                </span>
+              )}
+              {activeProspects.length > 0 && (
+                <>
+                  <button
+                    onClick={() => void sendCampaign('now')}
+                    disabled={sendingCampaign || sendBlocked}
+                    className="text-[10px] uppercase tracking-wider text-white bg-gradient-to-r from-urgent to-stage-mastering rounded-full px-3 py-1 hover:opacity-90 disabled:opacity-40 font-bold shadow-lg"
+                    title={
+                      incompleteCount > 0
+                        ? `${incompleteCount} contact${incompleteCount === 1 ? ' is' : 's are'} not filled out yet (facts, sentence, email, or verification). Every contact must be complete before you can send — nobody gets skipped.`
+                        : !oneSheetOk
+                          ? 'The one-sheet must be approved before you can send. Open the One-sheet card and click “Approve for blasts.”'
+                          : `Send ${activeProspects.length} outreach emails now, jittered across your verified sending domains.`
+                    }
+                  >
+                    {sendingCampaign
+                      ? 'Queueing…'
+                      : incompleteCount > 0
+                        ? `🔒 ${incompleteCount} to finish before sending`
+                        : !oneSheetOk
+                          ? '🔒 Approve one-sheet to send'
+                          : `🚀 Send now (${activeProspects.length})`}
+                  </button>
+                  {!sendBlocked && (
+                    <button
+                      onClick={() => void sendCampaign('5am_pt')}
+                      disabled={sendingCampaign}
+                      className="text-[10px] uppercase tracking-wider text-stage-mastering border border-stage-mastering/40 rounded-full px-3 py-1 hover:bg-stage-mastering/10 disabled:opacity-40 font-bold"
+                      title={`Schedule all ${activeProspects.length} emails to start going out at the next 5 AM Pacific, then trickle out from there.`}
+                    >
+                      {sendingCampaign ? 'Scheduling…' : '🕔 Schedule 5 AM PT'}
+                    </button>
+                  )}
+                  {!sendBlocked && (
+                    <span className="inline-flex items-center gap-1">
+                      <input
+                        type="datetime-local"
+                        value={customStart}
+                        onChange={(e) => setCustomStart(e.target.value)}
+                        className="bg-ink/40 border border-line rounded-lg px-2 py-1 text-[10px] focus:outline-none focus:border-stage-mastering"
+                        title="Pick your own start date and time (your local time)."
+                      />
+                      <button
+                        onClick={() => void sendCampaign('custom', customStart ? new Date(customStart).toISOString() : undefined)}
+                        disabled={sendingCampaign || !customStart}
+                        className="text-[10px] uppercase tracking-wider text-stage-mastering border border-stage-mastering/40 rounded-full px-3 py-1 hover:bg-stage-mastering/10 disabled:opacity-40 font-bold"
+                        title="Schedule the campaign to start at the date/time you picked."
+                      >
+                        🗓 Schedule
+                      </button>
+                    </span>
+                  )}
+                </>
+              )}
+              {uncheckedCount > 0 && (
+                <button
+                  onClick={() => void verifyEmails()}
+                  disabled={verifying}
+                  className="text-[10px] uppercase tracking-wider text-sky-950 bg-sky-400 rounded-full px-3 py-1 hover:bg-sky-300 disabled:opacity-40 font-bold"
+                  title="Check each address's domain can actually receive mail (MX lookup) before you send. Required before a campaign can go out."
+                >
+                  {verifying ? 'Verifying…' : `✅ Verify emails (${uncheckedCount})`}
                 </button>
               )}
               {prospects && prospects.some((p) => !p.unique_sentence) && (
                 <button
-                  onClick={() => void generateAllSentences()}
+                  onClick={() => void generateAllSentences(false)}
                   disabled={generatingAll}
                   className="text-[10px] uppercase tracking-wider text-emerald-950 bg-emerald-400 rounded-full px-3 py-1 hover:bg-emerald-300 disabled:opacity-40 font-bold"
                   title="Generate a Claude-written sentence for every prospect that's missing one."
                 >
                   {generatingAll ? 'Generating…' : `✨ Generate all sentences (${prospects.filter((p) => !p.unique_sentence).length})`}
+                </button>
+              )}
+              {prospects && prospects.some((p) => p.unique_sentence?.trim()) && (
+                <button
+                  onClick={() => void generateAllSentences(true)}
+                  disabled={generatingAll}
+                  className="text-[10px] uppercase tracking-wider text-emerald-300 border border-emerald-500/40 rounded-full px-3 py-1 hover:bg-emerald-500/10 disabled:opacity-40 font-bold"
+                  title="Rewrite the sentence for every prospect using the latest AI — replaces what's there now."
+                >
+                  {generatingAll ? 'Working…' : `🔄 Regenerate all (${prospects.filter((p) => p.unique_sentence?.trim()).length})`}
                 </button>
               )}
               <button
@@ -427,6 +788,24 @@ export default function OutreachSection({ projectId }: { projectId: string }) {
               >
                 {addOpen ? 'Cancel' : '+ Add one'}
               </button>
+              <button
+                onClick={() => setRolodexOpen((v) => !v)}
+                className={`text-[10px] uppercase tracking-wider border rounded-full px-3 py-1 font-bold ${
+                  rolodexOpen
+                    ? 'text-muted border-line'
+                    : 'text-stage-tracking border-stage-tracking/40 hover:bg-stage-tracking/10'
+                }`}
+                title="The Straw Hut Rolodex — everyone who's replied, plus contacts you add. Pull them into this show."
+              >
+                {rolodexOpen ? 'Hide Rolodex' : '📇 Rolodex'}
+              </button>
+              <button
+                onClick={() => void enableTracking()}
+                className="text-[10px] uppercase tracking-wider text-sky-300 border border-sky-500/40 rounded-full px-3 py-1 hover:bg-sky-500/10 font-bold"
+                title="Turn on open tracking for your sending domains (so 'Viewed N×' works). Safe to click anytime; confirms it's on."
+              >
+                👁 Enable open tracking
+              </button>
               {prospects && prospects.length > 0 && (
                 <button
                   onClick={() => void clearAll()}
@@ -439,17 +818,29 @@ export default function OutreachSection({ projectId }: { projectId: string }) {
             </div>
           </div>
 
+          {rolodexOpen && (
+            <RolodexPanel
+              projectId={projectId}
+              onImported={() => { void loadProspects() }}
+            />
+          )}
+
           {bulkOpen && (
             <BulkImportPanel
               projectId={projectId}
-              onImported={() => { setBulkOpen(false); void loadProspects() }}
+              onImported={(generate: boolean) => {
+                setBulkOpen(false)
+                setGenerateResult(null)
+                if (generate) void runGenerate(false)
+                else void loadProspects()
+              }}
             />
           )}
 
           {addOpen && (
             <AddProspectForm
               projectId={projectId}
-              onAdded={() => { setAddOpen(false); void loadProspects() }}
+              onAdded={() => { setAddOpen(false); setGenerateResult(null); void loadProspects() }}
             />
           )}
 
@@ -461,60 +852,15 @@ export default function OutreachSection({ projectId }: { projectId: string }) {
           )}
           {prospects && prospects.length > 0 && (
             <div className="space-y-2 max-h-[600px] overflow-y-auto pr-1">
-              {prospects.map((p) => {
-                const style = STATUS_STYLE[p.status]
-                const hasSentence = !!p.unique_sentence?.trim()
-                return (
-                  <button
-                    key={p.id}
-                    type="button"
-                    onClick={() => setOpenProspect(p)}
-                    className="w-full text-left rounded-lg border border-line bg-ink/30 hover:border-stage-mastering/60 hover:bg-ink/50 transition p-3 space-y-1 cursor-pointer group"
-                  >
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <span className="font-bold text-sm group-hover:text-stage-mastering transition">{p.name}</span>
-                      {p.full_name && p.full_name !== p.name && (
-                        <span className="text-xs text-muted">({p.full_name})</span>
-                      )}
-                      <span className={`text-[9px] uppercase tracking-wider font-bold px-2 py-0.5 rounded-full border ${style.bg}`}>
-                        {style.label}
-                      </span>
-                      {!hasSentence && !p.context && (
-                        <span className="text-[9px] uppercase tracking-wider font-bold px-2 py-0.5 rounded-full border border-urgent/50 bg-urgent/10 text-urgent">
-                          Add context to generate
-                        </span>
-                      )}
-                      {!hasSentence && p.context && (
-                        <span className="text-[9px] uppercase tracking-wider font-bold px-2 py-0.5 rounded-full border border-amber-500/40 bg-amber-500/10 text-amber-300">
-                          Ready to generate
-                        </span>
-                      )}
-                      <div className="flex-1" />
-                      <span
-                        onClick={(e) => { e.stopPropagation(); void removeProspect(p) }}
-                        role="button"
-                        className="text-[10px] text-muted hover:text-urgent cursor-pointer opacity-0 group-hover:opacity-100"
-                        title="Remove prospect"
-                      >
-                        ✕
-                      </span>
-                    </div>
-                    <div className="text-[11px] text-muted space-y-0.5">
-                      {p.email
-                        ? <div>📧 <code>{p.email}</code></div>
-                        : <div className="italic text-amber-300/80">📧 email not found yet — click to add</div>}
-                      <div>👤 {RECIPIENT_LABEL[p.recipient_type]}{p.client_name ? ` · ${p.client_name}` : ''}</div>
-                      {p.context && <div className="text-muted/80 italic truncate">💬 {p.context}</div>}
-                      {hasSentence && (
-                        <div className="mt-1 pt-1 border-t border-line/40">
-                          <span className="text-[9px] uppercase tracking-wider text-emerald-400 font-bold">Unique sentence:</span>
-                          <div className="text-emerald-100/80 italic">"{p.unique_sentence}"</div>
-                        </div>
-                      )}
-                    </div>
-                  </button>
-                )
-              })}
+              {prospects.map((p) => (
+                <ProspectCard
+                  key={p.id}
+                  prospect={p}
+                  onOpen={() => setOpenProspect(p)}
+                  onRemove={() => void removeProspect(p)}
+                  onChanged={() => { setGenerateResult(null); void loadProspects() }}
+                />
+              ))}
             </div>
           )}
         </div>
@@ -524,7 +870,7 @@ export default function OutreachSection({ projectId }: { projectId: string }) {
         <ProspectDetailModal
           prospect={openProspect}
           onClose={() => setOpenProspect(null)}
-          onChanged={() => { void loadProspects() }}
+          onChanged={() => { setGenerateResult(null); void loadProspects() }}
         />
       )}
     </section>
@@ -568,6 +914,25 @@ function extractEmails(s: string | undefined): string[] {
     if (!seen.has(lc)) { seen.add(lc); out.push(lc) }
   }
   return out
+}
+
+// A line with no email is only a real contact if its first field actually
+// looks like a person's name. Without this, pasting prose/notes (headings,
+// sentences, "How old is X?") turns every line into a junk prospect.
+const NAME_STOPWORDS = new Set([
+  'is', 'are', 'was', 'were', 'the', 'a', 'an', 'of', 'from', 'to', 'in', 'on',
+  'old', 'years', 'year', 'how', 'where', 'what', 'who', 'why', 'when', 'here',
+  'this', 'that', 'and', 'with', 'about', 'everything', 'know', 'born',
+])
+function looksLikeName(s: string): boolean {
+  const t = s.trim()
+  if (!t || t.length > 40) return false
+  if (/[.?!]$/.test(t)) return false          // sentence-like ending
+  if (/\d/.test(t)) return false              // real names don't carry digits
+  const words = t.split(/\s+/)
+  if (words.length > 4) return false          // too many words for a name
+  if (words.some((w) => NAME_STOPWORDS.has(w.toLowerCase()))) return false
+  return true
 }
 
 function parseBulk(text: string): ParsedRow[] {
@@ -635,11 +1000,19 @@ function parseBulk(text: string): ParsedRow[] {
       continue
     }
 
-    // Only a name, no email. That's fine — status will be needs_email.
-    rows.push({
-      name: c0 || '(unknown)',
-      error: c0 ? undefined : 'name_required',
-    })
+    // No email in an email column. Accept ONLY if the first field actually
+    // looks like a person's name — otherwise it's pasted prose/notes, not a
+    // contact, so flag it (it won't be imported). Keep any trailing fields
+    // as the facts/context.
+    if (looksLikeName(c0)) {
+      const restContext = parts.slice(1).map((s) => s.trim()).filter(Boolean).join(', ')
+      rows.push({ name: c0, context: restContext || undefined })
+    } else {
+      rows.push({
+        name: c0 || '(unknown)',
+        error: c0 ? 'not_a_contact — looks like a note, not a person (skipped)' : 'name_required',
+      })
+    }
   }
   return rows
 }
@@ -652,6 +1025,9 @@ function TokenBar({ onInsert }: { onInsert: (token: string) => void }) {
     { token: '[name]', label: '[name]', hint: 'Prospect first name — e.g. "Alex"' },
     { token: '[unique_sentence]', label: '[unique_sentence]', hint: 'Claude-written personalized sentence per prospect' },
     { token: '[one_sheet_url]', label: '[one_sheet_url]', hint: 'Public one-sheet URL (blank if unpublished)' },
+    { token: '[sender]', label: '[sender]', hint: 'Signs off with the name on the account that sends — e.g. "Caroline"' },
+    { token: '[guest]', label: '[guest]', hint: 'Who the interview is for — "you" for a direct guest, or the client\'s name when writing to their agent/manager' },
+    { token: '[location]', label: '[location]', hint: 'Where you record — set by the Location dropdown (LA / New York / either / remote)' },
   ]
   return (
     <div className="flex items-center gap-1 flex-wrap">
@@ -683,10 +1059,11 @@ function BulkImportPanel({
   projectId, onImported,
 }: {
   projectId: string
-  onImported: () => void
+  onImported: (generate: boolean) => void
 }) {
   const [text, setText] = useState('')
   const [importing, setImporting] = useState(false)
+  const [genAfter, setGenAfter] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const parsed = text.trim() ? parseBulk(text) : []
   const validCount = parsed.filter((r) => !r.error).length
@@ -711,7 +1088,7 @@ function BulkImportPanel({
       if (result.failed > 0) {
         setError(`Imported ${result.imported}, ${result.failed} failed. Reload to see what stuck.`)
       }
-      onImported()
+      onImported(genAfter && result.imported > 0)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'bulk import failed')
     } finally {
@@ -733,7 +1110,7 @@ function BulkImportPanel({
           </a>
           <span className="text-muted/70"> — fill in Excel/Sheets, copy the rows (header optional — we skip it), paste above.</span>
         </p>
-        <p className="pt-1"><strong className="text-emerald-300">Only 3 fields matter:</strong> name, email, context. Everything else is optional.</p>
+        <p className="pt-1"><strong className="text-emerald-300">Only 3 columns matter:</strong> name, email, and <strong className="text-emerald-300">facts</strong> (their role + something recent — this is what becomes their unique sentence). Everything else is optional.</p>
         <ul className="list-disc list-inside pl-2 space-y-0.5 text-[10px]">
           <li><code>alex@company.com</code> — email only, name auto-derived</li>
           <li><code>Alex, alex@company.com</code> — name, email</li>
@@ -752,6 +1129,18 @@ function BulkImportPanel({
         placeholder={'Alex, alex@company.com, Alex Rodriguez, person, , founder of X\nsarah@agency.com\nTom, tom@bigfilm.com, , agent, Emily Blunt, Emily Blunt\'s booking agent'}
         className="w-full bg-ink/40 border border-line rounded-lg px-3 py-2 text-sm font-mono focus:outline-none focus:border-stage-tracking"
       />
+      <label className="flex items-start gap-2 text-[11px] text-emerald-100 cursor-pointer">
+        <input
+          type="checkbox"
+          checked={genAfter}
+          onChange={(e) => setGenAfter(e.target.checked)}
+          className="mt-0.5 accent-emerald-400"
+        />
+        <span>
+          <strong className="text-emerald-300">Write all the sentences right after importing</strong> — Claude turns the
+          facts column into each person's unique line automatically, so you don't do them one by one.
+        </span>
+      </label>
       <div className="flex items-center justify-between gap-2 flex-wrap">
         <div className="text-[11px] text-muted">
           {parsed.length === 0 ? (
@@ -770,7 +1159,11 @@ function BulkImportPanel({
           disabled={importing || validCount === 0}
           className="text-[10px] uppercase tracking-wider text-stage-tracking border border-stage-tracking/40 rounded-full px-3 py-1.5 hover:bg-stage-tracking/10 disabled:opacity-40 font-bold"
         >
-          {importing ? 'Importing…' : `Import ${validCount} prospect${validCount === 1 ? '' : 's'}`}
+          {importing
+            ? 'Importing…'
+            : genAfter
+              ? `Import + write ${validCount} sentence${validCount === 1 ? '' : 's'}`
+              : `Import ${validCount} prospect${validCount === 1 ? '' : 's'}`}
         </button>
       </div>
       {parsed.length > 0 && parsed.length <= 20 && (
@@ -789,6 +1182,140 @@ function BulkImportPanel({
         </div>
       )}
       {error && <p className="text-xs text-urgent">{error}</p>}
+    </div>
+  )
+}
+
+// A single prospect row. The header (name/email/type) opens the full editor
+// modal; the inline facts box + Generate button let you add a fact and write
+// the researched sentence for this one person without leaving the list.
+function ProspectCard({
+  prospect: p, onOpen, onRemove, onChanged,
+}: {
+  prospect: ApiOutreachProspect
+  onOpen: () => void
+  onRemove: () => void
+  onChanged: () => void
+}) {
+  const [note, setNote] = useState(p.context ?? '')
+  const [busy, setBusy] = useState(false)
+  const [err, setErr] = useState<string | null>(null)
+  const style = STATUS_STYLE[p.status]
+  const hasSentence = !!p.unique_sentence?.trim()
+
+  // Re-sync the note if the underlying prospect changes (e.g. after reload).
+  useEffect(() => { setNote(p.context ?? '') }, [p.context])
+
+  async function persistNote() {
+    if ((note.trim() || null) === (p.context ?? null)) return
+    try {
+      await api.updateOutreachProspect(p.id, { context: note.trim() || null })
+      onChanged()
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : 'save failed')
+    }
+  }
+
+  async function generate() {
+    setBusy(true)
+    setErr(null)
+    try {
+      // Save the fact first so the researcher reads the freshest note.
+      if ((note.trim() || null) !== (p.context ?? null)) {
+        await api.updateOutreachProspect(p.id, { context: note.trim() || null })
+      }
+      await api.generateUniqueSentence(p.id)
+      onChanged()
+    } catch (e) {
+      const raw = e instanceof Error ? e.message : 'generate failed'
+      setErr(raw.replace(/^[a-z0-9_]+:\s*/, ''))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <div className="rounded-lg border border-line bg-ink/30 p-3 space-y-2">
+      {/* Header — click to open the full editor */}
+      <div className="group cursor-pointer" onClick={onOpen}>
+        <div className="flex items-center gap-2 flex-wrap">
+          <span className="font-bold text-sm group-hover:text-stage-mastering transition">{p.name}</span>
+          {p.full_name && p.full_name !== p.name && (
+            <span className="text-xs text-muted">({p.full_name})</span>
+          )}
+          <span className={`text-[9px] uppercase tracking-wider font-bold px-2 py-0.5 rounded-full border ${style.bg}`}>
+            {style.label}
+          </span>
+          {p.email && p.email_check_status === 'invalid' && (
+            <span title={p.email_check_detail ?? 'Undeliverable'} className="text-[9px] uppercase tracking-wider font-bold px-2 py-0.5 rounded-full border border-urgent/50 bg-urgent/10 text-urgent">✕ Undeliverable</span>
+          )}
+          {p.email && p.email_check_status === 'risky' && (
+            <span title={p.email_check_detail ?? 'No mail server'} className="text-[9px] uppercase tracking-wider font-bold px-2 py-0.5 rounded-full border border-amber-500/40 bg-amber-500/10 text-amber-300">⚠ Risky</span>
+          )}
+          {p.email && p.email_check_status === 'valid' && (
+            <span title={p.email_check_detail ?? 'Domain accepts mail'} className="text-[9px] uppercase tracking-wider font-bold px-2 py-0.5 rounded-full border border-emerald-500/40 bg-emerald-500/10 text-emerald-300">✓ Email ok</span>
+          )}
+          {(p.status === 'sent' || p.status === 'replied') && (
+            p.open_count > 0 ? (
+              <span
+                title={p.last_opened_at ? `Last viewed ${new Date(p.last_opened_at).toLocaleString()}` : 'Opened'}
+                className="text-[9px] uppercase tracking-wider font-bold px-2 py-0.5 rounded-full border border-sky-500/40 bg-sky-500/10 text-sky-300"
+              >
+                👁 Viewed {p.open_count}×
+              </span>
+            ) : (
+              <span className="text-[9px] uppercase tracking-wider font-bold px-2 py-0.5 rounded-full border border-line bg-ink/40 text-muted">
+                Not viewed yet
+              </span>
+            )
+          )}
+          <div className="flex-1" />
+          <span
+            onClick={(e) => { e.stopPropagation(); onRemove() }}
+            role="button"
+            className="text-[10px] text-muted hover:text-urgent cursor-pointer opacity-0 group-hover:opacity-100"
+            title="Remove prospect"
+          >
+            ✕
+          </span>
+        </div>
+        <div className="text-[11px] text-muted space-y-0.5 mt-1">
+          {p.email
+            ? <div>📧 <code>{p.email}</code></div>
+            : <div className="italic text-amber-300/80">📧 email not found yet — click to add</div>}
+          <div>👤 {RECIPIENT_LABEL[p.recipient_type]}{p.client_name ? ` · ${p.client_name}` : ''}</div>
+        </div>
+      </div>
+
+      {/* Inline facts + generate — no need to open the modal */}
+      <div className="space-y-1.5">
+        <textarea
+          value={note}
+          onChange={(e) => setNote(e.target.value)}
+          onBlur={() => void persistNote()}
+          rows={2}
+          placeholder="Type a fact or two here… e.g. Founder of Acme, just raised a Series A"
+          className="w-full bg-ink/40 border border-line rounded-lg px-2 py-1.5 text-[11px] focus:outline-none focus:border-stage-mastering"
+        />
+        <div className="flex items-center gap-2 flex-wrap">
+          <button
+            onClick={() => void generate()}
+            disabled={busy}
+            className="text-[10px] uppercase tracking-wider text-emerald-950 bg-emerald-400 rounded-full px-3 py-1 hover:bg-emerald-300 disabled:opacity-40 font-bold"
+            title="Save this note and write a researched sentence for just this person."
+          >
+            {busy ? 'Researching…' : hasSentence ? '🔄 Regenerate sentence' : '✨ Generate sentence'}
+          </button>
+          {err && <span className="text-[10px] text-urgent">{err}</span>}
+        </div>
+      </div>
+
+      {hasSentence && (
+        <div className="pt-1 border-t border-line/40">
+          <span className="text-[9px] uppercase tracking-wider text-emerald-400 font-bold">Unique sentence:</span>
+          <div className="text-emerald-100/80 italic text-[11px]">"{p.unique_sentence}"</div>
+        </div>
+      )}
     </div>
   )
 }
@@ -877,6 +1404,9 @@ function AddProspectForm({
             <option value="manager">Their manager</option>
             <option value="other">Other (PR, assistant, unclear)</option>
           </select>
+          <span className="block text-[10px] text-muted/70 mt-1 leading-snug">
+            Not sure? Leave it on “The guest” — you don't have to know the role.
+          </span>
         </label>
         {(recipientType === 'agent' || recipientType === 'manager') && (
           <label className="block">
@@ -892,15 +1422,18 @@ function AddProspectForm({
       </div>
       <label className="block">
         <span className="text-[10px] uppercase tracking-wider text-muted font-bold">
-          Context — Claude reads this to craft the unique sentence
+          Who are they? — Claude turns this into their personal line
         </span>
         <textarea
           value={context}
           onChange={(e) => setContext(e.target.value)}
           rows={3}
-          placeholder="e.g. Founder of X. Just launched Y. Recently guested on Diary of a CEO ep 342."
+          placeholder={'One line about them, e.g. "Founder of X, just guested on Diary of a CEO." Only have an email off their Instagram? Just say: "Email from their IG — not sure if it\'s them or their team."'}
           className="mt-1 w-full bg-ink/40 border border-line rounded-lg px-2 py-1 text-sm focus:outline-none focus:border-stage-mastering"
         />
+        <span className="block text-[10px] text-muted/70 mt-1 leading-snug">
+          One line is plenty. This is the only thing Claude needs to write their sentence.
+        </span>
       </label>
       {error && <p className="text-xs text-urgent">{error}</p>}
       <div className="flex justify-end">

@@ -110,9 +110,24 @@ async function probeResend(): Promise<void> {
     }
     
     if (missing.length > 0) {
+      // Include what the key CAN see + the key fingerprint so this alert
+      // is self-diagnosing: if `visibleToKey` lists other domains (e.g.
+      // the Pod Booster domain) but not the missing ones, the missing
+      // domains are verified under a DIFFERENT Resend team than this key
+      // belongs to (an API key is bound to exactly one team). If
+      // `visibleToKey` is empty, the key is invalid or has no domain
+      // access. Fix: verify the missing domains in the SAME Resend team
+      // the key lives in, or set RESEND_API_KEY to a full-access key from
+      // the team where they're already verified.
       logError('resend probe: Slate domains missing from Resend key', {
         missing,
-        diagnosis: 'This RESEND_API_KEY cannot see these domains. Either the key is scoped to a subset of your account, or it belongs to a different account/team than the one where these domains are verified. These domains have been marked as pending.',
+        visibleToKey: domains.map((d) => ({ name: d.name, status: d.status })),
+        visibleCount: domains.length,
+        keyFingerprint: resendKey ? `${resendKey.slice(0, 6)}…${resendKey.slice(-4)}` : null,
+        diagnosis:
+          domains.length === 0
+            ? 'This RESEND_API_KEY sees ZERO domains — it is invalid, or has no domain access. Set RESEND_API_KEY to a Full-access key from the Resend team where these domains are verified.'
+            : 'This RESEND_API_KEY can see the domains listed in visibleToKey but NOT the missing ones — so the missing domains are verified under a DIFFERENT Resend team/account than this key belongs to (a key is bound to one team). Fix: verify the missing domains in the same team this key lives in, OR set RESEND_API_KEY to a full-access key from the team where they are already verified.',
       })
     }
     
