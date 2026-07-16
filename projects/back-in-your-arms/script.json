@@ -5,7 +5,7 @@
     "subtitle": "Indie psychological drama feature · Written by Stephen Markley · 18-day shoot",
     "kind": "film",
     "filmPhase": "pre",
-    "dropboxFolder": null,
+    "dropboxFolder": "/Straw Hut Team Folder/2_CLIENTS/Back In Your Arms",
     "channelsSubfolder": null,
     "coverArtUrl": null,
     "brandAssetsFolder": null,
@@ -14,13 +14,13 @@
     "rssFeedUrl": null,
     "createdAt": "2026-04-29T22:31:46.421Z"
   },
-  "publishedAt": "2026-07-08T03:41:59.079Z",
+  "publishedAt": "2026-07-16T03:26:04.186Z",
   "counts": {
     "scenes": 157,
     "lineItems": 1766,
     "sceneLevelItems": 1509,
     "projectLevelItems": 257,
-    "shootDays": 21,
+    "shootDays": 22,
     "songs": 0,
     "tasks": 0,
     "comments": 0,
@@ -32,9 +32,16 @@
   },
   "members": [
     {
-      "userId": "05ac6a17-7dc6-44c2-b747-f651f7694c4d",
+      "userId": "e05f70d9-0a70-476e-a032-3b26d083b7f5",
       "displayName": "Alex",
       "email": "alex.clayton.wall@gmail.com",
+      "role": "user",
+      "projectRole": "user"
+    },
+    {
+      "userId": "095f1f65-ec6f-4c24-b76d-48ea6660ba29",
+      "displayName": "Alex",
+      "email": null,
       "role": "user",
       "projectRole": "user"
     },
@@ -55,148 +62,155 @@
   ],
   "shootDays": [
     {
-      "id": "435644f4-d678-4834-bdb2-868555ae2b84",
+      "id": "4b63fa1e-cf24-4416-b0a7-28406aa2ff92",
       "number": 1,
       "isBreak": false,
       "shootDate": null,
-      "notes": null
+      "notes": "TRAVEL — LA → Solvang"
     },
     {
-      "id": "5370fd0b-c517-422d-9b60-561ca40e7a96",
+      "id": "435644f4-d678-4834-bdb2-868555ae2b84",
       "number": 2,
       "isBreak": false,
       "shootDate": null,
       "notes": null
     },
     {
-      "id": "ddee6367-4e82-4ff9-b61f-91af1d03d3a0",
+      "id": "5370fd0b-c517-422d-9b60-561ca40e7a96",
       "number": 3,
       "isBreak": false,
       "shootDate": null,
       "notes": null
     },
     {
-      "id": "46d6dbf4-6659-4352-a27b-45d06152b4c0",
+      "id": "ddee6367-4e82-4ff9-b61f-91af1d03d3a0",
       "number": 4,
       "isBreak": false,
       "shootDate": null,
       "notes": null
     },
     {
-      "id": "13c34177-3daf-4ede-afc4-68c9586576af",
+      "id": "46d6dbf4-6659-4352-a27b-45d06152b4c0",
       "number": 5,
+      "isBreak": false,
+      "shootDate": null,
+      "notes": null
+    },
+    {
+      "id": "13c34177-3daf-4ede-afc4-68c9586576af",
+      "number": 6,
       "isBreak": true,
       "shootDate": null,
       "notes": null
     },
     {
       "id": "a24db28b-9485-4ee9-b88a-75282057e408",
-      "number": 6,
-      "isBreak": false,
-      "shootDate": null,
-      "notes": null
-    },
-    {
-      "id": "37a1358c-a091-40a0-8728-7c5f6fc81da2",
       "number": 7,
       "isBreak": false,
       "shootDate": null,
       "notes": null
     },
     {
-      "id": "5ded2dd0-7be7-4d70-ae17-b79ce555cf99",
+      "id": "37a1358c-a091-40a0-8728-7c5f6fc81da2",
       "number": 8,
       "isBreak": false,
       "shootDate": null,
       "notes": null
     },
     {
-      "id": "01b1fd0a-143e-4c73-afe3-92d7ee0f66d1",
+      "id": "5ded2dd0-7be7-4d70-ae17-b79ce555cf99",
       "number": 9,
       "isBreak": false,
       "shootDate": null,
       "notes": null
     },
     {
-      "id": "e85a75cb-d1d1-455f-860e-ecc47bdacd23",
+      "id": "01b1fd0a-143e-4c73-afe3-92d7ee0f66d1",
       "number": 10,
+      "isBreak": false,
+      "shootDate": null,
+      "notes": null
+    },
+    {
+      "id": "e85a75cb-d1d1-455f-860e-ecc47bdacd23",
+      "number": 11,
       "isBreak": true,
       "shootDate": null,
       "notes": null
     },
     {
       "id": "715a4b34-87e7-4a71-801f-4e0045af745f",
-      "number": 11,
-      "isBreak": false,
-      "shootDate": null,
-      "notes": null
-    },
-    {
-      "id": "cb410965-56a1-4bce-8f70-7d09e3a80405",
       "number": 12,
       "isBreak": false,
       "shootDate": null,
       "notes": null
     },
     {
-      "id": "ec86ab7d-e208-4f20-891a-33da61b564c7",
+      "id": "cb410965-56a1-4bce-8f70-7d09e3a80405",
       "number": 13,
       "isBreak": false,
       "shootDate": null,
       "notes": null
     },
     {
-      "id": "cec4c64c-6aad-4a36-978f-52732999db92",
+      "id": "ec86ab7d-e208-4f20-891a-33da61b564c7",
       "number": 14,
       "isBreak": false,
       "shootDate": null,
       "notes": null
     },
     {
-      "id": "59cf774e-2f85-4688-ab69-4f591b138e63",
+      "id": "cec4c64c-6aad-4a36-978f-52732999db92",
       "number": 15,
+      "isBreak": false,
+      "shootDate": null,
+      "notes": null
+    },
+    {
+      "id": "59cf774e-2f85-4688-ab69-4f591b138e63",
+      "number": 16,
       "isBreak": true,
       "shootDate": null,
       "notes": null
     },
     {
       "id": "6f5965ea-659a-4e6f-91e4-af3c0456a64a",
-      "number": 16,
-      "isBreak": false,
-      "shootDate": null,
-      "notes": null
-    },
-    {
-      "id": "a4e96196-e451-4044-bf8b-a3b171a51f65",
       "number": 17,
       "isBreak": false,
       "shootDate": null,
       "notes": null
     },
     {
-      "id": "ad030d02-4b1f-47b0-8060-8e0afd793453",
+      "id": "a4e96196-e451-4044-bf8b-a3b171a51f65",
       "number": 18,
       "isBreak": false,
       "shootDate": null,
       "notes": null
     },
     {
-      "id": "ce8247b3-a6b7-403a-ab87-540fb3eb614a",
+      "id": "ad030d02-4b1f-47b0-8060-8e0afd793453",
       "number": 19,
       "isBreak": false,
       "shootDate": null,
       "notes": null
     },
     {
-      "id": "a463b3ce-46d6-4cac-88dd-743251a809d8",
+      "id": "ce8247b3-a6b7-403a-ab87-540fb3eb614a",
       "number": 20,
       "isBreak": false,
       "shootDate": null,
       "notes": null
     },
     {
-      "id": "a28c67c4-3f2f-4ac6-a647-b9461786a1af",
+      "id": "a463b3ce-46d6-4cac-88dd-743251a809d8",
       "number": 21,
+      "isBreak": false,
+      "shootDate": null,
+      "notes": null
+    },
+    {
+      "id": "a28c67c4-3f2f-4ac6-a647-b9461786a1af",
+      "number": 22,
       "isBreak": false,
       "shootDate": null,
       "notes": null
