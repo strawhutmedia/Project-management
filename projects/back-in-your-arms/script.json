@@ -14,7 +14,7 @@
     "rssFeedUrl": null,
     "createdAt": "2026-04-29T22:31:46.421Z"
   },
-  "publishedAt": "2026-07-16T03:52:15.670Z",
+  "publishedAt": "2026-07-16T03:55:03.348Z",
   "counts": {
     "scenes": 157,
     "lineItems": 1766,
@@ -11652,7 +11652,7 @@
           "description": "condoms, in bathroom drawer",
           "amt": 0,
           "x": 1,
-          "rate": 0,
+          "rate": 15,
           "total": 0,
           "notes": "Found by character in a drawer; must be a recognizable branded or generic package.",
           "vendor": null,
@@ -11666,7 +11666,7 @@
           "description": "Viagra prescription bottle or pack",
           "amt": 0,
           "x": 1,
-          "rate": 30,
+          "rate": 15,
           "total": 0,
           "notes": "Found alongside condoms; if using a real brand, confirm clearance or use a prop label.",
           "vendor": null,
