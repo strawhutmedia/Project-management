@@ -65,6 +65,7 @@ export default function OutreachSection({ projectId }: { projectId: string }) {
   const [addOpen, setAddOpen] = useState(false)
   const [bulkOpen, setBulkOpen] = useState(false)
   const [rolodexOpen, setRolodexOpen] = useState(false)
+  const [listFilter, setListFilter] = useState<'all' | 'sent' | 'ready' | 'replied' | 'needs_email'>('all')
   const [oneSheetApproval, setOneSheetApproval] = useState<{ approvedAt: string | null; editedSinceApproval: boolean } | null>(null)
   const [openProspect, setOpenProspect] = useState<ApiOutreachProspect | null>(null)
   const [generatingAll, setGeneratingAll] = useState(false)
@@ -428,6 +429,13 @@ export default function OutreachSection({ projectId }: { projectId: string }) {
   const needsEmailCount = prospects?.filter((p) => p.status === 'needs_email').length ?? 0
   const sentCount = prospects?.filter((p) => p.status === 'sent').length ?? 0
   const repliedCount = prospects?.filter((p) => p.status === 'replied').length ?? 0
+  // "Sent" here means already contacted — includes those who then replied.
+  const contactedCount = prospects?.filter((p) => p.status === 'sent' || p.status === 'replied').length ?? 0
+  const visibleProspects = (prospects ?? []).filter((p) => {
+    if (listFilter === 'all') return true
+    if (listFilter === 'sent') return p.status === 'sent' || p.status === 'replied'
+    return p.status === listFilter
+  })
   // Addresses with an email that still need the deliverability check.
   const uncheckedCount = prospects?.filter(
     (p) => p.email && p.email_check_status === 'unchecked'
@@ -851,8 +859,34 @@ export default function OutreachSection({ projectId }: { projectId: string }) {
             </p>
           )}
           {prospects && prospects.length > 0 && (
+            <div className="flex items-center gap-1.5 flex-wrap">
+              {([
+                ['all', `All (${prospects.length})`],
+                ['sent', `📨 Already contacted (${contactedCount})`],
+                ['replied', `↩ Replied (${repliedCount})`],
+                ['ready', `Ready to send (${readyCount})`],
+                ['needs_email', `Needs email (${needsEmailCount})`],
+              ] as const).map(([key, label]) => (
+                <button
+                  key={key}
+                  onClick={() => setListFilter(key)}
+                  className={`text-[10px] uppercase tracking-wider rounded-full px-2.5 py-1 font-bold border ${
+                    listFilter === key
+                      ? 'text-stage-mastering border-stage-mastering bg-stage-mastering/10'
+                      : 'text-muted border-line hover:bg-ink/40'
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          )}
+          {prospects && prospects.length > 0 && (
             <div className="space-y-2 max-h-[600px] overflow-y-auto pr-1">
-              {prospects.map((p) => (
+              {visibleProspects.length === 0 && (
+                <p className="text-xs text-muted italic">No contacts in this filter.</p>
+              )}
+              {visibleProspects.map((p) => (
                 <ProspectCard
                   key={p.id}
                   prospect={p}
