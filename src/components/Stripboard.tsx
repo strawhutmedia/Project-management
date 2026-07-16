@@ -1712,10 +1712,10 @@ function DayCostsSection({
                               className="text-emerald-700 font-mono font-bold shrink-0 hover:underline"
                               title={`Scene ${li.sceneNumber}${li.sceneSlug ? ` — ${li.sceneSlug}` : ''} · tap to edit on the scene`}
                             >#{li.sceneNumber}</button>
-                            {li.code && <span className="text-muted/50 text-[9px] uppercase tracking-wider shrink-0">{li.code}</span>}
-                            <span className="text-text/80 truncate">{li.description}</span>
+                            {li.code && <span className="text-muted text-[9px] uppercase tracking-wider shrink-0">{li.code}</span>}
+                            <span className="text-text truncate">{li.description}</span>
                           </span>
-                          <span className="text-text/80 font-mono tabular-nums shrink-0">${Math.round(li.total).toLocaleString()}</span>
+                          <span className="text-text font-mono font-semibold tabular-nums shrink-0">${Math.round(li.total).toLocaleString()}</span>
                         </div>
                       ))}
                     </div>

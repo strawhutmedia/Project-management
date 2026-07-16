@@ -117,7 +117,13 @@ body[data-theme="film"] {
 [data-theme="film"] .text-muted\/80 { color: rgba(122, 106, 85, 0.85) !important; }
 [data-theme="film"] .text-muted\/70 { color: rgba(122, 106, 85, 0.75) !important; }
 [data-theme="film"] .text-muted\/60 { color: rgba(122, 106, 85, 0.6) !important; }
-[data-theme="film"] .text-muted\/40 { color: rgba(122, 106, 85, 0.5) !important; }
+[data-theme="film"] .text-muted\/50 { color: rgba(122, 106, 85, 0.7) !important; }
+[data-theme="film"] .text-muted\/40 { color: rgba(122, 106, 85, 0.6) !important; }
+/* Faded text-text variants also need to flip to ink, else they render the
+   dark-theme light color and vanish on cream. */
+[data-theme="film"] .text-text\/90 { color: rgba(42, 32, 24, 0.92) !important; }
+[data-theme="film"] .text-text\/80 { color: rgba(42, 32, 24, 0.85) !important; }
+[data-theme="film"] .text-text\/70 { color: rgba(42, 32, 24, 0.78) !important; }
 
 /* Borders become warm tan instead of dark gray. */
 [data-theme="film"] .border-line {
