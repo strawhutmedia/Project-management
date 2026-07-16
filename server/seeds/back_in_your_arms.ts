@@ -516,6 +516,27 @@ async function ensureShootDays(projectId: string): Promise<void> {
       [projectId, ord + TRAVEL_DAY_OFFSET, BREAK_DAYS.includes(ord)],
     )
   }
+  // Backfill the travel day's leg: drive LA → Solvang, 260 mi round trip.
+  // Destination (Solvang) also becomes the location_tag so that night's
+  // hotel + per diem compute. COALESCE respects any manual edits.
+  await pool.query(
+    `UPDATE shoot_days
+        SET travel_from  = COALESCE(travel_from, 'LA'),
+            travel_to    = COALESCE(travel_to, 'Solvang'),
+            travel_miles = COALESCE(travel_miles, 260),
+            location_tag = COALESCE(location_tag, 'Solvang')
+      WHERE project_id = $1 AND is_travel = true`,
+    [projectId],
+  )
+  // Off days mid-Solvang: cast/crew are held on location, so hotel + per
+  // diem still apply (no day rate). Tag the break days Solvang so those
+  // held-day costs show. COALESCE respects manual edits.
+  await pool.query(
+    `UPDATE shoot_days
+        SET location_tag = COALESCE(location_tag, 'Solvang')
+      WHERE project_id = $1 AND is_break = true AND number = ANY($2::int[])`,
+    [projectId, BREAK_DAYS.map((o) => o + TRAVEL_DAY_OFFSET)],
+  )
 }
 
 // Apply Ryan's StudioBinder schedule to scenes after .fdx upload.

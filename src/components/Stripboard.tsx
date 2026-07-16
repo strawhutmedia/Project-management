@@ -1009,8 +1009,8 @@ export default function Stripboard({ projectId, isAdmin, projectName }: { projec
   )
 }
 
-// Docked bar at the bottom of the viewport that lists every Stripboard
-// keyboard shortcut and drag-gesture. Always visible while the
+// Panel docked to the RIGHT edge of the viewport that lists every
+// Stripboard keyboard shortcut and drag-gesture. Always visible while the
 // Stripboard is on screen so anyone using it — Ryan, the team, a new
 // hire — can see what's available without asking. Collapsible if it's
 // in the way.
@@ -1036,29 +1036,28 @@ function ShortcutKey({ isAdmin }: { isAdmin: boolean }) {
   ]
   const visible = shortcuts.filter((s) => !s.adminOnly || isAdmin)
   return (
-    <div className="sticky bottom-2 left-0 right-0 z-30 mt-4 -mx-2 sm:mx-0">
+    <div className="fixed right-2 top-1/2 -translate-y-1/2 z-30 w-[210px] max-w-[45vw]">
       <div className="rounded-xl border border-line bg-panel/95 backdrop-blur-sm shadow-lg px-3 py-2">
-        <div className="flex items-center gap-3 flex-wrap">
-          <button
-            onClick={() => setCollapsed((v) => !v)}
-            className="text-[10px] uppercase tracking-[0.2em] text-muted font-bold hover:text-text shrink-0"
-            title={collapsed ? 'Show keyboard shortcuts' : 'Hide keyboard shortcuts'}
-          >
-            ⌨ Shortcuts {collapsed ? '▸' : '▾'}
-          </button>
-          {!collapsed && (
-            <div className="flex items-center gap-x-4 gap-y-1 flex-wrap text-[11px] min-w-0">
-              {visible.map((s) => (
-                <span key={s.keys} className="flex items-center gap-1.5 shrink-0">
-                  <kbd className="font-mono text-[10px] px-1.5 py-0.5 rounded bg-ink/60 border border-line/60 text-text">
-                    {s.keys}
-                  </kbd>
-                  <span className="text-muted">{s.label}</span>
-                </span>
-              ))}
-            </div>
-          )}
-        </div>
+        <button
+          onClick={() => setCollapsed((v) => !v)}
+          className="w-full flex items-center justify-between text-[10px] uppercase tracking-[0.2em] text-muted font-bold hover:text-text"
+          title={collapsed ? 'Show keyboard shortcuts' : 'Hide keyboard shortcuts'}
+        >
+          <span>⌨ Shortcuts</span>
+          <span>{collapsed ? '▸' : '▾'}</span>
+        </button>
+        {!collapsed && (
+          <div className="flex flex-col gap-1.5 text-[11px] mt-2 max-h-[70vh] overflow-y-auto pr-1">
+            {visible.map((s) => (
+              <span key={s.keys} className="flex items-start gap-1.5">
+                <kbd className="font-mono text-[10px] px-1.5 py-0.5 rounded bg-ink/60 border border-line/60 text-text shrink-0">
+                  {s.keys}
+                </kbd>
+                <span className="text-muted leading-tight">{s.label}</span>
+              </span>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   )
@@ -1145,11 +1144,9 @@ function DayRow({
             'text-stage-mastering'
           }`}>{label}</span>
           {day?.shootDate && <span className="text-[10px] text-muted">· {day.shootDate}</span>}
-          {day && (
-            <LocationTagInput
-              day={day}
-              onChanged={onDayLocationChanged}
-            />
+          {day && (day.isTravel
+            ? <TravelLegInput day={day} onChanged={onDayLocationChanged} />
+            : <LocationTagInput day={day} onChanged={onDayLocationChanged} />
           )}
         </div>
         <div className={`text-[11px] font-mono flex items-center gap-2 flex-wrap justify-end ${overTarget ? 'text-urgent font-bold' : heavyTarget ? 'text-stage-overdubs' : 'text-muted'}`}>
@@ -1345,6 +1342,59 @@ function LocationTagInput({ day, onChanged }: { day: ApiShootDay; onChanged?: ()
   )
 }
 
+// Round-trip driving distance between city centers. City-center to
+// city-center by rule; add pairs as new locations enter ALLOWED_LOCATIONS.
+const ROUND_TRIP_MILES: Record<string, number> = {
+  'LA|Solvang': 260,
+  'Solvang|LA': 260,
+}
+function lookupRoundTripMiles(from: string, to: string): number | null {
+  if (!from || !to || from === to) return null
+  return ROUND_TRIP_MILES[`${from}|${to}`] ?? null
+}
+
+// Travel days record a leg: FROM city → TO city, with round-trip miles.
+// Picking both cities auto-fills miles from the distance table (the user
+// can still override). The destination also drives that night's hotel +
+// per diem (handled server-side by syncing location_tag to travel_to).
+function TravelLegInput({ day, onChanged }: { day: ApiShootDay; onChanged?: () => void }) {
+  const from = day.travelFrom ?? ''
+  const to = day.travelTo ?? ''
+  async function save(patch: { travelFrom?: string | null; travelTo?: string | null; travelMiles?: number | null }) {
+    try { await api.updateShootDay(day.id, patch); onChanged?.() } catch {}
+  }
+  function pickFrom(next: string) {
+    const auto = lookupRoundTripMiles(next, to)
+    void save({ travelFrom: next || null, ...(auto != null ? { travelMiles: auto } : {}) })
+  }
+  function pickTo(next: string) {
+    const auto = lookupRoundTripMiles(from, next)
+    void save({ travelTo: next || null, ...(auto != null ? { travelMiles: auto } : {}) })
+  }
+  const selCls = 'text-[10px] uppercase tracking-wider font-bold px-2 py-0.5 rounded-full border cursor-pointer appearance-none bg-sky-500/10 text-sky-300 border-sky-500/40'
+  return (
+    <span className="flex items-center gap-1 flex-wrap" onClick={(e) => e.stopPropagation()}>
+      <select value={from} onChange={(e) => pickFrom(e.target.value)} className={selCls} title="Drive from">
+        <option value="">from…</option>
+        {ALLOWED_LOCATIONS.map((loc) => <option key={loc} value={loc}>{loc}</option>)}
+      </select>
+      <span className="text-sky-300 text-xs">→</span>
+      <select value={to} onChange={(e) => pickTo(e.target.value)} className={selCls} title="Drive to (sets that night's hotel + per diem)">
+        <option value="">to…</option>
+        {ALLOWED_LOCATIONS.map((loc) => <option key={loc} value={loc}>{loc}</option>)}
+      </select>
+      <input
+        type="number" min="0" value={day.travelMiles ?? ''}
+        onChange={(e) => { const n = Number(e.target.value); void save({ travelMiles: e.target.value === '' ? null : (Number.isFinite(n) && n >= 0 ? n : null) }) }}
+        placeholder="mi"
+        className="w-14 text-[10px] font-mono px-2 py-0.5 rounded-full border border-sky-500/40 bg-sky-500/10 text-sky-300 focus:outline-none focus:border-sky-400"
+        title="Round-trip miles (auto-filled between known cities)"
+      />
+      <span className="text-muted/60 text-[10px] normal-case">mi RT</span>
+    </span>
+  )
+}
+
 function LegendChip({ label, className }: { label: string; className: string }) {
   return (
     <span className="inline-flex items-center gap-1.5">
@@ -1408,6 +1458,9 @@ function DayCostsSection({
     hotelContingencyPct: number
     dayHotelCost: number; needsHotels: boolean
     dayLocationTag: string | null; homeLocationTag: string | null
+    dayMileage: number; mileageRate: number; travelMiles: number
+    travelFrom: string | null; travelTo: string | null
+    isTravel: boolean; mileageHeadcount: number
   } | null>(null)
   const [busy, setBusy] = useState(false)
 
@@ -1493,7 +1546,8 @@ function DayCostsSection({
   const dayCrewFringes = fringes ? dayCrewItemsTotal * (fringes.crewPayrollPct / 100) : 0
   const dayPerDiem = fringes ? fringes.castPerDiemPerDay + fringes.crewPerDiemPerDay : 0
   const dayHotelCost = fringes?.dayHotelCost ?? 0
-  const fringesTotal = dayCastFringes + dayCrewFringes + dayPerDiem + dayHotelCost
+  const dayMileage = fringes?.dayMileage ?? 0
+  const fringesTotal = dayCastFringes + dayCrewFringes + dayPerDiem + dayHotelCost + dayMileage
   const total = dayItemsTotal + sceneItemsTotal + fringesTotal
 
   return (
@@ -1560,6 +1614,17 @@ function DayCostsSection({
                   <div className="flex items-center justify-between py-0.5">
                     <span className="text-muted">Hotels</span>
                     <span className="text-text tabular-nums">${Math.round(dayHotelCost).toLocaleString()}</span>
+                  </div>
+                )}
+                {dayMileage > 0 && fringes && (
+                  <div className="flex items-center justify-between py-0.5">
+                    <span className="text-sky-300 flex items-center gap-1.5">
+                      Mileage
+                      <span className="text-sky-300/50 normal-case text-[10px]">
+                        · {fringes.travelMiles} mi × {fringes.mileageHeadcount} ppl × ${fringes.mileageRate.toFixed(2)}
+                      </span>
+                    </span>
+                    <span className="text-sky-300 tabular-nums">${Math.round(dayMileage).toLocaleString()}</span>
                   </div>
                 )}
                 <div className="flex items-center justify-between mt-1 pt-1.5 border-t border-line/60">

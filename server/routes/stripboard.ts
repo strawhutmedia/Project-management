@@ -31,7 +31,8 @@ stripboardRouter.get('/projects/:projectId', async (req, res) => {
     res.status(403).json({ error: 'forbidden' }); return
   }
   const days = await pool.query(
-    `SELECT id, number, is_break, is_travel, shoot_date, notes, location_tag
+    `SELECT id, number, is_break, is_travel, shoot_date, notes, location_tag,
+            travel_from, travel_to, travel_miles
      FROM shoot_days WHERE project_id = $1 ORDER BY number ASC`,
     [projectId],
   )
@@ -56,7 +57,7 @@ stripboardRouter.get('/projects/:projectId', async (req, res) => {
     [projectId],
   )
   res.json({
-    days: days.rows.map((d: { id: string; number: number; is_break: boolean; is_travel: boolean; shoot_date: string | null; notes: string | null; location_tag: string | null }) => ({
+    days: days.rows.map((d: { id: string; number: number; is_break: boolean; is_travel: boolean; shoot_date: string | null; notes: string | null; location_tag: string | null; travel_from: string | null; travel_to: string | null; travel_miles: string | number | null }) => ({
       id: d.id,
       number: d.number,
       isBreak: d.is_break,
@@ -64,6 +65,9 @@ stripboardRouter.get('/projects/:projectId', async (req, res) => {
       shootDate: d.shoot_date,
       notes: d.notes,
       locationTag: d.location_tag,
+      travelFrom: d.travel_from,
+      travelTo: d.travel_to,
+      travelMiles: d.travel_miles === null ? null : Number(d.travel_miles),
     })),
     scenes: scenes.rows.map((s: {
       id: string; number: string; script_position: number; slug: string; int_ext: string | null;
@@ -346,13 +350,34 @@ stripboardRouter.patch('/shoot-days/:shootDayId', async (req, res) => {
     [user.id, shootDayId, user.role],
   )
   if (access.rows.length === 0) { res.status(403).json({ error: 'forbidden' }); return }
-  const { locationTag, shootDate, notes, isBreak } = req.body ?? {}
+  const { locationTag, shootDate, notes, isBreak, travelFrom, travelTo, travelMiles } = req.body ?? {}
+  const body = req.body ?? {}
   const updates: string[] = []
   const values: unknown[] = []
   let i = 1
-  if ('locationTag' in (req.body ?? {})) {
+  if ('locationTag' in body) {
     updates.push(`location_tag = $${i++}`)
     values.push(typeof locationTag === 'string' && locationTag.trim() ? locationTag.trim().slice(0, 50) : null)
+  }
+  if ('travelFrom' in body) {
+    updates.push(`travel_from = $${i++}`)
+    values.push(typeof travelFrom === 'string' && travelFrom.trim() ? travelFrom.trim().slice(0, 50) : null)
+  }
+  if ('travelTo' in body) {
+    const to = typeof travelTo === 'string' && travelTo.trim() ? travelTo.trim().slice(0, 50) : null
+    updates.push(`travel_to = $${i++}`)
+    values.push(to)
+    // Destination drives that night's hotel + per diem — keep location_tag
+    // in sync with where the company lands, unless caller set it explicitly.
+    if (!('locationTag' in body) && to) {
+      updates.push(`location_tag = $${i++}`)
+      values.push(to)
+    }
+  }
+  if ('travelMiles' in body) {
+    updates.push(`travel_miles = $${i++}`)
+    const m = Number(travelMiles)
+    values.push(Number.isFinite(m) && m >= 0 ? m : null)
   }
   if ('shootDate' in (req.body ?? {})) {
     updates.push(`shoot_date = $${i++}`)
