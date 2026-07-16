@@ -554,7 +554,13 @@ budgetsRouter.get('/shoot-days/:shootDayId/items', async (req, res) => {
   // crew day-item lines (each line is a person), so it self-populates as
   // the producer adds people, no separate headcount config needed.
   const mileageHeadcount = rows.filter((r) => r.code === 'CAST' || r.code === 'CREW').length
-  const dayMileage = isTravelDay ? mileageRate * travelMiles * mileageHeadcount : 0
+  // Studio zone (TMZ): mileage is only reimbursed BEYOND the 30-mile radius
+  // around the home base. A travel day is ONE WAY (the return is its own
+  // travel day), so travel_miles is the one-way distance and we deduct the
+  // zone once. LA→Solvang 130 mi one-way → 100 billable.
+  const STUDIO_ZONE_MI = 30
+  const billableMiles = Math.max(0, travelMiles - STUDIO_ZONE_MI)
+  const dayMileage = isTravelDay ? mileageRate * billableMiles * mileageHeadcount : 0
 
   // Crew travel-day pay rule: a short move (< 4 hr one-way) is a half day
   // for crew; a long haul (>= 4 hr) is a full day. Cast are always full on
@@ -631,6 +637,8 @@ budgetsRouter.get('/shoot-days/:shootDayId/items', async (req, res) => {
       dayMileage,
       mileageRate,
       travelMiles,
+      billableMiles,
+      studioZoneMi: STUDIO_ZONE_MI,
       travelFrom: dayRow?.travel_from ?? null,
       travelTo: dayRow?.travel_to ?? null,
       isTravel: isTravelDay,

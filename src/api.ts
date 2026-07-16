@@ -953,6 +953,7 @@ export const api = {
         dayHotelCost: number; needsHotels: boolean
         dayLocationTag: string | null; homeLocationTag: string | null
         dayMileage: number; mileageRate: number; travelMiles: number
+        billableMiles: number; studioZoneMi: number
         travelFrom: string | null; travelTo: string | null
         isTravel: boolean; mileageHeadcount: number
         travelHours: number | null; crewTravelMultiplier: number

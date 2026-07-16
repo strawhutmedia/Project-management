@@ -524,10 +524,18 @@ async function ensureShootDays(projectId: string): Promise<void> {
     `UPDATE shoot_days
         SET travel_from  = COALESCE(travel_from, 'LA'),
             travel_to    = COALESCE(travel_to, 'Solvang'),
-            travel_miles = COALESCE(travel_miles, 260),
+            travel_miles = COALESCE(travel_miles, 130),
             travel_hours = COALESCE(travel_hours, 2.5),
             location_tag = COALESCE(location_tag, 'Solvang')
       WHERE project_id = $1 AND is_travel = true`,
+    [projectId],
+  )
+  // One-time correction: the first seed stored 260 as a round trip, but a
+  // travel day is one way (the return is its own travel day). LA→Solvang is
+  // 130 mi one way. Fix any travel day still carrying the old 260 default.
+  await pool.query(
+    `UPDATE shoot_days SET travel_miles = 130
+      WHERE project_id = $1 AND is_travel = true AND travel_miles = 260`,
     [projectId],
   )
   // Off days mid-Solvang: cast/crew are held on location, so hotel + per

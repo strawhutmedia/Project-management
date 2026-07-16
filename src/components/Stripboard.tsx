@@ -1342,12 +1342,13 @@ function LocationTagInput({ day, onChanged }: { day: ApiShootDay; onChanged?: ()
   )
 }
 
-// Driving legs between city centers: round-trip miles (for mileage) and
-// one-way hours (for the crew half/full-day rule). City-center to
+// One-way driving legs between city centers: miles + hours. A travel day is
+// one way (the return is its own travel day). Mileage is reimbursed only
+// beyond the 30-mile studio zone (billable = miles − 30). City-center to
 // city-center by rule; add pairs as new locations enter ALLOWED_LOCATIONS.
 const CITY_LEG: Record<string, { miles: number; hours: number }> = {
-  'LA|Solvang': { miles: 260, hours: 2.5 },
-  'Solvang|LA': { miles: 260, hours: 2.5 },
+  'LA|Solvang': { miles: 130, hours: 2.5 },
+  'Solvang|LA': { miles: 130, hours: 2.5 },
 }
 function lookupLeg(from: string, to: string): { miles: number; hours: number } | null {
   if (!from || !to || from === to) return null
@@ -1389,9 +1390,9 @@ function TravelLegInput({ day, onChanged }: { day: ApiShootDay; onChanged?: () =
         onChange={(e) => { const n = Number(e.target.value); void save({ travelMiles: e.target.value === '' ? null : (Number.isFinite(n) && n >= 0 ? n : null) }) }}
         placeholder="mi"
         className="w-16 text-[10px] font-mono px-2 py-0.5 rounded-full border border-sky-500/50 bg-sky-500/10 text-sky-700 focus:outline-none focus:border-sky-500 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
-        title="Round-trip miles (auto-filled between known cities)"
+        title="One-way miles, city center to city center (auto-filled). Mileage bills beyond the 30-mi studio zone."
       />
-      <span className="text-muted/60 text-[10px] normal-case">mi RT</span>
+      <span className="text-muted/60 text-[10px] normal-case">mi 1-way</span>
       <input
         type="number" min="0" step="0.5" value={day.travelHours ?? ''}
         onChange={(e) => { const n = Number(e.target.value); void save({ travelHours: e.target.value === '' ? null : (Number.isFinite(n) && n >= 0 ? n : null) }) }}
@@ -1470,6 +1471,7 @@ function DayCostsSection({
     dayHotelCost: number; needsHotels: boolean
     dayLocationTag: string | null; homeLocationTag: string | null
     dayMileage: number; mileageRate: number; travelMiles: number
+    billableMiles: number; studioZoneMi: number
     travelFrom: string | null; travelTo: string | null
     isTravel: boolean; mileageHeadcount: number
     travelHours: number | null; crewTravelMultiplier: number
@@ -1645,7 +1647,7 @@ function DayCostsSection({
                     <span className="text-sky-700 flex items-center gap-1.5">
                       Mileage
                       <span className="text-sky-700/70 normal-case text-[10px]">
-                        · {fringes.travelMiles} mi × {fringes.mileageHeadcount} ppl × ${fringes.mileageRate.toFixed(2)}
+                        · {fringes.billableMiles} mi ({fringes.travelMiles}−{fringes.studioZoneMi} zone) × {fringes.mileageHeadcount} ppl × ${fringes.mileageRate.toFixed(2)}
                       </span>
                     </span>
                     <span className="text-sky-700 tabular-nums">${Math.round(dayMileage).toLocaleString()}</span>
