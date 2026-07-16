@@ -1,9 +1,9 @@
 {
   "version": "0.2.2",
-  "now": "2026-07-15T18:50:01.763Z",
+  "now": "2026-07-16T02:50:47.401Z",
   "boot": {
-    "startedAt": "2026-07-15T18:50:01.415Z",
-    "completedAt": "2026-07-15T18:50:01.750Z",
+    "startedAt": "2026-07-16T02:50:46.963Z",
+    "completedAt": "2026-07-16T02:50:47.393Z",
     "error": null
   },
   "env": {
@@ -111,7 +111,8 @@
       "075_rolodex.sql",
       "076_one_sheet_approval.sql",
       "077_outreach_opens.sql",
-      "078_outreach_test_send_opens.sql"
+      "078_outreach_test_send_opens.sql",
+      "079_travel_day.sql"
     ],
     "userCount": 12,
     "projectCount": 16
@@ -119,7 +120,7 @@
   "recentLog": [
     {
       "level": "info",
-      "ts": "2026-07-15T18:50:01.412Z",
+      "ts": "2026-07-16T02:50:46.961Z",
       "msg": "serving client from",
       "data": {
         "clientDir": "/app/dist"
@@ -127,7 +128,7 @@
     },
     {
       "level": "info",
-      "ts": "2026-07-15T18:50:01.415Z",
+      "ts": "2026-07-16T02:50:46.963Z",
       "msg": "boot starting",
       "data": {
         "cwd": "/app",
@@ -138,12 +139,12 @@
     },
     {
       "level": "info",
-      "ts": "2026-07-15T18:50:01.628Z",
+      "ts": "2026-07-16T02:50:47.221Z",
       "msg": "migrations complete"
     },
     {
       "level": "info",
-      "ts": "2026-07-15T18:50:01.742Z",
+      "ts": "2026-07-16T02:50:47.385Z",
       "msg": "BIYA seed: project already exists, ensured shoot days",
       "data": {
         "projectId": "12f53ed1-c6c7-4c11-8d7b-06d91744c9af"
@@ -151,12 +152,12 @@
     },
     {
       "level": "info",
-      "ts": "2026-07-15T18:50:01.750Z",
+      "ts": "2026-07-16T02:50:47.393Z",
       "msg": "listening on :8080"
     },
     {
       "level": "info",
-      "ts": "2026-07-15T18:50:01.751Z",
+      "ts": "2026-07-16T02:50:47.393Z",
       "msg": "scheduler started (every 5 min)"
     }
   ]
