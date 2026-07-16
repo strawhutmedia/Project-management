@@ -15,6 +15,7 @@
 import type { PoolClient } from 'pg'
 import { pool } from '../db'
 import { STUDIOBINDER_ACCOUNTS } from '../budget_template'
+import { applyWardrobeOutfitNumbers } from './wardrobe_outfits'
 import { logInfo, logError } from '../diag'
 
 // Ryan's StudioBinder schedule, scene-number → StudioBinder shoot-day
@@ -157,6 +158,10 @@ export async function seedBackInYourArms(): Promise<void> {
       // populate path is intentionally NOT re-run here on existing
       // projects; first-time creation in the INSERT branch below
       // still seeds defaults once.
+      // Pre-fill wardrobe outfit numbers on blank WARDROBE items (never
+      // overwrites a number the costume team set). Fills any items that
+      // exist now; new ones from a re-analyze get numbered next boot.
+      await applyWardrobeOutfitNumbers(projId)
       logInfo('BIYA seed: project already exists, ensured shoot days', { projectId: projId })
       return
     }
