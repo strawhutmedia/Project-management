@@ -817,7 +817,7 @@ export default function Stripboard({ projectId, isAdmin, projectName }: { projec
           <h2 className="text-[11px] uppercase tracking-[0.2em] text-muted font-bold">🎬 Stripboard</h2>
           <p className="text-[11px] text-muted/80 mt-1">
             {board.scenes.length} scenes · {fmtEighths(totalEighths)} pages total ·
-            {' '}{fmtEighths(scheduledEighths)} scheduled · {board.days.filter((d) => !d.isBreak).length} shoot days
+            {' '}{fmtEighths(scheduledEighths)} scheduled · {board.days.filter((d) => !d.isBreak && !d.isTravel).length} shoot days
           </p>
         </div>
         {isAdmin && (
@@ -954,7 +954,7 @@ export default function Stripboard({ projectId, isAdmin, projectName }: { projec
           <DayRow
             key={day.id}
             day={day}
-            label={day.isBreak ? `BREAK · DAY ${day.number}` : `DAY ${day.number}`}
+            label={day.isTravel ? `✈️ TRAVEL · DAY ${day.number}` : day.isBreak ? `BREAK · DAY ${day.number}` : `DAY ${day.number}`}
             scenes={grouped?.byDay.get(day.id) ?? []}
             isAdmin={isAdmin}
             moveScene={moveScene}
@@ -980,7 +980,7 @@ export default function Stripboard({ projectId, isAdmin, projectName }: { projec
       {autoScheduleOpen && (
         <AutoScheduleModal
           projectId={projectId}
-          currentShootDayCount={board.days.filter((d) => !d.isBreak).length}
+          currentShootDayCount={board.days.filter((d) => !d.isBreak && !d.isTravel).length}
           onClose={() => setAutoScheduleOpen(false)}
           onApplied={() => {
             void load()
@@ -1114,6 +1114,7 @@ function DayRow({
 
   const isUnscheduled = day === null
   const isBreak = day?.isBreak ?? false
+  const isTravel = day?.isTravel ?? false
 
   return (
     <div
@@ -1122,6 +1123,7 @@ function DayRow({
       onDrop={(e) => isAdmin && void handleDrop(e)}
       className={`rounded-xl border transition ${
         over ? 'border-stage-mastering bg-stage-mastering/10' :
+        isTravel ? 'border-sky-500/30 bg-sky-500/5' :
         isBreak ? 'border-line/40 bg-ink/20' :
         isUnscheduled ? 'border-stage-stems/40 bg-stage-stems/5' :
         'border-line bg-ink/30'
@@ -1135,6 +1137,7 @@ function DayRow({
         <div className="flex items-center gap-3 min-w-0">
           <span className="text-muted text-xs">{collapsed ? '▸' : '▾'}</span>
           <span className={`text-[11px] uppercase tracking-[0.15em] font-bold ${
+            isTravel ? 'text-sky-300' :
             isBreak ? 'text-muted' :
             isUnscheduled ? 'text-stage-stems' :
             overTarget ? 'text-urgent' :
@@ -1151,7 +1154,7 @@ function DayRow({
         </div>
         <div className={`text-[11px] font-mono flex items-center gap-2 flex-wrap justify-end ${overTarget ? 'text-urgent font-bold' : heavyTarget ? 'text-stage-overdubs' : 'text-muted'}`}>
           <span>{scenes.length} sc · {fmtEighths(totalEighths)} pages</span>
-          {sceneCostTotal > 0 && !isBreak && !isUnscheduled && (
+          {sceneCostTotal > 0 && !isBreak && !isTravel && !isUnscheduled && (
             <span
               className="text-emerald-400 font-bold"
               title={`Sum of every scene's priced budget on this day. ${pricedCount} of ${scenes.length} scenes have prices in.`}

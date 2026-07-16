@@ -31,7 +31,7 @@ stripboardRouter.get('/projects/:projectId', async (req, res) => {
     res.status(403).json({ error: 'forbidden' }); return
   }
   const days = await pool.query(
-    `SELECT id, number, is_break, shoot_date, notes, location_tag
+    `SELECT id, number, is_break, is_travel, shoot_date, notes, location_tag
      FROM shoot_days WHERE project_id = $1 ORDER BY number ASC`,
     [projectId],
   )
@@ -56,10 +56,11 @@ stripboardRouter.get('/projects/:projectId', async (req, res) => {
     [projectId],
   )
   res.json({
-    days: days.rows.map((d: { id: string; number: number; is_break: boolean; shoot_date: string | null; notes: string | null; location_tag: string | null }) => ({
+    days: days.rows.map((d: { id: string; number: number; is_break: boolean; is_travel: boolean; shoot_date: string | null; notes: string | null; location_tag: string | null }) => ({
       id: d.id,
       number: d.number,
       isBreak: d.is_break,
+      isTravel: d.is_travel,
       shootDate: d.shoot_date,
       notes: d.notes,
       locationTag: d.location_tag,

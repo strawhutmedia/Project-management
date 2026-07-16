@@ -17,8 +17,15 @@ import { pool } from '../db'
 import { STUDIOBINDER_ACCOUNTS } from '../budget_template'
 import { logInfo, logError } from '../diag'
 
-// Ryan's StudioBinder schedule, scene-number → shoot-day-number.
-// Used by applyBackInYourArmsSchedule() after the .fdx is uploaded.
+// Ryan's StudioBinder schedule, scene-number → StudioBinder shoot-day
+// ORDINAL (1..21). Used by applyBackInYourArmsSchedule() after the .fdx
+// is uploaded.
+//
+// NOTE: Slate prepends a TRAVEL day as physical Day 1 (drive LA -> Solvang),
+// so the physical shoot_days.number = ordinal + TRAVEL_DAY_OFFSET. Keep this
+// map in StudioBinder ordinals (matching Ryan's call sheets); the offset is
+// applied at the single lookup site below. StudioBinder "Day 1" == Slate
+// "Day 2", and so on.
 export const BIYA_SCHEDULE: Record<string, number> = {
   // Day 1 — Kendrick's house break-in sequence
   '69': 1, '70': 1, '71': 1, '72': 1, '73': 1, '74': 1, '75': 1, '76': 1, '77': 1, '78': 1, '79': 1,
@@ -67,6 +74,11 @@ export const BIYA_SCHEDULE: Record<string, number> = {
 }
 
 const BREAK_DAYS = [5, 10, 15]
+
+// Slate prepends a travel day as physical Day 1 (LA -> Solvang), so every
+// StudioBinder ordinal maps to physical shoot_day number = ordinal + 1.
+const TRAVEL_DAY_OFFSET = 1
+const TRAVEL_DAY_NOTE = 'TRAVEL — LA → Solvang'
 
 async function ensurePlaceholderUser(name: string, displayName: string): Promise<string | null> {
   // Look up by exact name match first (placeholder users may not have email)
@@ -202,11 +214,17 @@ export async function seedBackInYourArms(): Promise<void> {
         }
       }
 
-      // 21 shoot days
-      for (let i = 1; i <= 21; i++) {
+      // Day 1 = TRAVEL (LA → Solvang). Days 2..22 = the 21 shoot/break
+      // days, each StudioBinder ordinal shifted +1 by TRAVEL_DAY_OFFSET.
+      await client.query(
+        `INSERT INTO shoot_days (project_id, number, is_travel, is_break, notes)
+         VALUES ($1, 1, true, false, $2)`,
+        [projId, TRAVEL_DAY_NOTE],
+      )
+      for (let ord = 1; ord <= 21; ord++) {
         await client.query(
           `INSERT INTO shoot_days (project_id, number, is_break) VALUES ($1, $2, $3)`,
-          [projId, i, BREAK_DAYS.includes(i)],
+          [projId, ord + TRAVEL_DAY_OFFSET, BREAK_DAYS.includes(ord)],
         )
       }
 
@@ -466,12 +484,36 @@ async function ensureFilmTeam(
 }
 
 async function ensureShootDays(projectId: string): Promise<void> {
-  for (let i = 1; i <= 21; i++) {
+  // One-time migration to the travel-day layout. If this project has no
+  // travel day yet, it's still on the legacy 1..21 numbering — shift every
+  // existing day +1 to free up Day 1, then insert Day 1 = TRAVEL. Scenes
+  // ride along on their shoot_day_id (unchanged), and the reschedule below
+  // uses TRAVEL_DAY_OFFSET so they still land on the right (now +1) day.
+  // Idempotent: once a travel day exists, we never shift again.
+  const hasTravel = await pool.query(
+    `SELECT 1 FROM shoot_days WHERE project_id = $1 AND is_travel = true LIMIT 1`,
+    [projectId],
+  )
+  if (hasTravel.rows.length === 0) {
+    // Two-step +1 via a high offset so the UNIQUE(project_id, number)
+    // constraint never trips on a transient collision mid-update.
+    await pool.query(`UPDATE shoot_days SET number = number + 1000 WHERE project_id = $1`, [projectId])
+    await pool.query(`UPDATE shoot_days SET number = number - 999 WHERE project_id = $1`, [projectId])
+    await pool.query(
+      `INSERT INTO shoot_days (project_id, number, is_travel, is_break, notes)
+       VALUES ($1, 1, true, false, $2)
+       ON CONFLICT (project_id, number)
+         DO UPDATE SET is_travel = true, is_break = false, notes = EXCLUDED.notes`,
+      [projectId, TRAVEL_DAY_NOTE],
+    )
+  }
+  // Ensure the full layout exists: travel Day 1 (above) + shoot Days 2..22.
+  for (let ord = 1; ord <= 21; ord++) {
     await pool.query(
       `INSERT INTO shoot_days (project_id, number, is_break)
        VALUES ($1, $2, $3)
        ON CONFLICT (project_id, number) DO NOTHING`,
-      [projectId, i, BREAK_DAYS.includes(i)],
+      [projectId, ord + TRAVEL_DAY_OFFSET, BREAK_DAYS.includes(ord)],
     )
   }
 }
@@ -508,7 +550,9 @@ export async function applyBackInYourArmsSchedule(projectId: string): Promise<{ 
   const missing: string[] = []
   for (const [sceneNum, dayNum] of Object.entries(BIYA_SCHEDULE)) {
     const scene = sceneRowByNumber.get(sceneNum)
-    const dayId = dayByNumber.get(dayNum)
+    // BIYA_SCHEDULE is in StudioBinder ordinals; physical day = ordinal + 1
+    // because Day 1 is the LA → Solvang travel day.
+    const dayId = dayByNumber.get(dayNum + TRAVEL_DAY_OFFSET)
     if (!scene) {
       missing.push(sceneNum)
       continue

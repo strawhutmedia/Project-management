@@ -450,6 +450,7 @@ export type ApiShootDay = {
   id: string
   number: number
   isBreak: boolean
+  isTravel: boolean
   shootDate: string | null
   notes: string | null
   locationTag?: string | null
