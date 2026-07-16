@@ -32,7 +32,7 @@ stripboardRouter.get('/projects/:projectId', async (req, res) => {
   }
   const days = await pool.query(
     `SELECT id, number, is_break, is_travel, shoot_date, notes, location_tag,
-            travel_from, travel_to, travel_miles
+            travel_from, travel_to, travel_miles, travel_hours
      FROM shoot_days WHERE project_id = $1 ORDER BY number ASC`,
     [projectId],
   )
@@ -57,7 +57,7 @@ stripboardRouter.get('/projects/:projectId', async (req, res) => {
     [projectId],
   )
   res.json({
-    days: days.rows.map((d: { id: string; number: number; is_break: boolean; is_travel: boolean; shoot_date: string | null; notes: string | null; location_tag: string | null; travel_from: string | null; travel_to: string | null; travel_miles: string | number | null }) => ({
+    days: days.rows.map((d: { id: string; number: number; is_break: boolean; is_travel: boolean; shoot_date: string | null; notes: string | null; location_tag: string | null; travel_from: string | null; travel_to: string | null; travel_miles: string | number | null; travel_hours: string | number | null }) => ({
       id: d.id,
       number: d.number,
       isBreak: d.is_break,
@@ -68,6 +68,7 @@ stripboardRouter.get('/projects/:projectId', async (req, res) => {
       travelFrom: d.travel_from,
       travelTo: d.travel_to,
       travelMiles: d.travel_miles === null ? null : Number(d.travel_miles),
+      travelHours: d.travel_hours === null ? null : Number(d.travel_hours),
     })),
     scenes: scenes.rows.map((s: {
       id: string; number: string; script_position: number; slug: string; int_ext: string | null;
@@ -350,7 +351,7 @@ stripboardRouter.patch('/shoot-days/:shootDayId', async (req, res) => {
     [user.id, shootDayId, user.role],
   )
   if (access.rows.length === 0) { res.status(403).json({ error: 'forbidden' }); return }
-  const { locationTag, shootDate, notes, isBreak, travelFrom, travelTo, travelMiles } = req.body ?? {}
+  const { locationTag, shootDate, notes, isBreak, travelFrom, travelTo, travelMiles, travelHours } = req.body ?? {}
   const body = req.body ?? {}
   const updates: string[] = []
   const values: unknown[] = []
@@ -378,6 +379,11 @@ stripboardRouter.patch('/shoot-days/:shootDayId', async (req, res) => {
     updates.push(`travel_miles = $${i++}`)
     const m = Number(travelMiles)
     values.push(Number.isFinite(m) && m >= 0 ? m : null)
+  }
+  if ('travelHours' in body) {
+    updates.push(`travel_hours = $${i++}`)
+    const h = Number(travelHours)
+    values.push(Number.isFinite(h) && h >= 0 ? h : null)
   }
   if ('shootDate' in (req.body ?? {})) {
     updates.push(`shoot_date = $${i++}`)

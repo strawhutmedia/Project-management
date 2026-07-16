@@ -525,8 +525,9 @@ budgetsRouter.get('/shoot-days/:shootDayId/items', async (req, res) => {
   const dayRes = await pool.query<{
     location_tag: string | null; is_break: boolean; is_travel: boolean;
     travel_from: string | null; travel_to: string | null; travel_miles: string | null;
+    travel_hours: string | null;
   }>(
-    `SELECT location_tag, is_break, is_travel, travel_from, travel_to, travel_miles
+    `SELECT location_tag, is_break, is_travel, travel_from, travel_to, travel_miles, travel_hours
        FROM shoot_days WHERE id = $1`, [shootDayId],
   )
   const dayRow = dayRes.rows[0]
@@ -548,6 +549,12 @@ budgetsRouter.get('/shoot-days/:shootDayId/items', async (req, res) => {
   const travelMiles = Number(dayRow?.travel_miles ?? 0)
   const mileageHeadcount = castPerDiemHeadcount + crewPerDiemHeadcount
   const dayMileage = isTravelDay ? mileageRate * travelMiles * mileageHeadcount : 0
+
+  // Crew travel-day pay rule: a short move (< 4 hr one-way) is a half day
+  // for crew; a long haul (>= 4 hr) is a full day. Cast are always full on
+  // travel days (SAG distant-location rule), so this only scales crew.
+  const travelHours = dayRow?.travel_hours != null ? Number(dayRow.travel_hours) : null
+  const crewTravelMultiplier = isTravelDay && travelHours != null && travelHours < 4 ? 0.5 : 1
 
   // Scene-attached rollup for this day. Each scene owns its own
   // priced line items (wardrobe, props, VFX, etc.); when a scene is
@@ -622,6 +629,8 @@ budgetsRouter.get('/shoot-days/:shootDayId/items', async (req, res) => {
       travelTo: dayRow?.travel_to ?? null,
       isTravel: isTravelDay,
       mileageHeadcount,
+      travelHours,
+      crewTravelMultiplier,
     },
   })
 })

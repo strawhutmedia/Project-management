@@ -458,6 +458,7 @@ export type ApiShootDay = {
   travelFrom?: string | null
   travelTo?: string | null
   travelMiles?: number | null
+  travelHours?: number | null
 }
 
 export type ApiScene = {
@@ -954,6 +955,7 @@ export const api = {
         dayMileage: number; mileageRate: number; travelMiles: number
         travelFrom: string | null; travelTo: string | null
         isTravel: boolean; mileageHeadcount: number
+        travelHours: number | null; crewTravelMultiplier: number
       }
     }>(
       `/api/budgets/shoot-days/${shootDayId}/items`,
@@ -1132,7 +1134,7 @@ export const api = {
       method: 'POST',
       body: JSON.stringify(body),
     }),
-  updateShootDay: (shootDayId: string, patch: { locationTag?: string | null; shootDate?: string | null; notes?: string; isBreak?: boolean; travelFrom?: string | null; travelTo?: string | null; travelMiles?: number | null }) =>
+  updateShootDay: (shootDayId: string, patch: { locationTag?: string | null; shootDate?: string | null; notes?: string; isBreak?: boolean; travelFrom?: string | null; travelTo?: string | null; travelMiles?: number | null; travelHours?: number | null }) =>
     request<{ ok: true }>(`/api/stripboard/shoot-days/${shootDayId}`, {
       method: 'PATCH',
       body: JSON.stringify(patch),

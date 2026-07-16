@@ -1342,15 +1342,16 @@ function LocationTagInput({ day, onChanged }: { day: ApiShootDay; onChanged?: ()
   )
 }
 
-// Round-trip driving distance between city centers. City-center to
+// Driving legs between city centers: round-trip miles (for mileage) and
+// one-way hours (for the crew half/full-day rule). City-center to
 // city-center by rule; add pairs as new locations enter ALLOWED_LOCATIONS.
-const ROUND_TRIP_MILES: Record<string, number> = {
-  'LA|Solvang': 260,
-  'Solvang|LA': 260,
+const CITY_LEG: Record<string, { miles: number; hours: number }> = {
+  'LA|Solvang': { miles: 260, hours: 2.5 },
+  'Solvang|LA': { miles: 260, hours: 2.5 },
 }
-function lookupRoundTripMiles(from: string, to: string): number | null {
+function lookupLeg(from: string, to: string): { miles: number; hours: number } | null {
   if (!from || !to || from === to) return null
-  return ROUND_TRIP_MILES[`${from}|${to}`] ?? null
+  return CITY_LEG[`${from}|${to}`] ?? null
 }
 
 // Travel days record a leg: FROM city → TO city, with round-trip miles.
@@ -1360,16 +1361,16 @@ function lookupRoundTripMiles(from: string, to: string): number | null {
 function TravelLegInput({ day, onChanged }: { day: ApiShootDay; onChanged?: () => void }) {
   const from = day.travelFrom ?? ''
   const to = day.travelTo ?? ''
-  async function save(patch: { travelFrom?: string | null; travelTo?: string | null; travelMiles?: number | null }) {
+  async function save(patch: { travelFrom?: string | null; travelTo?: string | null; travelMiles?: number | null; travelHours?: number | null }) {
     try { await api.updateShootDay(day.id, patch); onChanged?.() } catch {}
   }
   function pickFrom(next: string) {
-    const auto = lookupRoundTripMiles(next, to)
-    void save({ travelFrom: next || null, ...(auto != null ? { travelMiles: auto } : {}) })
+    const auto = lookupLeg(next, to)
+    void save({ travelFrom: next || null, ...(auto ? { travelMiles: auto.miles, travelHours: auto.hours } : {}) })
   }
   function pickTo(next: string) {
-    const auto = lookupRoundTripMiles(from, next)
-    void save({ travelTo: next || null, ...(auto != null ? { travelMiles: auto } : {}) })
+    const auto = lookupLeg(from, next)
+    void save({ travelTo: next || null, ...(auto ? { travelMiles: auto.miles, travelHours: auto.hours } : {}) })
   }
   const selCls = 'text-[10px] uppercase tracking-wider font-bold px-2 py-0.5 rounded-full border cursor-pointer appearance-none bg-sky-500/10 text-sky-700 border-sky-500/50'
   return (
@@ -1391,6 +1392,16 @@ function TravelLegInput({ day, onChanged }: { day: ApiShootDay; onChanged?: () =
         title="Round-trip miles (auto-filled between known cities)"
       />
       <span className="text-muted/60 text-[10px] normal-case">mi RT</span>
+      <input
+        type="number" min="0" step="0.5" value={day.travelHours ?? ''}
+        onChange={(e) => { const n = Number(e.target.value); void save({ travelHours: e.target.value === '' ? null : (Number.isFinite(n) && n >= 0 ? n : null) }) }}
+        placeholder="hr"
+        className="w-12 text-[10px] font-mono px-2 py-0.5 rounded-full border border-sky-500/50 bg-sky-500/10 text-sky-700 focus:outline-none focus:border-sky-500"
+        title="One-way drive time. Under 4hr → crew paid half day; 4hr+ → full day."
+      />
+      <span className={`text-[10px] normal-case font-bold ${(day.travelHours ?? 99) < 4 ? 'text-sky-700' : 'text-muted/60'}`}>
+        hr {day.travelHours != null && (day.travelHours < 4 ? '· crew ½' : '· crew full')}
+      </span>
     </span>
   )
 }
@@ -1461,6 +1472,7 @@ function DayCostsSection({
     dayMileage: number; mileageRate: number; travelMiles: number
     travelFrom: string | null; travelTo: string | null
     isTravel: boolean; mileageHeadcount: number
+    travelHours: number | null; crewTravelMultiplier: number
   } | null>(null)
   const [busy, setBusy] = useState(false)
 
@@ -1534,14 +1546,20 @@ function DayCostsSection({
     await load()
   }
 
-  const dayItemsTotal = (items ?? []).reduce((s, i) => s + i.total, 0)
-  const sceneItemsTotal = scenes.reduce((s, r) => s + r.total, 0)
   // Fringes on this day only cover the day's own cast/crew buckets.
   // Company-wide budget totals are the source of truth — here we just
   // show the "if this day happens, what fringes/per-diem land" number
   // so producers see the real day cost.
   const dayCastItemsTotal = (items ?? []).filter((i) => (i.code ?? 'OTHER') === 'CAST').reduce((s, i) => s + i.total, 0)
-  const dayCrewItemsTotal = (items ?? []).filter((i) => (i.code ?? 'OTHER') === 'CREW').reduce((s, i) => s + i.total, 0)
+  const dayCrewItemsRaw = (items ?? []).filter((i) => (i.code ?? 'OTHER') === 'CREW').reduce((s, i) => s + i.total, 0)
+  // Crew travel-day rule: a short move (< 4hr) pays crew a half day. The
+  // multiplier comes from the server (1 on normal days, 0.5 on short
+  // travel). Cast are unaffected. The reduction is shown in the ledger.
+  const crewTravelMultiplier = fringes?.crewTravelMultiplier ?? 1
+  const dayCrewItemsTotal = dayCrewItemsRaw * crewTravelMultiplier
+  const dayCrewReduction = dayCrewItemsRaw - dayCrewItemsTotal
+  const dayItemsTotal = (items ?? []).reduce((s, i) => s + i.total, 0) - dayCrewReduction
+  const sceneItemsTotal = scenes.reduce((s, r) => s + r.total, 0)
   const dayCastFringes = fringes ? dayCastItemsTotal * (fringes.castPayrollPct / 100) : 0
   const dayCrewFringes = fringes ? dayCrewItemsTotal * (fringes.crewPayrollPct / 100) : 0
   const dayPerDiem = fringes ? fringes.castPerDiemPerDay + fringes.crewPerDiemPerDay : 0
@@ -1589,6 +1607,12 @@ function DayCostsSection({
                   <span className="text-muted">Day items <span className="text-muted/60">(cast · crew · locations…)</span></span>
                   <span className="text-text tabular-nums">${Math.round(dayItemsTotal).toLocaleString()}</span>
                 </div>
+                {dayCrewReduction > 0 && fringes && (
+                  <div className="flex items-center justify-between py-0.5 pl-3">
+                    <span className="text-sky-700/80 text-[10px]">↳ crew ½ day · travel {fringes.travelHours ?? '?'}hr &lt; 4hr (cast stay full)</span>
+                    <span className="text-sky-700/80 tabular-nums text-[10px]">−${Math.round(dayCrewReduction).toLocaleString()}</span>
+                  </div>
+                )}
                 {scenes.length > 0 && (
                   <div className="flex items-center justify-between py-0.5">
                     <span className="text-emerald-700 flex items-center gap-1.5">

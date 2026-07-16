@@ -524,6 +524,7 @@ async function ensureShootDays(projectId: string): Promise<void> {
         SET travel_from  = COALESCE(travel_from, 'LA'),
             travel_to    = COALESCE(travel_to, 'Solvang'),
             travel_miles = COALESCE(travel_miles, 260),
+            travel_hours = COALESCE(travel_hours, 2.5),
             location_tag = COALESCE(location_tag, 'Solvang')
       WHERE project_id = $1 AND is_travel = true`,
     [projectId],
