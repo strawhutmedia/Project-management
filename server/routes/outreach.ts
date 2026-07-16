@@ -169,7 +169,7 @@ outreachRouter.get('/projects/:projectId/prospects', async (req, res) => {
             context, unique_sentence, unique_sentence_generated_at, status,
             email_check_status, email_checked_at, email_check_detail,
             sent_at, replied_at, bounced_at, open_count, first_opened_at, last_opened_at,
-            sending_domain_id, created_at, updated_at
+            batch_label, sending_domain_id, created_at, updated_at
        FROM outreach_prospects
       WHERE project_id = $1
       ORDER BY created_at DESC`,
@@ -193,9 +193,21 @@ outreachRouter.post('/projects/:projectId/prospects/bulk', async (req, res) => {
     res.status(400).json({ error: 'too_many_rows', detail: 'max 500 per bulk import' })
     return
   }
+  // Tag this whole import as one batch. Use the name the operator typed, or
+  // auto-number the next one for this show ("Batch 2", "Batch 3", …).
+  let batchLabel = typeof req.body?.batchLabel === 'string' && req.body.batchLabel.trim()
+    ? req.body.batchLabel.trim().slice(0, 80) : ''
+  if (!batchLabel) {
+    const { rows: br } = await pool.query<{ n: number }>(
+      `SELECT COUNT(DISTINCT batch_label)::int AS n FROM outreach_prospects WHERE project_id = $1 AND batch_label IS NOT NULL`,
+      [projectId],
+    )
+    batchLabel = `Batch ${(br[0]?.n ?? 0) + 1}`
+  }
   type Result = { row: number; ok: boolean; error?: string; id?: string }
   const results: Result[] = []
   const client = await pool.connect()
+  const seenEmails = new Set<string>()
   try {
     await client.query('BEGIN')
     for (let i = 0; i < rows.length; i++) {
@@ -207,6 +219,24 @@ outreachRouter.post('/projects/:projectId/prospects/bulk', async (req, res) => {
       }
       const fullName = typeof raw?.fullName === 'string' && raw.fullName.trim() ? raw.fullName.trim() : null
       const email = typeof raw?.email === 'string' && raw.email.trim() ? raw.email.trim().toLowerCase() : null
+      // Never import someone already on this show's list (whether they were
+      // already emailed or are a dupe within this same paste). This is what
+      // makes "add the next batch, keep the old" safe — nobody gets re-emailed.
+      if (email) {
+        if (seenEmails.has(email)) {
+          results.push({ row: i, ok: false, error: 'duplicate_email' })
+          continue
+        }
+        const dup = await client.query(
+          `SELECT 1 FROM outreach_prospects WHERE project_id = $1 AND lower(email) = $2 LIMIT 1`,
+          [projectId, email],
+        )
+        if (dup.rowCount && dup.rowCount > 0) {
+          results.push({ row: i, ok: false, error: 'duplicate_email' })
+          continue
+        }
+        seenEmails.add(email)
+      }
       const recipientType = typeof raw?.recipientType === 'string' && RECIPIENT_TYPES.has(raw.recipientType)
         ? raw.recipientType : 'person'
       const clientName = typeof raw?.clientName === 'string' && raw.clientName.trim() ? raw.clientName.trim() : null
@@ -215,10 +245,10 @@ outreachRouter.post('/projects/:projectId/prospects/bulk', async (req, res) => {
       const insertRes = await client.query<{ id: string }>(
         `INSERT INTO outreach_prospects
            (project_id, name, full_name, email, recipient_type, client_name,
-            context, status, created_by)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+            context, status, created_by, batch_label)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
          RETURNING id`,
-        [projectId, name, fullName, email, recipientType, clientName, context, initialStatus, user.id],
+        [projectId, name, fullName, email, recipientType, clientName, context, initialStatus, user.id, batchLabel],
       )
       results.push({ row: i, ok: true, id: insertRes.rows[0].id })
     }
@@ -231,8 +261,9 @@ outreachRouter.post('/projects/:projectId/prospects/bulk', async (req, res) => {
     client.release()
   }
   const imported = results.filter((r) => r.ok).length
-  const failed = results.filter((r) => !r.ok).length
-  res.json({ imported, failed, results })
+  const duplicates = results.filter((r) => !r.ok && r.error === 'duplicate_email').length
+  const failed = results.filter((r) => !r.ok && r.error !== 'duplicate_email').length
+  res.json({ imported, failed, duplicates, batchLabel, results })
 })
 
 outreachRouter.post('/projects/:projectId/prospects', async (req, res) => {
