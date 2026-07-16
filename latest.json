@@ -1,9 +1,9 @@
 {
   "version": "0.2.2",
-  "now": "2026-07-16T04:36:01.579Z",
+  "now": "2026-07-16T04:44:00.397Z",
   "boot": {
-    "startedAt": "2026-07-16T04:36:01.149Z",
-    "completedAt": "2026-07-16T04:36:01.569Z",
+    "startedAt": "2026-07-16T04:43:59.858Z",
+    "completedAt": "2026-07-16T04:44:00.383Z",
     "error": null
   },
   "env": {
@@ -115,7 +115,8 @@
       "079_travel_day.sql",
       "080_travel_mileage.sql",
       "081_travel_hours.sql",
-      "082_breakdown_default_days.sql"
+      "082_breakdown_default_days.sql",
+      "083_wardrobe_outfit_number.sql"
     ],
     "userCount": 12,
     "projectCount": 16
@@ -123,7 +124,7 @@
   "recentLog": [
     {
       "level": "info",
-      "ts": "2026-07-16T04:36:01.147Z",
+      "ts": "2026-07-16T04:43:59.856Z",
       "msg": "serving client from",
       "data": {
         "clientDir": "/app/dist"
@@ -131,7 +132,7 @@
     },
     {
       "level": "info",
-      "ts": "2026-07-16T04:36:01.149Z",
+      "ts": "2026-07-16T04:43:59.858Z",
       "msg": "boot starting",
       "data": {
         "cwd": "/app",
@@ -142,12 +143,12 @@
     },
     {
       "level": "info",
-      "ts": "2026-07-16T04:36:01.420Z",
+      "ts": "2026-07-16T04:44:00.173Z",
       "msg": "migrations complete"
     },
     {
       "level": "info",
-      "ts": "2026-07-16T04:36:01.562Z",
+      "ts": "2026-07-16T04:44:00.371Z",
       "msg": "BIYA seed: project already exists, ensured shoot days",
       "data": {
         "projectId": "12f53ed1-c6c7-4c11-8d7b-06d91744c9af"
@@ -155,12 +156,12 @@
     },
     {
       "level": "info",
-      "ts": "2026-07-16T04:36:01.569Z",
+      "ts": "2026-07-16T04:44:00.383Z",
       "msg": "listening on :8080"
     },
     {
       "level": "info",
-      "ts": "2026-07-16T04:36:01.569Z",
+      "ts": "2026-07-16T04:44:00.383Z",
       "msg": "scheduler started (every 5 min)"
     }
   ]
