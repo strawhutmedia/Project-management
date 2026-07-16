@@ -668,6 +668,7 @@ export type ApiOutreachProspect = {
   open_count: number
   first_opened_at: string | null
   last_opened_at: string | null
+  batch_label: string | null
   sending_domain_id: string | null
   created_at: string
   updated_at: string
@@ -1481,10 +1482,10 @@ export const api = {
     name: string; fullName?: string; email?: string;
     recipientType?: 'person' | 'agent' | 'manager' | 'other';
     clientName?: string; context?: string;
-  }>) =>
-    request<{ imported: number; failed: number; duplicates: number; results: Array<{ row: number; ok: boolean; error?: string; id?: string }> }>(
+  }>, batchLabel?: string) =>
+    request<{ imported: number; failed: number; duplicates: number; batchLabel: string; results: Array<{ row: number; ok: boolean; error?: string; id?: string }> }>(
       `/api/outreach/projects/${projectId}/prospects/bulk`,
-      { method: 'POST', body: JSON.stringify({ rows }) },
+      { method: 'POST', body: JSON.stringify({ rows, batchLabel }) },
     ),
   updateOutreachProspect: (id: string, patch: Partial<{
     name: string; fullName: string | null; email: string | null;

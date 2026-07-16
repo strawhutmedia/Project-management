@@ -65,7 +65,7 @@ export default function OutreachSection({ projectId }: { projectId: string }) {
   const [addOpen, setAddOpen] = useState(false)
   const [bulkOpen, setBulkOpen] = useState(false)
   const [rolodexOpen, setRolodexOpen] = useState(false)
-  const [listFilter, setListFilter] = useState<'all' | 'sent' | 'ready' | 'replied' | 'needs_email'>('all')
+  const [listFilter, setListFilter] = useState<string>('all') // 'all' | 'replied' | a batch label
   const [oneSheetApproval, setOneSheetApproval] = useState<{ approvedAt: string | null; editedSinceApproval: boolean } | null>(null)
   const [openProspect, setOpenProspect] = useState<ApiOutreachProspect | null>(null)
   const [generatingAll, setGeneratingAll] = useState(false)
@@ -429,13 +429,16 @@ export default function OutreachSection({ projectId }: { projectId: string }) {
   const needsEmailCount = prospects?.filter((p) => p.status === 'needs_email').length ?? 0
   const sentCount = prospects?.filter((p) => p.status === 'sent').length ?? 0
   const repliedCount = prospects?.filter((p) => p.status === 'replied').length ?? 0
-  // "Sent" here means already contacted — includes those who then replied.
-  const contactedCount = prospects?.filter((p) => p.status === 'sent' || p.status === 'replied').length ?? 0
+  // Distinct batches present, natural-sorted ("Batch 2" before "Batch 10").
+  const batches = Array.from(new Set((prospects ?? []).map((p) => p.batch_label).filter((b): b is string => !!b)))
+    .sort((a, b) => a.localeCompare(b, undefined, { numeric: true }))
   const visibleProspects = (prospects ?? []).filter((p) => {
     if (listFilter === 'all') return true
-    if (listFilter === 'sent') return p.status === 'sent' || p.status === 'replied'
-    return p.status === listFilter
+    if (listFilter === 'replied') return p.status === 'replied'
+    return p.batch_label === listFilter
   })
+  const batchContacted = (label: string) =>
+    (prospects ?? []).filter((p) => p.batch_label === label && (p.status === 'sent' || p.status === 'replied')).length
   // Addresses with an email that still need the deliverability check.
   const uncheckedCount = prospects?.filter(
     (p) => p.email && p.email_check_status === 'unchecked'
@@ -860,25 +863,41 @@ export default function OutreachSection({ projectId }: { projectId: string }) {
           )}
           {prospects && prospects.length > 0 && (
             <div className="flex items-center gap-1.5 flex-wrap">
-              {([
-                ['all', `All (${prospects.length})`],
-                ['sent', `📨 Already contacted (${contactedCount})`],
-                ['replied', `↩ Replied (${repliedCount})`],
-                ['ready', `Ready to send (${readyCount})`],
-                ['needs_email', `Needs email (${needsEmailCount})`],
-              ] as const).map(([key, label]) => (
+              <span className="text-[10px] uppercase tracking-wider text-muted/70 font-bold mr-1">View:</span>
+              <button
+                onClick={() => setListFilter('all')}
+                className={`text-[10px] uppercase tracking-wider rounded-full px-2.5 py-1 font-bold border ${
+                  listFilter === 'all' ? 'text-stage-mastering border-stage-mastering bg-stage-mastering/10' : 'text-muted border-line hover:bg-ink/40'
+                }`}
+              >
+                All ({prospects.length})
+              </button>
+              {batches.map((b) => {
+                const total = (prospects ?? []).filter((p) => p.batch_label === b).length
+                const contacted = batchContacted(b)
+                return (
+                  <button
+                    key={b}
+                    onClick={() => setListFilter(b)}
+                    title={`${contacted} of ${total} in ${b} already contacted`}
+                    className={`text-[10px] uppercase tracking-wider rounded-full px-2.5 py-1 font-bold border ${
+                      listFilter === b ? 'text-stage-mastering border-stage-mastering bg-stage-mastering/10' : 'text-muted border-line hover:bg-ink/40'
+                    }`}
+                  >
+                    📨 {b} ({total}{contacted > 0 ? ` · ${contacted} sent` : ''})
+                  </button>
+                )
+              })}
+              {repliedCount > 0 && (
                 <button
-                  key={key}
-                  onClick={() => setListFilter(key)}
+                  onClick={() => setListFilter('replied')}
                   className={`text-[10px] uppercase tracking-wider rounded-full px-2.5 py-1 font-bold border ${
-                    listFilter === key
-                      ? 'text-stage-mastering border-stage-mastering bg-stage-mastering/10'
-                      : 'text-muted border-line hover:bg-ink/40'
+                    listFilter === 'replied' ? 'text-emerald-300 border-emerald-500 bg-emerald-500/10' : 'text-muted border-line hover:bg-ink/40'
                   }`}
                 >
-                  {label}
+                  ↩ Replied ({repliedCount})
                 </button>
-              ))}
+              )}
             </div>
           )}
           {prospects && prospects.length > 0 && (
@@ -1096,6 +1115,7 @@ function BulkImportPanel({
   onImported: (generate: boolean) => void
 }) {
   const [text, setText] = useState('')
+  const [batchName, setBatchName] = useState('')
   const [importing, setImporting] = useState(false)
   const [genAfter, setGenAfter] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -1118,14 +1138,15 @@ function BulkImportPanel({
           clientName: r.clientName,
           context: r.context,
         }))
-      const result = await api.bulkImportProspects(projectId, rows)
+      const result = await api.bulkImportProspects(projectId, rows, batchName.trim() || undefined)
       const dupeNote = result.duplicates > 0
         ? ` Skipped ${result.duplicates} already on this list (already emailed or duplicates) — they won't be re-contacted.`
         : ''
+      const tag = result.batchLabel ? ` Tagged as "${result.batchLabel}".` : ''
       if (result.failed > 0) {
-        setError(`Imported ${result.imported}, ${result.failed} failed.${dupeNote} Reload to see what stuck.`)
-      } else if (result.duplicates > 0) {
-        setError(`Imported ${result.imported} new contact${result.imported === 1 ? '' : 's'}.${dupeNote}`)
+        setError(`Imported ${result.imported}, ${result.failed} failed.${dupeNote}${tag} Reload to see what stuck.`)
+      } else if (result.duplicates > 0 || result.imported > 0) {
+        setError(`Imported ${result.imported} new contact${result.imported === 1 ? '' : 's'}.${dupeNote}${tag}`)
       }
       onImported(genAfter && result.imported > 0)
     } catch (err) {
@@ -1161,6 +1182,18 @@ function BulkImportPanel({
           <strong>Multiple emails in one cell?</strong> Slate splits them into separate prospects (one send per address) — you get one row per email, not a joined mess.
         </p>
       </div>
+      <label className="block">
+        <span className="text-[10px] uppercase tracking-wider text-muted font-bold">Batch name (optional)</span>
+        <input
+          value={batchName}
+          onChange={(e) => setBatchName(e.target.value)}
+          placeholder="Leave blank to auto-name (Batch 2, Batch 3…)"
+          className="mt-1 w-full bg-ink/40 border border-line rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-stage-tracking"
+        />
+        <span className="block text-[10px] text-muted/70 mt-1 leading-snug">
+          Everyone in this import gets tagged with this so you can always see which batch they came from and filter by it.
+        </span>
+      </label>
       <textarea
         value={text}
         onChange={(e) => setText(e.target.value)}
@@ -1285,6 +1318,11 @@ function ProspectCard({
           <span className={`text-[9px] uppercase tracking-wider font-bold px-2 py-0.5 rounded-full border ${style.bg}`}>
             {style.label}
           </span>
+          {p.batch_label && (
+            <span className="text-[9px] uppercase tracking-wider font-bold px-2 py-0.5 rounded-full border border-stage-tracking/40 bg-stage-tracking/10 text-stage-tracking">
+              {p.batch_label}
+            </span>
+          )}
           {p.email && p.email_check_status === 'invalid' && (
             <span title={p.email_check_detail ?? 'Undeliverable'} className="text-[9px] uppercase tracking-wider font-bold px-2 py-0.5 rounded-full border border-urgent/50 bg-urgent/10 text-urgent">✕ Undeliverable</span>
           )}
