@@ -58,9 +58,14 @@ function accountInBucket(acc: ApiBudgetAccount, bucket: GoalBucket): boolean {
 }
 
 function bucketSpend(budget: ApiBudget, bucket: GoalBucket): number {
-  return budget.accounts
+  const lineItems = budget.accounts
     .filter((a) => accountInBucket(a, bucket))
     .reduce((s, a) => s + accountTotal(a), 0)
+  // Fold the auto-computed day costs (fringes, per diem, hotels, mileage,
+  // less the crew half-day discount) into Production — they're real
+  // committed spend shown in each day total but never stored as line items.
+  if (bucket === 'production') return lineItems + (budget.autoDayCosts || 0)
+  return lineItems
 }
 
 export default function BudgetSection({ projectId, isAdmin }: { projectId: string; isAdmin: boolean }) {
@@ -263,7 +268,7 @@ export default function BudgetSection({ projectId, isAdmin }: { projectId: strin
             {budget.productionTarget != null && (
               <GoalBar
                 label="🎬 Production"
-                hint="Above the Line + Production"
+                hint="Above/Below line + day fringes · per diem · hotels · mileage"
                 spent={bucketSpend(budget, 'production')}
                 target={budget.productionTarget}
                 currency={budget.currency}
@@ -1126,6 +1131,27 @@ function BudgetItemTable({
   const [draft, setDraft] = useState<Draft>(EMPTY_DRAFT)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [openScenes, setOpenScenes] = useState<Set<string>>(new Set())
+
+  // When items are scene-attached (the Script Breakdown account), group them
+  // by scene into collapsible dropdowns instead of one endless flat list.
+  const sceneGroups = useMemo(() => {
+    const withScene = account.lineItems.filter((i) => i.sceneNumber)
+    if (withScene.length === 0) return null
+    const map = new Map<string, typeof account.lineItems>()
+    for (const i of withScene) {
+      const k = i.sceneNumber as string
+      if (!map.has(k)) map.set(k, [])
+      map.get(k)!.push(i)
+    }
+    const groups = Array.from(map.entries()).sort((a, b) => {
+      const pa = parseInt(a[0], 10), pb = parseInt(b[0], 10)
+      if (pa !== pb) return (isNaN(pa) ? 1e9 : pa) - (isNaN(pb) ? 1e9 : pb)
+      return a[0].localeCompare(b[0])
+    })
+    const noScene = account.lineItems.filter((i) => !i.sceneNumber)
+    return { groups, noScene }
+  }, [account.lineItems])
 
   async function add() {
     if (!draft.description.trim()) {
@@ -1164,9 +1190,52 @@ function BudgetItemTable({
           No line items yet — add one below.
         </div>
       )}
-      {account.lineItems.map((item) => (
-        <BudgetItemCard key={item.id} item={item} currency={currency} onChanged={onChanged} />
-      ))}
+      {sceneGroups ? (
+        <>
+          {sceneGroups.groups.length > 2 && (
+            <div className="flex items-center justify-end gap-3 text-[10px] uppercase tracking-wider pb-1">
+              <button onClick={() => setOpenScenes(new Set(sceneGroups.groups.map((g) => g[0])))} className="text-stage-mastering hover:underline">Expand all</button>
+              <button onClick={() => setOpenScenes(new Set())} className="text-muted hover:underline">Collapse all</button>
+            </div>
+          )}
+          {sceneGroups.groups.map(([sceneNum, items]) => {
+            const open = openScenes.has(sceneNum)
+            const sub = items.reduce((s, i) => s + i.total, 0)
+            const priced = items.filter((i) => i.total > 0).length
+            return (
+              <div key={sceneNum} className="rounded-lg border border-line/50 overflow-hidden">
+                <button
+                  onClick={() => setOpenScenes((prev) => { const n = new Set(prev); if (n.has(sceneNum)) n.delete(sceneNum); else n.add(sceneNum); return n })}
+                  className="w-full flex items-center justify-between gap-2 px-3 py-2 text-left bg-ink/20 hover:bg-ink/30"
+                >
+                  <span className="flex items-center gap-2 min-w-0">
+                    <span className="text-muted text-xs">{open ? '▾' : '▸'}</span>
+                    <span className="font-mono font-bold text-emerald-700 text-xs">#{sceneNum}</span>
+                    <span className="text-[10px] text-muted">{items.length} {items.length === 1 ? 'item' : 'items'} · {priced} priced</span>
+                  </span>
+                  <span className="font-mono text-sm font-bold">
+                    {sub > 0 ? fmtMoney(sub, currency) : <span className="text-muted/60 font-normal">price me</span>}
+                  </span>
+                </button>
+                {open && (
+                  <div className="p-2 space-y-2 border-t border-line/40">
+                    {items.map((item) => (
+                      <BudgetItemCard key={item.id} item={item} currency={currency} onChanged={onChanged} />
+                    ))}
+                  </div>
+                )}
+              </div>
+            )
+          })}
+          {sceneGroups.noScene.map((item) => (
+            <BudgetItemCard key={item.id} item={item} currency={currency} onChanged={onChanged} />
+          ))}
+        </>
+      ) : (
+        account.lineItems.map((item) => (
+          <BudgetItemCard key={item.id} item={item} currency={currency} onChanged={onChanged} />
+        ))
+      )}
       <div className="rounded-lg border border-dashed border-line/60 bg-ink/20 p-2.5 space-y-2">
         <div className="text-[10px] uppercase tracking-wider text-muted font-bold">+ Add new line item</div>
         <div className="grid grid-cols-[auto_1fr] gap-2 items-start">

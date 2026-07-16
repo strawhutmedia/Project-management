@@ -245,6 +245,12 @@ export type ApiBudget = {
   mileageRatePerMi: number
   travelDays: number
   awayDaysCount: number
+  autoDayCosts: number
+  autoFringes: number
+  autoPerDiem: number
+  autoHotels: number
+  autoMileage: number
+  autoCrewDiscount: number
   productionTarget: number | null
   postTarget: number | null
   marketingTarget: number | null

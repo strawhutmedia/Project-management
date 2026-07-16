@@ -135,6 +135,58 @@ budgetsRouter.get('/projects/:projectId', async (req, res) => {
     [projectId, homeTagLower],
   )
   const awayDaysCount = Number(awayRes.rows[0]?.n ?? 0)
+
+  // Auto-computed day costs that live only in each day's "Day total"
+  // (payroll fringes, per diem, hotels, mileage — minus the crew half-day
+  // travel discount). These are NOT stored as line items, so the top-sheet
+  // was undercounting. Sum them across every shoot day so Production
+  // reflects the real committed spend (= the sum of the per-day totals).
+  const dayAgg = await pool.query<{
+    location_tag: string | null; is_travel: boolean; travel_miles: string | null; travel_hours: string | null;
+    cast_count: string; crew_count: string; cast_total: string; crew_total: string;
+  }>(
+    `SELECT sd.location_tag, sd.is_travel, sd.travel_miles, sd.travel_hours,
+            COUNT(li.id) FILTER (WHERE li.code = 'CAST') AS cast_count,
+            COUNT(li.id) FILTER (WHERE li.code = 'CREW') AS crew_count,
+            COALESCE(SUM(li.amt * li.x * li.rate) FILTER (WHERE li.code = 'CAST'), 0) AS cast_total,
+            COALESCE(SUM(li.amt * li.x * li.rate) FILTER (WHERE li.code = 'CREW'), 0) AS crew_total
+       FROM shoot_days sd
+       LEFT JOIN budget_line_items li ON li.shoot_day_id = sd.id
+      WHERE sd.project_id = $1
+      GROUP BY sd.id, sd.location_tag, sd.is_travel, sd.travel_miles, sd.travel_hours`,
+    [projectId],
+  )
+  const castPct = Number(budget.cast_payroll_pct ?? 33)
+  const crewPct = Number(budget.crew_payroll_pct ?? 15)
+  const castPDd = Number(budget.cast_per_diem_daily ?? 0)
+  const crewPDd = Number(budget.crew_per_diem_daily ?? 0)
+  const hotelCastN = Number(budget.hotel_cast_nightly ?? 0)
+  const hotelCrewN = Number(budget.hotel_crew_nightly ?? 0)
+  const hotelContPct = Number(budget.hotel_contingency_pct ?? 10)
+  const mileageRateB = Number(budget.mileage_rate_per_mi ?? 0.70)
+  const STUDIO_ZONE_MI = 30
+  let autoFringes = 0, autoPerDiem = 0, autoHotels = 0, autoMileage = 0, autoCrewDiscount = 0
+  for (const d of dayAgg.rows) {
+    const castCount = Number(d.cast_count), crewCount = Number(d.crew_count)
+    const castTotal = Number(d.cast_total), crewTotal = Number(d.crew_total)
+    const dayTag = (d.location_tag ?? '').trim().toLowerCase()
+    const away = dayTag !== '' && dayTag !== homeTagLower
+    const travelMiles = Number(d.travel_miles ?? 0)
+    const travelHours = d.travel_hours != null ? Number(d.travel_hours) : null
+    const crewMult = d.is_travel && travelHours != null && travelHours < 4 ? 0.5 : 1
+    const effCrew = crewTotal * crewMult
+    autoCrewDiscount += crewTotal - effCrew
+    autoFringes += castTotal * (castPct / 100) + effCrew * (crewPct / 100)
+    if (away) {
+      autoPerDiem += castPDd * castCount + crewPDd * crewCount
+      autoHotels += (hotelCastN * castCount + hotelCrewN * crewCount) * (1 + hotelContPct / 100)
+    }
+    if (d.is_travel) {
+      autoMileage += mileageRateB * Math.max(0, travelMiles - STUDIO_ZONE_MI) * (castCount + crewCount)
+    }
+  }
+  const autoDayCosts = autoFringes + autoPerDiem + autoHotels + autoMileage - autoCrewDiscount
+
   res.json({
     budget: {
       id: budget.id,
@@ -155,6 +207,14 @@ budgetsRouter.get('/projects/:projectId', async (req, res) => {
       mileageRatePerMi: Number(budget.mileage_rate_per_mi ?? 0.70),
       travelDays: Number(budget.travel_days ?? 0),
       awayDaysCount,
+      // Auto-computed day costs (not stored as line items) — folded into the
+      // Production total so it matches the sum of the per-day "Day total"s.
+      autoDayCosts,
+      autoFringes,
+      autoPerDiem,
+      autoHotels,
+      autoMileage,
+      autoCrewDiscount,
       productionTarget: numOrNull(budget.production_target),
       postTarget: numOrNull(budget.post_target),
       marketingTarget: numOrNull(budget.marketing_target),
