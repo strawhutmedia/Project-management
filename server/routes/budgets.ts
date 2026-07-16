@@ -586,6 +586,22 @@ budgetsRouter.get('/shoot-days/:shootDayId/items', async (req, res) => {
    ORDER BY s.day_position ASC, s.script_position ASC`,
     [shootDayId],
   )
+  // Every PRICED ($1+) line item across the scenes on this day, tagged with
+  // its scene, so the day view can list them read-only and show exactly what
+  // makes up the scene rollup. Editing still happens on the scene.
+  const sceneLineItemsRes = await pool.query<{
+    scene_number: string; scene_slug: string | null; description: string; code: string | null; total: string;
+  }>(
+    `SELECT s.number AS scene_number, s.slug AS scene_slug,
+            li.description, li.code,
+            (li.amt * li.x * li.rate)::numeric AS total
+       FROM scenes s
+       JOIN budget_line_items li ON li.scene_id = s.id
+      WHERE s.shoot_day_id = $1
+        AND (li.amt * li.x * li.rate) >= 1
+   ORDER BY s.day_position ASC, s.script_position ASC, li.position ASC`,
+    [shootDayId],
+  )
   res.json({
     items: rows.map((r) => ({
       id: r.id,
@@ -611,6 +627,13 @@ budgetsRouter.get('/shoot-days/:shootDayId/items', async (req, res) => {
       number: r.number,
       slug: r.slug,
       itemCount: Number(r.item_count),
+      total: Number(r.total),
+    })),
+    sceneLineItems: sceneLineItemsRes.rows.map((r) => ({
+      sceneNumber: r.scene_number,
+      sceneSlug: r.scene_slug,
+      description: r.description,
+      code: r.code,
       total: Number(r.total),
     })),
     fringes: {

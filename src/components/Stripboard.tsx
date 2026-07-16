@@ -1447,6 +1447,7 @@ const DAY_BUCKETS: Array<{ code: string; label: string; icon: string }> = [
 ]
 
 type SceneRollup = { id: string; number: string; slug: string | null; itemCount: number; total: number }
+type SceneLineItem = { sceneNumber: string; sceneSlug: string | null; description: string; code: string | null; total: number }
 
 function DayCostsSection({
   shootDayId,
@@ -1460,6 +1461,7 @@ function DayCostsSection({
   const [expanded, setExpanded] = useState(false)
   const [items, setItems] = useState<DayCostItem[] | null>(null)
   const [scenes, setScenes] = useState<SceneRollup[]>([])
+  const [sceneLineItems, setSceneLineItems] = useState<SceneLineItem[]>([])
   const [fringes, setFringes] = useState<{
     castPayrollPct: number; crewPayrollPct: number
     castPerDiemPerDay: number; crewPerDiemPerDay: number
@@ -1490,10 +1492,12 @@ function DayCostsSection({
         sourceShootDayNumber: it.sourceShootDayNumber,
       })))
       setScenes(r.scenes ?? [])
+      setSceneLineItems(r.sceneLineItems ?? [])
       setFringes(r.fringes ?? null)
     } catch {
       setItems([])
       setScenes([])
+      setSceneLineItems([])
       setFringes(null)
     }
   }
@@ -1694,6 +1698,28 @@ function DayCostsSection({
                       )
                     })}
                   </div>
+                  {/* Every priced ($1+) item across the day's scenes,
+                      read-only, tagged with its scene. Editing is on the
+                      scene (tap the # tag). These already roll into the
+                      day total via the scene rollup above. */}
+                  {sceneLineItems.length > 0 && (
+                    <div className="border-t border-line/40 pt-2 space-y-1">
+                      {sceneLineItems.map((li, idx) => (
+                        <div key={idx} className="flex items-center justify-between gap-2 text-[11px]">
+                          <span className="flex items-center gap-1.5 min-w-0">
+                            <button
+                              onClick={() => { const sc = scenes.find((s) => s.number === li.sceneNumber); if (sc) onOpenScene?.(sc.id) }}
+                              className="text-emerald-700 font-mono font-bold shrink-0 hover:underline"
+                              title={`Scene ${li.sceneNumber}${li.sceneSlug ? ` — ${li.sceneSlug}` : ''} · tap to edit on the scene`}
+                            >#{li.sceneNumber}</button>
+                            {li.code && <span className="text-muted/50 text-[9px] uppercase tracking-wider shrink-0">{li.code}</span>}
+                            <span className="text-text/80 truncate">{li.description}</span>
+                          </span>
+                          <span className="text-text/80 font-mono tabular-nums shrink-0">${Math.round(li.total).toLocaleString()}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               )}
               {/* Location + fringes + per diem + hotels. Always shown

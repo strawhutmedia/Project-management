@@ -942,6 +942,7 @@ export const api = {
     request<{
       items: Array<{ id: string; accountId: string; code: string | null; description: string; amt: number; units: string | null; x: number; rate: number; vendor: string | null; datedAt: string | null; notes: string | null; position: number; total: number; spansAllShootDays: boolean; isSource: boolean; sourceShootDayId: string | null; sourceShootDayNumber: number | null }>
       scenes: Array<{ id: string; number: string; slug: string | null; itemCount: number; total: number }>
+      sceneLineItems: Array<{ sceneNumber: string; sceneSlug: string | null; description: string; code: string | null; total: number }>
       fringes: {
         castPayrollPct: number; crewPayrollPct: number
         castPerDiemPerDay: number; crewPerDiemPerDay: number
