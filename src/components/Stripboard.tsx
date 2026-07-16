@@ -1522,6 +1522,49 @@ function DayCostsSection({
             <p className="text-[11px] text-muted italic">Loading…</p>
           ) : (
             <>
+              {/* Reconciliation ledger — the day total, itemized, so it
+                  adds up in plain sight. Producers kept asking "where's
+                  the scene money in this total?" — the emerald line is
+                  the answer. Scene costs are read-only here (edit on the
+                  scene); every other line is editable in its section. */}
+              <div className="rounded-lg border border-line/60 bg-ink/30 p-2.5 text-[11px] font-mono">
+                <div className="flex items-center justify-between py-0.5">
+                  <span className="text-muted">Day items <span className="text-muted/60">(cast · crew · locations…)</span></span>
+                  <span className="text-text tabular-nums">${Math.round(dayItemsTotal).toLocaleString()}</span>
+                </div>
+                {scenes.length > 0 && (
+                  <div className="flex items-center justify-between py-0.5">
+                    <span className="text-emerald-300 flex items-center gap-1.5">
+                      Scenes on this day
+                      <span className="text-emerald-300/50 normal-case text-[10px]">· read-only, edit on scene</span>
+                    </span>
+                    <span className="text-emerald-300 tabular-nums">${Math.round(sceneItemsTotal).toLocaleString()}</span>
+                  </div>
+                )}
+                {(dayCastFringes + dayCrewFringes) > 0 && (
+                  <div className="flex items-center justify-between py-0.5">
+                    <span className="text-muted">Payroll fringes</span>
+                    <span className="text-text tabular-nums">${Math.round(dayCastFringes + dayCrewFringes).toLocaleString()}</span>
+                  </div>
+                )}
+                {dayPerDiem > 0 && (
+                  <div className="flex items-center justify-between py-0.5">
+                    <span className="text-muted">Per diem</span>
+                    <span className="text-text tabular-nums">${Math.round(dayPerDiem).toLocaleString()}</span>
+                  </div>
+                )}
+                {dayHotelCost > 0 && (
+                  <div className="flex items-center justify-between py-0.5">
+                    <span className="text-muted">Hotels</span>
+                    <span className="text-text tabular-nums">${Math.round(dayHotelCost).toLocaleString()}</span>
+                  </div>
+                )}
+                <div className="flex items-center justify-between mt-1 pt-1.5 border-t border-line/60">
+                  <span className="text-text font-bold uppercase tracking-wider text-[10px]">Day total</span>
+                  <span className="text-text font-bold tabular-nums text-sm">${Math.round(total).toLocaleString()}</span>
+                </div>
+              </div>
+
               {/* Scene rollup — each scene on this day with its budget
                   total. Click a chip to open the scene modal and edit
                   its items. Costs live on the scene, so dragging the
@@ -1532,6 +1575,7 @@ function DayCostsSection({
                     <span className="text-[10px] uppercase tracking-wider text-muted font-bold flex items-center gap-1.5">
                       <span>🎬</span>
                       <span>Scenes on this day</span>
+                      <span className="normal-case tracking-normal text-muted/60 font-normal">· counted in day total · tap a scene to edit</span>
                     </span>
                     <span className="text-[10px] font-mono text-text/80">
                       ${Math.round(sceneItemsTotal).toLocaleString()}
