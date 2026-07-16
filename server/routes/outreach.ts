@@ -45,6 +45,15 @@ function locationLine(loc: string | null | undefined): string {
   return LOCATION_LINES[(loc ?? 'either')] ?? LOCATION_LINES.either
 }
 
+// Reply-to can be one address or several (comma/semicolon separated). Returns
+// an array so every listed inbox receives replies. Falls back to the shared
+// booking inbox when none is set.
+function parseReplyTo(raw: string | null | undefined): string[] {
+  const list = (raw?.trim() || 'booking@strawhutmedia.com')
+    .split(/[,;]+/).map((s) => s.trim()).filter(Boolean)
+  return list.length ? list : ['booking@strawhutmedia.com']
+}
+
 function mergeTemplate(
   text: string,
   tokens: { name: string; uniqueSentence: string; oneSheetUrl: string; sender?: string; guest?: string; location?: string },
@@ -704,7 +713,9 @@ async function sendOneProspect(prospectId: string): Promise<void> {
   const showName = showRes.rows[0]?.name || 'Straw Hut Media'
   const fromName = tpl.from_name?.trim() || showName
   const from = `${fromName} <booking@${domain.name}>`
-  const replyTo = tpl.reply_to?.trim() || 'booking@strawhutmedia.com'
+  // Reply-to may hold several addresses (comma/semicolon separated) so replies
+  // reach everyone who should see them — Resend accepts an array.
+  const replyTo = parseReplyTo(tpl.reply_to)
 
   const sender = tpl.sender_name?.trim() || tpl.from_name?.trim() || 'The team'
   const guest = resolveGuest(p.recipient_type, p.client_name)
@@ -1538,7 +1549,7 @@ outreachRouter.post('/projects/:projectId/test-send', async (req, res) => {
   const showName = showNameRes.rows[0]?.name || 'Straw Hut Media'
   const fromName = tpl.from_name?.trim() || showName
   const from = `${fromName} <booking@${domain}>`
-  const replyTo = tpl.reply_to?.trim() || 'booking@strawhutmedia.com'
+  const replyTo = parseReplyTo(tpl.reply_to)
 
   try {
     const send = await resend.emails.send({
