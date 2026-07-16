@@ -909,6 +909,7 @@ export const api = {
     sceneId: string | null
     shootDayId: string | null
     spansAllShootDays: boolean
+    outfitNumber: string | null
   }>) => request<{ ok: true }>(`/api/budgets/items/${itemId}`, { method: 'PATCH', body: JSON.stringify(patch) }),
   deleteBudgetItem: (itemId: string) =>
     request<{ ok: true }>(`/api/budgets/items/${itemId}`, { method: 'DELETE' }),
@@ -943,6 +944,7 @@ export const api = {
       items: Array<{ id: string; accountId: string; code: string | null; description: string; amt: number; units: string | null; x: number; rate: number; vendor: string | null; datedAt: string | null; notes: string | null; position: number; total: number; spansAllShootDays: boolean; isSource: boolean; sourceShootDayId: string | null; sourceShootDayNumber: number | null }>
       scenes: Array<{ id: string; number: string; slug: string | null; itemCount: number; total: number }>
       sceneLineItems: Array<{ sceneNumber: string; sceneSlug: string | null; description: string; code: string | null; total: number }>
+      wardrobe: Array<{ id: string; sceneNumber: string; description: string; notes: string | null; outfitNumber: string | null; total: number }>
       fringes: {
         castPayrollPct: number; crewPayrollPct: number
         castPerDiemPerDay: number; crewPerDiemPerDay: number

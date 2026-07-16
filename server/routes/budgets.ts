@@ -379,6 +379,7 @@ budgetsRouter.patch('/items/:itemId', async (req, res) => {
     ['spansAllShootDays', 'spans_all_shoot_days', (v) => Boolean(v)],
     ['resourceType', 'resource_type', (v) => (typeof v === 'string' ? v.slice(0, 40) : null)],
     ['resourceKey', 'resource_key', (v) => (typeof v === 'string' ? v.slice(0, 80) : null)],
+    ['outfitNumber', 'outfit_number', (v) => (typeof v === 'string' && v.trim() ? v.trim().slice(0, 20) : null)],
   ]
   const updates: string[] = []
   const values: unknown[] = []
@@ -602,6 +603,20 @@ budgetsRouter.get('/shoot-days/:shootDayId/items', async (req, res) => {
    ORDER BY s.day_position ASC, s.script_position ASC, li.position ASC`,
     [shootDayId],
   )
+  // WARDROBE items across the day's scenes — shown regardless of cost, so
+  // the day view lists each character's look(s) for the day. Grouping by
+  // character happens client-side from the description.
+  const wardrobeRes = await pool.query<{
+    id: string; scene_number: string; description: string; notes: string | null; outfit_number: string | null; total: string;
+  }>(
+    `SELECT li.id, s.number AS scene_number, li.description, li.notes, li.outfit_number,
+            (li.amt * li.x * li.rate)::numeric AS total
+       FROM scenes s
+       JOIN budget_line_items li ON li.scene_id = s.id
+      WHERE s.shoot_day_id = $1 AND li.code = 'WARDROBE'
+   ORDER BY s.day_position ASC, s.script_position ASC, li.position ASC`,
+    [shootDayId],
+  )
   res.json({
     items: rows.map((r) => ({
       id: r.id,
@@ -634,6 +649,14 @@ budgetsRouter.get('/shoot-days/:shootDayId/items', async (req, res) => {
       sceneSlug: r.scene_slug,
       description: r.description,
       code: r.code,
+      total: Number(r.total),
+    })),
+    wardrobe: wardrobeRes.rows.map((r) => ({
+      id: r.id,
+      sceneNumber: r.scene_number,
+      description: r.description,
+      notes: r.notes,
+      outfitNumber: r.outfit_number,
       total: Number(r.total),
     })),
     fringes: {

@@ -1407,6 +1407,24 @@ function TravelLegInput({ day, onChanged }: { day: ApiShootDay; onChanged?: () =
   )
 }
 
+// Small editable outfit-number field. Local state, commits on blur so we
+// don't reload on every keystroke.
+function OutfitNumberInput({ value, onSave, disabled }: { value: string | null; onSave: (v: string) => void; disabled?: boolean }) {
+  const [v, setV] = useState(value ?? '')
+  useEffect(() => { setV(value ?? '') }, [value])
+  return (
+    <input
+      value={v}
+      onChange={(e) => setV(e.target.value)}
+      onBlur={() => { if ((v.trim() || null) !== (value ?? null)) onSave(v) }}
+      disabled={disabled}
+      placeholder="#"
+      className="w-9 shrink-0 text-[11px] text-center font-mono font-bold rounded border border-sky-500/50 bg-sky-500/10 text-sky-700 px-1 py-0.5 focus:outline-none focus:border-sky-500 placeholder:text-sky-700/40"
+      title="Outfit number — editable. Use the same number for a recurring look."
+    />
+  )
+}
+
 function LegendChip({ label, className }: { label: string; className: string }) {
   return (
     <span className="inline-flex items-center gap-1.5">
@@ -1448,6 +1466,21 @@ const DAY_BUCKETS: Array<{ code: string; label: string; icon: string }> = [
 
 type SceneRollup = { id: string; number: string; slug: string | null; itemCount: number; total: number }
 type SceneLineItem = { sceneNumber: string; sceneSlug: string | null; description: string; code: string | null; total: number }
+type WardrobeItem = { id: string; sceneNumber: string; description: string; notes: string | null; outfitNumber: string | null; total: number }
+
+// Pull the character name off a wardrobe description like
+// "SAWYER: white sundress" or "Sawyer wardrobe, surveillance/casual".
+function splitWardrobe(desc: string): { character: string; outfit: string } {
+  const s = (desc ?? '').trim()
+  const colon = s.indexOf(':')
+  if (colon > 0 && colon <= 28) {
+    return { character: s.slice(0, colon).trim(), outfit: s.slice(colon + 1).trim() || s }
+  }
+  const m = s.match(/^([A-Z][\w'’\-]*(?:\s+[A-Z][\w'’\-]*)?)/)
+  const character = m ? m[1].replace(/\s+wardrobe$/i, '').trim() : (s.split(/[,\-]/)[0] || s).trim()
+  const outfit = s.slice(character.length).replace(/^[\s:,\-–]+/, '').replace(/^wardrobe[\s:,\-–]*/i, '').trim() || s
+  return { character, outfit }
+}
 
 function DayCostsSection({
   shootDayId,
@@ -1462,6 +1495,7 @@ function DayCostsSection({
   const [items, setItems] = useState<DayCostItem[] | null>(null)
   const [scenes, setScenes] = useState<SceneRollup[]>([])
   const [sceneLineItems, setSceneLineItems] = useState<SceneLineItem[]>([])
+  const [wardrobe, setWardrobe] = useState<WardrobeItem[]>([])
   const [fringes, setFringes] = useState<{
     castPayrollPct: number; crewPayrollPct: number
     castPerDiemPerDay: number; crewPerDiemPerDay: number
@@ -1493,11 +1527,13 @@ function DayCostsSection({
       })))
       setScenes(r.scenes ?? [])
       setSceneLineItems(r.sceneLineItems ?? [])
+      setWardrobe(r.wardrobe ?? [])
       setFringes(r.fringes ?? null)
     } catch {
       setItems([])
       setScenes([])
       setSceneLineItems([])
+      setWardrobe([])
       setFringes(null)
     }
   }
@@ -1551,6 +1587,24 @@ function DayCostsSection({
     await api.deleteBudgetItem(id)
     await load()
   }
+
+  async function saveOutfitNumber(id: string, outfitNumber: string) {
+    await api.updateBudgetItem(id, { outfitNumber: outfitNumber.trim() || null })
+    await load()
+  }
+
+  // Group the day's wardrobe items by character (parsed from the
+  // description) so each performer's look(s) sit together.
+  const groupedWardrobe = (() => {
+    const map = new Map<string, { id: string; sceneNumber: string; outfit: string; outfitNumber: string | null }[]>()
+    for (const w of wardrobe) {
+      const { character, outfit } = splitWardrobe(w.description)
+      const key = character || '—'
+      if (!map.has(key)) map.set(key, [])
+      map.get(key)!.push({ id: w.id, sceneNumber: w.sceneNumber, outfit, outfitNumber: w.outfitNumber })
+    }
+    return Array.from(map.entries())
+  })()
 
   // Fringes on this day only cover the day's own cast/crew buckets.
   // Company-wide budget totals are the source of truth — here we just
@@ -1662,6 +1716,38 @@ function DayCostsSection({
                   <span className="text-text font-bold tabular-nums text-sm">${Math.round(total).toLocaleString()}</span>
                 </div>
               </div>
+
+              {/* Wardrobe — each character's look(s) for the day, with an
+                  editable outfit number. Descriptions come from the scene
+                  breakdown; edit the look on the scene, set the # here. */}
+              {wardrobe.length > 0 && (
+                <div className="rounded-lg border border-line/60 bg-ink/20 p-2 space-y-2">
+                  <div className="text-[10px] uppercase tracking-wider text-muted font-bold flex items-center gap-1.5">
+                    <span>👗</span><span>Wardrobe</span>
+                    <span className="normal-case tracking-normal text-muted/70 font-normal">· set an outfit # · reuse the same # for a recurring look</span>
+                  </div>
+                  <div className="space-y-1.5">
+                    {groupedWardrobe.map(([character, looks]) => (
+                      <div key={character} className="flex items-start gap-2">
+                        <span className="text-text font-bold text-[12px] shrink-0 min-w-[92px] pt-1 truncate" title={character}>{character}</span>
+                        <div className="flex flex-col gap-1 min-w-0 flex-1">
+                          {looks.map((l) => (
+                            <div key={l.id} className="flex items-center gap-2 text-[11px]">
+                              <OutfitNumberInput value={l.outfitNumber} onSave={(v) => void saveOutfitNumber(l.id, v)} disabled={!isAdmin} />
+                              <button
+                                onClick={() => { const sc = scenes.find((s) => s.number === l.sceneNumber); if (sc) onOpenScene?.(sc.id) }}
+                                className="text-emerald-700 font-mono font-bold shrink-0 hover:underline"
+                                title={`Scene ${l.sceneNumber} · tap to edit the look on the scene`}
+                              >#{l.sceneNumber}</button>
+                              <span className="text-text truncate">{l.outfit}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
 
               {/* Scene rollup — each scene on this day with its budget
                   total. Click a chip to open the scene modal and edit
