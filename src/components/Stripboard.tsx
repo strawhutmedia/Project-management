@@ -1136,7 +1136,7 @@ function DayRow({
         <div className="flex items-center gap-3 min-w-0">
           <span className="text-muted text-xs">{collapsed ? '▸' : '▾'}</span>
           <span className={`text-[11px] uppercase tracking-[0.15em] font-bold ${
-            isTravel ? 'text-sky-300' :
+            isTravel ? 'text-sky-600' :
             isBreak ? 'text-muted' :
             isUnscheduled ? 'text-stage-stems' :
             overTarget ? 'text-urgent' :
@@ -1371,14 +1371,14 @@ function TravelLegInput({ day, onChanged }: { day: ApiShootDay; onChanged?: () =
     const auto = lookupRoundTripMiles(from, next)
     void save({ travelTo: next || null, ...(auto != null ? { travelMiles: auto } : {}) })
   }
-  const selCls = 'text-[10px] uppercase tracking-wider font-bold px-2 py-0.5 rounded-full border cursor-pointer appearance-none bg-sky-500/10 text-sky-300 border-sky-500/40'
+  const selCls = 'text-[10px] uppercase tracking-wider font-bold px-2 py-0.5 rounded-full border cursor-pointer appearance-none bg-sky-500/10 text-sky-700 border-sky-500/50'
   return (
     <span className="flex items-center gap-1 flex-wrap" onClick={(e) => e.stopPropagation()}>
       <select value={from} onChange={(e) => pickFrom(e.target.value)} className={selCls} title="Drive from">
         <option value="">from…</option>
         {ALLOWED_LOCATIONS.map((loc) => <option key={loc} value={loc}>{loc}</option>)}
       </select>
-      <span className="text-sky-300 text-xs">→</span>
+      <span className="text-sky-600 text-xs">→</span>
       <select value={to} onChange={(e) => pickTo(e.target.value)} className={selCls} title="Drive to (sets that night's hotel + per diem)">
         <option value="">to…</option>
         {ALLOWED_LOCATIONS.map((loc) => <option key={loc} value={loc}>{loc}</option>)}
@@ -1387,7 +1387,7 @@ function TravelLegInput({ day, onChanged }: { day: ApiShootDay; onChanged?: () =
         type="number" min="0" value={day.travelMiles ?? ''}
         onChange={(e) => { const n = Number(e.target.value); void save({ travelMiles: e.target.value === '' ? null : (Number.isFinite(n) && n >= 0 ? n : null) }) }}
         placeholder="mi"
-        className="w-14 text-[10px] font-mono px-2 py-0.5 rounded-full border border-sky-500/40 bg-sky-500/10 text-sky-300 focus:outline-none focus:border-sky-400"
+        className="w-14 text-[10px] font-mono px-2 py-0.5 rounded-full border border-sky-500/50 bg-sky-500/10 text-sky-700 focus:outline-none focus:border-sky-500"
         title="Round-trip miles (auto-filled between known cities)"
       />
       <span className="text-muted/60 text-[10px] normal-case">mi RT</span>
@@ -1591,11 +1591,11 @@ function DayCostsSection({
                 </div>
                 {scenes.length > 0 && (
                   <div className="flex items-center justify-between py-0.5">
-                    <span className="text-emerald-300 flex items-center gap-1.5">
+                    <span className="text-emerald-700 flex items-center gap-1.5">
                       Scenes on this day
-                      <span className="text-emerald-300/50 normal-case text-[10px]">· read-only, edit on scene</span>
+                      <span className="text-emerald-700/70 normal-case text-[10px]">· read-only, edit on scene</span>
                     </span>
-                    <span className="text-emerald-300 tabular-nums">${Math.round(sceneItemsTotal).toLocaleString()}</span>
+                    <span className="text-emerald-700 tabular-nums">${Math.round(sceneItemsTotal).toLocaleString()}</span>
                   </div>
                 )}
                 {(dayCastFringes + dayCrewFringes) > 0 && (
@@ -1618,13 +1618,13 @@ function DayCostsSection({
                 )}
                 {dayMileage > 0 && fringes && (
                   <div className="flex items-center justify-between py-0.5">
-                    <span className="text-sky-300 flex items-center gap-1.5">
+                    <span className="text-sky-700 flex items-center gap-1.5">
                       Mileage
-                      <span className="text-sky-300/50 normal-case text-[10px]">
+                      <span className="text-sky-700/70 normal-case text-[10px]">
                         · {fringes.travelMiles} mi × {fringes.mileageHeadcount} ppl × ${fringes.mileageRate.toFixed(2)}
                       </span>
                     </span>
-                    <span className="text-sky-300 tabular-nums">${Math.round(dayMileage).toLocaleString()}</span>
+                    <span className="text-sky-700 tabular-nums">${Math.round(dayMileage).toLocaleString()}</span>
                   </div>
                 )}
                 <div className="flex items-center justify-between mt-1 pt-1.5 border-t border-line/60">
