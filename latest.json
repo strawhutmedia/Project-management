@@ -1,9 +1,9 @@
 {
   "version": "0.2.2",
-  "now": "2026-07-16T22:20:44.792Z",
+  "now": "2026-07-17T16:27:53.068Z",
   "boot": {
-    "startedAt": "2026-07-16T22:20:44.431Z",
-    "completedAt": "2026-07-16T22:20:44.780Z",
+    "startedAt": "2026-07-17T16:27:52.636Z",
+    "completedAt": "2026-07-17T16:27:53.058Z",
     "error": null
   },
   "env": {
@@ -110,6 +110,7 @@
       "074_outreach_template_location.sql",
       "075_rolodex.sql",
       "076_one_sheet_approval.sql",
+      "077_ffmpeg_clips.sql",
       "077_outreach_opens.sql",
       "078_outreach_test_send_opens.sql",
       "079_travel_day.sql",
@@ -127,7 +128,7 @@
   "recentLog": [
     {
       "level": "info",
-      "ts": "2026-07-16T22:20:44.429Z",
+      "ts": "2026-07-17T16:27:52.632Z",
       "msg": "serving client from",
       "data": {
         "clientDir": "/app/dist"
@@ -135,7 +136,7 @@
     },
     {
       "level": "info",
-      "ts": "2026-07-16T22:20:44.431Z",
+      "ts": "2026-07-17T16:27:52.637Z",
       "msg": "boot starting",
       "data": {
         "cwd": "/app",
@@ -146,12 +147,12 @@
     },
     {
       "level": "info",
-      "ts": "2026-07-16T22:20:44.663Z",
+      "ts": "2026-07-17T16:27:52.931Z",
       "msg": "migrations complete"
     },
     {
       "level": "info",
-      "ts": "2026-07-16T22:20:44.773Z",
+      "ts": "2026-07-17T16:27:53.049Z",
       "msg": "wardrobe outfits: applied",
       "data": {
         "projectId": "12f53ed1-c6c7-4c11-8d7b-06d91744c9af",
@@ -162,7 +163,7 @@
     },
     {
       "level": "info",
-      "ts": "2026-07-16T22:20:44.773Z",
+      "ts": "2026-07-17T16:27:53.050Z",
       "msg": "BIYA seed: project already exists, ensured shoot days",
       "data": {
         "projectId": "12f53ed1-c6c7-4c11-8d7b-06d91744c9af"
@@ -170,12 +171,12 @@
     },
     {
       "level": "info",
-      "ts": "2026-07-16T22:20:44.780Z",
+      "ts": "2026-07-17T16:27:53.058Z",
       "msg": "listening on :8080"
     },
     {
       "level": "info",
-      "ts": "2026-07-16T22:20:44.780Z",
+      "ts": "2026-07-17T16:27:53.059Z",
       "msg": "scheduler started (every 5 min)"
     }
   ]
