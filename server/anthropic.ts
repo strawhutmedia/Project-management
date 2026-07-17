@@ -2141,3 +2141,99 @@ export async function generateSocialStrategyDocument(
     },
   }
 }
+
+// ── Clip moment selection ───────────────────────────────────────────
+//
+// Owns the "which moments are worth clipping" decision that OpusClip
+// used to make in a black box. Claude reads the episode transcript
+// (blocks prefixed with [HH:MM:SS]) and returns a ranked set of clip
+// windows with exact in/out seconds. The ffmpeg cutter turns each into
+// a vertical captioned short. Keeping selection in-house means it uses
+// the show's own voice/context instead of a generic virality model.
+
+export type ClipMomentInput = {
+  showName: string
+  transcript: string // timecoded blocks, "[HH:MM:SS] Speaker: text"
+  focus?: string | null // optional plain-English steer from the user
+  count?: number | null // desired number of clips (default 6)
+}
+
+export type ClipMoment = {
+  startSeconds: number
+  endSeconds: number
+  title: string
+  reason: string
+}
+
+const CLIP_PICKER_SYSTEM = `You are a senior short-form video editor for a podcast network.
+
+Given an episode transcript, pick the moments that will actually perform
+as standalone vertical clips (Reels / TikTok / Shorts). Each transcript
+block is prefixed with its start time as [HH:MM:SS].
+
+What makes a good pick:
+- A self-contained beat: a story, a hot take, a surprising fact, a big
+  laugh, a genuine emotional turn. It must make sense with NO outside
+  context and open on a strong line.
+- 20-75 seconds long. Never cut mid-sentence at the start or end —
+  start on the first word of the thought, end on the last.
+- Skip intros, ad reads, housekeeping, and rambly setup with no payoff.
+- Pick DISTINCT moments — no two clips covering the same ground.
+
+Return ONLY a JSON array (no prose, no code fences), each element:
+{"startSeconds": <int>, "endSeconds": <int>, "title": "<=8 word hook", "reason": "one line: why it lands"}
+Order best-first. startSeconds/endSeconds are whole seconds from the
+start of the recording, derived from the [HH:MM:SS] timecodes.`
+
+export async function pickClipMoments(input: ClipMomentInput): Promise<ClipMoment[]> {
+  const count = input.count && input.count > 0 && input.count <= 20 ? Math.round(input.count) : 6
+  const focus = input.focus?.trim()
+  const user = [
+    `Show: ${input.showName}`,
+    `Pick the ${count} best clip moments.`,
+    focus ? `Editor's steer (weight this heavily): ${focus}` : '',
+    '',
+    'TRANSCRIPT:',
+    input.transcript,
+  ].filter(Boolean).join('\n')
+
+  const response = await client.messages.create({
+    model: MODEL,
+    max_tokens: 2000,
+    system: CLIP_PICKER_SYSTEM,
+    messages: [{ role: 'user', content: user }],
+  })
+  const block = response.content.find((b) => b.type === 'text')
+  const text = block && block.type === 'text' ? block.text : ''
+  // Tolerate stray prose / fences around the JSON array.
+  const start = text.indexOf('[')
+  const end = text.lastIndexOf(']')
+  if (start === -1 || end === -1 || end <= start) {
+    throw new Error('clip_picker_no_json')
+  }
+  let parsed: unknown
+  try {
+    parsed = JSON.parse(text.slice(start, end + 1))
+  } catch {
+    throw new Error('clip_picker_bad_json')
+  }
+  if (!Array.isArray(parsed)) throw new Error('clip_picker_not_array')
+
+  const moments: ClipMoment[] = []
+  for (const raw of parsed) {
+    const r = (raw ?? {}) as Record<string, unknown>
+    const s = Number(r.startSeconds)
+    const e = Number(r.endSeconds)
+    if (!Number.isFinite(s) || !Number.isFinite(e) || e <= s) continue
+    // Guard against a runaway end timecode; clamp to a 90s ceiling.
+    const end2 = e - s > 90 ? s + 90 : e
+    moments.push({
+      startSeconds: Math.max(0, Math.round(s)),
+      endSeconds: Math.round(end2),
+      title: typeof r.title === 'string' ? r.title.slice(0, 120) : 'Clip',
+      reason: typeof r.reason === 'string' ? r.reason.slice(0, 300) : '',
+    })
+    if (moments.length >= count) break
+  }
+  return moments
+}

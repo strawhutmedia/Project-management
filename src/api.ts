@@ -386,17 +386,16 @@ export type ApiClip = {
   id: string
   title: string | null
   durationSeconds: number | null
-  previewUrl: string | null
-  downloadUrl: string | null
-  thumbnailUrl: string | null
-  score: number | null
+  startSeconds: number | null
+  endSeconds: number | null
+  dropboxPath: string | null
+  vertical: boolean
+  captioned: boolean
 }
 
 export type ClipJobOptions = {
   prompt?: string | null
   clipCount?: number | null
-  minDuration?: number | null
-  maxDuration?: number | null
 }
 
 export type ApiClipJob = {
@@ -409,19 +408,8 @@ export type ApiClipJob = {
   error: string | null
   createdAt: string
   updatedAt: string
-  opusProjectId?: string | null
   options?: ClipJobOptions | null
   clips: ApiClip[]
-}
-
-export type ApiOpusAccount = {
-  available: boolean
-  endpoint?: string
-  planName?: string | null
-  creditsRemaining?: number | null
-  creditsTotal?: number | null
-  minutesRemaining?: number | null
-  minutesTotal?: number | null
 }
 
 export type ApiTranscriptBlock = {
@@ -1331,7 +1319,7 @@ export const api = {
     body: JSON.stringify(body),
   }),
 
-  // Clips (OpusClip)
+  // Clips (Slate ffmpeg cutter)
   clipJobs: (songId: string) =>
     request<{ jobs: ApiClipJob[] }>(`/api/clips?songId=${songId}`),
   clipJob: (id: string) =>
@@ -1343,18 +1331,9 @@ export const api = {
     }),
   deleteClipJob: (id: string) =>
     request<{ ok: true }>(`/api/clips/${id}`, { method: 'DELETE' }),
-  opusAccount: () => request<ApiOpusAccount>('/api/clips/account'),
-  clipJobRaw: (id: string) =>
-    request<{ createResponse: unknown; pollResponse: unknown }>(`/api/clips/${id}/raw`),
-  renderClip: (clipId: string) =>
-    request<{
-      ok: true
-      endpoint: string
-      videoUrl: string | null
-      downloadUrl: string | null
-      thumbnailUrl: string | null
-      raw: unknown
-    }>(`/api/clips/clips/${clipId}/render`, { method: 'POST' }),
+  // Fresh (short-lived) Dropbox link to play / download one clip.
+  clipLink: (clipId: string) =>
+    request<{ url: string }>(`/api/clips/clip/${clipId}/link`),
 
   transcriptSrtUrl: (id: string) => `/api/transcripts/${id}/srt`,
   transcriptVttUrl: (id: string) => `/api/transcripts/${id}/vtt`,

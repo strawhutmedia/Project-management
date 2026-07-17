@@ -216,17 +216,17 @@ async function runPostTranscriptAutopipeline(args: {
     })
   }
 
-  // Clip job (OpusClip) — fire if we have an OpusClip key.
+  // Clip job — Slate's ffmpeg cutter (Claude picks moments, ffmpeg cuts
+  // vertical captioned clips). The transcript is done by this point, so
+  // clip selection has what it needs.
   try {
-    if (process.env.OPUSCLIP_API_KEY) {
-      const { triggerClipJob } = await import('./clips')
-      await triggerClipJob({
-        projectId: args.projectId,
-        songId: args.songId,
-        dropboxPath: args.dropboxPath,
-        createdBy: args.createdBy,
-      })
-    }
+    const { triggerClipJob } = await import('./clips')
+    await triggerClipJob({
+      projectId: args.projectId,
+      songId: args.songId,
+      dropboxPath: args.dropboxPath,
+      createdBy: args.createdBy,
+    })
   } catch (err) {
     logError('autopipeline: clip job trigger failed', {
       songId: args.songId, error: err instanceof Error ? err.message : String(err),

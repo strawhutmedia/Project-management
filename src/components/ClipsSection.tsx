@@ -1,10 +1,10 @@
-// AI clip generation panel for podcast episodes. Mirrors the transcripts
-// flow: pick a Dropbox media file → submit to OpusClip → poll for clips
-// → display them as preview cards with download buttons.
-import { useEffect, useState } from 'react'
-import { api, type ApiClipJob, type ApiOpusAccount, type ClipJobOptions } from '../api'
+// Clip generation panel for podcast episodes. Slate's own pipeline:
+// pick the episode video → Claude picks the moments from the transcript
+// → ffmpeg cuts each as a framed 9:16 vertical with burned captions →
+// they show here as playable, downloadable clips. No OpusClip.
+import { useEffect, useRef, useState } from 'react'
+import { api, type ApiClip, type ApiClipJob, type ClipJobOptions } from '../api'
 import DropboxFilePicker from './DropboxFilePicker'
-import { useAuth } from '../auth'
 
 export default function ClipsSection({
   projectId,
@@ -22,9 +22,6 @@ export default function ClipsSection({
   const [picking, setPicking] = useState(false)
   const [pendingFile, setPendingFile] = useState<{ path: string; name: string; size?: number } | null>(null)
   const [starting, setStarting] = useState(false)
-  const [account, setAccount] = useState<ApiOpusAccount | null>(null)
-  const { user } = useAuth()
-  const isAdmin = user?.role === 'admin'
 
   async function load() {
     try {
@@ -37,13 +34,7 @@ export default function ClipsSection({
 
   useEffect(() => { void load() }, [songId])
 
-  // Best-effort OpusClip balance pull. If their API doesn't expose it
-  // via any of the patterns we try, we hide the chip.
-  useEffect(() => {
-    void api.opusAccount().then(setAccount).catch(() => setAccount({ available: false }))
-  }, [])
-
-  // Poll every 15s while any job is queued/processing
+  // Poll every 15s while any job is still cutting.
   useEffect(() => {
     if (!jobs) return
     const inflight = jobs.some((j) => j.status === 'queued' || j.status === 'processing')
@@ -52,14 +43,8 @@ export default function ClipsSection({
     return () => clearInterval(id)
   }, [jobs])
 
-  // File picked → stash and open the options panel. Submission happens
-  // from there so the user can drive count / focus / length first.
   function onFilePicked(path: string, name: string, size?: number) {
     setPicking(false)
-    if (size && size > 30 * 1024 * 1024 * 1024) {
-      setError(`File is ${(size / 1e9).toFixed(2)} GB — over OpusClip's 30 GB cap.`)
-      return
-    }
     setPendingFile({ path, name, size })
     setError(null)
   }
@@ -91,14 +76,12 @@ export default function ClipsSection({
   return (
     <section className="rounded-2xl border border-line bg-panel/60 p-5 space-y-4">
       <div className="flex items-center justify-between gap-3 flex-wrap">
-        <div className="flex items-center gap-3 flex-wrap">
-          <div>
-            <h2 className="text-[11px] uppercase tracking-[0.2em] text-muted font-bold">✂️ Clips</h2>
-            <p className="text-[11px] text-muted/80 mt-1">
-              Pick a video, tell Slate what kind of clips you want, OpusClip cuts them.
-            </p>
-          </div>
-          <OpusBalanceChip account={account} />
+        <div>
+          <h2 className="text-[11px] uppercase tracking-[0.2em] text-muted font-bold">✂️ Clips</h2>
+          <p className="text-[11px] text-muted/80 mt-1 max-w-md">
+            Slate reads the transcript, picks the strongest moments, and cuts each into a
+            vertical 9:16 short with burned-in captions. Needs the episode’s transcript first.
+          </p>
         </div>
         {canWrite && (
           <button
@@ -106,7 +89,7 @@ export default function ClipsSection({
             disabled={starting}
             className="rounded-xl bg-gradient-to-r from-stage-mixing to-stage-mastering text-white font-bold uppercase tracking-wider text-xs px-3 py-2 disabled:opacity-50"
           >
-            {starting ? 'Starting…' : '+ New clip job'}
+            {starting ? 'Starting…' : '+ Generate clips'}
           </button>
         )}
       </div>
@@ -118,26 +101,20 @@ export default function ClipsSection({
       ) : jobs.length === 0 ? (
         <p className="text-muted/70 text-sm italic py-4 text-center border border-dashed border-line/60 rounded-xl">
           {canWrite
-            ? 'No clip jobs yet. Tap "+ New clip job" to pick a Dropbox video.'
+            ? 'No clips yet. Tap “+ Generate clips” and pick the episode video.'
             : 'No clips generated yet.'}
         </p>
       ) : (
         <div className="space-y-3">
           {jobs.map((j) => (
-            <ClipJobCard
-              key={j.id}
-              job={j}
-              canWrite={canWrite}
-              isAdmin={isAdmin}
-              onDelete={() => void remove(j.id, j.fileName)}
-            />
+            <ClipJobCard key={j.id} job={j} canWrite={canWrite} onDelete={() => void remove(j.id, j.fileName)} />
           ))}
         </div>
       )}
 
       {picking && (
         <DropboxFilePicker
-          title="Pick a video for clip generation"
+          title="Pick the episode video to clip"
           acceptExtensions={['.mp4', '.mov', '.webm', '.m4v', '.mkv']}
           initialPath={projectRoot ?? undefined}
           restrictAbove={projectRoot ?? undefined}
@@ -150,7 +127,6 @@ export default function ClipsSection({
       {pendingFile && (
         <ClipOptionsDialog
           fileName={pendingFile.name}
-          songId={songId}
           submitting={starting}
           onCancel={() => setPendingFile(null)}
           onSubmit={submitWithOptions}
@@ -160,98 +136,20 @@ export default function ClipsSection({
   )
 }
 
-function OpusBalanceChip({ account }: { account: ApiOpusAccount | null }) {
-  if (!account || !account.available) return null
-  const minutes = account.minutesRemaining
-  const total = account.minutesTotal
-  if (minutes == null && account.creditsRemaining == null) {
-    return (
-      <span className="text-[10px] uppercase tracking-wider rounded-full px-2 py-0.5 border border-line text-muted" title="OpusClip account reachable but balance fields not exposed via the endpoint we found">
-        OpusClip: ✓ linked
-      </span>
-    )
-  }
-  const low = minutes != null && total != null && minutes / total < 0.2
-  const label = minutes != null
-    ? `${minutes} min${total ? ` / ${total}` : ''}`
-    : `${account.creditsRemaining} cr${account.creditsTotal ? ` / ${account.creditsTotal}` : ''}`
-  return (
-    <a
-      href="https://clip.opus.pro/"
-      target="_blank"
-      rel="noreferrer"
-      className={`text-[10px] uppercase tracking-wider rounded-full px-2 py-0.5 border ${
-        low ? 'border-urgent/60 text-urgent bg-urgent/10' : 'border-stage-stems/40 text-stage-stems'
-      }`}
-      title="OpusClip remaining balance — click to open OpusClip"
-    >
-      OpusClip: {label}
-    </a>
-  )
-}
-
 function ClipOptionsDialog({
   fileName,
-  songId,
   submitting,
   onCancel,
   onSubmit,
 }: {
   fileName: string
-  songId: string
   submitting: boolean
   onCancel: () => void
   onSubmit: (options: ClipJobOptions) => void
 }) {
   const [prompt, setPrompt] = useState('')
-  const [clipCount, setClipCount] = useState<number | ''>(10)
-  const [minDuration, setMinDuration] = useState<number | ''>(15)
-  const [maxDuration, setMaxDuration] = useState<number | ''>(60)
-  const [loadingClaude, setLoadingClaude] = useState(false)
-  const [claudeError, setClaudeError] = useState<string | null>(null)
+  const [clipCount, setClipCount] = useState<number | ''>(6)
 
-  // Pull every suggested_clip field with a timecode out of the most-
-  // recent generated social plan for this episode, format it into a
-  // line-by-line directive list, and pre-fill the prompt textarea.
-  // This is the strongest hint we can give OpusClip's AI without their
-  // (undocumented) per-cut API: a list of specific moments to focus on.
-  async function useClaudeSuggestions() {
-    setLoadingClaude(true); setClaudeError(null)
-    try {
-      const { plans } = await api.socialPlans(songId)
-      const latest = plans.find((p) => p.status === 'generated')
-      if (!latest) { setClaudeError('No generated social plan yet. Generate one on the episode first.'); return }
-      const lines: string[] = []
-      for (const item of latest.items) {
-        if (item.kind === 'story_concept' && item.medium === 'video' && item.suggested_clip) {
-          lines.push(`- ${item.suggested_clip}`)
-        }
-        if (item.kind === 'reel_concept' && item.suggested_clip) {
-          lines.push(`- ${item.suggested_clip}`)
-        }
-      }
-      if (lines.length === 0) {
-        setClaudeError('Latest plan has no suggested clips. Try generating a fresh one.')
-        return
-      }
-      // Be as directive as possible — OpusClip's AI may or may not
-      // honor a soft suggestion. Frame this as an explicit instruction
-      // so the chance of getting back exactly these moments goes up.
-      const directive = [
-        `Generate exactly ${lines.length} clips, one per moment listed below. Do not pick your own moments; use ONLY these:`,
-        '',
-        ...lines,
-        '',
-        'Each output clip must correspond to one moment above, keeping its timecode range. Do not invent new clips outside this list.',
-      ].join('\n')
-      setPrompt((prev) => prev.trim() ? `${prev}\n\n${directive}` : directive)
-      setClipCount(lines.length)
-    } catch (err) {
-      setClaudeError(err instanceof Error ? err.message : 'failed to load plan')
-    } finally {
-      setLoadingClaude(false)
-    }
-  }
   return (
     <div className="fixed inset-0 z-40 grid place-items-center bg-ink/80 backdrop-blur-sm p-4" onClick={onCancel}>
       <div
@@ -267,73 +165,32 @@ function ClipOptionsDialog({
         </div>
 
         <label className="block">
-          <div className="flex items-center justify-between mb-1">
-            <div className="text-[10px] uppercase tracking-wider text-muted/70 font-bold">
-              What kind of clips do you want?
-            </div>
-            <button
-              type="button"
-              onClick={() => void useClaudeSuggestions()}
-              disabled={loadingClaude}
-              className="text-[10px] uppercase tracking-wider font-bold text-stage-mastering border border-stage-mastering/40 rounded-full px-2.5 py-0.5 hover:bg-stage-mastering/10 disabled:opacity-50"
-              title="Pull the timecoded suggested clips from this episode's latest social plan"
-            >
-              {loadingClaude ? '…' : '✨ Use Claude\'s clip suggestions'}
-            </button>
+          <div className="text-[10px] uppercase tracking-wider text-muted/70 font-bold mb-1">
+            What should the clips lean into? (optional)
           </div>
           <textarea
             value={prompt}
             onChange={(e) => setPrompt(e.target.value)}
             rows={4}
-            placeholder={'e.g. Focus on the funniest moments where Cheri talks about her early SNL days. Skip ad breaks and the intro music.'}
+            placeholder={'e.g. The funniest moments where Cheri talks about her early SNL days. Skip ad reads and the intro.'}
             className="w-full rounded-lg bg-ink/40 border border-line text-text px-3 py-2 text-sm outline-none focus:border-stage-mastering resize-y"
           />
-          {claudeError && <p className="text-[10px] text-urgent mt-1">{claudeError}</p>}
           <p className="text-[10px] text-muted/60 mt-1">
-            Plain English. Used as a hint to OpusClip's AI when picking moments. Leave blank to let
-            it choose freely.
+            Plain English — steers which moments Claude picks. Leave blank to let it choose the best.
           </p>
         </label>
 
-        <div className="grid grid-cols-3 gap-3">
-          <label className="block">
-            <div className="text-[10px] uppercase tracking-wider text-muted/70 font-bold mb-1"># of clips</div>
-            <input
-              type="number"
-              min={1}
-              max={50}
-              value={clipCount}
-              onChange={(e) => setClipCount(e.target.value === '' ? '' : Number(e.target.value))}
-              className="w-full rounded-lg bg-ink/40 border border-line text-text px-2 py-1.5 text-sm outline-none focus:border-stage-mastering"
-            />
-          </label>
-          <label className="block">
-            <div className="text-[10px] uppercase tracking-wider text-muted/70 font-bold mb-1">Min length (s)</div>
-            <input
-              type="number"
-              min={5}
-              max={180}
-              value={minDuration}
-              onChange={(e) => setMinDuration(e.target.value === '' ? '' : Number(e.target.value))}
-              className="w-full rounded-lg bg-ink/40 border border-line text-text px-2 py-1.5 text-sm outline-none focus:border-stage-mastering"
-            />
-          </label>
-          <label className="block">
-            <div className="text-[10px] uppercase tracking-wider text-muted/70 font-bold mb-1">Max length (s)</div>
-            <input
-              type="number"
-              min={10}
-              max={300}
-              value={maxDuration}
-              onChange={(e) => setMaxDuration(e.target.value === '' ? '' : Number(e.target.value))}
-              className="w-full rounded-lg bg-ink/40 border border-line text-text px-2 py-1.5 text-sm outline-none focus:border-stage-mastering"
-            />
-          </label>
-        </div>
-        <p className="text-[10px] text-muted/60 -mt-2">
-          Heads-up: OpusClip's API doesn't publicly document every parameter. We send these
-          best-effort — their AI may still pick its own count/length if it disagrees.
-        </p>
+        <label className="block max-w-[140px]">
+          <div className="text-[10px] uppercase tracking-wider text-muted/70 font-bold mb-1"># of clips</div>
+          <input
+            type="number"
+            min={1}
+            max={20}
+            value={clipCount}
+            onChange={(e) => setClipCount(e.target.value === '' ? '' : Number(e.target.value))}
+            className="w-full rounded-lg bg-ink/40 border border-line text-text px-2 py-1.5 text-sm outline-none focus:border-stage-mastering"
+          />
+        </label>
 
         <div className="flex items-center justify-end gap-2 pt-1">
           <button onClick={onCancel} disabled={submitting} className="text-[11px] uppercase tracking-wider text-muted hover:text-text px-3 py-1.5">
@@ -343,8 +200,6 @@ function ClipOptionsDialog({
             onClick={() => onSubmit({
               prompt: prompt.trim() || null,
               clipCount: typeof clipCount === 'number' ? clipCount : null,
-              minDuration: typeof minDuration === 'number' ? minDuration : null,
-              maxDuration: typeof maxDuration === 'number' ? maxDuration : null,
             })}
             disabled={submitting}
             className="rounded-lg bg-gradient-to-r from-stage-mastering to-stage-tracking text-white font-bold uppercase tracking-wider text-[11px] px-4 py-2 disabled:opacity-50"
@@ -360,33 +215,16 @@ function ClipOptionsDialog({
 function ClipJobCard({
   job,
   canWrite,
-  isAdmin,
   onDelete,
 }: {
   job: ApiClipJob
   canWrite: boolean
-  isAdmin: boolean
   onDelete: () => void
 }) {
   const statusColor =
     job.status === 'done' ? 'text-stage-stems' :
     job.status === 'failed' ? 'text-urgent' :
     'text-stage-mastering'
-
-  const [rawOpen, setRawOpen] = useState(false)
-  const [raw, setRaw] = useState<{ createResponse: unknown; pollResponse: unknown } | null>(null)
-  async function loadRaw() {
-    setRawOpen(true)
-    if (raw) return
-    try {
-      const r = await api.clipJobRaw(job.id)
-      setRaw(r)
-    } catch {
-      setRaw({ createResponse: 'fetch failed', pollResponse: null })
-    }
-  }
-
-  const opusUrl = job.opusProjectId ? `https://clip.opus.pro/projects/${job.opusProjectId}` : null
 
   return (
     <div className="rounded-xl border border-line bg-ink/30 p-3 space-y-3">
@@ -395,7 +233,7 @@ function ClipJobCard({
           <div className="font-bold text-sm truncate">{job.fileName}</div>
           <div className="text-[11px] text-muted mt-0.5 flex flex-wrap gap-x-3 gap-y-0.5">
             <span className={`uppercase tracking-wider font-bold ${statusColor}`}>
-              {job.status === 'processing' ? 'Processing…' :
+              {job.status === 'processing' ? 'Cutting…' :
                job.status === 'queued' ? 'Queued' :
                job.status}
             </span>
@@ -410,82 +248,26 @@ function ClipJobCard({
           </div>
           {job.error && <div className="text-[11px] text-urgent mt-1">{job.error}</div>}
         </div>
-        <div className="flex items-center gap-1.5">
-          {opusUrl && (
-            <a
-              href={opusUrl}
-              target="_blank"
-              rel="noreferrer"
-              className="text-[10px] uppercase tracking-wider font-bold text-stage-mastering border border-stage-mastering/40 rounded-full px-2.5 py-1 hover:bg-stage-mastering/10 whitespace-nowrap"
-              title="Open this project in OpusClip to preview + download all clips"
-            >
-              ↗ Open in OpusClip
-            </a>
-          )}
-          {isAdmin && (
-            <button
-              onClick={() => void loadRaw()}
-              className="text-[10px] uppercase tracking-wider text-muted hover:text-text border border-line rounded-full px-2 py-1"
-              title="Show raw OpusClip API response (admin only)"
-            >
-              { } raw
-            </button>
-          )}
-          {isAdmin && (
-            <button
-              onClick={async () => {
-                try {
-                  const r = raw ?? await api.clipJobRaw(job.id)
-                  if (!raw) setRaw(r)
-                  await navigator.clipboard.writeText(JSON.stringify(r, null, 2))
-                  alert('Raw OpusClip response copied to clipboard.')
-                } catch (err) {
-                  alert('Copy failed: ' + (err instanceof Error ? err.message : String(err)))
-                }
-              }}
-              className="text-[10px] uppercase tracking-wider text-muted hover:text-text border border-line rounded-full px-2 py-1"
-              title="Copy raw OpusClip JSON to clipboard"
-            >
-              📋 copy raw
-            </button>
-          )}
-          {canWrite && (
-            <button
-              onClick={onDelete}
-              className="text-[11px] uppercase tracking-wider text-muted hover:text-urgent border border-line rounded-full px-2.5 py-1"
-            >
-              ✕
-            </button>
-          )}
-        </div>
+        {canWrite && (
+          <button
+            onClick={onDelete}
+            className="text-[11px] uppercase tracking-wider text-muted hover:text-urgent border border-line rounded-full px-2.5 py-1"
+          >
+            ✕
+          </button>
+        )}
       </div>
 
-      {rawOpen && (
-        <details open className="rounded-lg border border-line/60 bg-ink/40 p-2 text-[10px]">
-          <summary className="cursor-pointer text-muted uppercase tracking-wider font-bold">
-            Raw OpusClip response · <button onClick={() => setRawOpen(false)} className="text-muted/60 hover:text-text">close</button>
-          </summary>
-          <div className="mt-2 space-y-3">
-            <div>
-              <div className="text-muted/70 font-bold mb-1">CREATE response</div>
-              <pre className="overflow-x-auto bg-ink/60 rounded p-2 text-text/80 whitespace-pre-wrap break-words">
-                {JSON.stringify(raw?.createResponse, null, 2)}
-              </pre>
-            </div>
-            <div>
-              <div className="text-muted/70 font-bold mb-1">Latest POLL response</div>
-              <pre className="overflow-x-auto bg-ink/60 rounded p-2 text-text/80 whitespace-pre-wrap break-words">
-                {JSON.stringify(raw?.pollResponse, null, 2)}
-              </pre>
-            </div>
-          </div>
-        </details>
+      {job.status === 'processing' && (
+        <p className="text-[11px] text-muted italic">
+          Picking moments and cutting vertical clips — this can take a few minutes on a long episode.
+        </p>
       )}
 
       {job.clips.length > 0 && (
-        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
           {job.clips.map((c) => (
-            <ClipCard key={c.id} clip={c} opusProjectId={job.opusProjectId ?? null} />
+            <ClipCard key={c.id} clip={c} />
           ))}
         </div>
       )}
@@ -493,102 +275,48 @@ function ClipJobCard({
   )
 }
 
-function ClipCard({ clip, opusProjectId }: {
-  clip: { id: string; title: string | null; durationSeconds: number | null; previewUrl: string | null; downloadUrl: string | null; thumbnailUrl: string | null; score: number | null }
-  opusProjectId: string | null
-}) {
-  const [rendering, setRendering] = useState(false)
-  const [renderedPreview, setRenderedPreview] = useState<string | null>(null)
-  const [renderedDownload, setRenderedDownload] = useState<string | null>(null)
-  const [renderedThumb, setRenderedThumb] = useState<string | null>(null)
-  const [renderError, setRenderError] = useState<string | null>(null)
-  const previewUrl = clip.previewUrl ?? renderedPreview
-  const downloadUrl = clip.downloadUrl ?? renderedDownload
-  const thumbnailUrl = clip.thumbnailUrl ?? renderedThumb
+function ClipCard({ clip }: { clip: ApiClip }) {
+  const [url, setUrl] = useState<string | null>(null)
+  const [err, setErr] = useState<string | null>(null)
+  const asked = useRef(false)
 
-  async function render() {
-    setRendering(true); setRenderError(null)
+  async function loadLink() {
+    if (asked.current) return
+    asked.current = true
     try {
-      const r = await api.renderClip(clip.id)
-      setRenderedPreview(r.videoUrl)
-      setRenderedDownload(r.downloadUrl)
-      setRenderedThumb(r.thumbnailUrl)
-      if (!r.videoUrl && !r.thumbnailUrl) {
-        setRenderError('OpusClip responded but no playable URL came back. Try the raw inspector to see what they returned.')
-      }
-    } catch (err) {
-      setRenderError(err instanceof Error ? err.message : 'render failed')
-    } finally {
-      setRendering(false)
+      const r = await api.clipLink(clip.id)
+      setUrl(r.url)
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : 'link failed')
     }
   }
 
-  const hasPlayable = !!previewUrl || !!thumbnailUrl
-  // Until OpusClip's per-clip export endpoint is wired, the only way to
-  // actually see/download a clip is in OpusClip's UI. Make every card
-  // a link there as the default behavior.
-  const opusUrl = opusProjectId ? `https://clip.opus.pro/projects/${opusProjectId}` : null
+  useEffect(() => { void loadLink() }, [clip.id])
+
+  const dur = clip.durationSeconds != null ? `${Math.round(clip.durationSeconds)}s` : ''
+
   return (
-    <div className="rounded-lg border border-line/60 bg-panel/40 overflow-hidden flex flex-col">
-      <div className="aspect-[9/16] bg-ink relative">
-        {previewUrl ? (
-          <video
-            src={previewUrl}
-            poster={thumbnailUrl ?? undefined}
-            controls
-            preload="metadata"
-            className="w-full h-full object-cover"
-          />
-        ) : thumbnailUrl ? (
-          <img src={thumbnailUrl} alt={clip.title ?? ''} className="w-full h-full object-cover" />
+    <div className="rounded-lg border border-line bg-ink/40 overflow-hidden flex flex-col">
+      <div className="relative bg-black aspect-[9/16] grid place-items-center">
+        {url ? (
+          <video src={url} controls playsInline className="w-full h-full object-contain" />
+        ) : err ? (
+          <span className="text-[10px] text-urgent px-2 text-center">{err}</span>
         ) : (
-          <button
-            onClick={() => void render()}
-            disabled={rendering}
-            className="w-full h-full grid place-items-center text-muted text-xs hover:bg-ink/60 transition gap-1 disabled:opacity-60"
-            title="Ask OpusClip to render this clip so we can play it in Slate"
-          >
-            <span className="text-2xl">{rendering ? '⏳' : '🎬'}</span>
-            <span className="text-[10px] uppercase tracking-wider px-2 text-center">
-              {rendering ? 'Rendering…' : 'Tap to render'}
-            </span>
-            {renderError && (
-              <span className="text-[9px] text-urgent px-2 text-center mt-1">{renderError.slice(0, 80)}</span>
-            )}
-          </button>
-        )}
-        {clip.score != null && (
-          <span className="absolute top-1.5 right-1.5 text-[9px] font-mono font-bold uppercase tracking-wider bg-stage-mastering/80 text-white rounded-full px-1.5 py-0.5">
-            {Math.round(clip.score)}
-          </span>
+          <span className="text-[10px] text-muted animate-pulse">loading…</span>
         )}
       </div>
       <div className="p-2 space-y-1">
-        {clip.title && (
-          <div className="text-[11px] font-bold leading-tight line-clamp-2">{clip.title}</div>
-        )}
-        <div className="flex items-center justify-between gap-2 text-[10px] text-muted">
-          {clip.durationSeconds != null && <span>{Math.round(clip.durationSeconds)}s</span>}
-          {downloadUrl ? (
-            <a
-              href={downloadUrl}
-              target="_blank"
-              rel="noreferrer"
-              className="uppercase tracking-wider font-bold text-stage-mastering hover:text-text"
-            >
-              ⬇ Download
+        <div className="text-[11px] font-bold leading-tight line-clamp-2" title={clip.title ?? ''}>
+          {clip.title || 'Clip'}
+        </div>
+        <div className="flex items-center justify-between text-[10px] text-muted">
+          <span className="tabular-nums">{dur}{clip.captioned ? ' · captioned' : ''}</span>
+          {url && (
+            <a href={url} download className="uppercase tracking-wider font-bold text-stage-mastering hover:text-text">
+              ↓ Save
             </a>
-          ) : opusUrl && !hasPlayable && !rendering ? (
-            <a
-              href={opusUrl}
-              target="_blank"
-              rel="noreferrer"
-              className="uppercase tracking-wider font-bold text-muted/60 hover:text-text"
-              title="Fallback: open in OpusClip's UI"
-            >
-              ↗ OpusClip
-            </a>
-          ) : null}
+          )}
         </div>
       </div>
     </div>
