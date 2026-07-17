@@ -225,9 +225,9 @@ export async function extractStillsForItem(input: StillExtractInput): Promise<St
 // debugging).
 const FFMPEG_TIMEOUT_MS = 5 * 60 * 1000  // 5 minutes per invocation
 
-function runFfmpeg(args: string[]): Promise<void> {
+function runFfmpeg(args: string[], opts?: { cwd?: string }): Promise<void> {
   return new Promise((resolve, reject) => {
-    const proc = spawn(FFMPEG_PATH, args, { stdio: ['ignore', 'ignore', 'pipe'] })
+    const proc = spawn(FFMPEG_PATH, args, { stdio: ['ignore', 'ignore', 'pipe'], cwd: opts?.cwd })
     let stderr = ''
     proc.stderr?.on('data', (d) => { stderr += String(d) })
     const timer = setTimeout(() => {
@@ -371,6 +371,10 @@ export function parseTimecodeRange(s: string | undefined | null): { startSeconds
 // a real ready-to-post clip, no OpusClip required for moments Claude
 // has already picked.
 
+// One timed caption line, in ABSOLUTE source seconds. We offset to
+// clip-relative time when we build the subtitle file.
+export type ClipCaption = { startSeconds: number; endSeconds: number; text: string }
+
 export type ClipExtractInput = {
   videoDropboxPath: string
   startSeconds: number
@@ -378,12 +382,103 @@ export type ClipExtractInput = {
   songId: string
   itemId: string
   version?: number
+  // Render a framed 9:16 vertical (blurred fill + centered video) —
+  // the shape social clips actually need. Default true. Set false only
+  // for a raw horizontal passthrough cut.
+  vertical?: boolean
+  // Transcript blocks that overlap the clip. When present we burn them
+  // in as captions. Best-effort: if the build's subtitle filter is
+  // missing, we fall back to the same clip without captions.
+  captions?: ClipCaption[]
 }
 
 export type ClipExtractResult = {
   dropboxPath: string
   durationSeconds: number
   version: number
+  // What actually rendered, after the fallback ladder, so the caller /
+  // logs know whether captions + vertical framing made it in.
+  vertical: boolean
+  captioned: boolean
+}
+
+// ── Subtitle (ASS) generation ───────────────────────────────────────
+//
+// Block-level captions from the transcript. Each transcript block is
+// split into ~6-word chunks spread evenly across its duration so the
+// caption reads a few words at a time (the look that works on Reels)
+// rather than dumping a whole paragraph on screen. Times are made
+// relative to the clip start, since we fast-seek with -ss before -i
+// (output timestamps reset to 0).
+
+function assTime(seconds: number): string {
+  const s = Math.max(0, seconds)
+  const h = Math.floor(s / 3600)
+  const m = Math.floor((s % 3600) / 60)
+  const sec = Math.floor(s % 60)
+  const cs = Math.floor((s - Math.floor(s)) * 100)
+  const p2 = (n: number) => String(n).padStart(2, '0')
+  return `${h}:${p2(m)}:${p2(sec)}.${p2(cs)}`
+}
+
+function sanitizeCaptionText(text: string): string {
+  // Strip ASS override braces + collapse whitespace so a stray brace or
+  // newline can't corrupt the Dialogue line.
+  return text.replace(/[{}]/g, '').replace(/\s+/g, ' ').trim()
+}
+
+function buildAssFile(captions: ClipCaption[], clipStartSeconds: number, clipDurationSeconds: number): string {
+  const header = [
+    '[Script Info]',
+    'ScriptType: v4.00+',
+    'PlayResX: 1080',
+    'PlayResY: 1920',
+    'WrapStyle: 0',
+    'ScaledBorderAndShadow: yes',
+    '',
+    '[V4+ Styles]',
+    'Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding',
+    // White text, opaque-ish black box (BorderStyle 3), bottom-center,
+    // lifted off the very bottom. Clean + editorial, no karaoke colours.
+    'Style: Cap,Arial,52,&H00FFFFFF,&H00FFFFFF,&H00000000,&HA0000000,-1,0,0,0,100,100,0,0,3,6,0,2,90,90,300,1',
+    '',
+    '[Events]',
+    'Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text',
+  ]
+  const lines: string[] = []
+  for (const cap of captions) {
+    const relStart = cap.startSeconds - clipStartSeconds
+    const relEnd = Math.min(cap.endSeconds - clipStartSeconds, clipDurationSeconds)
+    if (relEnd <= 0 || relStart >= clipDurationSeconds || relEnd <= relStart) continue
+    const text = sanitizeCaptionText(cap.text)
+    if (!text) continue
+    const words = text.split(' ')
+    const CHUNK = 6
+    const chunks: string[] = []
+    for (let i = 0; i < words.length; i += CHUNK) chunks.push(words.slice(i, i + CHUNK).join(' '))
+    const span = relEnd - relStart
+    const per = span / chunks.length
+    for (let i = 0; i < chunks.length; i++) {
+      const cs = Math.max(0, relStart + per * i)
+      const ce = Math.min(clipDurationSeconds, relStart + per * (i + 1))
+      if (ce <= cs) continue
+      lines.push(`Dialogue: 0,${assTime(cs)},${assTime(ce)},Cap,,0,0,0,,${chunks[i]}`)
+    }
+  }
+  return header.concat(lines).join('\n') + '\n'
+}
+
+// Vertical framing filtergraph: a blurred, filled 9:16 background with
+// the source video scaled to full width and centered. Optionally burns
+// the ASS subtitle file (referenced by bare name; ffmpeg runs with cwd
+// = workDir so we never have to escape the path).
+function verticalFilter(withCaptions: boolean): string {
+  const base =
+    '[0:v]split=2[bg][fg];' +
+    '[bg]scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,boxblur=20:2[bgb];' +
+    '[fg]scale=1080:-2:force_original_aspect_ratio=decrease[fg2];' +
+    '[bgb][fg2]overlay=(W-w)/2:(H-h)/2'
+  return withCaptions ? `${base}[base];[base]ass=captions.ass[vout]` : `${base}[vout]`
 }
 
 export async function extractClipForItem(input: ClipExtractInput): Promise<ClipExtractResult> {
@@ -407,27 +502,79 @@ export async function extractClipForItem(input: ClipExtractInput): Promise<ClipE
       bytes: fs.statSync(sourcePath).size,
     })
     const outPath = path.join(workDir, 'clip.mp4')
-    // Use -ss BEFORE -i for fast seeking, then -t for duration. Use
-    // -c copy to avoid re-encoding (fast, lossless). If the keyframes
-    // don't line up exactly, the cut may start a fraction of a second
-    // late — acceptable for a 30-60s social clip preview.
-    await runFfmpeg([
-      // Fast seek to start position
+    const wantVertical = input.vertical !== false
+    const haveCaptions = wantVertical && Array.isArray(input.captions) && input.captions.length > 0
+    const errMsg = (err: unknown) => (err instanceof Error ? err.message : String(err))
+
+    // Vertical (9:16 framed) render. -ss BEFORE -i fast-seeks and resets
+    // output timestamps to 0, so the subtitle times (clip-relative) line
+    // up. We re-encode here (the filters require it), unlike the raw
+    // copy fallback below.
+    const verticalArgs = (withCaptions: boolean): string[] => [
       '-ss', input.startSeconds.toFixed(3),
-      // Reduce probe size and duration to minimize memory on file open
       '-probesize', '50M',
       '-analyzeduration', '10M',
       '-i', sourcePath,
-      // Duration to extract
       '-t', duration.toFixed(3),
-      // Copy codec (no re-encoding) for speed and quality
-      '-c', 'copy',
-      // Optimize for web playback
+      '-filter_complex', verticalFilter(withCaptions),
+      '-map', '[vout]',
+      // Optional audio — the '?' means "don't fail if there's no track".
+      '-map', '0:a?',
+      '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '22', '-pix_fmt', 'yuv420p',
+      '-c:a', 'aac', '-b:a', '128k',
       '-movflags', '+faststart',
-      // Overwrite output
-      '-y',
-      outPath,
-    ])
+      '-y', outPath,
+    ]
+    // Original behaviour: a raw horizontal passthrough cut. Last-resort
+    // fallback so a clip is ALWAYS produced even if the filter graph
+    // (missing libass / boxblur in the build) can't run.
+    const copyArgs = (): string[] => [
+      '-ss', input.startSeconds.toFixed(3),
+      '-probesize', '50M',
+      '-analyzeduration', '10M',
+      '-i', sourcePath,
+      '-t', duration.toFixed(3),
+      '-c', 'copy',
+      '-movflags', '+faststart',
+      '-y', outPath,
+    ]
+
+    if (haveCaptions) {
+      await fs.promises.writeFile(
+        path.join(workDir, 'captions.ass'),
+        buildAssFile(input.captions!, input.startSeconds, duration),
+      )
+    }
+
+    // Render ladder — best look first, guaranteed output last.
+    let renderedVertical = false
+    let renderedCaptioned = false
+    if (haveCaptions) {
+      try {
+        await runFfmpeg(verticalArgs(true), { cwd: workDir })
+        renderedVertical = true; renderedCaptioned = true
+      } catch (err) {
+        logInfo('clips: vertical+captions render failed, retrying without captions', {
+          itemId: input.itemId, error: errMsg(err),
+        })
+      }
+    }
+    if (!renderedVertical && wantVertical) {
+      try {
+        await runFfmpeg(verticalArgs(false), { cwd: workDir })
+        renderedVertical = true
+      } catch (err) {
+        logInfo('clips: vertical render failed, falling back to horizontal cut', {
+          itemId: input.itemId, error: errMsg(err),
+        })
+      }
+    }
+    if (!renderedVertical) {
+      // Throws on failure — if even a raw copy can't run, the clip
+      // genuinely can't be produced and the caller should hear about it.
+      await runFfmpeg(copyArgs())
+    }
+
     if (!fs.existsSync(outPath) || fs.statSync(outPath).size === 0) {
       throw new Error('clip_no_output')
     }
@@ -446,12 +593,16 @@ export async function extractClipForItem(input: ClipExtractInput): Promise<ClipE
       endSeconds: input.endSeconds,
       durationSeconds: duration,
       version,
+      vertical: renderedVertical,
+      captioned: renderedCaptioned,
       bytes: buf.length,
     })
     return {
       dropboxPath: res.path,
       durationSeconds: duration,
       version,
+      vertical: renderedVertical,
+      captioned: renderedCaptioned,
     }
   } finally {
     fs.promises.rm(workDir, { recursive: true, force: true }).catch(() => {})
