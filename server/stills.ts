@@ -685,6 +685,24 @@ function fullBleedCropFilter(centerX: number): string {
   return `crop=w='ih*9/16':h=ih:x='clip(${c}*iw-(ih*9/16)/2\\,0\\,iw-ih*9/16)':y=0,scale=1080:1920,setsar=1`
 }
 
+// Source video WxH, parsed from ffmpeg's -i output (ffprobe isn't
+// bundled). Needed to turn the vision path (0..1 fractions) into
+// absolute-pixel crop commands for the tracking render.
+function probeVideoDimensions(filePath: string): Promise<{ width: number; height: number } | null> {
+  return new Promise((resolve) => {
+    const proc = spawn(FFMPEG_PATH, ['-hide_banner', '-i', filePath], { stdio: ['ignore', 'ignore', 'pipe'] })
+    let stderr = ''
+    proc.stderr?.on('data', (d) => { stderr += String(d) })
+    const finish = () => {
+      const m = stderr.match(/Video:[^\n]*?(\d{3,5})x(\d{3,5})/)
+      resolve(m ? { width: Number(m[1]), height: Number(m[2]) } : null)
+    }
+    const timer = setTimeout(() => { try { proc.kill('SIGKILL') } catch { /* noop */ } finish() }, 15_000)
+    proc.on('error', () => { clearTimeout(timer); resolve(null) })
+    proc.on('close', () => { clearTimeout(timer); finish() })
+  })
+}
+
 // ffmpeg args to burn an ASS file (bare name, cwd = workDir) onto an
 // already-vertical clip. Video re-encodes; audio is copied.
 function burnArgs(inputPath: string, outPath: string): string[] {
@@ -710,53 +728,72 @@ export async function extractEditableClip(input: EditableClipInput): Promise<Edi
     const sourcePath = path.join(workDir, 'source')
     await downloadToLocalFile(link.url, sourcePath)
 
-    // LOOK at the shot before cropping: sample a few downscaled frames
-    // across the clip and ask Claude vision where the speaker is. If it's
-    // confident, we crop full-bleed 9:16 centered on them; otherwise we
-    // fall back to the safe framed (blurred-fill) layout below.
-    let crop = { centerX: 0.5, confident: false }
+    // LOOK at the shot, then FOLLOW the speaker. Sample ~1 frame/sec,
+    // ask vision for the speaker's horizontal position in each frame,
+    // smooth it, and drive a moving crop that tracks them across the
+    // clip. Falls back to safe framed (blurred-fill) if not confident.
+    const cleanPath = path.join(workDir, 'clean.mp4')
+    let cleanArgs: string[] | null = null
     try {
-      const N = 4
+      const N = Math.max(1, Math.min(90, Math.round(duration))) // ~1 frame/sec, capped
+      const step = duration / N
       const frameBufs: Buffer[] = []
-      for (let i = 1; i <= N; i++) {
-        const t = input.startSeconds + (duration * i) / (N + 1)
+      for (let i = 0; i < N; i++) {
+        const t = input.startSeconds + i * step
         const fp = path.join(workDir, `vf-${i}.jpg`)
         try {
           await runFfmpeg([
             '-ss', t.toFixed(3), '-probesize', '50M', '-analyzeduration', '10M',
-            '-i', sourcePath, '-frames:v', '1', '-vf', 'scale=640:-2', '-q:v', '4', '-y', fp,
+            '-i', sourcePath, '-frames:v', '1', '-vf', 'scale=480:-2', '-q:v', '5', '-y', fp,
           ])
           if (fs.existsSync(fp) && fs.statSync(fp).size > 0) frameBufs.push(await fs.promises.readFile(fp))
-        } catch { /* one bad frame won't stop framing */ }
+        } catch { /* one bad frame won't stop tracking */ }
       }
       if (frameBufs.length > 0) {
-        const { pickVerticalCrop } = await import('./anthropic')
-        crop = await pickVerticalCrop(frameBufs)
+        const { trackVerticalCrop } = await import('./anthropic')
+        const track = await trackVerticalCrop(frameBufs)
+        const dims = await probeVideoDimensions(sourcePath)
+        if (track.confident && track.path.length > 0 && dims && dims.width > 0 && dims.height > 0) {
+          // Smooth (3-tap average) + clamp pan speed so it glides, not jitters.
+          const raw = track.path
+          const smooth: number[] = []
+          for (let i = 0; i < raw.length; i++) {
+            const avg = (raw[Math.max(0, i - 1)] + raw[i] + raw[Math.min(raw.length - 1, i + 1)]) / 3
+            const clamped = i === 0 ? avg : Math.max(smooth[i - 1] - 0.08, Math.min(smooth[i - 1] + 0.08, avg))
+            smooth.push(clamped)
+          }
+          const cropW = Math.round(dims.height * 9 / 16)
+          const maxX = Math.max(0, dims.width - cropW)
+          const xAt = (cx: number) => Math.max(0, Math.min(maxX, Math.round(cx * dims.width - cropW / 2)))
+          // One timed crop command per sampled second (relative to clip start).
+          const cmds = smooth.map((cx, i) => `${(i * step).toFixed(2)} crop x ${xAt(cx)};`).join('\n') + '\n'
+          await fs.promises.writeFile(path.join(workDir, 'crop.cmd'), cmds)
+          cleanArgs = [
+            '-ss', input.startSeconds.toFixed(3), '-probesize', '50M', '-analyzeduration', '10M',
+            '-i', sourcePath, '-t', duration.toFixed(3),
+            '-vf', `sendcmd=f=crop.cmd,crop=w=${cropW}:h=${dims.height}:x=${xAt(smooth[0])}:y=0,scale=1080:1920,setsar=1`,
+            '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '22', '-pix_fmt', 'yuv420p',
+            '-c:a', 'aac', '-b:a', '128k', '-movflags', '+faststart', '-y', cleanPath,
+          ]
+          logInfo('eclip: tracking crop', { itemId: input.itemId, frames: N, width: dims.width, height: dims.height })
+        }
       }
     } catch (err) {
-      logInfo('eclip: vision framing skipped, using safe framing', { itemId: input.itemId, error: errMsg(err) })
+      logInfo('eclip: tracking skipped, safe framing', { itemId: input.itemId, error: errMsg(err) })
     }
-    logInfo('eclip: framing', { itemId: input.itemId, confident: crop.confident, centerX: crop.centerX })
 
-    // Pass 1 — clean vertical from source. Full-bleed (subject-centered)
-    // when vision was confident; framed blurred-fill otherwise.
-    const cleanPath = path.join(workDir, 'clean.mp4')
-    const cleanArgs = crop.confident
-      ? [
-          '-ss', input.startSeconds.toFixed(3), '-probesize', '50M', '-analyzeduration', '10M',
-          '-i', sourcePath, '-t', duration.toFixed(3),
-          '-vf', fullBleedCropFilter(crop.centerX),
-          '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '22', '-pix_fmt', 'yuv420p',
-          '-c:a', 'aac', '-b:a', '128k', '-movflags', '+faststart', '-y', cleanPath,
-        ]
-      : [
-          '-ss', input.startSeconds.toFixed(3), '-probesize', '50M', '-analyzeduration', '10M',
-          '-i', sourcePath, '-t', duration.toFixed(3),
-          '-filter_complex', verticalFilter(false),
-          '-map', '[vout]', '-map', '0:a?',
-          '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '22', '-pix_fmt', 'yuv420p',
-          '-c:a', 'aac', '-b:a', '128k', '-movflags', '+faststart', '-y', cleanPath,
-        ]
+    // Pass 1 — build clean.mp4. Tracking crop above, or safe framed
+    // (blurred-fill) fallback when we couldn't build a track.
+    if (!cleanArgs) {
+      cleanArgs = [
+        '-ss', input.startSeconds.toFixed(3), '-probesize', '50M', '-analyzeduration', '10M',
+        '-i', sourcePath, '-t', duration.toFixed(3),
+        '-filter_complex', verticalFilter(false),
+        '-map', '[vout]', '-map', '0:a?',
+        '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '22', '-pix_fmt', 'yuv420p',
+        '-c:a', 'aac', '-b:a', '128k', '-movflags', '+faststart', '-y', cleanPath,
+      ]
+    }
     let vertical = true
     try {
       await runFfmpeg(cleanArgs, { cwd: workDir })

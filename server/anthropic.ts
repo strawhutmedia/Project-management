@@ -2316,3 +2316,56 @@ export async function pickVerticalCrop(frames: Buffer[]): Promise<VerticalCrop> 
     return { centerX: 0.5, confident: false }
   }
 }
+
+export type VerticalTrack = { path: number[]; confident: boolean }
+
+const TRACK_SYSTEM = `You are tracking the main speaker across a landscape video clip so it
+can be cropped to a moving 9:16 vertical that FOLLOWS them.
+
+You will see N frames sampled about 1 per second, in time order. For EACH frame, report
+the horizontal center (0..1) where a tall 9:16 crop should sit so the main speaker stays
+framed in that moment: 0 = far left, 0.5 = middle, 1 = far right. Track the SAME person
+across frames; move the value as they move.
+
+Return ONLY JSON, no prose:
+{"path": [<centerX for frame 1>, <frame 2>, ... exactly N values], "confident": <boolean>}
+  - path length MUST equal the number of frames.
+  - confident: true if there's a clear speaker to follow; false for a wide shot with no
+    clear subject (caller will fall back to safe framing).`
+
+// Per-frame tracking: one centerX for each ~1s frame, so the crop can
+// follow the speaker instead of holding a single static position.
+export async function trackVerticalCrop(frames: Buffer[]): Promise<VerticalTrack> {
+  const n = frames.length
+  if (!hasAnthropicKey() || n === 0) return { path: [], confident: false }
+  const content: Anthropic.MessageParam['content'] = [
+    ...frames.map((b) => ({
+      type: 'image' as const,
+      source: { type: 'base64' as const, media_type: 'image/jpeg' as const, data: b.toString('base64') },
+    })),
+    { type: 'text' as const, text: `These are the ${n} frames in time order. Return the path array with exactly ${n} values.` },
+  ]
+  const response = await client.messages.create({
+    model: VISION_MODEL,
+    max_tokens: 1500,
+    system: TRACK_SYSTEM,
+    messages: [{ role: 'user', content }],
+  })
+  const block = response.content.find((b) => b.type === 'text')
+  const text = block && block.type === 'text' ? block.text : ''
+  const s = text.indexOf('{'), e = text.lastIndexOf('}')
+  if (s === -1 || e <= s) return { path: [], confident: false }
+  try {
+    const parsed = JSON.parse(text.slice(s, e + 1)) as { path?: unknown; confident?: unknown }
+    let arr = Array.isArray(parsed.path) ? parsed.path.map((v) => Number(v)) : []
+    arr = arr.map((v) => (Number.isFinite(v) ? Math.max(0, Math.min(1, v)) : 0.5))
+    // Reconcile length with the frame count: pad by repeating the last
+    // value, or truncate.
+    if (arr.length === 0) return { path: [], confident: false }
+    while (arr.length < n) arr.push(arr[arr.length - 1])
+    if (arr.length > n) arr = arr.slice(0, n)
+    return { path: arr, confident: parsed.confident === true }
+  } catch {
+    return { path: [], confident: false }
+  }
+}
