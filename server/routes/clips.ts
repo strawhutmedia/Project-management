@@ -184,14 +184,17 @@ async function runClipJob(jobId: string, songId: string, sourceDropboxPath: stri
     if (moments.length === 0) throw new Error('no_moments_selected')
     logInfo('clip job: moments picked', { jobId, count: moments.length })
 
-    const { extractEditableClip } = await import('../stills')
+    const { extractEditableClip, chunkCaptions } = await import('../stills')
     let made = 0
     for (let i = 0; i < moments.length; i++) {
       const m = moments[i]
       try {
-        const captions = blocks
+        // Chunk the transcript blocks into the ~6-word lines that show on
+        // screen, so the stored captions match what's rendered/editable.
+        const blocksInRange = blocks
           .filter((b) => b.end > m.startSeconds && b.start < m.endSeconds)
           .map((b) => ({ startSeconds: b.start, endSeconds: b.end, text: b.text }))
+        const captions = chunkCaptions(blocksInRange, m.startSeconds, m.endSeconds - m.startSeconds)
         const clip = await extractEditableClip({
           videoDropboxPath: sourceDropboxPath,
           startSeconds: m.startSeconds,

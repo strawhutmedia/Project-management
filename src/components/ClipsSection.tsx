@@ -280,47 +280,29 @@ function ClipCard({ clip }: { clip: ApiClip }) {
   const [url, setUrl] = useState<string | null>(null)
   const [err, setErr] = useState<string | null>(null)
   const [editing, setEditing] = useState(false)
-  const [lines, setLines] = useState<ApiClipCaption[]>(clip.captions ?? [])
-  const [saving, setSaving] = useState(false)
+  const [current, setCurrent] = useState<ApiClip>(clip)
   const bust = useRef(0)
 
   async function loadLink() {
-    setUrl(null)
+    setUrl(null); setErr(null)
     try {
-      const r = await api.clipLink(clip.id)
-      // Cache-bust so a re-rendered clip doesn't show the old cached video.
+      const r = await api.clipLink(current.id)
+      // Cache-bust so a re-rendered clip doesn't show the stale video.
       setUrl(`${r.url}${r.url.includes('?') ? '&' : '?'}v=${bust.current}`)
     } catch (e) {
       setErr(e instanceof Error ? e.message : 'link failed')
     }
   }
 
-  useEffect(() => { void loadLink() }, [clip.id])
+  useEffect(() => { void loadLink() }, [current.id])
 
-  async function saveCaptions() {
-    setSaving(true); setErr(null)
-    try {
-      const r = await api.editClipCaptions(clip.id, lines)
-      setLines(r.clip.captions)
-      setEditing(false)
-      bust.current += 1
-      await loadLink() // reload the freshly re-rendered clip
-    } catch (e) {
-      setErr(e instanceof Error ? e.message : 'save failed')
-    } finally {
-      setSaving(false)
-    }
-  }
-
-  const dur = clip.durationSeconds != null ? `${Math.round(clip.durationSeconds)}s` : ''
-  const canEdit = (clip.captions?.length ?? 0) > 0
+  const dur = current.durationSeconds != null ? `${Math.round(current.durationSeconds)}s` : ''
+  const canEdit = (current.captions?.length ?? 0) > 0
 
   return (
     <div className="rounded-lg border border-line bg-ink/40 overflow-hidden flex flex-col">
       <div className="relative bg-black aspect-[9/16] grid place-items-center">
-        {saving ? (
-          <span className="text-[10px] text-stage-mastering animate-pulse px-2 text-center">re-rendering captions…</span>
-        ) : url ? (
+        {url ? (
           <video src={url} controls playsInline className="w-full h-full object-contain" />
         ) : err ? (
           <span className="text-[10px] text-urgent px-2 text-center">{err}</span>
@@ -328,52 +310,152 @@ function ClipCard({ clip }: { clip: ApiClip }) {
           <span className="text-[10px] text-muted animate-pulse">loading…</span>
         )}
       </div>
-      <div className="p-2 space-y-1.5">
-        <div className="text-[11px] font-bold leading-tight line-clamp-2" title={clip.title ?? ''}>
-          {clip.title || 'Clip'}
+      <div className="p-2 space-y-1">
+        <div className="text-[11px] font-bold leading-tight line-clamp-2" title={current.title ?? ''}>
+          {current.title || 'Clip'}
+        </div>
+        <div className="flex items-center justify-between text-[10px] text-muted">
+          <span className="tabular-nums">{dur}{current.captioned ? ' · captioned' : ''}</span>
+          <div className="flex items-center gap-2">
+            {canEdit && (
+              <button onClick={() => setEditing(true)} className="uppercase tracking-wider font-bold text-muted hover:text-text">
+                ✎ Captions
+              </button>
+            )}
+            {url && (
+              <a href={url} download className="uppercase tracking-wider font-bold text-stage-mastering hover:text-text">↓ Save</a>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {editing && (
+        <CaptionEditor
+          clip={current}
+          onClose={() => setEditing(false)}
+          onSaved={(c) => { setCurrent(c); bust.current += 1; setEditing(false) }}
+        />
+      )}
+    </div>
+  )
+}
+
+// Synced caption editor — video on one side, its on-screen caption lines
+// on the other. Click a line to jump the video there; the playing line
+// highlights; edit the text in place; Save re-renders the clip.
+function CaptionEditor({
+  clip, onClose, onSaved,
+}: {
+  clip: ApiClip
+  onClose: () => void
+  onSaved: (updated: ApiClip) => void
+}) {
+  const [url, setUrl] = useState<string | null>(null)
+  const [lines, setLines] = useState<ApiClipCaption[]>(clip.captions ?? [])
+  const [saving, setSaving] = useState(false)
+  const [err, setErr] = useState<string | null>(null)
+  const [activeIdx, setActiveIdx] = useState(-1)
+  const videoRef = useRef<HTMLVideoElement | null>(null)
+  const activeRowRef = useRef<HTMLDivElement | null>(null)
+  const clipStart = clip.startSeconds ?? 0
+
+  useEffect(() => {
+    api.clipLink(clip.id).then((r) => setUrl(r.url)).catch((e) => setErr(e instanceof Error ? e.message : 'link failed'))
+  }, [clip.id])
+
+  useEffect(() => { activeRowRef.current?.scrollIntoView({ block: 'nearest' }) }, [activeIdx])
+
+  const rel = (s: number) => Math.max(0, s - clipStart)
+  const fmt = (s: number) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`
+
+  function seekTo(i: number) {
+    const v = videoRef.current
+    if (!v) return
+    v.currentTime = rel(lines[i].startSeconds)
+    void v.play()
+  }
+  function onTime() {
+    const v = videoRef.current
+    if (!v) return
+    const t = v.currentTime
+    setActiveIdx(lines.findIndex((l) => t >= rel(l.startSeconds) - 0.05 && t < rel(l.endSeconds)))
+  }
+
+  async function save() {
+    setSaving(true); setErr(null)
+    try {
+      const r = await api.editClipCaptions(clip.id, lines)
+      onSaved(r.clip)
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : 'save failed')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 grid place-items-center bg-ink/85 backdrop-blur-sm p-3" onClick={onClose}>
+      <div onClick={(e) => e.stopPropagation()}
+        className="w-full max-w-3xl max-h-[92vh] rounded-2xl border border-line bg-panel flex flex-col overflow-hidden">
+        <div className="flex items-center justify-between px-4 py-3 border-b border-line/60">
+          <div>
+            <h3 className="text-sm font-black">Edit captions</h3>
+            <p className="text-[11px] text-muted truncate max-w-[70vw]">{clip.title || 'Clip'} — fix a spelling, click a line to jump there</p>
+          </div>
+          <button onClick={onClose} className="text-muted hover:text-text text-xl leading-none">×</button>
         </div>
 
-        {editing ? (
-          <div className="space-y-1.5">
-            <div className="text-[9px] uppercase tracking-wider text-muted/70 font-bold">Captions — fix any spellings</div>
-            <div className="space-y-1 max-h-40 overflow-y-auto pr-0.5">
-              {lines.map((ln, i) => (
-                <textarea
-                  key={i}
+        <div className="flex flex-col md:flex-row min-h-0 flex-1">
+          {/* Video */}
+          <div className="md:w-[46%] bg-black grid place-items-center p-3 shrink-0">
+            {url ? (
+              <video ref={videoRef} src={url} controls playsInline onTimeUpdate={onTime}
+                className="max-h-[38vh] md:max-h-[70vh] w-auto rounded-lg" />
+            ) : (
+              <span className="text-[11px] text-muted animate-pulse py-10">loading video…</span>
+            )}
+          </div>
+
+          {/* Caption lines */}
+          <div className="flex-1 min-h-0 overflow-y-auto p-3 space-y-1.5">
+            {lines.length === 0 && <p className="text-[12px] text-muted italic">No caption lines on this clip.</p>}
+            {lines.map((ln, i) => (
+              <div
+                key={i}
+                ref={i === activeIdx ? activeRowRef : null}
+                className={`flex items-start gap-2 rounded-lg border p-1.5 transition-colors ${
+                  i === activeIdx ? 'border-stage-mastering/60 bg-stage-mastering/10' : 'border-line/50 bg-ink/30'
+                }`}
+              >
+                <button
+                  onClick={() => seekTo(i)}
+                  className="shrink-0 tabular-nums text-[10px] font-mono text-muted hover:text-stage-mastering border border-line rounded px-1.5 py-1 mt-0.5"
+                  title="Jump the video here"
+                >
+                  {fmt(rel(ln.startSeconds))}
+                </button>
+                <input
                   value={ln.text}
                   onChange={(e) => setLines((prev) => prev.map((p, j) => j === i ? { ...p, text: e.target.value } : p))}
-                  rows={2}
-                  className="w-full rounded bg-panel/60 border border-line text-text px-2 py-1 text-[11px] outline-none focus:border-stage-mastering resize-y"
+                  onFocus={() => seekTo(i)}
+                  className="flex-1 min-w-0 rounded bg-panel/60 border border-line text-text px-2 py-1.5 text-sm outline-none focus:border-stage-mastering"
                 />
-              ))}
-              {lines.length === 0 && <p className="text-[10px] text-muted italic">No caption lines on this clip.</p>}
-            </div>
-            <div className="flex items-center gap-2 justify-end">
-              <button onClick={() => { setLines(clip.captions ?? []); setEditing(false) }} disabled={saving}
-                className="text-[10px] uppercase tracking-wider text-muted hover:text-text">Cancel</button>
-              <button onClick={() => void saveCaptions()} disabled={saving}
-                className="rounded bg-gradient-to-r from-stage-mastering to-stage-tracking text-white font-bold uppercase tracking-wider text-[10px] px-2.5 py-1 disabled:opacity-50">
-                {saving ? 'Saving…' : 'Save & re-render'}
-              </button>
-            </div>
-            {err && <p className="text-[10px] text-urgent">{err}</p>}
+              </div>
+            ))}
           </div>
-        ) : (
-          <div className="flex items-center justify-between text-[10px] text-muted">
-            <span className="tabular-nums">{dur}{clip.captioned ? ' · captioned' : ''}</span>
-            <div className="flex items-center gap-2">
-              {canEdit && (
-                <button onClick={() => { setLines(clip.captions ?? []); setEditing(true) }}
-                  className="uppercase tracking-wider font-bold text-muted hover:text-text">
-                  ✎ Captions
-                </button>
-              )}
-              {url && !saving && (
-                <a href={url} download className="uppercase tracking-wider font-bold text-stage-mastering hover:text-text">↓ Save</a>
-              )}
-            </div>
+        </div>
+
+        <div className="flex items-center justify-between gap-3 px-4 py-3 border-t border-line/60">
+          <span className="text-[11px] text-urgent">{err}</span>
+          <div className="flex items-center gap-2">
+            {saving && <span className="text-[11px] text-stage-mastering animate-pulse">re-rendering…</span>}
+            <button onClick={onClose} disabled={saving} className="text-[11px] uppercase tracking-wider text-muted hover:text-text px-3 py-1.5">Cancel</button>
+            <button onClick={() => void save()} disabled={saving || lines.length === 0}
+              className="rounded-lg bg-gradient-to-r from-stage-mastering to-stage-tracking text-white font-bold uppercase tracking-wider text-[11px] px-4 py-2 disabled:opacity-50">
+              {saving ? 'Saving…' : 'Save & re-render'}
+            </button>
           </div>
-        )}
+        </div>
       </div>
     </div>
   )

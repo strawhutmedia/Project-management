@@ -427,6 +427,42 @@ function sanitizeCaptionText(text: string): string {
   return text.replace(/[{}]/g, '').replace(/\s+/g, ' ').trim()
 }
 
+const CAPTION_CHUNK_WORDS = 6
+
+// Break transcript blocks into the ~6-word lines that ACTUALLY appear on
+// screen, each with its own absolute start/end. We store these as the
+// clip's captions so the editor shows exactly what the viewer sees (like
+// Instagram/rev), and buildAssFile renders each line one-to-one.
+export function chunkCaptions(
+  blocks: ClipCaption[],
+  clipStartSeconds: number,
+  clipDurationSeconds: number,
+): ClipCaption[] {
+  const out: ClipCaption[] = []
+  for (const cap of blocks) {
+    const relStart = cap.startSeconds - clipStartSeconds
+    const relEnd = Math.min(cap.endSeconds - clipStartSeconds, clipDurationSeconds)
+    if (relEnd <= 0 || relStart >= clipDurationSeconds || relEnd <= relStart) continue
+    const text = sanitizeCaptionText(cap.text)
+    if (!text) continue
+    const words = text.split(' ')
+    const chunks: string[] = []
+    for (let i = 0; i < words.length; i += CAPTION_CHUNK_WORDS) {
+      chunks.push(words.slice(i, i + CAPTION_CHUNK_WORDS).join(' '))
+    }
+    const span = relEnd - relStart
+    const per = span / chunks.length
+    for (let i = 0; i < chunks.length; i++) {
+      const cs = Math.max(0, relStart + per * i)
+      const ce = Math.min(clipDurationSeconds, relStart + per * (i + 1))
+      if (ce <= cs) continue
+      // Store in ABSOLUTE source seconds so edits + re-renders line up.
+      out.push({ startSeconds: clipStartSeconds + cs, endSeconds: clipStartSeconds + ce, text: chunks[i] })
+    }
+  }
+  return out
+}
+
 function buildAssFile(captions: ClipCaption[], clipStartSeconds: number, clipDurationSeconds: number): string {
   const header = [
     '[Script Info]',
