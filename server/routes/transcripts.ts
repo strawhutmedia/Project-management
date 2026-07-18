@@ -190,7 +190,7 @@ export async function createInternalTranscriptJob(args: {
 
 // After Deepgram succeeds on an autopipeline transcript, chain into:
 //   1. Social plan generation (via existing /api/socials handler logic)
-//   2. Clip job creation (OpusClip)
+//   2. Clip generation (Slate's own ffmpeg cutter)
 //   3. Flip song.processing_state to 'ready' once everything's queued.
 //
 // We don't wait for the social plan or clip job to FINISH — both run

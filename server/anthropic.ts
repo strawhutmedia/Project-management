@@ -136,8 +136,8 @@ timecodes from the transcript. Example:
   "[00:14:23 – 00:15:02] Sherri's bit about the Kool-Aid vase and
    the 'I trust your visit with Adele was pleasant' line."
 
-This lets the editor jump straight to the moment and lets us hand
-OpusClip an exact cut directive.
+This lets the editor jump straight to the moment and gives the ffmpeg
+clip cutter an exact cut directive.
 
 Output: ONLY valid JSON matching the supplied schema. No preamble. No
 explanation. No markdown fences.`
