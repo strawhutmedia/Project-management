@@ -177,6 +177,15 @@ export async function extractStillsForItem(input: StillExtractInput): Promise<St
 
     // Upload each frame to Dropbox.
     const dropboxFolder = `/slate-stills/${input.songId}/${input.itemId}`
+    // Ensure the target folder exists before uploading files. Dropbox's
+    // upload API requires parent folders to exist; attempting to upload
+    // to a non-existent path returns 409 path/no_write_permission.
+    const { createFolder } = await import('./dropbox')
+    const folderRes = await createFolder(dropboxFolder)
+    if (!folderRes.ok && folderRes.error) {
+      logError('stills: failed to create dropbox folder', { itemId: input.itemId, folder: dropboxFolder, error: folderRes.error })
+      throw new Error(folderRes.error)
+    }
     const uploadedPaths: string[] = []
     for (let i = 0; i < localFiles.length; i++) {
       const buf = await fs.promises.readFile(localFiles[i])
@@ -616,6 +625,15 @@ export async function extractClipForItem(input: ClipExtractInput): Promise<ClipE
     }
     const buf = await fs.promises.readFile(outPath)
     const dropboxFolder = `/slate-clips/${input.songId}/${input.itemId}`
+    // Ensure the target folder exists before uploading. Dropbox's upload
+    // API requires parent folders to exist; attempting to upload to a
+    // non-existent path returns 409 path/no_write_permission.
+    const { createFolder } = await import('./dropbox')
+    const folderRes = await createFolder(dropboxFolder)
+    if (!folderRes.ok && folderRes.error) {
+      logError('clips: failed to create dropbox folder', { itemId: input.itemId, folder: dropboxFolder, error: folderRes.error })
+      throw new Error(folderRes.error)
+    }
     const fileName = `v${version}.mp4`
     const res = await uploadFile(dropboxFolder, fileName, buf)
     if (!res.ok || !res.path) {
@@ -815,6 +833,15 @@ export async function extractEditableClip(input: EditableClipInput): Promise<Edi
     if (!fs.existsSync(cleanPath) || fs.statSync(cleanPath).size === 0) throw new Error('clip_no_output')
 
     const folder = `/slate-clips/${input.songId}/${input.itemId}`
+    // Ensure the target folder exists before uploading. Dropbox's upload
+    // API requires parent folders to exist; attempting to upload to a
+    // non-existent path returns 409 path/no_write_permission.
+    const { createFolder } = await import('./dropbox')
+    const folderRes = await createFolder(folder)
+    if (!folderRes.ok && folderRes.error) {
+      logError('eclip: failed to create dropbox folder', { itemId: input.itemId, folder, error: folderRes.error })
+      throw new Error(folderRes.error)
+    }
     const cleanUp = await uploadFile(folder, `clean-v${version}.mp4`, await fs.promises.readFile(cleanPath))
     if (!cleanUp.ok || !cleanUp.path) throw new Error(cleanUp.error || 'dropbox_upload_failed')
 
@@ -875,6 +902,14 @@ export async function reburnClipCaptions(args: {
     if (!fs.existsSync(outPath) || fs.statSync(outPath).size === 0) throw new Error('reburn_no_output')
 
     const folder = `/slate-clips/${args.songId}/${args.itemId}`
+    // Ensure the target folder exists before uploading. While it should
+    // exist from the original clip creation, check anyway for safety.
+    const { createFolder } = await import('./dropbox')
+    const folderRes = await createFolder(folder)
+    if (!folderRes.ok && folderRes.error) {
+      logError('reburn: failed to create dropbox folder', { itemId: args.itemId, folder, error: folderRes.error })
+      throw new Error(folderRes.error)
+    }
     const up = await uploadFile(folder, `v${args.version}.mp4`, await fs.promises.readFile(outPath))
     if (!up.ok || !up.path) throw new Error(up.error || 'dropbox_upload_failed')
     logInfo('eclip: re-burned captions', { itemId: args.itemId, version: args.version })
