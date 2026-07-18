@@ -1,9 +1,9 @@
 {
   "version": "0.2.2",
-  "now": "2026-07-18T16:18:29.316Z",
+  "now": "2026-07-18T16:53:47.547Z",
   "boot": {
-    "startedAt": "2026-07-18T16:18:28.709Z",
-    "completedAt": "2026-07-18T16:18:29.296Z",
+    "startedAt": "2026-07-18T16:53:47.162Z",
+    "completedAt": "2026-07-18T16:53:47.531Z",
     "error": null
   },
   "env": {
@@ -120,7 +120,8 @@
       "083_wardrobe_outfit_number.sql",
       "084_outreach_batch_label.sql",
       "085_private_talk_reply_to.sql",
-      "086_private_talk_reply_to_booking_only.sql"
+      "086_private_talk_reply_to_booking_only.sql",
+      "087_clip_captions.sql"
     ],
     "userCount": 12,
     "projectCount": 16
@@ -128,7 +129,7 @@
   "recentLog": [
     {
       "level": "info",
-      "ts": "2026-07-18T16:18:28.704Z",
+      "ts": "2026-07-18T16:53:47.160Z",
       "msg": "serving client from",
       "data": {
         "clientDir": "/app/dist"
@@ -136,7 +137,7 @@
     },
     {
       "level": "info",
-      "ts": "2026-07-18T16:18:28.709Z",
+      "ts": "2026-07-18T16:53:47.162Z",
       "msg": "boot starting",
       "data": {
         "cwd": "/app",
@@ -147,12 +148,12 @@
     },
     {
       "level": "info",
-      "ts": "2026-07-18T16:18:29.139Z",
+      "ts": "2026-07-18T16:53:47.419Z",
       "msg": "migrations complete"
     },
     {
       "level": "info",
-      "ts": "2026-07-18T16:18:29.285Z",
+      "ts": "2026-07-18T16:53:47.525Z",
       "msg": "wardrobe outfits: applied",
       "data": {
         "projectId": "12f53ed1-c6c7-4c11-8d7b-06d91744c9af",
@@ -163,7 +164,7 @@
     },
     {
       "level": "info",
-      "ts": "2026-07-18T16:18:29.286Z",
+      "ts": "2026-07-18T16:53:47.525Z",
       "msg": "BIYA seed: project already exists, ensured shoot days",
       "data": {
         "projectId": "12f53ed1-c6c7-4c11-8d7b-06d91744c9af"
@@ -171,12 +172,12 @@
     },
     {
       "level": "info",
-      "ts": "2026-07-18T16:18:29.296Z",
+      "ts": "2026-07-18T16:53:47.531Z",
       "msg": "listening on :8080"
     },
     {
       "level": "info",
-      "ts": "2026-07-18T16:18:29.297Z",
+      "ts": "2026-07-18T16:53:47.532Z",
       "msg": "scheduler started (every 5 min)"
     }
   ]
