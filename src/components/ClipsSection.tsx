@@ -79,8 +79,9 @@ export default function ClipsSection({
         <div>
           <h2 className="text-[11px] uppercase tracking-[0.2em] text-muted font-bold">✂️ Clips</h2>
           <p className="text-[11px] text-muted/80 mt-1 max-w-md">
-            Slate reads the transcript, picks the strongest moments, and cuts each into a
-            vertical 9:16 short with burned-in captions. Needs the episode’s transcript first.
+            Slate reads the transcript, finds the strongest moments for this show, and cuts
+            7–15 vertical 9:16 shorts with burned-in captions. Runs automatically on upload;
+            needs the episode’s transcript first.
           </p>
         </div>
         {canWrite && (
@@ -148,7 +149,7 @@ function ClipOptionsDialog({
   onSubmit: (options: ClipJobOptions) => void
 }) {
   const [prompt, setPrompt] = useState('')
-  const [clipCount, setClipCount] = useState<number | ''>(6)
+  const [clipCount, setClipCount] = useState<number | ''>(12)
 
   return (
     <div className="fixed inset-0 z-40 grid place-items-center bg-ink/80 backdrop-blur-sm p-4" onClick={onCancel}>

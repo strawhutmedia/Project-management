@@ -124,11 +124,15 @@ async function runClipJob(jobId: string, songId: string, sourceDropboxPath: stri
       `SELECT options FROM clip_jobs WHERE id = $1`, [jobId],
     )
     const options = jobRes.rows[0]?.options ?? null
-    const showRes = await pool.query<{ name: string }>(
-      `SELECT p.name FROM projects p JOIN songs s ON s.project_id = p.id WHERE s.id = $1`,
+    // Pull the show's voice + vocabulary so selection is "based on the
+    // show" — what THIS audience cares about, not generic virality.
+    const showRes = await pool.query<{ name: string; socials_brand_voice: string | null; socials_vocabulary: string | null }>(
+      `SELECT p.name, p.socials_brand_voice, p.socials_vocabulary
+         FROM projects p JOIN songs s ON s.project_id = p.id WHERE s.id = $1`,
       [songId],
     )
-    const showName = showRes.rows[0]?.name ?? 'the show'
+    const show = showRes.rows[0]
+    const showName = show?.name ?? 'the show'
 
     const fmt = (s: number) => {
       const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), sec = Math.floor(s % 60)
@@ -145,6 +149,8 @@ async function runClipJob(jobId: string, songId: string, sourceDropboxPath: stri
       transcript,
       focus: options?.prompt ?? null,
       count: options?.clipCount ?? null,
+      brandVoice: show?.socials_brand_voice ?? null,
+      vocabulary: show?.socials_vocabulary ?? null,
     })
     if (moments.length === 0) throw new Error('no_moments_selected')
     logInfo('clip job: moments picked', { jobId, count: moments.length })

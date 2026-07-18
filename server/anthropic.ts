@@ -2155,7 +2155,9 @@ export type ClipMomentInput = {
   showName: string
   transcript: string // timecoded blocks, "[HH:MM:SS] Speaker: text"
   focus?: string | null // optional plain-English steer from the user
-  count?: number | null // desired number of clips (default 6)
+  count?: number | null // desired number of clips (default 12; range 7-15)
+  brandVoice?: string | null // the show's voice, so picks fit the show
+  vocabulary?: string | null // names/terms that signal what matters
 }
 
 export type ClipMoment = {
@@ -2168,8 +2170,13 @@ export type ClipMoment = {
 const CLIP_PICKER_SYSTEM = `You are a senior short-form video editor for a podcast network.
 
 Given an episode transcript, pick the moments that will actually perform
-as standalone vertical clips (Reels / TikTok / Shorts). Each transcript
-block is prefixed with its start time as [HH:MM:SS].
+as standalone vertical clips (Reels / TikTok / Shorts) FOR THIS SPECIFIC
+SHOW. Each transcript block is prefixed with its start time as [HH:MM:SS].
+
+Fit the show: if a show voice / vocabulary is provided, weight moments
+that match what this show and its audience actually care about — the
+recurring themes, the names, the kind of beat this show is known for —
+over generic "viral" moments that could come from any podcast.
 
 What makes a good pick:
 - A self-contained beat: a story, a hot take, a surprising fact, a big
@@ -2180,17 +2187,28 @@ What makes a good pick:
 - Skip intros, ad reads, housekeeping, and rambly setup with no payoff.
 - Pick DISTINCT moments — no two clips covering the same ground.
 
+HOW MANY: return between 7 and 15 clips. Give as many genuinely strong,
+distinct options as the episode supports — aim for the target the user
+asks for, but never drop below 7 when there's material, and never pad
+the list with weak picks to hit a number.
+
 Return ONLY a JSON array (no prose, no code fences), each element:
 {"startSeconds": <int>, "endSeconds": <int>, "title": "<=8 word hook", "reason": "one line: why it lands"}
 Order best-first. startSeconds/endSeconds are whole seconds from the
 start of the recording, derived from the [HH:MM:SS] timecodes.`
 
 export async function pickClipMoments(input: ClipMomentInput): Promise<ClipMoment[]> {
-  const count = input.count && input.count > 0 && input.count <= 20 ? Math.round(input.count) : 6
+  // Default to 12 — squarely in the 7-15 band we want per episode.
+  const target = input.count && input.count > 0 && input.count <= 20 ? Math.round(input.count) : 12
+  // Accept up to 15 even when the aim is lower, so a rich episode can
+  // surface the full slate of options.
+  const hardMax = Math.min(20, Math.max(target, 15))
   const focus = input.focus?.trim()
   const user = [
     `Show: ${input.showName}`,
-    `Pick the ${count} best clip moments.`,
+    input.brandVoice?.trim() ? `Show voice: ${input.brandVoice.trim().slice(0, 1200)}` : '',
+    input.vocabulary?.trim() ? `Names / terms that matter to this show: ${input.vocabulary.trim().slice(0, 600)}` : '',
+    `Aim for about ${target} clips (7-15 range).`,
     focus ? `Editor's steer (weight this heavily): ${focus}` : '',
     '',
     'TRANSCRIPT:',
@@ -2233,7 +2251,7 @@ export async function pickClipMoments(input: ClipMomentInput): Promise<ClipMomen
       title: typeof r.title === 'string' ? r.title.slice(0, 120) : 'Clip',
       reason: typeof r.reason === 'string' ? r.reason.slice(0, 300) : '',
     })
-    if (moments.length >= count) break
+    if (moments.length >= hardMax) break
   }
   return moments
 }
