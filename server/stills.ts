@@ -782,30 +782,35 @@ export async function extractEditableClip(input: EditableClipInput): Promise<Edi
       logInfo('eclip: tracking skipped, safe framing', { itemId: input.itemId, error: errMsg(err) })
     }
 
-    // Pass 1 — build clean.mp4. Tracking crop above, or safe framed
-    // (blurred-fill) fallback when we couldn't build a track.
-    if (!cleanArgs) {
-      cleanArgs = [
-        '-ss', input.startSeconds.toFixed(3), '-probesize', '50M', '-analyzeduration', '10M',
-        '-i', sourcePath, '-t', duration.toFixed(3),
-        '-filter_complex', verticalFilter(false),
-        '-map', '[vout]', '-map', '0:a?',
-        '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '22', '-pix_fmt', 'yuv420p',
-        '-c:a', 'aac', '-b:a', '128k', '-movflags', '+faststart', '-y', cleanPath,
-      ]
-    }
+    // Full-bleed CENTER crop — the "no bars" fallback whenever we don't
+    // have a confident track. Always a proper 9:16 crop, never a letterbox
+    // or blurred-bar frame. This is what standard social clips look like.
+    const centerCropArgs = (): string[] => [
+      '-ss', input.startSeconds.toFixed(3), '-probesize', '50M', '-analyzeduration', '10M',
+      '-i', sourcePath, '-t', duration.toFixed(3),
+      '-vf', fullBleedCropFilter(0.5),
+      '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '22', '-pix_fmt', 'yuv420p',
+      '-c:a', 'aac', '-b:a', '128k', '-movflags', '+faststart', '-y', cleanPath,
+    ]
+    if (!cleanArgs) cleanArgs = centerCropArgs()
+
+    // Render ladder — NEVER a letterbox: tracking crop → full-bleed center
+    // crop → (only if ffmpeg can't crop at all) a raw cut as a last resort.
     let vertical = true
     try {
       await runFfmpeg(cleanArgs, { cwd: workDir })
     } catch (err) {
-      // No vertical framing available — fall back to a raw horizontal
-      // cut. Captions can't be burned on that, but a clip still exists.
-      logInfo('eclip: vertical failed, raw cut fallback', { itemId: input.itemId, error: errMsg(err) })
-      vertical = false
-      await runFfmpeg([
-        '-ss', input.startSeconds.toFixed(3), '-probesize', '50M', '-analyzeduration', '10M',
-        '-i', sourcePath, '-t', duration.toFixed(3), '-c', 'copy', '-movflags', '+faststart', '-y', cleanPath,
-      ])
+      logInfo('eclip: primary crop failed, trying center crop', { itemId: input.itemId, error: errMsg(err) })
+      try {
+        await runFfmpeg(centerCropArgs(), { cwd: workDir })
+      } catch (err2) {
+        logInfo('eclip: center crop failed, raw cut fallback', { itemId: input.itemId, error: errMsg(err2) })
+        vertical = false
+        await runFfmpeg([
+          '-ss', input.startSeconds.toFixed(3), '-probesize', '50M', '-analyzeduration', '10M',
+          '-i', sourcePath, '-t', duration.toFixed(3), '-c', 'copy', '-movflags', '+faststart', '-y', cleanPath,
+        ])
+      }
     }
     if (!fs.existsSync(cleanPath) || fs.statSync(cleanPath).size === 0) throw new Error('clip_no_output')
 
