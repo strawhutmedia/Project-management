@@ -98,6 +98,50 @@ async function ensurePlaceholderUser(name: string, displayName: string): Promise
   return created.rows[0]?.id ?? null
 }
 
+// Alex was seeded as an emailless placeholder so his editor role could be
+// assigned before he had an account. Once he signed up (ALEX_EMAIL), that
+// left a DUPLICATE "Alex" in the user list. Collapse the placeholder into
+// his real account: move memberships + role references, then delete it.
+// Returns the real Alex id if he exists, else null (still pre-signup).
+const ALEX_EMAIL = 'alex.clayton.wall@gmail.com'
+async function resolveAlexMergingDuplicate(): Promise<string | null> {
+  const real = await pool.query<{ id: string }>(
+    `SELECT id FROM users WHERE lower(email) = lower($1) LIMIT 1`, [ALEX_EMAIL],
+  )
+  if (real.rows.length === 0) return null
+  const realId = real.rows[0].id
+  const dupes = await pool.query<{ id: string }>(
+    `SELECT id FROM users WHERE name = 'Alex' AND (email IS NULL OR email = '') AND id <> $1`, [realId],
+  )
+  for (const d of dupes.rows) {
+    const dupId = d.id
+    try {
+      await pool.query(
+        `INSERT INTO project_members (project_id, user_id)
+         SELECT project_id, $2 FROM project_members WHERE user_id = $1
+         ON CONFLICT DO NOTHING`, [dupId, realId])
+      await pool.query(
+        `UPDATE projects SET default_owners = replace(default_owners::text, $1, $2)::jsonb
+          WHERE default_owners IS NOT NULL AND default_owners::text LIKE '%' || $1 || '%'`, [dupId, realId])
+      const reassign: Array<[string, string]> = [
+        ['comments', 'author_id'], ['links', 'created_by'],
+        ['tasks', 'assignee_id'], ['tasks', 'created_by'],
+        ['budgets', 'created_by'], ['budget_line_items', 'created_by'],
+        ['songs', 'producer_id'], ['songs', 'mixer_id'], ['songs', 'writer_id'],
+        ['songs', 'tracker_id'], ['songs', 'overdub_id'], ['songs', 'stems_id'], ['songs', 'master_id'],
+      ]
+      for (const [t, c] of reassign) {
+        await pool.query(`UPDATE ${t} SET ${c} = $2 WHERE ${c} = $1`, [dupId, realId]).catch(() => {})
+      }
+      await pool.query(`DELETE FROM users WHERE id = $1`, [dupId])
+      logInfo('BIYA seed: merged placeholder Alex into real account', { dupId, realId })
+    } catch (err) {
+      logError('BIYA seed: merge duplicate Alex failed', { dupId, error: err instanceof Error ? err.message : String(err) })
+    }
+  }
+  return realId
+}
+
 export async function seedBackInYourArms(): Promise<void> {
   try {
     const ryan = await pool.query<{ id: string }>(
@@ -113,7 +157,9 @@ export async function seedBackInYourArms(): Promise<void> {
     // Placeholder users for Stephen Markley and Alex (creative team
     // unpaid in cash, but listed here so roles can be assigned)
     const stephenId = await ensurePlaceholderUser('Stephen Markley', 'Stephen')
-    const alexId = await ensurePlaceholderUser('Alex', 'Alex')
+    // Prefer Alex's real account (by email) and clean up the old placeholder;
+    // fall back to a placeholder only if he hasn't signed up yet.
+    const alexId = (await resolveAlexMergingDuplicate()) ?? await ensurePlaceholderUser('Alex', 'Alex')
 
     const existing = await pool.query<{ id: string }>(
       `SELECT id FROM projects WHERE name = $1`,
