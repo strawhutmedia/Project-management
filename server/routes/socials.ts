@@ -389,6 +389,11 @@ export async function triggerSocialPlanGeneration(args: {
                 const range = parseTimecodeRange((it as { suggested_clip?: string }).suggested_clip)
                 if (range) {
                   try {
+                    // Transcript blocks overlapping this clip → burned-in
+                    // captions. Rendered as a framed 9:16 vertical.
+                    const clipCaptions = (transcript.edited_blocks ?? [])
+                      .filter((b) => b.end > range.startSeconds && b.start < range.endSeconds)
+                      .map((b) => ({ startSeconds: b.start, endSeconds: b.end, text: b.text }))
                     const clip = await extractClipForItem({
                       videoDropboxPath: ctx.source_file_path!,
                       startSeconds: range.startSeconds,
@@ -396,6 +401,8 @@ export async function triggerSocialPlanGeneration(args: {
                       songId: args.songId,
                       itemId: it.id,
                       version: 0,
+                      vertical: true,
+                      captions: clipCaptions,
                     })
                     ;(items[i] as unknown as Record<string, unknown>).clip_dropbox_path = clip.dropboxPath
                     ;(items[i] as unknown as Record<string, unknown>).clip_duration_s = clip.durationSeconds

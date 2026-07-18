@@ -121,8 +121,8 @@ export default function ProjectPage() {
         <Link to="/" className="text-[11px] uppercase tracking-[0.2em] text-muted hover:text-text font-bold">
           ← Projects
         </Link>
-        <div className="mt-3 flex items-end justify-between flex-wrap gap-4">
-          <div className="flex-1 min-w-0 flex flex-col sm:flex-row sm:items-start gap-4 sm:gap-5">
+        <div className="mt-3 flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
+          <div className="w-full sm:flex-1 min-w-0 flex flex-col sm:flex-row sm:items-start gap-4 sm:gap-5">
             {project.kind === 'podcast' && project.coverArtUrl && (
               <img
                 src={project.coverArtUrl}
