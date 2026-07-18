@@ -428,5 +428,23 @@
     "attemptedAt": "2026-07-16T19:40:04.327Z",
     "error": "Anthropic 529: {\"type\":\"error\",\"error\":{\"type\":\"overloaded_error\",\"message\":\"Overloaded\"},\"request_id\":\"req_011Cd6JapZ5TYmeTTADJ2Ruz\"}",
     "iterations": 0
+  },
+  "dropbox: path permission denied — reconnect may be required::{\"path\":\"/slate-stills/86f7e266-6b28-48dd-a302-b4d9fec13630/361b25c9-dae1-4cd1-b": {
+    "attemptedAt": "2026-07-18T23:36:10.649Z",
+    "outcome": "fixed",
+    "summary": "Added folder creation before Dropbox uploads in stills.ts to prevent path/no_write_permission errors when uploading to non-existent folders.",
+    "iterations": 16
+  },
+  "clip job: one clip failed::{\"jobId\":\"595ad9f6-1b40-499a-9ab7-de89cc615987\",\"index\":0,\"error\":\"dropbox_path_": {
+    "attemptedAt": "2026-07-18T23:37:21.187Z",
+    "outcome": "fixed",
+    "summary": "Fixed Dropbox folder creation to properly detect and report permission errors instead of treating them as success, ensuring users get a clear \"reconnect required\" message when write permissions are missing.",
+    "iterations": 17
+  },
+  "dropbox: path permission denied — reconnect may be required::{\"path\":\"/slate-clips/86f7e266-6b28-48dd-a302-b4d9fec13630/595ad9f6-1b40-499a-9a": {
+    "attemptedAt": "2026-07-18T23:38:27.014Z",
+    "outcome": "fixed",
+    "summary": "Enhanced Dropbox permission error logging with specific operation names (file upload, chunked upload start/append/finish, folder creation) and additional diagnostic data (fileName, fileSize, chunkOffset, errorBody) to improve troubleshooting.",
+    "iterations": 13
   }
 }
