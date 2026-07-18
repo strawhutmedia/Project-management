@@ -608,3 +608,156 @@ export async function extractClipForItem(input: ClipExtractInput): Promise<ClipE
     fs.promises.rm(workDir, { recursive: true, force: true }).catch(() => {})
   }
 }
+
+// ============================================================
+// Editable-caption clips
+// ============================================================
+//
+// For the Clips panel we want captions the team can fix (Deepgram
+// misspells names). So we render TWO files per clip:
+//   - a clean (caption-free) 9:16 vertical, cut from the source, and
+//   - a captioned version, made by burning the transcript captions
+//     ONTO that clean clip.
+// Editing captions later re-burns onto the small clean clip (seconds),
+// never re-downloads/re-cuts the multi-GB source.
+
+export type EditableClipInput = {
+  videoDropboxPath: string
+  startSeconds: number
+  endSeconds: number
+  songId: string
+  itemId: string
+  captions?: ClipCaption[]
+  version?: number
+}
+
+export type EditableClipResult = {
+  dropboxPath: string          // the captioned clip (or clean if no captions)
+  cleanDropboxPath: string     // caption-free copy, for future re-burns
+  durationSeconds: number
+  version: number
+  vertical: boolean
+  captioned: boolean
+}
+
+// ffmpeg args to burn an ASS file (bare name, cwd = workDir) onto an
+// already-vertical clip. Video re-encodes; audio is copied.
+function burnArgs(inputPath: string, outPath: string): string[] {
+  return [
+    '-i', inputPath,
+    '-vf', 'ass=captions.ass',
+    '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '22', '-pix_fmt', 'yuv420p',
+    '-c:a', 'copy',
+    '-movflags', '+faststart',
+    '-y', outPath,
+  ]
+}
+
+export async function extractEditableClip(input: EditableClipInput): Promise<EditableClipResult> {
+  if (!(await probeFfmpeg())) throw new Error('clips_ffmpeg_unavailable')
+  const version = input.version ?? 0
+  const duration = input.endSeconds - input.startSeconds
+  const workDir = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'slate-eclip-'))
+  const errMsg = (err: unknown) => (err instanceof Error ? err.message : String(err))
+  try {
+    const link = await getTemporaryLink(input.videoDropboxPath)
+    if (!link.ok || !link.url) throw new Error(`dropbox_temp_link_failed: ${link.error || 'unknown'}`)
+    const sourcePath = path.join(workDir, 'source')
+    await downloadToLocalFile(link.url, sourcePath)
+
+    // Pass 1 — clean vertical from source.
+    const cleanPath = path.join(workDir, 'clean.mp4')
+    const cleanArgs = [
+      '-ss', input.startSeconds.toFixed(3),
+      '-probesize', '50M', '-analyzeduration', '10M',
+      '-i', sourcePath,
+      '-t', duration.toFixed(3),
+      '-filter_complex', verticalFilter(false),
+      '-map', '[vout]', '-map', '0:a?',
+      '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '22', '-pix_fmt', 'yuv420p',
+      '-c:a', 'aac', '-b:a', '128k', '-movflags', '+faststart', '-y', cleanPath,
+    ]
+    let vertical = true
+    try {
+      await runFfmpeg(cleanArgs, { cwd: workDir })
+    } catch (err) {
+      // No vertical framing available — fall back to a raw horizontal
+      // cut. Captions can't be burned on that, but a clip still exists.
+      logInfo('eclip: vertical failed, raw cut fallback', { itemId: input.itemId, error: errMsg(err) })
+      vertical = false
+      await runFfmpeg([
+        '-ss', input.startSeconds.toFixed(3), '-probesize', '50M', '-analyzeduration', '10M',
+        '-i', sourcePath, '-t', duration.toFixed(3), '-c', 'copy', '-movflags', '+faststart', '-y', cleanPath,
+      ])
+    }
+    if (!fs.existsSync(cleanPath) || fs.statSync(cleanPath).size === 0) throw new Error('clip_no_output')
+
+    const folder = `/slate-clips/${input.songId}/${input.itemId}`
+    const cleanUp = await uploadFile(folder, `clean-v${version}.mp4`, await fs.promises.readFile(cleanPath))
+    if (!cleanUp.ok || !cleanUp.path) throw new Error(cleanUp.error || 'dropbox_upload_failed')
+
+    // Pass 2 — burn captions onto the clean clip (fast; small input).
+    let dropboxPath = cleanUp.path
+    let captioned = false
+    const caps = input.captions ?? []
+    if (vertical && caps.length > 0) {
+      try {
+        await fs.promises.writeFile(
+          path.join(workDir, 'captions.ass'),
+          buildAssFile(caps, input.startSeconds, duration),
+        )
+        const capPath = path.join(workDir, 'captioned.mp4')
+        await runFfmpeg(burnArgs(cleanPath, capPath), { cwd: workDir })
+        if (fs.existsSync(capPath) && fs.statSync(capPath).size > 0) {
+          const capUp = await uploadFile(folder, `v${version}.mp4`, await fs.promises.readFile(capPath))
+          if (capUp.ok && capUp.path) { dropboxPath = capUp.path; captioned = true }
+        }
+      } catch (err) {
+        logInfo('eclip: caption burn failed, keeping clean clip', { itemId: input.itemId, error: errMsg(err) })
+      }
+    }
+
+    logInfo('eclip: rendered', { itemId: input.itemId, version, vertical, captioned })
+    return { dropboxPath, cleanDropboxPath: cleanUp.path, durationSeconds: duration, version, vertical, captioned }
+  } finally {
+    fs.promises.rm(workDir, { recursive: true, force: true }).catch(() => {})
+  }
+}
+
+// Re-burn edited captions onto an existing clean clip. Fast: downloads
+// only the short clean clip, not the source episode. Returns the new
+// captioned Dropbox path.
+export async function reburnClipCaptions(args: {
+  cleanDropboxPath: string
+  captions: ClipCaption[]
+  clipStartSeconds: number
+  clipDurationSeconds: number
+  songId: string
+  itemId: string
+  version: number
+}): Promise<{ dropboxPath: string }> {
+  if (!(await probeFfmpeg())) throw new Error('clips_ffmpeg_unavailable')
+  const workDir = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'slate-reburn-'))
+  try {
+    const link = await getTemporaryLink(args.cleanDropboxPath)
+    if (!link.ok || !link.url) throw new Error(`dropbox_temp_link_failed: ${link.error || 'unknown'}`)
+    const cleanLocal = path.join(workDir, 'clean.mp4')
+    await downloadToLocalFile(link.url, cleanLocal)
+
+    await fs.promises.writeFile(
+      path.join(workDir, 'captions.ass'),
+      buildAssFile(args.captions, args.clipStartSeconds, args.clipDurationSeconds),
+    )
+    const outPath = path.join(workDir, 'captioned.mp4')
+    await runFfmpeg(burnArgs(cleanLocal, outPath), { cwd: workDir })
+    if (!fs.existsSync(outPath) || fs.statSync(outPath).size === 0) throw new Error('reburn_no_output')
+
+    const folder = `/slate-clips/${args.songId}/${args.itemId}`
+    const up = await uploadFile(folder, `v${args.version}.mp4`, await fs.promises.readFile(outPath))
+    if (!up.ok || !up.path) throw new Error(up.error || 'dropbox_upload_failed')
+    logInfo('eclip: re-burned captions', { itemId: args.itemId, version: args.version })
+    return { dropboxPath: up.path }
+  } finally {
+    fs.promises.rm(workDir, { recursive: true, force: true }).catch(() => {})
+  }
+}

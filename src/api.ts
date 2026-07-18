@@ -382,6 +382,8 @@ export type ApiPodcastSearchResult = {
   genre: string | null
 }
 
+export type ApiClipCaption = { startSeconds: number; endSeconds: number; text: string }
+
 export type ApiClip = {
   id: string
   title: string | null
@@ -391,6 +393,7 @@ export type ApiClip = {
   dropboxPath: string | null
   vertical: boolean
   captioned: boolean
+  captions: ApiClipCaption[]
 }
 
 export type ClipJobOptions = {
@@ -1334,6 +1337,12 @@ export const api = {
   // Fresh (short-lived) Dropbox link to play / download one clip.
   clipLink: (clipId: string) =>
     request<{ url: string }>(`/api/clips/clip/${clipId}/link`),
+  // Edit a clip's captions (fix spellings) → re-burns onto the clean clip.
+  editClipCaptions: (clipId: string, captions: ApiClipCaption[]) =>
+    request<{ clip: ApiClip }>(`/api/clips/clip/${clipId}/captions`, {
+      method: 'PATCH',
+      body: JSON.stringify({ captions }),
+    }),
 
   transcriptSrtUrl: (id: string) => `/api/transcripts/${id}/srt`,
   transcriptVttUrl: (id: string) => `/api/transcripts/${id}/vtt`,

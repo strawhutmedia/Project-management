@@ -53,6 +53,8 @@ type ClipJobRow = {
   updated_at: string
 }
 
+type CaptionLine = { startSeconds: number; endSeconds: number; text: string }
+
 type ClipRow = {
   id: string
   job_id: string
@@ -63,6 +65,7 @@ type ClipRow = {
   dropbox_path: string | null
   vertical: boolean | null
   captioned: boolean | null
+  captions: CaptionLine[] | null
 }
 
 function jobToApi(row: ClipJobRow, clips: ClipRow[] = []) {
@@ -86,6 +89,7 @@ function jobToApi(row: ClipJobRow, clips: ClipRow[] = []) {
       dropboxPath: c.dropbox_path,
       vertical: c.vertical ?? false,
       captioned: c.captioned ?? false,
+      captions: c.captions ?? [],
     })),
   }
 }
@@ -93,7 +97,7 @@ function jobToApi(row: ClipJobRow, clips: ClipRow[] = []) {
 async function loadClips(jobId: string): Promise<ClipRow[]> {
   const { rows } = await pool.query<ClipRow>(
     `SELECT id, job_id, title, duration_seconds, start_seconds, end_seconds,
-            dropbox_path, vertical, captioned
+            dropbox_path, vertical, captioned, captions
        FROM clips WHERE job_id = $1 AND dropbox_path IS NOT NULL
       ORDER BY created_at ASC`,
     [jobId],
@@ -180,7 +184,7 @@ async function runClipJob(jobId: string, songId: string, sourceDropboxPath: stri
     if (moments.length === 0) throw new Error('no_moments_selected')
     logInfo('clip job: moments picked', { jobId, count: moments.length })
 
-    const { extractClipForItem } = await import('../stills')
+    const { extractEditableClip } = await import('../stills')
     let made = 0
     for (let i = 0; i < moments.length; i++) {
       const m = moments[i]
@@ -188,22 +192,23 @@ async function runClipJob(jobId: string, songId: string, sourceDropboxPath: stri
         const captions = blocks
           .filter((b) => b.end > m.startSeconds && b.start < m.endSeconds)
           .map((b) => ({ startSeconds: b.start, endSeconds: b.end, text: b.text }))
-        const clip = await extractClipForItem({
+        const clip = await extractEditableClip({
           videoDropboxPath: sourceDropboxPath,
           startSeconds: m.startSeconds,
           endSeconds: m.endSeconds,
           songId,
           itemId: `${jobId}-${i}`,
           version: 0,
-          vertical: true,
           captions,
         })
         await pool.query(
           `INSERT INTO clips (job_id, title, duration_seconds, start_seconds, end_seconds,
-                              dropbox_path, vertical, captioned)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+                              dropbox_path, clean_dropbox_path, captions, render_version,
+                              vertical, captioned)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8::jsonb, 0, $9, $10)`,
           [jobId, m.title, clip.durationSeconds, m.startSeconds, m.endSeconds,
-           clip.dropboxPath, clip.vertical, clip.captioned],
+           clip.dropboxPath, clip.cleanDropboxPath, JSON.stringify(captions),
+           clip.vertical, clip.captioned],
         )
         made++
       } catch (err) {
@@ -310,6 +315,83 @@ clipsRouter.get('/clip/:clipId/link', async (req, res) => {
   const link = await getTemporaryLink(rows[0].dropbox_path)
   if (!link.ok || !link.url) { res.status(502).json({ error: link.error || 'link_failed' }); return }
   res.json({ url: link.url })
+})
+
+// EDIT CAPTIONS — fix a misspelled name, etc. Re-burns the corrected
+// text onto the stored clean (caption-free) clip; no re-cut from source.
+clipsRouter.patch('/clip/:clipId/captions', async (req, res) => {
+  const user = (req as typeof req & { user: SessionUser }).user
+  const { rows } = await pool.query<{
+    id: string; job_id: string; project_id: string; song_id: string | null
+    clean_dropbox_path: string | null
+    start_seconds: string | null; end_seconds: string | null; render_version: number
+  }>(
+    `SELECT c.id, c.job_id, j.project_id, j.song_id, c.clean_dropbox_path,
+            c.start_seconds, c.end_seconds, c.render_version
+       FROM clips c JOIN clip_jobs j ON j.id = c.job_id WHERE c.id = $1`,
+    [req.params.clipId],
+  )
+  if (rows.length === 0) { res.status(404).json({ error: 'clip_not_found' }); return }
+  const c = rows[0]
+  if (!await assertWriter(user, c.project_id, res)) return
+  if (!c.clean_dropbox_path) {
+    res.status(400).json({ error: 'not_editable', detail: 'This clip predates editable captions — regenerate clips to enable editing.' })
+    return
+  }
+  // Validate the edited caption lines. Timings stay; only text changes,
+  // but we accept the whole array back from the client for simplicity.
+  const raw = req.body?.captions
+  if (!Array.isArray(raw)) { res.status(400).json({ error: 'captions_required' }); return }
+  const captions: CaptionLine[] = []
+  for (const r of raw.slice(0, 300)) {
+    const rr = (r ?? {}) as Record<string, unknown>
+    const s = Number(rr.startSeconds), e = Number(rr.endSeconds)
+    if (!Number.isFinite(s) || !Number.isFinite(e)) continue
+    captions.push({ startSeconds: s, endSeconds: e, text: typeof rr.text === 'string' ? rr.text.slice(0, 500) : '' })
+  }
+
+  const start = Number(c.start_seconds ?? 0)
+  const end = Number(c.end_seconds ?? 0)
+  const duration = end > start ? end - start : 60
+  const newVersion = (c.render_version ?? 0) + 1
+  try {
+    const { reburnClipCaptions } = await import('../stills')
+    const r = await reburnClipCaptions({
+      cleanDropboxPath: c.clean_dropbox_path,
+      captions,
+      clipStartSeconds: start,
+      clipDurationSeconds: duration,
+      songId: c.song_id ?? 'unknown',
+      itemId: c.id,
+      version: newVersion,
+    })
+    await pool.query(
+      `UPDATE clips SET dropbox_path = $2, captions = $3::jsonb, render_version = $4, captioned = TRUE WHERE id = $1`,
+      [c.id, r.dropboxPath, JSON.stringify(captions), newVersion],
+    )
+    const upd = await pool.query<ClipRow>(
+      `SELECT id, job_id, title, duration_seconds, start_seconds, end_seconds,
+              dropbox_path, vertical, captioned, captions FROM clips WHERE id = $1`,
+      [c.id],
+    )
+    const u = upd.rows[0]
+    res.json({
+      clip: {
+        id: u.id,
+        title: u.title,
+        durationSeconds: u.duration_seconds ? Number(u.duration_seconds) : null,
+        startSeconds: u.start_seconds ? Number(u.start_seconds) : null,
+        endSeconds: u.end_seconds ? Number(u.end_seconds) : null,
+        dropboxPath: u.dropbox_path,
+        vertical: u.vertical ?? false,
+        captioned: u.captioned ?? false,
+        captions: u.captions ?? [],
+      },
+    })
+  } catch (err) {
+    logError('clip: caption re-burn failed', { clipId: c.id, error: err instanceof Error ? err.message : String(err) })
+    res.status(502).json({ error: err instanceof Error ? err.message.slice(0, 300) : 'reburn_failed' })
+  }
 })
 
 // READ ONE
