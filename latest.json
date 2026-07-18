@@ -1,9 +1,9 @@
 {
   "version": "0.2.2",
-  "now": "2026-07-18T21:58:55.072Z",
+  "now": "2026-07-18T22:02:06.239Z",
   "boot": {
-    "startedAt": "2026-07-18T21:58:54.813Z",
-    "completedAt": "2026-07-18T21:58:55.061Z",
+    "startedAt": "2026-07-18T22:02:05.802Z",
+    "completedAt": "2026-07-18T22:02:06.229Z",
     "error": null
   },
   "env": {
@@ -13,7 +13,6 @@
     "HAS_RESEND_API_KEY": true,
     "HAS_GITHUB_TOKEN": true,
     "HAS_DEEPGRAM_API_KEY": true,
-    "HAS_OPUSCLIP_API_KEY": true,
     "HAS_ANTHROPIC_API_KEY": true,
     "HAS_DROPBOX_APP_KEY": true,
     "APP_BASE_URL": null,
@@ -129,7 +128,7 @@
   "recentLog": [
     {
       "level": "info",
-      "ts": "2026-07-18T21:58:54.810Z",
+      "ts": "2026-07-18T22:02:05.800Z",
       "msg": "serving client from",
       "data": {
         "clientDir": "/app/dist"
@@ -137,7 +136,7 @@
     },
     {
       "level": "info",
-      "ts": "2026-07-18T21:58:54.813Z",
+      "ts": "2026-07-18T22:02:05.802Z",
       "msg": "boot starting",
       "data": {
         "cwd": "/app",
@@ -148,12 +147,12 @@
     },
     {
       "level": "info",
-      "ts": "2026-07-18T21:58:54.961Z",
+      "ts": "2026-07-18T22:02:06.095Z",
       "msg": "migrations complete"
     },
     {
       "level": "info",
-      "ts": "2026-07-18T21:58:55.054Z",
+      "ts": "2026-07-18T22:02:06.223Z",
       "msg": "wardrobe outfits: applied",
       "data": {
         "projectId": "12f53ed1-c6c7-4c11-8d7b-06d91744c9af",
@@ -164,7 +163,7 @@
     },
     {
       "level": "info",
-      "ts": "2026-07-18T21:58:55.054Z",
+      "ts": "2026-07-18T22:02:06.223Z",
       "msg": "BIYA seed: project already exists, ensured shoot days",
       "data": {
         "projectId": "12f53ed1-c6c7-4c11-8d7b-06d91744c9af"
@@ -172,12 +171,12 @@
     },
     {
       "level": "info",
-      "ts": "2026-07-18T21:58:55.061Z",
+      "ts": "2026-07-18T22:02:06.229Z",
       "msg": "listening on :8080"
     },
     {
       "level": "info",
-      "ts": "2026-07-18T21:58:55.061Z",
+      "ts": "2026-07-18T22:02:06.230Z",
       "msg": "scheduler started (every 5 min)"
     }
   ]
