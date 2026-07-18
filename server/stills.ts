@@ -676,6 +676,15 @@ export type EditableClipResult = {
   captioned: boolean
 }
 
+// Full-bleed 9:16 crop centered on the subject (centerX 0..1), then
+// scaled to 1080x1920. This is the "we looked at it" crop — the speaker
+// fills the vertical frame instead of sitting in a letterbox. Commas
+// inside clip() are escaped for the ffmpeg filter parser.
+function fullBleedCropFilter(centerX: number): string {
+  const c = Math.max(0, Math.min(1, centerX)).toFixed(3)
+  return `crop=w='ih*9/16':h=ih:x='clip(${c}*iw-(ih*9/16)/2\\,0\\,iw-ih*9/16)':y=0,scale=1080:1920,setsar=1`
+}
+
 // ffmpeg args to burn an ASS file (bare name, cwd = workDir) onto an
 // already-vertical clip. Video re-encodes; audio is copied.
 function burnArgs(inputPath: string, outPath: string): string[] {
@@ -701,18 +710,53 @@ export async function extractEditableClip(input: EditableClipInput): Promise<Edi
     const sourcePath = path.join(workDir, 'source')
     await downloadToLocalFile(link.url, sourcePath)
 
-    // Pass 1 — clean vertical from source.
+    // LOOK at the shot before cropping: sample a few downscaled frames
+    // across the clip and ask Claude vision where the speaker is. If it's
+    // confident, we crop full-bleed 9:16 centered on them; otherwise we
+    // fall back to the safe framed (blurred-fill) layout below.
+    let crop = { centerX: 0.5, confident: false }
+    try {
+      const N = 4
+      const frameBufs: Buffer[] = []
+      for (let i = 1; i <= N; i++) {
+        const t = input.startSeconds + (duration * i) / (N + 1)
+        const fp = path.join(workDir, `vf-${i}.jpg`)
+        try {
+          await runFfmpeg([
+            '-ss', t.toFixed(3), '-probesize', '50M', '-analyzeduration', '10M',
+            '-i', sourcePath, '-frames:v', '1', '-vf', 'scale=640:-2', '-q:v', '4', '-y', fp,
+          ])
+          if (fs.existsSync(fp) && fs.statSync(fp).size > 0) frameBufs.push(await fs.promises.readFile(fp))
+        } catch { /* one bad frame won't stop framing */ }
+      }
+      if (frameBufs.length > 0) {
+        const { pickVerticalCrop } = await import('./anthropic')
+        crop = await pickVerticalCrop(frameBufs)
+      }
+    } catch (err) {
+      logInfo('eclip: vision framing skipped, using safe framing', { itemId: input.itemId, error: errMsg(err) })
+    }
+    logInfo('eclip: framing', { itemId: input.itemId, confident: crop.confident, centerX: crop.centerX })
+
+    // Pass 1 — clean vertical from source. Full-bleed (subject-centered)
+    // when vision was confident; framed blurred-fill otherwise.
     const cleanPath = path.join(workDir, 'clean.mp4')
-    const cleanArgs = [
-      '-ss', input.startSeconds.toFixed(3),
-      '-probesize', '50M', '-analyzeduration', '10M',
-      '-i', sourcePath,
-      '-t', duration.toFixed(3),
-      '-filter_complex', verticalFilter(false),
-      '-map', '[vout]', '-map', '0:a?',
-      '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '22', '-pix_fmt', 'yuv420p',
-      '-c:a', 'aac', '-b:a', '128k', '-movflags', '+faststart', '-y', cleanPath,
-    ]
+    const cleanArgs = crop.confident
+      ? [
+          '-ss', input.startSeconds.toFixed(3), '-probesize', '50M', '-analyzeduration', '10M',
+          '-i', sourcePath, '-t', duration.toFixed(3),
+          '-vf', fullBleedCropFilter(crop.centerX),
+          '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '22', '-pix_fmt', 'yuv420p',
+          '-c:a', 'aac', '-b:a', '128k', '-movflags', '+faststart', '-y', cleanPath,
+        ]
+      : [
+          '-ss', input.startSeconds.toFixed(3), '-probesize', '50M', '-analyzeduration', '10M',
+          '-i', sourcePath, '-t', duration.toFixed(3),
+          '-filter_complex', verticalFilter(false),
+          '-map', '[vout]', '-map', '0:a?',
+          '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '22', '-pix_fmt', 'yuv420p',
+          '-c:a', 'aac', '-b:a', '128k', '-movflags', '+faststart', '-y', cleanPath,
+        ]
     let vertical = true
     try {
       await runFfmpeg(cleanArgs, { cwd: workDir })

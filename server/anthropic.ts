@@ -2262,3 +2262,57 @@ export async function pickClipMoments(input: ClipMomentInput): Promise<ClipMomen
   }
   return moments
 }
+
+// ── Vertical crop framing (vision) ──────────────────────────────────
+//
+// Clips are picked from the transcript (blind to the picture). Before
+// we crop a clip to full-bleed 9:16, we actually LOOK: a few frames go
+// to Claude's vision, which reports where the speaker is so the crop
+// keeps them in frame instead of guessing a center crop.
+
+const VISION_MODEL = 'claude-sonnet-4-6'
+
+export type VerticalCrop = { centerX: number; confident: boolean }
+
+const CROP_SYSTEM = `You are framing a landscape video clip for a 9:16 vertical crop
+(TikTok / Reels / Shorts). You'll see a few frames sampled from ONE clip.
+
+Find the MAIN SPEAKER — the most prominent person / the one talking. Report where
+to center a tall 9:16 crop so that person stays comfortably in frame across the clip.
+
+Return ONLY JSON, no prose:
+{"centerX": <number 0..1>, "confident": <boolean>}
+  - centerX: horizontal center for the crop. 0 = far left, 0.5 = middle, 1 = far right.
+  - confident: true if there is a clear single subject to follow; false if it's a wide
+    shot, two people far apart, or no clear subject (we'll fall back to a safe framing).`
+
+export async function pickVerticalCrop(frames: Buffer[]): Promise<VerticalCrop> {
+  if (!hasAnthropicKey() || frames.length === 0) return { centerX: 0.5, confident: false }
+  const content: Anthropic.MessageParam['content'] = [
+    ...frames.map((b) => ({
+      type: 'image' as const,
+      source: { type: 'base64' as const, media_type: 'image/jpeg' as const, data: b.toString('base64') },
+    })),
+    { type: 'text' as const, text: 'Frames from one clip, left-to-right in time. Where should the vertical crop be centered?' },
+  ]
+  const response = await client.messages.create({
+    model: VISION_MODEL,
+    max_tokens: 100,
+    system: CROP_SYSTEM,
+    messages: [{ role: 'user', content }],
+  })
+  const block = response.content.find((b) => b.type === 'text')
+  const text = block && block.type === 'text' ? block.text : ''
+  const s = text.indexOf('{'), e = text.lastIndexOf('}')
+  if (s === -1 || e <= s) return { centerX: 0.5, confident: false }
+  try {
+    const parsed = JSON.parse(text.slice(s, e + 1)) as { centerX?: unknown; confident?: unknown }
+    const cx = Number(parsed.centerX)
+    return {
+      centerX: Number.isFinite(cx) ? Math.max(0, Math.min(1, cx)) : 0.5,
+      confident: parsed.confident === true,
+    }
+  } catch {
+    return { centerX: 0.5, confident: false }
+  }
+}
