@@ -1,9 +1,9 @@
 {
   "version": "0.2.2",
-  "now": "2026-07-18T21:12:12.591Z",
+  "now": "2026-07-18T21:58:55.072Z",
   "boot": {
-    "startedAt": "2026-07-18T21:12:11.970Z",
-    "completedAt": "2026-07-18T21:12:12.576Z",
+    "startedAt": "2026-07-18T21:58:54.813Z",
+    "completedAt": "2026-07-18T21:58:55.061Z",
     "error": null
   },
   "env": {
@@ -129,7 +129,7 @@
   "recentLog": [
     {
       "level": "info",
-      "ts": "2026-07-18T21:12:11.968Z",
+      "ts": "2026-07-18T21:58:54.810Z",
       "msg": "serving client from",
       "data": {
         "clientDir": "/app/dist"
@@ -137,7 +137,7 @@
     },
     {
       "level": "info",
-      "ts": "2026-07-18T21:12:11.970Z",
+      "ts": "2026-07-18T21:58:54.813Z",
       "msg": "boot starting",
       "data": {
         "cwd": "/app",
@@ -148,21 +148,12 @@
     },
     {
       "level": "info",
-      "ts": "2026-07-18T21:12:12.345Z",
+      "ts": "2026-07-18T21:58:54.961Z",
       "msg": "migrations complete"
     },
     {
       "level": "info",
-      "ts": "2026-07-18T21:12:12.439Z",
-      "msg": "BIYA seed: merged placeholder Alex into real account",
-      "data": {
-        "dupId": "095f1f65-ec6f-4c24-b76d-48ea6660ba29",
-        "realId": "e05f70d9-0a70-476e-a032-3b26d083b7f5"
-      }
-    },
-    {
-      "level": "info",
-      "ts": "2026-07-18T21:12:12.569Z",
+      "ts": "2026-07-18T21:58:55.054Z",
       "msg": "wardrobe outfits: applied",
       "data": {
         "projectId": "12f53ed1-c6c7-4c11-8d7b-06d91744c9af",
@@ -173,7 +164,7 @@
     },
     {
       "level": "info",
-      "ts": "2026-07-18T21:12:12.569Z",
+      "ts": "2026-07-18T21:58:55.054Z",
       "msg": "BIYA seed: project already exists, ensured shoot days",
       "data": {
         "projectId": "12f53ed1-c6c7-4c11-8d7b-06d91744c9af"
@@ -181,12 +172,12 @@
     },
     {
       "level": "info",
-      "ts": "2026-07-18T21:12:12.576Z",
+      "ts": "2026-07-18T21:58:55.061Z",
       "msg": "listening on :8080"
     },
     {
       "level": "info",
-      "ts": "2026-07-18T21:12:12.577Z",
+      "ts": "2026-07-18T21:58:55.061Z",
       "msg": "scheduler started (every 5 min)"
     }
   ]
