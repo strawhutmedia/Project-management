@@ -295,8 +295,17 @@ export async function createFolder(folderPath: string): Promise<{ ok: boolean; e
   })
   if (res.ok) return { ok: true }
   const text = await res.text()
-  // 409 = folder already exists, treat as success
-  if (res.status === 409 && text.includes('conflict')) return { ok: true }
+  const lowerText = text.toLowerCase()
+  // 409 can mean either "folder already exists" (ok) or "permission denied" (error).
+  // Check for permission errors first, then treat remaining 409s as "already exists".
+  if (res.status === 409) {
+    if (lowerText.includes('no_write_permission') || lowerText.includes('restricted_content')) {
+      logError('dropbox: folder creation permission denied — reconnect may be required', { path: folderPath })
+      return { ok: false, error: `dropbox_path_permission_denied: The folder '${folderPath}' does not allow writes. This usually means the Dropbox integration needs to be reconnected with updated permissions. Go to Settings > Integrations, disconnect Dropbox, then reconnect it.` }
+    }
+    // Folder already exists, treat as success
+    if (lowerText.includes('conflict')) return { ok: true }
+  }
   return { ok: false, error: `dropbox_${res.status}: ${text.slice(0, 200)}` }
 }
 
