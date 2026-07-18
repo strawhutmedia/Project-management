@@ -2156,7 +2156,11 @@ export type ClipMomentInput = {
   transcript: string // timecoded blocks, "[HH:MM:SS] Speaker: text"
   focus?: string | null // optional plain-English steer from the user
   count?: number | null // desired number of clips (default 12; range 7-15)
-  brandVoice?: string | null // the show's voice, so picks fit the show
+  // What the show is about — its description / show notes / niche /
+  // audience. This is the primary "based on the show" signal and comes
+  // from data already on the show record; no one has to fill in a field.
+  showDescription?: string | null
+  brandVoice?: string | null // the show's voice, if set (bonus signal)
   vocabulary?: string | null // names/terms that signal what matters
 }
 
@@ -2173,10 +2177,12 @@ Given an episode transcript, pick the moments that will actually perform
 as standalone vertical clips (Reels / TikTok / Shorts) FOR THIS SPECIFIC
 SHOW. Each transcript block is prefixed with its start time as [HH:MM:SS].
 
-Fit the show: if a show voice / vocabulary is provided, weight moments
-that match what this show and its audience actually care about — the
-recurring themes, the names, the kind of beat this show is known for —
-over generic "viral" moments that could come from any podcast.
+Fit the show: use the show's description / show notes (and voice, if
+given) to judge what THIS show and THIS audience actually care about —
+the recurring themes, the kind of beat this show is known for — and
+weight those moments over generic "viral" ones that could come from any
+podcast. The transcript tells you what was said; the show description
+tells you which of it matters to this audience.
 
 What makes a good pick:
 - A self-contained beat: a story, a hot take, a surprising fact, a big
@@ -2206,6 +2212,7 @@ export async function pickClipMoments(input: ClipMomentInput): Promise<ClipMomen
   const focus = input.focus?.trim()
   const user = [
     `Show: ${input.showName}`,
+    input.showDescription?.trim() ? `About this show (description / show notes):\n${input.showDescription.trim().slice(0, 2500)}` : '',
     input.brandVoice?.trim() ? `Show voice: ${input.brandVoice.trim().slice(0, 1200)}` : '',
     input.vocabulary?.trim() ? `Names / terms that matter to this show: ${input.vocabulary.trim().slice(0, 600)}` : '',
     `Aim for about ${target} clips (7-15 range).`,

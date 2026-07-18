@@ -124,15 +124,39 @@ async function runClipJob(jobId: string, songId: string, sourceDropboxPath: stri
       `SELECT options FROM clip_jobs WHERE id = $1`, [jobId],
     )
     const options = jobRes.rows[0]?.options ?? null
-    // Pull the show's voice + vocabulary so selection is "based on the
-    // show" — what THIS audience cares about, not generic virality.
-    const showRes = await pool.query<{ name: string; socials_brand_voice: string | null; socials_vocabulary: string | null }>(
-      `SELECT p.name, p.socials_brand_voice, p.socials_vocabulary
-         FROM projects p JOIN songs s ON s.project_id = p.id WHERE s.id = $1`,
+    // Pull the show's description / notes + voice so selection is "based
+    // on the show" — what THIS audience cares about, not generic
+    // virality. All from data already on the show record; nothing to
+    // fill in by hand.
+    const showRes = await pool.query<{
+      name: string
+      subtitle: string | null
+      notable_topics: string | null
+      socials_brand_voice: string | null
+      socials_vocabulary: string | null
+      business_description: string | null
+      niche: string | null
+      target_audience: string | null
+    }>(
+      `SELECT p.name, p.subtitle, p.notable_topics,
+              p.socials_brand_voice, p.socials_vocabulary,
+              b.business_description, b.niche, b.target_audience
+         FROM projects p
+         JOIN songs s ON s.project_id = p.id
+         LEFT JOIN social_strategy_briefs b ON b.project_id = p.id
+        WHERE s.id = $1`,
       [songId],
     )
     const show = showRes.rows[0]
     const showName = show?.name ?? 'the show'
+    // Stitch together whatever description the show already has.
+    const showDescription = [
+      show?.subtitle && `Description: ${show.subtitle}`,
+      show?.business_description && `What the show is: ${show.business_description}`,
+      show?.niche && `Niche: ${show.niche}`,
+      show?.target_audience && `Audience: ${show.target_audience}`,
+      show?.notable_topics && `Recurring topics: ${show.notable_topics}`,
+    ].filter(Boolean).join('\n')
 
     const fmt = (s: number) => {
       const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), sec = Math.floor(s % 60)
@@ -149,6 +173,7 @@ async function runClipJob(jobId: string, songId: string, sourceDropboxPath: stri
       transcript,
       focus: options?.prompt ?? null,
       count: options?.clipCount ?? null,
+      showDescription: showDescription || null,
       brandVoice: show?.socials_brand_voice ?? null,
       vocabulary: show?.socials_vocabulary ?? null,
     })
