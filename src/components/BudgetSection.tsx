@@ -79,9 +79,11 @@ export default function BudgetSection({ projectId, isAdmin }: { projectId: strin
     new Set<BudgetCategory>(['above_line', 'production', 'post', 'other']),
   )
   const [openAccountIds, setOpenAccountIds] = useState<Set<string>>(new Set())
-  // Default to the flat spreadsheet view — easier to scan and edit in one place.
-  // Users can flip to the hierarchical view for category subtotals.
-  const [viewMode, setViewMode] = useState<'items' | 'categories'>('items')
+  // Default to the hierarchical categories view — it drills down
+  // category → account → scene (collapsible), so the 1,500-item Script
+  // Breakdown isn't one endless flat spreadsheet. Flip to "items" for the
+  // flat spreadsheet when you want to scan/edit everything in one table.
+  const [viewMode, setViewMode] = useState<'items' | 'categories'>('categories')
 
   async function load() {
     setLoading(true)
