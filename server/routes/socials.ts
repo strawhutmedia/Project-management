@@ -736,7 +736,7 @@ socialsRouter.post('/:planId/regenerate-item', async (req, res) => {
 })
 
 // HH:MM:SS — used to anchor every Claude clip suggestion to a real
-// timecode the editor or OpusClip prompt can act on.
+// timecode the editor or ffmpeg clip cutter can act on.
 function fmtTimecode(seconds: number): string {
   if (!Number.isFinite(seconds) || seconds < 0) return '00:00:00'
   const s = Math.floor(seconds)

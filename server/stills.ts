@@ -177,6 +177,15 @@ export async function extractStillsForItem(input: StillExtractInput): Promise<St
 
     // Upload each frame to Dropbox.
     const dropboxFolder = `/slate-stills/${input.songId}/${input.itemId}`
+    // Ensure the target folder exists before uploading files. Dropbox's
+    // upload API requires parent folders to exist; attempting to upload
+    // to a non-existent path returns 409 path/no_write_permission.
+    const { createFolder } = await import('./dropbox')
+    const folderRes = await createFolder(dropboxFolder)
+    if (!folderRes.ok && folderRes.error) {
+      logError('stills: failed to create dropbox folder', { itemId: input.itemId, folder: dropboxFolder, error: folderRes.error })
+      throw new Error(folderRes.error)
+    }
     const uploadedPaths: string[] = []
     for (let i = 0; i < localFiles.length; i++) {
       const buf = await fs.promises.readFile(localFiles[i])
@@ -616,6 +625,15 @@ export async function extractClipForItem(input: ClipExtractInput): Promise<ClipE
     }
     const buf = await fs.promises.readFile(outPath)
     const dropboxFolder = `/slate-clips/${input.songId}/${input.itemId}`
+    // Ensure the target folder exists before uploading. Dropbox's upload
+    // API requires parent folders to exist; attempting to upload to a
+    // non-existent path returns 409 path/no_write_permission.
+    const { createFolder } = await import('./dropbox')
+    const folderRes = await createFolder(dropboxFolder)
+    if (!folderRes.ok && folderRes.error) {
+      logError('clips: failed to create dropbox folder', { itemId: input.itemId, folder: dropboxFolder, error: folderRes.error })
+      throw new Error(folderRes.error)
+    }
     const fileName = `v${version}.mp4`
     const res = await uploadFile(dropboxFolder, fileName, buf)
     if (!res.ok || !res.path) {
@@ -676,6 +694,33 @@ export type EditableClipResult = {
   captioned: boolean
 }
 
+// Full-bleed 9:16 crop centered on the subject (centerX 0..1), then
+// scaled to 1080x1920. This is the "we looked at it" crop — the speaker
+// fills the vertical frame instead of sitting in a letterbox. Commas
+// inside clip() are escaped for the ffmpeg filter parser.
+function fullBleedCropFilter(centerX: number): string {
+  const c = Math.max(0, Math.min(1, centerX)).toFixed(3)
+  return `crop=w='ih*9/16':h=ih:x='clip(${c}*iw-(ih*9/16)/2\\,0\\,iw-ih*9/16)':y=0,scale=1080:1920,setsar=1`
+}
+
+// Source video WxH, parsed from ffmpeg's -i output (ffprobe isn't
+// bundled). Needed to turn the vision path (0..1 fractions) into
+// absolute-pixel crop commands for the tracking render.
+function probeVideoDimensions(filePath: string): Promise<{ width: number; height: number } | null> {
+  return new Promise((resolve) => {
+    const proc = spawn(FFMPEG_PATH, ['-hide_banner', '-i', filePath], { stdio: ['ignore', 'ignore', 'pipe'] })
+    let stderr = ''
+    proc.stderr?.on('data', (d) => { stderr += String(d) })
+    const finish = () => {
+      const m = stderr.match(/Video:[^\n]*?(\d{3,5})x(\d{3,5})/)
+      resolve(m ? { width: Number(m[1]), height: Number(m[2]) } : null)
+    }
+    const timer = setTimeout(() => { try { proc.kill('SIGKILL') } catch { /* noop */ } finish() }, 15_000)
+    proc.on('error', () => { clearTimeout(timer); resolve(null) })
+    proc.on('close', () => { clearTimeout(timer); finish() })
+  })
+}
+
 // ffmpeg args to burn an ASS file (bare name, cwd = workDir) onto an
 // already-vertical clip. Video re-encodes; audio is copied.
 function burnArgs(inputPath: string, outPath: string): string[] {
@@ -701,34 +746,102 @@ export async function extractEditableClip(input: EditableClipInput): Promise<Edi
     const sourcePath = path.join(workDir, 'source')
     await downloadToLocalFile(link.url, sourcePath)
 
-    // Pass 1 — clean vertical from source.
+    // LOOK at the shot, then FOLLOW the speaker. Sample ~1 frame/sec,
+    // ask vision for the speaker's horizontal position in each frame,
+    // smooth it, and drive a moving crop that tracks them across the
+    // clip. Falls back to safe framed (blurred-fill) if not confident.
     const cleanPath = path.join(workDir, 'clean.mp4')
-    const cleanArgs = [
-      '-ss', input.startSeconds.toFixed(3),
-      '-probesize', '50M', '-analyzeduration', '10M',
-      '-i', sourcePath,
-      '-t', duration.toFixed(3),
-      '-filter_complex', verticalFilter(false),
-      '-map', '[vout]', '-map', '0:a?',
+    let cleanArgs: string[] | null = null
+    try {
+      const N = Math.max(1, Math.min(90, Math.round(duration))) // ~1 frame/sec, capped
+      const step = duration / N
+      const frameBufs: Buffer[] = []
+      for (let i = 0; i < N; i++) {
+        const t = input.startSeconds + i * step
+        const fp = path.join(workDir, `vf-${i}.jpg`)
+        try {
+          await runFfmpeg([
+            '-ss', t.toFixed(3), '-probesize', '50M', '-analyzeduration', '10M',
+            '-i', sourcePath, '-frames:v', '1', '-vf', 'scale=480:-2', '-q:v', '5', '-y', fp,
+          ])
+          if (fs.existsSync(fp) && fs.statSync(fp).size > 0) frameBufs.push(await fs.promises.readFile(fp))
+        } catch { /* one bad frame won't stop tracking */ }
+      }
+      if (frameBufs.length > 0) {
+        const { trackVerticalCrop } = await import('./anthropic')
+        const track = await trackVerticalCrop(frameBufs)
+        const dims = await probeVideoDimensions(sourcePath)
+        if (track.confident && track.path.length > 0 && dims && dims.width > 0 && dims.height > 0) {
+          // Smooth (3-tap average) + clamp pan speed so it glides, not jitters.
+          const raw = track.path
+          const smooth: number[] = []
+          for (let i = 0; i < raw.length; i++) {
+            const avg = (raw[Math.max(0, i - 1)] + raw[i] + raw[Math.min(raw.length - 1, i + 1)]) / 3
+            const clamped = i === 0 ? avg : Math.max(smooth[i - 1] - 0.08, Math.min(smooth[i - 1] + 0.08, avg))
+            smooth.push(clamped)
+          }
+          const cropW = Math.round(dims.height * 9 / 16)
+          const maxX = Math.max(0, dims.width - cropW)
+          const xAt = (cx: number) => Math.max(0, Math.min(maxX, Math.round(cx * dims.width - cropW / 2)))
+          // One timed crop command per sampled second (relative to clip start).
+          const cmds = smooth.map((cx, i) => `${(i * step).toFixed(2)} crop x ${xAt(cx)};`).join('\n') + '\n'
+          await fs.promises.writeFile(path.join(workDir, 'crop.cmd'), cmds)
+          cleanArgs = [
+            '-ss', input.startSeconds.toFixed(3), '-probesize', '50M', '-analyzeduration', '10M',
+            '-i', sourcePath, '-t', duration.toFixed(3),
+            '-vf', `sendcmd=f=crop.cmd,crop=w=${cropW}:h=${dims.height}:x=${xAt(smooth[0])}:y=0,scale=1080:1920,setsar=1`,
+            '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '22', '-pix_fmt', 'yuv420p',
+            '-c:a', 'aac', '-b:a', '128k', '-movflags', '+faststart', '-y', cleanPath,
+          ]
+          logInfo('eclip: tracking crop', { itemId: input.itemId, frames: N, width: dims.width, height: dims.height })
+        }
+      }
+    } catch (err) {
+      logInfo('eclip: tracking skipped, safe framing', { itemId: input.itemId, error: errMsg(err) })
+    }
+
+    // Full-bleed CENTER crop — the "no bars" fallback whenever we don't
+    // have a confident track. Always a proper 9:16 crop, never a letterbox
+    // or blurred-bar frame. This is what standard social clips look like.
+    const centerCropArgs = (): string[] => [
+      '-ss', input.startSeconds.toFixed(3), '-probesize', '50M', '-analyzeduration', '10M',
+      '-i', sourcePath, '-t', duration.toFixed(3),
+      '-vf', fullBleedCropFilter(0.5),
       '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '22', '-pix_fmt', 'yuv420p',
       '-c:a', 'aac', '-b:a', '128k', '-movflags', '+faststart', '-y', cleanPath,
     ]
+    if (!cleanArgs) cleanArgs = centerCropArgs()
+
+    // Render ladder — NEVER a letterbox: tracking crop → full-bleed center
+    // crop → (only if ffmpeg can't crop at all) a raw cut as a last resort.
     let vertical = true
     try {
       await runFfmpeg(cleanArgs, { cwd: workDir })
     } catch (err) {
-      // No vertical framing available — fall back to a raw horizontal
-      // cut. Captions can't be burned on that, but a clip still exists.
-      logInfo('eclip: vertical failed, raw cut fallback', { itemId: input.itemId, error: errMsg(err) })
-      vertical = false
-      await runFfmpeg([
-        '-ss', input.startSeconds.toFixed(3), '-probesize', '50M', '-analyzeduration', '10M',
-        '-i', sourcePath, '-t', duration.toFixed(3), '-c', 'copy', '-movflags', '+faststart', '-y', cleanPath,
-      ])
+      logInfo('eclip: primary crop failed, trying center crop', { itemId: input.itemId, error: errMsg(err) })
+      try {
+        await runFfmpeg(centerCropArgs(), { cwd: workDir })
+      } catch (err2) {
+        logInfo('eclip: center crop failed, raw cut fallback', { itemId: input.itemId, error: errMsg(err2) })
+        vertical = false
+        await runFfmpeg([
+          '-ss', input.startSeconds.toFixed(3), '-probesize', '50M', '-analyzeduration', '10M',
+          '-i', sourcePath, '-t', duration.toFixed(3), '-c', 'copy', '-movflags', '+faststart', '-y', cleanPath,
+        ])
+      }
     }
     if (!fs.existsSync(cleanPath) || fs.statSync(cleanPath).size === 0) throw new Error('clip_no_output')
 
     const folder = `/slate-clips/${input.songId}/${input.itemId}`
+    // Ensure the target folder exists before uploading. Dropbox's upload
+    // API requires parent folders to exist; attempting to upload to a
+    // non-existent path returns 409 path/no_write_permission.
+    const { createFolder } = await import('./dropbox')
+    const folderRes = await createFolder(folder)
+    if (!folderRes.ok && folderRes.error) {
+      logError('eclip: failed to create dropbox folder', { itemId: input.itemId, folder, error: folderRes.error })
+      throw new Error(folderRes.error)
+    }
     const cleanUp = await uploadFile(folder, `clean-v${version}.mp4`, await fs.promises.readFile(cleanPath))
     if (!cleanUp.ok || !cleanUp.path) throw new Error(cleanUp.error || 'dropbox_upload_failed')
 
@@ -789,6 +902,14 @@ export async function reburnClipCaptions(args: {
     if (!fs.existsSync(outPath) || fs.statSync(outPath).size === 0) throw new Error('reburn_no_output')
 
     const folder = `/slate-clips/${args.songId}/${args.itemId}`
+    // Ensure the target folder exists before uploading. While it should
+    // exist from the original clip creation, check anyway for safety.
+    const { createFolder } = await import('./dropbox')
+    const folderRes = await createFolder(folder)
+    if (!folderRes.ok && folderRes.error) {
+      logError('reburn: failed to create dropbox folder', { itemId: args.itemId, folder, error: folderRes.error })
+      throw new Error(folderRes.error)
+    }
     const up = await uploadFile(folder, `v${args.version}.mp4`, await fs.promises.readFile(outPath))
     if (!up.ok || !up.path) throw new Error(up.error || 'dropbox_upload_failed')
     logInfo('eclip: re-burned captions', { itemId: args.itemId, version: args.version })

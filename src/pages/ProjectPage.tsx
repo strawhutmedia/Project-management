@@ -64,6 +64,16 @@ export default function ProjectPage() {
     }
   }, [project?.kind])
 
+  // Live-refresh while any episode is still processing, so the page
+  // updates itself (Processing → Ready) without a manual reload.
+  useEffect(() => {
+    const list = (project?.songs ?? []) as unknown as Array<{ processingState?: string | null }>
+    const anyProcessing = list.some((s) => s.processingState === 'processing')
+    if (!anyProcessing) return
+    const id = setInterval(() => { void reload() }, 15_000)
+    return () => clearInterval(id)
+  }, [project])
+
   if (error) {
     return (
       <div className="text-muted">
@@ -763,11 +773,13 @@ function UploadEpisodeDialog({
         </label>
 
         <div className="rounded-lg border border-line/40 bg-ink/30 p-3 text-[11px] text-muted space-y-1">
-          <div><span className="text-stage-stems font-bold">What happens next:</span></div>
-          <div>1. Slate transcribes via Deepgram (~5–15 min for an hour episode)</div>
-          <div>2. Claude writes the daily social plan from the transcript</div>
-          <div>3. OpusClip generates short clips from the video</div>
-          <div className="pt-1 text-muted/70">The episode appears in this list as "Processing…" and flips to "Ready" when done.</div>
+          <div><span className="text-stage-stems font-bold">What happens next (all automatic):</span></div>
+          <div>1. Slate transcribes the video (~5–15 min for an hour episode)</div>
+          <div>2. It picks the strongest moments for this show from the transcript</div>
+          <div>3. It cuts 7–15 vertical clips with captions — right here in Slate</div>
+          <div className="pt-1 text-muted/70">
+            The episode shows a pulsing “Transcribing + cutting clips…” tag and flips to “Ready” on its own — the page refreshes itself, no need to reload. Clips land in the episode’s Clips panel.
+          </div>
         </div>
 
         {error && <p className="text-urgent text-sm">{error}</p>}
@@ -897,13 +909,19 @@ function QuickTranscriptDialog({
 
 function ProcessingPill({ state }: { state: 'processing' | 'ready' | 'posted' }) {
   const styles: Record<typeof state, { label: string; cls: string }> = {
-    processing: { label: '⏳ Processing…', cls: 'text-stage-mastering border-stage-mastering/40 bg-stage-mastering/10' },
-    ready:      { label: '✓ Ready',         cls: 'text-stage-stems border-stage-stems/40 bg-stage-stems/10' },
-    posted:     { label: '🚀 Posted',       cls: 'text-emerald-300 border-emerald-400/40 bg-emerald-400/10' },
+    processing: { label: 'Transcribing + cutting clips…', cls: 'text-stage-mastering border-stage-mastering/40 bg-stage-mastering/10' },
+    ready:      { label: '✓ Ready',   cls: 'text-stage-stems border-stage-stems/40 bg-stage-stems/10' },
+    posted:     { label: '🚀 Posted', cls: 'text-emerald-300 border-emerald-400/40 bg-emerald-400/10' },
   }
   const s = styles[state]
   return (
-    <span className={`inline-flex items-center text-[10px] uppercase tracking-wider font-bold rounded-full px-2 py-0.5 border ${s.cls}`}>
+    <span
+      className={`inline-flex items-center gap-1.5 text-[10px] uppercase tracking-wider font-bold rounded-full px-2 py-0.5 border ${s.cls}`}
+      title={state === 'processing' ? 'Slate is transcribing, picking moments, and cutting clips. This can take ~5–15 min. The page refreshes itself.' : undefined}
+    >
+      {state === 'processing' && (
+        <span className="w-1.5 h-1.5 rounded-full bg-stage-mastering animate-pulse" />
+      )}
       {s.label}
     </span>
   )
