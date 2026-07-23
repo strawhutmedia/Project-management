@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-07-23T17:27:27.567Z",
+  "generatedAt": "2026-07-23T17:32:27.598Z",
   "note": "Read-only operational snapshot. Emails are masked; no full contact list is stored here.",
   "summary": {
     "showsWithOutreach": 1,
@@ -53,21 +53,21 @@
           {
             "name": "Kendall Washington",
             "emailMasked": "k***@underscoretalent.com",
-            "daysSinceFirstEmail": 7,
+            "daysSinceFirstEmail": 8,
             "opened": false,
             "openCount": 0
           },
           {
             "name": "Coye Simmons",
             "emailMasked": "c***@gmail.com",
-            "daysSinceFirstEmail": 7,
+            "daysSinceFirstEmail": 8,
             "opened": false,
             "openCount": 0
           },
           {
             "name": "Olandria Carthen",
             "emailMasked": "i***@align-pr.com",
-            "daysSinceFirstEmail": 7,
+            "daysSinceFirstEmail": 8,
             "opened": false,
             "openCount": 0
           },
