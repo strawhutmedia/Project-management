@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-07-23T19:17:28.040Z",
+  "generatedAt": "2026-07-23T19:22:28.067Z",
   "note": "Read-only operational snapshot. Emails are masked; no full contact list is stored here.",
   "summary": {
     "showsWithOutreach": 1,
@@ -403,14 +403,14 @@
           {
             "name": "Leah Kateb",
             "emailMasked": "l***@unitedtalent.com",
-            "daysSinceFirstEmail": 7,
+            "daysSinceFirstEmail": 8,
             "opened": false,
             "openCount": 0
           },
           {
             "name": "Paul George",
             "emailMasked": "p***@podwallentertainment.com",
-            "daysSinceFirstEmail": 7,
+            "daysSinceFirstEmail": 8,
             "opened": false,
             "openCount": 0
           },
