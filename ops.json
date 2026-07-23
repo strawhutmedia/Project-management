@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-07-23T17:17:27.580Z",
+  "generatedAt": "2026-07-23T17:22:27.546Z",
   "note": "Read-only operational snapshot. Emails are masked; no full contact list is stored here.",
   "summary": {
     "showsWithOutreach": 1,
@@ -32,7 +32,7 @@
           {
             "name": "Emily",
             "emailMasked": "e***@emilyblairmedia.com",
-            "daysSinceFirstEmail": 7,
+            "daysSinceFirstEmail": 8,
             "opened": false,
             "openCount": 0
           },
