@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-07-23T21:02:28.395Z",
+  "generatedAt": "2026-07-23T21:07:28.413Z",
   "note": "Read-only operational snapshot. Emails are masked; no full contact list is stored here.",
   "summary": {
     "showsWithOutreach": 1,
@@ -585,14 +585,14 @@
           {
             "name": "Taylor Smith",
             "emailMasked": "k***@gmail.com",
-            "daysSinceFirstEmail": 6,
+            "daysSinceFirstEmail": 7,
             "opened": false,
             "openCount": 0
           },
           {
             "name": "Carsten \"Bergie\" Bergersen",
             "emailMasked": "b***@theazureagency.com",
-            "daysSinceFirstEmail": 6,
+            "daysSinceFirstEmail": 7,
             "opened": false,
             "openCount": 0
           },
