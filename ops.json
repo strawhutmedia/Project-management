@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-07-23T18:52:27.930Z",
+  "generatedAt": "2026-07-23T18:57:27.995Z",
   "note": "Read-only operational snapshot. Emails are masked; no full contact list is stored here.",
   "summary": {
     "showsWithOutreach": 1,
@@ -319,14 +319,14 @@
           {
             "name": "Harry Jowsey",
             "emailMasked": "c***@align-pr.com",
-            "daysSinceFirstEmail": 7,
+            "daysSinceFirstEmail": 8,
             "opened": false,
             "openCount": 0
           },
           {
             "name": "Madison Stewart",
             "emailMasked": "m***@align-pr.com",
-            "daysSinceFirstEmail": 7,
+            "daysSinceFirstEmail": 8,
             "opened": false,
             "openCount": 0
           },
