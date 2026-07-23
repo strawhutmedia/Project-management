@@ -150,6 +150,10 @@ export function startScheduler() {
         await checkOverdue()
         await checkStuckDigest()
       })
+      // Refresh the read-only ops snapshot (ops.json on the status branch) so
+      // operational state stays current for anyone reading the repo. Best-effort
+      // and self-contained — never fails the tick.
+      await import('./ops').then(({ reportOps }) => reportOps()).catch(() => {})
     } catch (err) {
       const errMsg = err instanceof Error ? err.message : String(err)
       // Only log as error if it's not a transient DNS issue

@@ -210,6 +210,7 @@ async function start() {
     scheduleBootResendProbe()
     scheduleBootBiyaScriptDump()
     void reportStatus()
+    void import('./ops').then(({ reportOps }) => { void reportOps() })
     startScheduler()
     startOutreachSendLoop()
     void enableDomainOpenTracking()
