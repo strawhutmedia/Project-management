@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-07-23T19:22:28.067Z",
+  "generatedAt": "2026-07-23T19:27:28.071Z",
   "note": "Read-only operational snapshot. Emails are masked; no full contact list is stored here.",
   "summary": {
     "showsWithOutreach": 1,
@@ -417,21 +417,21 @@
           {
             "name": "Sophie Bressler",
             "emailMasked": "s***@night.co",
-            "daysSinceFirstEmail": 7,
+            "daysSinceFirstEmail": 8,
             "opened": false,
             "openCount": 0
           },
           {
             "name": "Aaron Evans",
             "emailMasked": "m***@smallscreenmarketing.com",
-            "daysSinceFirstEmail": 7,
+            "daysSinceFirstEmail": 8,
             "opened": false,
             "openCount": 0
           },
           {
             "name": "Sherman Davis",
             "emailMasked": "s***@debonairlawgroup.com",
-            "daysSinceFirstEmail": 7,
+            "daysSinceFirstEmail": 8,
             "opened": false,
             "openCount": 0
           },
