@@ -1,0 +1,652 @@
+{
+  "generatedAt": "2026-07-23T14:52:26.934Z",
+  "note": "Read-only operational snapshot. Emails are masked; no full contact list is stored here.",
+  "summary": {
+    "showsWithOutreach": 1,
+    "totalEligibleForFollowup": 88,
+    "totalFollowupQueued": 0,
+    "totalFollowupSent": 0
+  },
+  "shows": [
+    {
+      "projectId": "c3227529-8bc9-43d9-995f-5d65a7bdbf9c",
+      "name": "Private Talk",
+      "outreach": {
+        "total": 88,
+        "needsEmail": 0,
+        "ready": 0,
+        "queued": 0,
+        "sent": 88,
+        "replied": 0,
+        "bounced": 0,
+        "optedOut": 0,
+        "failed": 0
+      },
+      "followup": {
+        "minDaysUsed": 4,
+        "eligibleNow": 88,
+        "queued": 0,
+        "alreadySent": 0,
+        "truncated": false,
+        "people": [
+          {
+            "name": "Emily",
+            "emailMasked": "e***@emilyblairmedia.com",
+            "daysSinceFirstEmail": 7,
+            "opened": false,
+            "openCount": 0
+          },
+          {
+            "name": "Jeremiah Brown",
+            "emailMasked": "n***@latalent.com",
+            "daysSinceFirstEmail": 7,
+            "opened": false,
+            "openCount": 0
+          },
+          {
+            "name": "GIanni",
+            "emailMasked": "g***@weareverified.co",
+            "daysSinceFirstEmail": 7,
+            "opened": false,
+            "openCount": 0
+          },
+          {
+            "name": "Kendall Washington",
+            "emailMasked": "k***@underscoretalent.com",
+            "daysSinceFirstEmail": 7,
+            "opened": false,
+            "openCount": 0
+          },
+          {
+            "name": "Coye Simmons",
+            "emailMasked": "c***@gmail.com",
+            "daysSinceFirstEmail": 7,
+            "opened": false,
+            "openCount": 0
+          },
+          {
+            "name": "Olandria Carthen",
+            "emailMasked": "i***@align-pr.com",
+            "daysSinceFirstEmail": 7,
+            "opened": false,
+            "openCount": 0
+          },
+          {
+            "name": "Olandria Carthen",
+            "emailMasked": "t***@unitedtalent.com",
+            "daysSinceFirstEmail": 7,
+            "opened": false,
+            "openCount": 0
+          },
+          {
+            "name": "Nicolas Vansteenberghe",
+            "emailMasked": "v***@caa.com",
+            "daysSinceFirstEmail": 7,
+            "opened": false,
+            "openCount": 0
+          },
+          {
+            "name": "Benjamin Gaynor",
+            "emailMasked": "b***@wishlabinc.com",
+            "daysSinceFirstEmail": 7,
+            "opened": false,
+            "openCount": 0
+          },
+          {
+            "name": "Sharron Townsend",
+            "emailMasked": "s***@gmail.com",
+            "daysSinceFirstEmail": 7,
+            "opened": false,
+            "openCount": 0
+          },
+          {
+            "name": "Huda Mustafa",
+            "emailMasked": "h***@hudamustafaofficial.com",
+            "daysSinceFirstEmail": 7,
+            "opened": false,
+            "openCount": 0
+          },
+          {
+            "name": "Francesca Farago",
+            "emailMasked": "f***@weareverified.co",
+            "daysSinceFirstEmail": 7,
+            "opened": false,
+            "openCount": 0
+          },
+          {
+            "name": "Samantha Jewel",
+            "emailMasked": "s***@playmgmt.com",
+            "daysSinceFirstEmail": 7,
+            "opened": false,
+            "openCount": 0
+          },
+          {
+            "name": "Gabriel Vasconcelos",
+            "emailMasked": "i***@gabrielvasconcelos.com",
+            "daysSinceFirstEmail": 7,
+            "opened": false,
+            "openCount": 0
+          },
+          {
+            "name": "Jeremiah Brown",
+            "emailMasked": "f***@select.co",
+            "daysSinceFirstEmail": 7,
+            "opened": false,
+            "openCount": 0
+          },
+          {
+            "name": "Kori Sampson",
+            "emailMasked": "c***@fortetalentgroup.com",
+            "daysSinceFirstEmail": 7,
+            "opened": false,
+            "openCount": 0
+          },
+          {
+            "name": "Ace Greene",
+            "emailMasked": "e***@amprgroup.com",
+            "daysSinceFirstEmail": 7,
+            "opened": false,
+            "openCount": 0
+          },
+          {
+            "name": "Kaylor Martin",
+            "emailMasked": "a***@nymmg.com",
+            "daysSinceFirstEmail": 7,
+            "opened": false,
+            "openCount": 0
+          },
+          {
+            "name": "Terri Tex",
+            "emailMasked": "t***@sparkleagency.org",
+            "daysSinceFirstEmail": 7,
+            "opened": false,
+            "openCount": 0
+          },
+          {
+            "name": "Sherman Davis",
+            "emailMasked": "s***@debonairlawgroup.com",
+            "daysSinceFirstEmail": 7,
+            "opened": false,
+            "openCount": 0
+          },
+          {
+            "name": "Gianni Pasciuto",
+            "emailMasked": "g***@weareverified.co",
+            "daysSinceFirstEmail": 7,
+            "opened": false,
+            "openCount": 0
+          },
+          {
+            "name": "David Birtwistle",
+            "emailMasked": "s***@debonairlawgroup.com",
+            "daysSinceFirstEmail": 7,
+            "opened": false,
+            "openCount": 0
+          },
+          {
+            "name": "Bryce Dettloff",
+            "emailMasked": "i***@brycealakai.com",
+            "daysSinceFirstEmail": 7,
+            "opened": false,
+            "openCount": 0
+          },
+          {
+            "name": "Harriette Feliz",
+            "emailMasked": "h***@ariseaa.com",
+            "daysSinceFirstEmail": 7,
+            "opened": false,
+            "openCount": 0
+          },
+          {
+            "name": "Sherman Davis",
+            "emailMasked": "s***@debonairlawgroup.com",
+            "daysSinceFirstEmail": 7,
+            "opened": false,
+            "openCount": 0
+          },
+          {
+            "name": "Kordell Beckham",
+            "emailMasked": "k***@caa.com",
+            "daysSinceFirstEmail": 7,
+            "opened": false,
+            "openCount": 0
+          },
+          {
+            "name": "Jeremiah Brown",
+            "emailMasked": "j***@select.co",
+            "daysSinceFirstEmail": 7,
+            "opened": false,
+            "openCount": 0
+          },
+          {
+            "name": "Pepe Garcia",
+            "emailMasked": "p***@weareverified.co",
+            "daysSinceFirstEmail": 7,
+            "opened": false,
+            "openCount": 0
+          },
+          {
+            "name": "Harry Jowsey",
+            "emailMasked": "i***@harryjowsey.com",
+            "daysSinceFirstEmail": 7,
+            "opened": false,
+            "openCount": 0
+          },
+          {
+            "name": "Jalen Brown",
+            "emailMasked": "t***@thisisamplifytalent.com",
+            "daysSinceFirstEmail": 7,
+            "opened": false,
+            "openCount": 0
+          },
+          {
+            "name": "Zoe Berman",
+            "emailMasked": "z***@gersh.com",
+            "daysSinceFirstEmail": 7,
+            "opened": false,
+            "openCount": 0
+          },
+          {
+            "name": "Caleb McDaniel",
+            "emailMasked": "c***@yahoo.com",
+            "daysSinceFirstEmail": 7,
+            "opened": false,
+            "openCount": 0
+          },
+          {
+            "name": "Tori Lopez",
+            "emailMasked": "t***@soxvla.com",
+            "daysSinceFirstEmail": 7,
+            "opened": false,
+            "openCount": 0
+          },
+          {
+            "name": "Jen Terry",
+            "emailMasked": "t***@motive-la.com",
+            "daysSinceFirstEmail": 7,
+            "opened": false,
+            "openCount": 0
+          },
+          {
+            "name": "Adam Loria",
+            "emailMasked": "a***@night.co",
+            "daysSinceFirstEmail": 7,
+            "opened": false,
+            "openCount": 0
+          },
+          {
+            "name": "Amaya Espinal",
+            "emailMasked": "a***@untitledent.com",
+            "daysSinceFirstEmail": 7,
+            "opened": false,
+            "openCount": 0
+          },
+          {
+            "name": "Trinity Tatum",
+            "emailMasked": "s***@gmail.com",
+            "daysSinceFirstEmail": 7,
+            "opened": false,
+            "openCount": 0
+          },
+          {
+            "name": "Jen Terry",
+            "emailMasked": "j***@gmail.com",
+            "daysSinceFirstEmail": 7,
+            "opened": false,
+            "openCount": 0
+          },
+          {
+            "name": "Jenna Wolf",
+            "emailMasked": "j***@weareverified.co",
+            "daysSinceFirstEmail": 7,
+            "opened": false,
+            "openCount": 0
+          },
+          {
+            "name": "Erica Barry",
+            "emailMasked": "e***@unitedtalent.com",
+            "daysSinceFirstEmail": 7,
+            "opened": false,
+            "openCount": 0
+          },
+          {
+            "name": "Jennifer Hyde",
+            "emailMasked": "j***@gersh.com",
+            "daysSinceFirstEmail": 7,
+            "opened": false,
+            "openCount": 0
+          },
+          {
+            "name": "Harry Jowsey",
+            "emailMasked": "c***@align-pr.com",
+            "daysSinceFirstEmail": 7,
+            "opened": false,
+            "openCount": 0
+          },
+          {
+            "name": "Madison Stewart",
+            "emailMasked": "m***@align-pr.com",
+            "daysSinceFirstEmail": 7,
+            "opened": false,
+            "openCount": 0
+          },
+          {
+            "name": "Sherman Davis",
+            "emailMasked": "s***@debonairlawgroup.com",
+            "daysSinceFirstEmail": 7,
+            "opened": false,
+            "openCount": 0
+          },
+          {
+            "name": "Vivian Fullerlove",
+            "emailMasked": "v***@vlfmediaandpromotions.com",
+            "daysSinceFirstEmail": 7,
+            "opened": false,
+            "openCount": 0
+          },
+          {
+            "name": "Sherman Davis",
+            "emailMasked": "s***@debonairlawgroup.com",
+            "daysSinceFirstEmail": 7,
+            "opened": false,
+            "openCount": 0
+          },
+          {
+            "name": "Iris Kendall",
+            "emailMasked": "t***@wmeagency.com",
+            "daysSinceFirstEmail": 7,
+            "opened": false,
+            "openCount": 0
+          },
+          {
+            "name": "Kelechi Kelz Dyke",
+            "emailMasked": "d***@gmail.com",
+            "daysSinceFirstEmail": 7,
+            "opened": false,
+            "openCount": 0
+          },
+          {
+            "name": "Jessica Lee",
+            "emailMasked": "j***@caa.com",
+            "daysSinceFirstEmail": 7,
+            "opened": false,
+            "openCount": 0
+          },
+          {
+            "name": "Chloe Veitch",
+            "emailMasked": "c***@ingenuity.live",
+            "daysSinceFirstEmail": 7,
+            "opened": false,
+            "openCount": 0
+          },
+          {
+            "name": "Heather Weiss-Besignano",
+            "emailMasked": "h***@icon-publicity.com",
+            "daysSinceFirstEmail": 7,
+            "opened": false,
+            "openCount": 0
+          },
+          {
+            "name": "Ace Greene",
+            "emailMasked": "c***@realacegreene.com",
+            "daysSinceFirstEmail": 7,
+            "opened": false,
+            "openCount": 0
+          },
+          {
+            "name": "Belle-A Walker",
+            "emailMasked": "i***@gmail.com",
+            "daysSinceFirstEmail": 7,
+            "opened": false,
+            "openCount": 0
+          },
+          {
+            "name": "Leah Kateb",
+            "emailMasked": "l***@unitedtalent.com",
+            "daysSinceFirstEmail": 7,
+            "opened": false,
+            "openCount": 0
+          },
+          {
+            "name": "Paul George",
+            "emailMasked": "p***@podwallentertainment.com",
+            "daysSinceFirstEmail": 7,
+            "opened": false,
+            "openCount": 0
+          },
+          {
+            "name": "Sophie Bressler",
+            "emailMasked": "s***@night.co",
+            "daysSinceFirstEmail": 7,
+            "opened": false,
+            "openCount": 0
+          },
+          {
+            "name": "Aaron Evans",
+            "emailMasked": "m***@smallscreenmarketing.com",
+            "daysSinceFirstEmail": 7,
+            "opened": false,
+            "openCount": 0
+          },
+          {
+            "name": "Sherman Davis",
+            "emailMasked": "s***@debonairlawgroup.com",
+            "daysSinceFirstEmail": 7,
+            "opened": false,
+            "openCount": 0
+          },
+          {
+            "name": "Zack Teperman",
+            "emailMasked": "z***@ztpr.net",
+            "daysSinceFirstEmail": 7,
+            "opened": false,
+            "openCount": 0
+          },
+          {
+            "name": "Jade Caucci",
+            "emailMasked": "j***@align-pr.com",
+            "daysSinceFirstEmail": 7,
+            "opened": false,
+            "openCount": 0
+          },
+          {
+            "name": "Nicole O'Brien",
+            "emailMasked": "a***@abdlents.com",
+            "daysSinceFirstEmail": 7,
+            "opened": false,
+            "openCount": 0
+          },
+          {
+            "name": "Olandria Carthen",
+            "emailMasked": "o***@gmail.com",
+            "daysSinceFirstEmail": 7,
+            "opened": false,
+            "openCount": 0
+          },
+          {
+            "name": "Alex Holt",
+            "emailMasked": "a***@gersh.com",
+            "daysSinceFirstEmail": 7,
+            "opened": false,
+            "openCount": 0
+          },
+          {
+            "name": "Bryan Arenales",
+            "emailMasked": "b***@slashmgmt.com",
+            "daysSinceFirstEmail": 7,
+            "opened": false,
+            "openCount": 0
+          },
+          {
+            "name": "Steven Grossman",
+            "emailMasked": "s***@untitledent.com",
+            "daysSinceFirstEmail": 7,
+            "opened": false,
+            "openCount": 0
+          },
+          {
+            "name": "Sherman Davis",
+            "emailMasked": "s***@debonairlawgroup.com",
+            "daysSinceFirstEmail": 7,
+            "opened": false,
+            "openCount": 0
+          },
+          {
+            "name": "Yulissa Escobar",
+            "emailMasked": "y***@gmail.com",
+            "daysSinceFirstEmail": 7,
+            "opened": false,
+            "openCount": 0
+          },
+          {
+            "name": "Taylor Williams",
+            "emailMasked": "t***@select.co",
+            "daysSinceFirstEmail": 7,
+            "opened": false,
+            "openCount": 0
+          },
+          {
+            "name": "Malcolm Roberson",
+            "emailMasked": "m***@persona-pr.com",
+            "daysSinceFirstEmail": 7,
+            "opened": false,
+            "openCount": 0
+          },
+          {
+            "name": "Rob",
+            "emailMasked": "r***@hotmail.com",
+            "daysSinceFirstEmail": 6,
+            "opened": false,
+            "openCount": 0
+          },
+          {
+            "name": "Kenzo Nudo",
+            "emailMasked": "c***@gmail.com",
+            "daysSinceFirstEmail": 6,
+            "opened": false,
+            "openCount": 0
+          },
+          {
+            "name": "Destiny Davis",
+            "emailMasked": "d***@gmail.com",
+            "daysSinceFirstEmail": 6,
+            "opened": false,
+            "openCount": 0
+          },
+          {
+            "name": "Keenan Anunay",
+            "emailMasked": "k***@gmail.com",
+            "daysSinceFirstEmail": 6,
+            "opened": false,
+            "openCount": 0
+          },
+          {
+            "name": "Greg Metelus",
+            "emailMasked": "m***@gmail.com",
+            "daysSinceFirstEmail": 6,
+            "opened": false,
+            "openCount": 0
+          },
+          {
+            "name": "Marco Donatelli",
+            "emailMasked": "j***@freedomunitedsocial.com",
+            "daysSinceFirstEmail": 6,
+            "opened": false,
+            "openCount": 0
+          },
+          {
+            "name": "Scott van-der-Sluis",
+            "emailMasked": "n***@ballmgmt.co.uk",
+            "daysSinceFirstEmail": 6,
+            "opened": false,
+            "openCount": 0
+          },
+          {
+            "name": "Johnnie Olivia",
+            "emailMasked": "j***@theazureagency.com",
+            "daysSinceFirstEmail": 6,
+            "opened": false,
+            "openCount": 0
+          },
+          {
+            "name": "Kelly",
+            "emailMasked": "k***@kellykpr.com",
+            "daysSinceFirstEmail": 6,
+            "opened": false,
+            "openCount": 0
+          },
+          {
+            "name": "Marco Donatelli",
+            "emailMasked": "m***@rewiredtalent.com",
+            "daysSinceFirstEmail": 6,
+            "opened": false,
+            "openCount": 0
+          },
+          {
+            "name": "Taylor Smith",
+            "emailMasked": "k***@gmail.com",
+            "daysSinceFirstEmail": 6,
+            "opened": false,
+            "openCount": 0
+          },
+          {
+            "name": "Carsten \"Bergie\" Bergersen",
+            "emailMasked": "b***@theazureagency.com",
+            "daysSinceFirstEmail": 6,
+            "opened": false,
+            "openCount": 0
+          },
+          {
+            "name": "Hannah Wright",
+            "emailMasked": "j***@jbsocialgroup.com",
+            "daysSinceFirstEmail": 6,
+            "opened": false,
+            "openCount": 0
+          },
+          {
+            "name": "Leonardo Dionicio",
+            "emailMasked": "c***@leonardodionicio.com",
+            "daysSinceFirstEmail": 6,
+            "opened": false,
+            "openCount": 0
+          },
+          {
+            "name": "Kassy Castillo",
+            "emailMasked": "c***@kassyc.com",
+            "daysSinceFirstEmail": 6,
+            "opened": false,
+            "openCount": 0
+          },
+          {
+            "name": "CJ Franco",
+            "emailMasked": "m***@cjfranco.us",
+            "daysSinceFirstEmail": 6,
+            "opened": false,
+            "openCount": 0
+          },
+          {
+            "name": "Casey Johnson",
+            "emailMasked": "t***@wilhelmina.com",
+            "daysSinceFirstEmail": 6,
+            "opened": false,
+            "openCount": 0
+          },
+          {
+            "name": "Carmen Kocourek",
+            "emailMasked": "c***@dulcedo.com",
+            "daysSinceFirstEmail": 6,
+            "opened": false,
+            "openCount": 0
+          },
+          {
+            "name": "Sarah Emig",
+            "emailMasked": "e***@gmail.com",
+            "daysSinceFirstEmail": 6,
+            "opened": false,
+            "openCount": 0
+          }
+        ]
+      }
+    }
+  ]
+}
