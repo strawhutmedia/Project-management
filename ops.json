@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-07-24T18:32:30.946Z",
+  "generatedAt": "2026-07-24T18:37:30.957Z",
   "note": "Read-only operational snapshot. Emails are masked; no full contact list is stored here.",
   "summary": {
     "showsWithOutreach": 1,
@@ -256,14 +256,14 @@
           {
             "name": "Tori Lopez",
             "emailMasked": "t***@soxvla.com",
-            "daysSinceFirstEmail": 8,
+            "daysSinceFirstEmail": 9,
             "opened": false,
             "openCount": 0
           },
           {
             "name": "Jen Terry",
             "emailMasked": "t***@motive-la.com",
-            "daysSinceFirstEmail": 8,
+            "daysSinceFirstEmail": 9,
             "opened": false,
             "openCount": 0
           },
