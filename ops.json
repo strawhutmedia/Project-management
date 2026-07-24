@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-07-24T18:07:30.930Z",
+  "generatedAt": "2026-07-24T18:12:30.941Z",
   "note": "Read-only operational snapshot. Emails are masked; no full contact list is stored here.",
   "summary": {
     "showsWithOutreach": 1,
@@ -179,14 +179,14 @@
           {
             "name": "David Birtwistle",
             "emailMasked": "s***@debonairlawgroup.com",
-            "daysSinceFirstEmail": 8,
+            "daysSinceFirstEmail": 9,
             "opened": false,
             "openCount": 0
           },
           {
             "name": "Bryce Dettloff",
             "emailMasked": "i***@brycealakai.com",
-            "daysSinceFirstEmail": 8,
+            "daysSinceFirstEmail": 9,
             "opened": false,
             "openCount": 0
           },
