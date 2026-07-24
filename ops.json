@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-07-24T18:42:30.949Z",
+  "generatedAt": "2026-07-24T18:47:30.955Z",
   "note": "Read-only operational snapshot. Emails are masked; no full contact list is stored here.",
   "summary": {
     "showsWithOutreach": 1,
@@ -291,14 +291,14 @@
           {
             "name": "Jen Terry",
             "emailMasked": "j***@gmail.com",
-            "daysSinceFirstEmail": 8,
+            "daysSinceFirstEmail": 9,
             "opened": false,
             "openCount": 0
           },
           {
             "name": "Jenna Wolf",
             "emailMasked": "j***@weareverified.co",
-            "daysSinceFirstEmail": 8,
+            "daysSinceFirstEmail": 9,
             "opened": false,
             "openCount": 0
           },
