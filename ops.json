@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-07-25T21:17:34.682Z",
+  "generatedAt": "2026-07-25T21:22:34.678Z",
   "note": "Read-only operational snapshot. Emails are masked; no full contact list is stored here.",
   "summary": {
     "showsWithOutreach": 1,
@@ -634,14 +634,14 @@
           {
             "name": "Carmen Kocourek",
             "emailMasked": "c***@dulcedo.com",
-            "daysSinceFirstEmail": 8,
+            "daysSinceFirstEmail": 9,
             "opened": false,
             "openCount": 0
           },
           {
             "name": "Sarah Emig",
             "emailMasked": "e***@gmail.com",
-            "daysSinceFirstEmail": 8,
+            "daysSinceFirstEmail": 9,
             "opened": false,
             "openCount": 0
           }
