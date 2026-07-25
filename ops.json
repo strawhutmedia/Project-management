@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-07-25T19:27:34.619Z",
+  "generatedAt": "2026-07-25T19:32:34.611Z",
   "note": "Read-only operational snapshot. Emails are masked; no full contact list is stored here.",
   "summary": {
     "showsWithOutreach": 1,
@@ -438,14 +438,14 @@
           {
             "name": "Zack Teperman",
             "emailMasked": "z***@ztpr.net",
-            "daysSinceFirstEmail": 9,
+            "daysSinceFirstEmail": 10,
             "opened": false,
             "openCount": 0
           },
           {
             "name": "Jade Caucci",
             "emailMasked": "j***@align-pr.com",
-            "daysSinceFirstEmail": 9,
+            "daysSinceFirstEmail": 10,
             "opened": false,
             "openCount": 0
           },
