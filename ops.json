@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-07-25T18:02:34.560Z",
+  "generatedAt": "2026-07-25T18:07:34.551Z",
   "note": "Read-only operational snapshot. Emails are masked; no full contact list is stored here.",
   "summary": {
     "showsWithOutreach": 1,
@@ -158,21 +158,21 @@
           {
             "name": "Terri Tex",
             "emailMasked": "t***@sparkleagency.org",
-            "daysSinceFirstEmail": 9,
+            "daysSinceFirstEmail": 10,
             "opened": false,
             "openCount": 0
           },
           {
             "name": "Sherman Davis",
             "emailMasked": "s***@debonairlawgroup.com",
-            "daysSinceFirstEmail": 9,
+            "daysSinceFirstEmail": 10,
             "opened": false,
             "openCount": 0
           },
           {
             "name": "Gianni Pasciuto",
             "emailMasked": "g***@weareverified.co",
-            "daysSinceFirstEmail": 9,
+            "daysSinceFirstEmail": 10,
             "opened": false,
             "openCount": 0
           },
