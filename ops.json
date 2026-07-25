@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-07-25T17:37:34.522Z",
+  "generatedAt": "2026-07-25T17:42:34.535Z",
   "note": "Read-only operational snapshot. Emails are masked; no full contact list is stored here.",
   "summary": {
     "showsWithOutreach": 1,
@@ -81,21 +81,21 @@
           {
             "name": "Nicolas Vansteenberghe",
             "emailMasked": "v***@caa.com",
-            "daysSinceFirstEmail": 9,
+            "daysSinceFirstEmail": 10,
             "opened": false,
             "openCount": 0
           },
           {
             "name": "Benjamin Gaynor",
             "emailMasked": "b***@wishlabinc.com",
-            "daysSinceFirstEmail": 9,
+            "daysSinceFirstEmail": 10,
             "opened": false,
             "openCount": 0
           },
           {
             "name": "Sharron Townsend",
             "emailMasked": "s***@gmail.com",
-            "daysSinceFirstEmail": 9,
+            "daysSinceFirstEmail": 10,
             "opened": false,
             "openCount": 0
           },
