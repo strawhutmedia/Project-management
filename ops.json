@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-07-26T20:47:36.650Z",
+  "generatedAt": "2026-07-26T20:52:36.652Z",
   "note": "Read-only operational snapshot. Emails are masked; no full contact list is stored here.",
   "summary": {
     "showsWithOutreach": 1,
@@ -543,14 +543,14 @@
           {
             "name": "Greg Metelus",
             "emailMasked": "m***@gmail.com",
-            "daysSinceFirstEmail": 9,
+            "daysSinceFirstEmail": 10,
             "opened": false,
             "openCount": 0
           },
           {
             "name": "Marco Donatelli",
             "emailMasked": "j***@freedomunitedsocial.com",
-            "daysSinceFirstEmail": 9,
+            "daysSinceFirstEmail": 10,
             "opened": false,
             "openCount": 0
           },
