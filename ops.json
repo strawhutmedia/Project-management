@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-07-26T19:02:36.606Z",
+  "generatedAt": "2026-07-26T19:07:36.591Z",
   "note": "Read-only operational snapshot. Emails are masked; no full contact list is stored here.",
   "summary": {
     "showsWithOutreach": 1,
@@ -354,21 +354,21 @@
           {
             "name": "Iris Kendall",
             "emailMasked": "t***@wmeagency.com",
-            "daysSinceFirstEmail": 10,
+            "daysSinceFirstEmail": 11,
             "opened": false,
             "openCount": 0
           },
           {
             "name": "Kelechi Kelz Dyke",
             "emailMasked": "d***@gmail.com",
-            "daysSinceFirstEmail": 10,
+            "daysSinceFirstEmail": 11,
             "opened": false,
             "openCount": 0
           },
           {
             "name": "Jessica Lee",
             "emailMasked": "j***@caa.com",
-            "daysSinceFirstEmail": 10,
+            "daysSinceFirstEmail": 11,
             "opened": false,
             "openCount": 0
           },
