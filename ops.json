@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-07-26T18:17:36.543Z",
+  "generatedAt": "2026-07-26T18:22:36.547Z",
   "note": "Read-only operational snapshot. Emails are masked; no full contact list is stored here.",
   "summary": {
     "showsWithOutreach": 1,
@@ -207,21 +207,21 @@
           {
             "name": "Kordell Beckham",
             "emailMasked": "k***@caa.com",
-            "daysSinceFirstEmail": 10,
+            "daysSinceFirstEmail": 11,
             "opened": false,
             "openCount": 0
           },
           {
             "name": "Jeremiah Brown",
             "emailMasked": "j***@select.co",
-            "daysSinceFirstEmail": 10,
+            "daysSinceFirstEmail": 11,
             "opened": false,
             "openCount": 0
           },
           {
             "name": "Pepe Garcia",
             "emailMasked": "p***@weareverified.co",
-            "daysSinceFirstEmail": 10,
+            "daysSinceFirstEmail": 11,
             "opened": false,
             "openCount": 0
           },
