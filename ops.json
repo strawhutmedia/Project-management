@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-07-26T18:47:36.573Z",
+  "generatedAt": "2026-07-26T18:52:36.583Z",
   "note": "Read-only operational snapshot. Emails are masked; no full contact list is stored here.",
   "summary": {
     "showsWithOutreach": 1,
@@ -305,14 +305,14 @@
           {
             "name": "Erica Barry",
             "emailMasked": "e***@unitedtalent.com",
-            "daysSinceFirstEmail": 10,
+            "daysSinceFirstEmail": 11,
             "opened": false,
             "openCount": 0
           },
           {
             "name": "Jennifer Hyde",
             "emailMasked": "j***@gersh.com",
-            "daysSinceFirstEmail": 10,
+            "daysSinceFirstEmail": 11,
             "opened": false,
             "openCount": 0
           },
