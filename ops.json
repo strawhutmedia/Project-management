@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-07-26T19:07:36.591Z",
+  "generatedAt": "2026-07-26T19:12:36.623Z",
   "note": "Read-only operational snapshot. Emails are masked; no full contact list is stored here.",
   "summary": {
     "showsWithOutreach": 1,
@@ -375,14 +375,14 @@
           {
             "name": "Chloe Veitch",
             "emailMasked": "c***@ingenuity.live",
-            "daysSinceFirstEmail": 10,
+            "daysSinceFirstEmail": 11,
             "opened": false,
             "openCount": 0
           },
           {
             "name": "Heather Weiss-Besignano",
             "emailMasked": "h***@icon-publicity.com",
-            "daysSinceFirstEmail": 10,
+            "daysSinceFirstEmail": 11,
             "opened": false,
             "openCount": 0
           },
