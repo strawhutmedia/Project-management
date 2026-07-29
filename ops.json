@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-07-29T20:53:37.080Z",
+  "generatedAt": "2026-07-29T20:58:37.102Z",
   "note": "Read-only operational snapshot. Emails are masked; no full contact list is stored here.",
   "summary": {
     "showsWithOutreach": 1,
@@ -557,14 +557,14 @@
           {
             "name": "Scott van-der-Sluis",
             "emailMasked": "n***@ballmgmt.co.uk",
-            "daysSinceFirstEmail": 12,
+            "daysSinceFirstEmail": 13,
             "opened": false,
             "openCount": 0
           },
           {
             "name": "Johnnie Olivia",
             "emailMasked": "j***@theazureagency.com",
-            "daysSinceFirstEmail": 12,
+            "daysSinceFirstEmail": 13,
             "opened": false,
             "openCount": 0
           },
