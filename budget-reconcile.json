@@ -1,19 +1,19 @@
 {
-  "generatedAt": "2026-07-29T03:35:32.504Z",
+  "generatedAt": "2026-07-29T03:48:57.666Z",
   "note": "Diagnostic: three ways of totalling the BIYA budget, to explain why they disagree.",
   "totals": {
-    "grand": 125968,
-    "production_goalbar": 18847,
+    "grand": 320661,
+    "production_goalbar": 168668,
     "sumOfDayBudgets": 18847,
-    "directTotal_allLineItems": 108936
+    "directTotal_allLineItems": 258757
   },
   "grandBreakdown": {
-    "directTotal": 108936,
-    "oldModel_fringes": 2540,
+    "directTotal": 258757,
+    "oldModel_fringes": 25014,
     "oldModel_perDiem": 0,
     "oldModel_hotels": 0,
-    "contingency": 11148,
-    "bond": 3344
+    "contingency": 28377,
+    "bond": 8513
   },
   "perDayModel": {
     "autoDayCosts": 1911,
@@ -22,7 +22,7 @@
     "autoHotels": 0,
     "autoMileage": 0,
     "autoCrewDiscount": 0,
-    "productionLineItems": 16936
+    "productionLineItems": 166757
   },
   "settings": {
     "shootDays": 18,
@@ -50,12 +50,19 @@
     }
   },
   "byCategory": {
-    "production": 16936,
+    "production": 166757,
     "other": 15000,
     "above_line": 0,
     "post": 77000
   },
   "accounts": [
+    {
+      "code": "__day_costs__",
+      "name": "Day Costs",
+      "category": "production",
+      "total": 162534,
+      "items": 32
+    },
     {
       "code": "46-00",
       "name": "MUSIC",
@@ -76,13 +83,6 @@
       "category": "other",
       "total": 15000,
       "items": 7
-    },
-    {
-      "code": "__day_costs__",
-      "name": "Day Costs",
-      "category": "production",
-      "total": 12713,
-      "items": 32
     },
     {
       "code": "49-00",
