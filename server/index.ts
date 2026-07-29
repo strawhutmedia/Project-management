@@ -11,6 +11,7 @@ import { adminRouter } from './routes/admin'
 import { notificationsRouter } from './routes/notifications'
 import { budgetsRouter } from './routes/budgets'
 import { stripboardRouter } from './routes/stripboard'
+import { locationsRouter } from './routes/locations'
 import { transcriptsRouter } from './routes/transcripts'
 import { clipsRouter } from './routes/clips'
 import { socialsRouter } from './routes/socials'
@@ -90,6 +91,7 @@ app.use('/api/admin', adminRouter)
 app.use('/api/notifications', notificationsRouter)
 app.use('/api/budgets', budgetsRouter)
 app.use('/api/stripboard', stripboardRouter)
+app.use('/api/locations', locationsRouter)
 app.use('/api/transcripts', transcriptsRouter)
 app.use('/api/clips', clipsRouter)
 app.use('/api/socials', socialsRouter)

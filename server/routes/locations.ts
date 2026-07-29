@@ -1,0 +1,146 @@
+import { Router } from 'express'
+import { pool } from '../db'
+import { requireUser, type SessionUser } from '../auth'
+import { logError } from '../diag'
+
+// Locations: a nestable list of a film's shooting locations, auto-seeded from
+// distinct scenes.location_tag. Users rename them and drag one under another
+// as a sub-location. Shooting-day counts are computed live from the schedule.
+export const locationsRouter = Router()
+locationsRouter.use(requireUser)
+
+async function userCanAccessProject(userId: string, role: string, projectId: string): Promise<boolean> {
+  if (role === 'admin') return true
+  const { rows } = await pool.query(
+    `SELECT 1 FROM projects p
+     LEFT JOIN project_members m ON m.project_id = p.id AND m.user_id = $1
+     WHERE p.id = $2 AND (p.created_by = $1 OR m.user_id IS NOT NULL) LIMIT 1`,
+    [userId, projectId],
+  )
+  return rows.length > 0
+}
+
+// Ensure a locations row exists for every distinct scene location_tag in the
+// project. Never clobbers a name/parent the user set (ON CONFLICT DO NOTHING).
+async function ensureLocationRows(projectId: string): Promise<void> {
+  await pool.query(
+    `INSERT INTO locations (project_id, tag, name, position)
+     SELECT $1, s.location_tag,
+            COALESCE(MIN(s.location), s.location_tag),
+            (row_number() OVER (ORDER BY MIN(s.script_position)) * 10)::int
+       FROM scenes s
+      WHERE s.project_id = $1 AND s.location_tag IS NOT NULL AND s.location_tag <> ''
+      GROUP BY s.location_tag
+     ON CONFLICT (project_id, tag) DO NOTHING`,
+    [projectId],
+  )
+}
+
+// GET all locations for a project, with per-location scene count + the shoot
+// day NUMBERS the location appears on (client unions these for parent roll-ups).
+locationsRouter.get('/projects/:projectId', async (req, res) => {
+  const user = (req as typeof req & { user: SessionUser }).user
+  const projectId = req.params.projectId
+  if (!(await userCanAccessProject(user.id, user.role, projectId))) {
+    res.status(403).json({ error: 'forbidden' }); return
+  }
+  try {
+    await ensureLocationRows(projectId)
+    const locs = await pool.query<{ id: string; tag: string; name: string; parent_id: string | null; position: number }>(
+      `SELECT id, tag, name, parent_id, position FROM locations
+        WHERE project_id = $1 ORDER BY position ASC, name ASC`,
+      [projectId],
+    )
+    // Per-tag scene count + the distinct scheduled shoot-day numbers.
+    const stats = await pool.query<{ location_tag: string; scene_count: string; int_ext: string | null; day_numbers: number[] }>(
+      `SELECT s.location_tag,
+              COUNT(*)::int AS scene_count,
+              (array_agg(DISTINCT s.int_ext) FILTER (WHERE s.int_ext IS NOT NULL))[1] AS int_ext,
+              COALESCE(array_agg(DISTINCT sd.number) FILTER (WHERE sd.number IS NOT NULL), '{}') AS day_numbers
+         FROM scenes s
+         LEFT JOIN shoot_days sd ON sd.id = s.shoot_day_id
+        WHERE s.project_id = $1 AND s.location_tag IS NOT NULL AND s.location_tag <> ''
+        GROUP BY s.location_tag`,
+      [projectId],
+    )
+    const statByTag = new Map(stats.rows.map((r) => [r.location_tag, r]))
+    res.json({
+      locations: locs.rows.map((l) => {
+        const st = statByTag.get(l.tag)
+        const dayNumbers = (st?.day_numbers ?? []).map(Number).sort((a, b) => a - b)
+        return {
+          id: l.id,
+          tag: l.tag,
+          name: l.name,
+          parentId: l.parent_id,
+          position: l.position,
+          sceneCount: st ? Number(st.scene_count) : 0,
+          intExt: st?.int_ext ?? null,
+          dayNumbers,
+        }
+      }),
+    })
+  } catch (err) {
+    logError('locations GET failed', { error: err instanceof Error ? err.message : String(err), projectId })
+    res.status(500).json({ error: 'internal_error' })
+  }
+})
+
+// Would setting `parentId` as the parent of `id` create a cycle? (i.e. is
+// parentId the same node or one of its descendants?)
+async function wouldCycle(id: string, parentId: string): Promise<boolean> {
+  if (id === parentId) return true
+  // Walk up from parentId; if we reach id, nesting id under parentId loops.
+  let cursor: string | null = parentId
+  const seen = new Set<string>()
+  while (cursor) {
+    if (cursor === id) return true
+    if (seen.has(cursor)) break
+    seen.add(cursor)
+    const { rows }: { rows: { parent_id: string | null }[] } = await pool.query(
+      `SELECT parent_id FROM locations WHERE id = $1`, [cursor],
+    )
+    cursor = rows[0]?.parent_id ?? null
+  }
+  return false
+}
+
+// PATCH a location: rename, re-nest (parentId), or reorder (position).
+locationsRouter.patch('/:id', async (req, res) => {
+  const user = (req as typeof req & { user: SessionUser }).user
+  const id = req.params.id
+  const locRes = await pool.query<{ project_id: string }>(
+    `SELECT project_id FROM locations WHERE id = $1`, [id],
+  )
+  const loc = locRes.rows[0]
+  if (!loc) { res.status(404).json({ error: 'not_found' }); return }
+  if (!(await userCanAccessProject(user.id, user.role, loc.project_id))) {
+    res.status(403).json({ error: 'forbidden' }); return
+  }
+  const body = req.body as { parentId?: string | null; name?: string; position?: number }
+
+  if (body.parentId !== undefined) {
+    if (body.parentId === null) {
+      await pool.query(`UPDATE locations SET parent_id = NULL WHERE id = $1`, [id])
+    } else {
+      // Parent must exist in the same project and not create a cycle.
+      const p = await pool.query<{ project_id: string }>(
+        `SELECT project_id FROM locations WHERE id = $1`, [body.parentId],
+      )
+      if (!p.rows[0] || p.rows[0].project_id !== loc.project_id) {
+        res.status(400).json({ error: 'bad_parent' }); return
+      }
+      if (await wouldCycle(id, body.parentId)) {
+        res.status(400).json({ error: 'would_cycle' }); return
+      }
+      await pool.query(`UPDATE locations SET parent_id = $2 WHERE id = $1`, [id, body.parentId])
+    }
+  }
+  if (typeof body.name === 'string' && body.name.trim()) {
+    await pool.query(`UPDATE locations SET name = $2 WHERE id = $1`, [id, body.name.trim()])
+  }
+  if (typeof body.position === 'number') {
+    await pool.query(`UPDATE locations SET position = $2 WHERE id = $1`, [id, Math.round(body.position)])
+  }
+  res.json({ ok: true })
+})

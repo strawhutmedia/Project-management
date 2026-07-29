@@ -200,6 +200,17 @@ export type ApiAdminProject = {
 
 export type BudgetCategory = 'above_line' | 'production' | 'post' | 'other'
 
+export type ApiLocation = {
+  id: string
+  tag: string
+  name: string
+  parentId: string | null
+  position: number
+  sceneCount: number
+  intExt: string | null
+  dayNumbers: number[]
+}
+
 export type ApiBudgetLineItem = {
   id: string
   code: string | null
@@ -1044,6 +1055,11 @@ export const api = {
       `/api/budgets/items/${itemId}/promote-to-shared`,
       { method: 'POST', body: JSON.stringify(body) },
     ),
+  // Locations
+  locations: (projectId: string) =>
+    request<{ locations: ApiLocation[] }>(`/api/locations/projects/${projectId}`),
+  updateLocation: (id: string, patch: { parentId?: string | null; name?: string; position?: number }) =>
+    request<{ ok: true }>(`/api/locations/${id}`, { method: 'PATCH', body: JSON.stringify(patch) }),
   // Stripboard
   stripboard: (projectId: string) =>
     request<ApiStripboard>(`/api/stripboard/projects/${projectId}`),

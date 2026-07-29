@@ -19,6 +19,7 @@ import ShowChatCard from '../components/ShowChatCard'
 import ScriptOverviewCard from '../components/ScriptOverviewCard'
 import PresenceBar from '../components/PresenceBar'
 import Stripboard from '../components/Stripboard'
+import LocationsSection from '../components/LocationsSection'
 import FilmPhaseBar, { type FilmPhase } from '../components/FilmPhaseBar'
 import { useAuth } from '../auth'
 
@@ -286,6 +287,8 @@ export default function ProjectPage() {
       {project.kind === 'film' && (
         <Stripboard projectId={project.id} isAdmin={isAdmin} projectName={project.name} />
       )}
+
+      {project.kind === 'film' && <LocationsSection projectId={project.id} isAdmin={isAdmin} />}
 
       {project.kind === 'film' && <BudgetSection projectId={project.id} isAdmin={isAdmin} />}
 
