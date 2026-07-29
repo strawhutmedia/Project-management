@@ -203,8 +203,8 @@ export async function seedBackInYourArms(): Promise<void> {
       // typed. Undo that ONCE, precisely (only zeroing lines that still
       // hold exactly the loaded amount), then never auto-apply again. His
       // own per-day entries and any hand-typed prices are untouched.
-      const budgetRow = await pool.query<{ id: string; detailed_budget_applied: boolean; detailed_budget_reverted: boolean }>(
-        `SELECT id, detailed_budget_applied, detailed_budget_reverted FROM budgets WHERE project_id = $1`,
+      const budgetRow = await pool.query<{ id: string; detailed_budget_applied: boolean; detailed_budget_reverted: boolean; post_sound_restored: boolean }>(
+        `SELECT id, detailed_budget_applied, detailed_budget_reverted, post_sound_restored FROM budgets WHERE project_id = $1`,
         [projId],
       )
       if (budgetRow.rows[0] && budgetRow.rows[0].detailed_budget_applied && !budgetRow.rows[0].detailed_budget_reverted) {
@@ -214,6 +214,30 @@ export async function seedBackInYourArms(): Promise<void> {
           [budgetRow.rows[0].id],
         )
         logInfo('BIYA seed: reverted mistakenly-loaded detailed budget amounts (one-time)', {
+          projectId: projId, budgetId: budgetRow.rows[0].id,
+        })
+      }
+      // Corrective: the value-matching revert above collided with Ryan's real
+      // Post Sound line ($20,000 in 48-00 "sound designer" — same figure as a
+      // loaded amount) and zeroed it. Restore that one item exactly once, and
+      // only if it's still sitting at 0 (never overwrite a fresh edit).
+      if (budgetRow.rows[0] && budgetRow.rows[0].detailed_budget_reverted && !budgetRow.rows[0].post_sound_restored) {
+        await pool.query(
+          `UPDATE budget_line_items li
+             SET amt = 1, x = 1, rate = 20000
+           FROM budget_accounts a
+           WHERE li.account_id = a.id
+             AND a.budget_id = $1
+             AND a.code = '48-00'
+             AND lower(li.description) LIKE '%sound designer%'
+             AND (li.amt * li.x * li.rate) = 0`,
+          [budgetRow.rows[0].id],
+        )
+        await pool.query(
+          `UPDATE budgets SET post_sound_restored = true WHERE id = $1`,
+          [budgetRow.rows[0].id],
+        )
+        logInfo('BIYA seed: restored Post Sound $20k zeroed by revert collision (one-time)', {
           projectId: projId, budgetId: budgetRow.rows[0].id,
         })
       }
