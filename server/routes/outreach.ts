@@ -131,7 +131,8 @@ outreachRouter.get('/template.csv', (_req, res) => {
 // ─── Templates ──────────────────────────────────────────────────────
 outreachRouter.get('/projects/:projectId/template', async (req, res) => {
   const { rows } = await pool.query(
-    `SELECT project_id, subject, body, from_name, reply_to, location, updated_at
+    `SELECT project_id, subject, body, from_name, reply_to, location,
+            followup_subject, followup_body, updated_at
        FROM outreach_templates WHERE project_id = $1`,
     [req.params.projectId],
   )
@@ -785,6 +786,145 @@ async function sendOneProspect(prospectId: string): Promise<void> {
   }
 }
 
+// ─── Follow-up sender ────────────────────────────────────────────────
+//
+// Sends the SECOND (follow-up) email to a prospect who got the initial one
+// but never replied. Deliberately mirrors sendOneProspect but on its own lane:
+// it reads followup_subject/followup_body, stamps followup_sent_at (leaving
+// status = 'sent'), and NEVER touches the initial-send path.
+//
+// Every send re-checks the hard exclusions at fire time — replied / bounced /
+// opted-out / already-followed-up prospects are skipped silently (return, don't
+// throw), because between queueing and firing a prospect may have replied. This
+// is the last line of defence behind the claim query's WHERE clause.
+async function sendFollowUp(prospectId: string): Promise<void> {
+  if (!resend) throw new Error('resend_not_configured')
+
+  const pRes = await pool.query<{
+    project_id: string; name: string; email: string | null;
+    unique_sentence: string | null; status: string;
+    recipient_type: string | null; client_name: string | null;
+    replied_at: string | null; followup_sent_at: string | null;
+    sending_domain_id: string | null;
+  }>(
+    `SELECT project_id, name, email, unique_sentence, status, recipient_type,
+            client_name, replied_at, followup_sent_at, sending_domain_id
+       FROM outreach_prospects WHERE id = $1`,
+    [prospectId],
+  )
+  const p = pRes.rows[0]
+  if (!p) throw new Error('prospect_not_found')
+  // Hard exclusions, re-verified at fire time. If any fails, this prospect is
+  // no longer a valid follow-up target — skip quietly, don't error the tick.
+  if (p.status !== 'sent' || p.replied_at || p.followup_sent_at) {
+    logInfo('outreach: follow-up skipped (no longer eligible)', {
+      prospectId, status: p.status, replied: Boolean(p.replied_at), alreadyFollowedUp: Boolean(p.followup_sent_at),
+    })
+    // Clear the schedule so it isn't re-claimed every tick.
+    await pool.query(
+      `UPDATE outreach_prospects SET followup_scheduled_at = NULL, updated_at = now() WHERE id = $1`,
+      [prospectId],
+    )
+    return
+  }
+  if (!p.email) throw new Error('prospect_has_no_email')
+  if (!p.unique_sentence?.trim()) throw new Error('prospect_missing_sentence')
+
+  const tplRes = await pool.query<{
+    followup_subject: string | null; followup_body: string | null;
+    reply_to: string | null; from_name: string | null; sender_name: string | null; location: string | null;
+  }>(
+    `SELECT followup_subject, followup_body, reply_to, from_name, sender_name, location
+       FROM outreach_templates WHERE project_id = $1`,
+    [p.project_id],
+  )
+  const tpl = tplRes.rows[0]
+  if (!tpl || !tpl.followup_subject?.trim() || !tpl.followup_body?.trim()) throw new Error('followup_template_empty')
+
+  // Send the follow-up from the SAME domain the initial went out on, when it's
+  // still verified + active — a follow-up from the same address reads as a
+  // genuine nudge in the same thread. Otherwise fall back to the pool.
+  let domain: { id: string; name: string } | undefined
+  if (p.sending_domain_id) {
+    const sameRes = await pool.query<{ id: string; name: string }>(
+      `SELECT id, name FROM sending_domains
+        WHERE id = $1 AND status = 'verified' AND active = TRUE`,
+      [p.sending_domain_id],
+    )
+    domain = sameRes.rows[0]
+  }
+  if (!domain) {
+    const domRes = await pool.query<{ id: string; name: string }>(
+      `SELECT id, name FROM sending_domains
+        WHERE status = 'verified' AND active = TRUE
+        ORDER BY (primary_show_id = $1) DESC, created_at ASC
+        LIMIT 1`,
+      [p.project_id],
+    )
+    domain = domRes.rows[0]
+  }
+  if (!domain) throw new Error('no_verified_domain')
+
+  const showRes = await pool.query<{ name: string }>(
+    `SELECT name FROM projects WHERE id = $1`, [p.project_id],
+  )
+  const showName = showRes.rows[0]?.name || 'Straw Hut Media'
+  const fromName = tpl.from_name?.trim() || showName
+  const from = `${fromName} <booking@${domain.name}>`
+  const replyTo = parseReplyTo(tpl.reply_to)
+
+  const sender = tpl.sender_name?.trim() || tpl.from_name?.trim() || 'The team'
+  const guest = resolveGuest(p.recipient_type, p.client_name)
+  const location = locationLine(tpl.location)
+  const oneSheetUrl = await getOneSheetUrl(p.project_id)
+  const subject = mergeTemplate(tpl.followup_subject, { name: p.name, uniqueSentence: p.unique_sentence, oneSheetUrl, sender, guest, location })
+  const body = mergeTemplate(tpl.followup_body, { name: p.name, uniqueSentence: p.unique_sentence, oneSheetUrl, sender, guest, location })
+
+  const logRes = await pool.query<{ id: string }>(
+    `INSERT INTO outreach_sends
+       (prospect_id, sending_domain_id, from_email, to_email, subject, body, status, is_followup)
+     VALUES ($1, $2, $3, $4, $5, $6, 'queued', true)
+     RETURNING id`,
+    [prospectId, domain.id, from, p.email, subject, body],
+  )
+  const sendLogId = logRes.rows[0].id
+
+  try {
+    const send = await resend.emails.send({ from, to: p.email, subject, text: body, replyTo })
+    if (send.error) {
+      const errorMsg = String(send.error.message ?? send.error).slice(0, 500)
+      await pool.query(`UPDATE outreach_sends SET status = 'failed', error = $1 WHERE id = $2`, [errorMsg, sendLogId])
+      // Stop it being re-claimed forever, but DON'T flip the prospect's status —
+      // the initial send still succeeded; only this follow-up failed.
+      await pool.query(
+        `UPDATE outreach_prospects SET followup_scheduled_at = NULL, updated_at = now() WHERE id = $1`,
+        [prospectId],
+      )
+      if (errorMsg.includes('domain is not verified') || errorMsg.includes('domain not verified')) {
+        await pool.query(`UPDATE sending_domains SET status = 'failed', updated_at = now() WHERE id = $1`, [domain.id])
+        logError('outreach: follow-up domain verification failed', { domainId: domain.id, domainName: domain.name, error: errorMsg })
+      }
+      throw new Error(`resend_error: ${send.error.message ?? send.error}`)
+    }
+    await pool.query(
+      `UPDATE outreach_sends SET status = 'sent', resend_message_id = $1, sent_at = now() WHERE id = $2`,
+      [send.data?.id ?? null, sendLogId],
+    )
+    // status stays 'sent'. Stamp followup_sent_at (one-and-done) and clear the
+    // schedule so it can never be claimed again.
+    await pool.query(
+      `UPDATE outreach_prospects
+          SET followup_sent_at = now(), followup_scheduled_at = NULL, updated_at = now()
+        WHERE id = $1`,
+      [prospectId],
+    )
+    logInfo('outreach: follow-up sent', { prospectId, to: p.email, domain: domain.name })
+  } catch (err) {
+    logError('outreach: follow-up send failed', { prospectId, error: err instanceof Error ? err.message : String(err) })
+    throw err
+  }
+}
+
 // Durable scheduler. Every queued prospect carries a scheduled_send_at; a
 // 60s loop fires the ones whose time has come. This survives Railway
 // restarts/deploys (a campaign scheduled for 5 AM PT still goes at 5 AM),
@@ -812,6 +952,31 @@ async function runOutreachTick(): Promise<void> {
         await sendOneProspect(id)
       } catch (err) {
         logError('outreach: scheduled send failed', {
+          prospectId: id,
+          error: err instanceof Error ? err.message : String(err),
+        })
+      }
+    }
+
+    // Follow-up lane — same pacing, separate claim. The WHERE clause IS the
+    // safety gate: only status='sent', never-replied, not-yet-followed-up
+    // prospects whose scheduled time has come. sendFollowUp re-checks these at
+    // fire time as a backstop.
+    const dueFollowups = await pool.query<{ id: string }>(
+      `SELECT id FROM outreach_prospects
+        WHERE status = 'sent'
+          AND replied_at IS NULL
+          AND followup_sent_at IS NULL
+          AND followup_scheduled_at IS NOT NULL
+          AND followup_scheduled_at <= now()
+        ORDER BY followup_scheduled_at ASC
+        LIMIT 5`,
+    )
+    for (const { id } of dueFollowups.rows) {
+      try {
+        await sendFollowUp(id)
+      } catch (err) {
+        logError('outreach: scheduled follow-up failed', {
           prospectId: id,
           error: err instanceof Error ? err.message : String(err),
         })
@@ -1609,4 +1774,292 @@ outreachRouter.get('/projects/:projectId/test-open-status', async (req, res) => 
   )
   const r = rows[0]
   res.json({ test: r ? { to: r.to_email, openCount: r.open_count, lastOpenedAt: r.last_opened_at, sentAt: r.sent_at } : null })
+})
+
+// ─── Follow-up campaign (Caroline's ask) ─────────────────────────────
+//
+// A second, gated lane for nudging prospects who got the initial email but
+// never replied. Flow: (1) Caroline writes/saves a follow-up template, (2) she
+// opens the preview — the EXACT list of who would get a follow-up, names +
+// emails, before anything sends, (3) optional test-send to herself/Ryan, (4)
+// she clicks send, which queues follow-ups on the durable loop. Every stage
+// enforces the hard exclusions: never anyone who replied / bounced / opted out,
+// and at most one follow-up per person.
+
+// Default: only follow up with people whose initial email is at least this many
+// days old (gives them time to reply before we nudge). Overridable per send.
+const FOLLOWUP_MIN_DAYS_DEFAULT = 4
+
+// The single source of truth for "who is a live follow-up target". Everyone
+// here has status='sent' (so they're structurally not replied/bounced/opted-out
+// /failed), never replied, has an email, hasn't already had a follow-up, and
+// isn't already queued for one. `sent_at` older than minDays.
+function eligibleFollowupSql(): string {
+  return `status = 'sent'
+      AND replied_at IS NULL
+      AND email IS NOT NULL
+      AND followup_sent_at IS NULL
+      AND followup_scheduled_at IS NULL
+      AND sent_at IS NOT NULL
+      AND sent_at <= now() - ($2 || ' days')::interval`
+}
+
+// Save the follow-up template (separate from the initial template so saving one
+// never clobbers the other).
+outreachRouter.put('/projects/:projectId/followup-template', async (req, res) => {
+  const user = (req as typeof req & { user: SessionUser }).user
+  const projectId = req.params.projectId
+  const subject = String(req.body?.subject ?? '')
+  const body = String(req.body?.body ?? '')
+  // Upsert only the follow-up columns. If the row doesn't exist yet, create it
+  // with empty initial subject/body (the initial editor fills those in).
+  await pool.query(
+    `INSERT INTO outreach_templates
+       (project_id, subject, body, followup_subject, followup_body, updated_by, updated_at)
+     VALUES ($1, '', '', $2, $3, $4, now())
+     ON CONFLICT (project_id) DO UPDATE SET
+       followup_subject = EXCLUDED.followup_subject,
+       followup_body = EXCLUDED.followup_body,
+       updated_by = EXCLUDED.updated_by,
+       updated_at = now()`,
+    [projectId, subject, body, user.id],
+  )
+  res.json({ ok: true })
+})
+
+// Preview — the exact people who would receive a follow-up, shown BEFORE any
+// email sends. Names + emails + when they were first emailed + whether they
+// opened it. Also reports whether the follow-up template is written yet.
+outreachRouter.get('/projects/:projectId/followup/preview', async (req, res) => {
+  const projectId = req.params.projectId
+  const minDays = Math.max(0, Math.min(60, Number(req.query.minDays) || FOLLOWUP_MIN_DAYS_DEFAULT))
+
+  const tplRes = await pool.query<{ followup_subject: string | null; followup_body: string | null }>(
+    `SELECT followup_subject, followup_body FROM outreach_templates WHERE project_id = $1`,
+    [projectId],
+  )
+  const tpl = tplRes.rows[0]
+  const templateReady = Boolean(tpl?.followup_subject?.trim() && tpl?.followup_body?.trim())
+
+  const { rows } = await pool.query<{
+    id: string; name: string; email: string; sent_at: string; open_count: number; first_opened_at: string | null; batch_label: string | null;
+  }>(
+    `SELECT id, name, email, sent_at, open_count, first_opened_at, batch_label
+       FROM outreach_prospects
+      WHERE project_id = $1 AND ${eligibleFollowupSql()}
+      ORDER BY sent_at ASC`,
+    [projectId, String(minDays)],
+  )
+
+  // Also count who's already queued/sent a follow-up, for context in the UI.
+  const { rows: stat } = await pool.query<{ queued: number; sent: number }>(
+    `SELECT
+        COUNT(*) FILTER (WHERE followup_scheduled_at IS NOT NULL AND followup_sent_at IS NULL)::int AS queued,
+        COUNT(*) FILTER (WHERE followup_sent_at IS NOT NULL)::int AS sent
+       FROM outreach_prospects WHERE project_id = $1`,
+    [projectId],
+  )
+
+  res.json({
+    templateReady,
+    minDays,
+    eligible: rows.map((r) => ({
+      id: r.id, name: r.name, email: r.email, sentAt: r.sent_at,
+      openCount: r.open_count, opened: Boolean(r.first_opened_at), batchLabel: r.batch_label,
+    })),
+    followupQueued: stat[0]?.queued ?? 0,
+    followupSent: stat[0]?.sent ?? 0,
+  })
+})
+
+// Send — queue follow-ups for the eligible set (or a caller-selected subset of
+// it). Mirrors the initial campaign's gates: follow-up template must be
+// written, a verified domain must exist, and the one-sheet must be approved
+// (the follow-up body links it too). Sends are jittered 90-180s apart on the
+// durable loop — nothing fires synchronously here.
+outreachRouter.post('/projects/:projectId/followup/send', async (req, res) => {
+  const projectId = req.params.projectId
+  if (!resend) { res.status(503).json({ error: 'resend_not_configured' }); return }
+  const minDays = Math.max(0, Math.min(60, Number(req.body?.minDays) || FOLLOWUP_MIN_DAYS_DEFAULT))
+
+  // Follow-up template must be filled.
+  const tplRes = await pool.query<{ followup_subject: string | null; followup_body: string | null }>(
+    `SELECT followup_subject, followup_body FROM outreach_templates WHERE project_id = $1`,
+    [projectId],
+  )
+  const tpl = tplRes.rows[0]
+  if (!tpl?.followup_subject?.trim() || !tpl?.followup_body?.trim()) {
+    res.status(400).json({ error: 'followup_template_empty', detail: 'Write and save the follow-up email first.' })
+    return
+  }
+
+  // One-sheet must be approved + unchanged (same gate as the initial campaign).
+  const osRes = await pool.query<{ one_sheet_approved_at: string | null; one_sheet_approved_snapshot: Record<string, unknown> | null }>(
+    `SELECT one_sheet_approved_at, one_sheet_approved_snapshot FROM projects WHERE id = $1`,
+    [projectId],
+  )
+  const os = osRes.rows[0]
+  const curOneSheet = await currentOneSheet(projectId)
+  const oneSheetApproved = Boolean(os?.one_sheet_approved_at) && !oneSheetChanged(curOneSheet, os?.one_sheet_approved_snapshot ?? null)
+  if (!oneSheetApproved) {
+    res.status(400).json({
+      error: 'one_sheet_not_approved',
+      detail: os?.one_sheet_approved_at
+        ? 'The one-sheet was edited since it was approved. Re-approve it before sending follow-ups.'
+        : 'Approve the one-sheet before sending — open the One-sheet card and click “Approve for blasts.”',
+    })
+    return
+  }
+
+  // Compute the eligible set fresh (never trust a stale client list).
+  const eligRes = await pool.query<{ id: string }>(
+    `SELECT id FROM outreach_prospects
+      WHERE project_id = $1 AND ${eligibleFollowupSql()}`,
+    [projectId, String(minDays)],
+  )
+  let ids = eligRes.rows.map((r) => r.id)
+
+  // If the caller passed an explicit subset (Caroline deselected some in the
+  // preview), intersect — you can only send to people who are actually eligible.
+  const rawIds = req.body?.prospectIds
+  if (Array.isArray(rawIds)) {
+    const want = new Set(rawIds.filter((x): x is string => typeof x === 'string'))
+    ids = ids.filter((id) => want.has(id))
+  }
+  if (ids.length === 0) {
+    res.status(400).json({ error: 'no_eligible_prospects', detail: 'Nobody is eligible for a follow-up right now.' })
+    return
+  }
+
+  // Need at least one verified + active domain.
+  const domRes = await pool.query<{ id: string; name: string }>(
+    `SELECT id, name FROM sending_domains
+      WHERE status = 'verified' AND active = TRUE
+      ORDER BY (primary_show_id = $1) DESC, created_at ASC`,
+    [projectId],
+  )
+  const domains = domRes.rows
+  if (domains.length === 0) {
+    res.status(400).json({ error: 'no_verified_domain', detail: 'No verified sending domain yet.' })
+    return
+  }
+
+  // Shuffle so per-domain timing isn't predictable (same approach as the
+  // initial campaign). sendFollowUp itself prefers each prospect's original
+  // domain, so this round-robin is just the fallback distribution.
+  const shuffled = [...ids]
+  for (let i = shuffled.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1))
+    ;[shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]]
+  }
+
+  const startPreset = typeof req.body?.startPreset === 'string' ? req.body.startPreset : 'now'
+  const startAtRaw = typeof req.body?.startAt === 'string' ? new Date(req.body.startAt) : null
+  const nowMs = Date.now()
+  let startMs = nowMs
+  if (startPreset === '5am_pt') startMs = nextFiveAmPT().getTime()
+  else if (startAtRaw && !Number.isNaN(startAtRaw.getTime()) && startAtRaw.getTime() > nowMs) startMs = startAtRaw.getTime()
+
+  let cursorMs = 0
+  const sendAts = shuffled.map(() => {
+    cursorMs += 90_000 + Math.floor(Math.random() * 90_000) // 90-180s apart
+    return new Date(startMs + cursorMs).toISOString()
+  })
+  await pool.query(
+    `UPDATE outreach_prospects AS p
+        SET followup_scheduled_at = a.send_at::timestamptz,
+            updated_at = now()
+       FROM unnest($1::uuid[], $2::timestamptz[]) AS a(pid, send_at)
+      WHERE p.id = a.pid`,
+    [shuffled, sendAts],
+  )
+  void runOutreachTick()
+
+  const scheduled = startMs > nowMs + 60_000
+  logInfo('outreach: follow-up campaign queued', {
+    projectId, count: ids.length, scheduled, startAt: new Date(startMs).toISOString(),
+  })
+  res.json({
+    ok: true,
+    queued: ids.length,
+    scheduled,
+    startAt: new Date(startMs).toISOString(),
+    firstAt: new Date(startMs + 90_000).toISOString(),
+    lastAt: new Date(startMs + cursorMs).toISOString(),
+  })
+})
+
+// Test-send the follow-up email to a single address (Caroline/Ryan) so she can
+// eyeball it before queueing the real thing. Mirrors the initial test-send.
+outreachRouter.post('/projects/:projectId/followup/test-send', async (req, res) => {
+  const projectId = req.params.projectId
+  if (!resend) { res.status(503).json({ error: 'resend_not_configured' }); return }
+  const to = typeof req.body?.to === 'string' && req.body.to.trim() ? req.body.to.trim() : ''
+  if (!to) { res.status(400).json({ error: 'to_required', detail: 'Enter an email to send the test to.' }); return }
+
+  const tplRes = await pool.query<{
+    followup_subject: string | null; followup_body: string | null;
+    reply_to: string | null; from_name: string | null; sender_name: string | null; location: string | null;
+  }>(
+    `SELECT followup_subject, followup_body, reply_to, from_name, sender_name, location
+       FROM outreach_templates WHERE project_id = $1`,
+    [projectId],
+  )
+  const tpl = tplRes.rows[0]
+  if (!tpl?.followup_subject?.trim() || !tpl?.followup_body?.trim()) {
+    res.status(400).json({ error: 'followup_template_empty', detail: 'Save the follow-up email first.' })
+    return
+  }
+
+  // Use a real prospect as the preview subject when one exists, else fabricate.
+  const previewRes = await pool.query<{ id: string; name: string; unique_sentence: string | null; recipient_type: string | null; client_name: string | null }>(
+    `SELECT id, name, unique_sentence, recipient_type, client_name FROM outreach_prospects
+      WHERE project_id = $1
+      ORDER BY (unique_sentence IS NOT NULL) DESC, (email IS NOT NULL) DESC, created_at DESC
+      LIMIT 1`,
+    [projectId],
+  )
+  const preview = previewRes.rows[0]
+  const previewName = preview?.name || 'Alex'
+  const previewSentence = preview?.unique_sentence
+    || 'I love what you have been putting out lately and think our audience would really connect with you.'
+  const previewGuest = resolveGuest(preview?.recipient_type, preview?.client_name)
+
+  const sessionUser = (req as typeof req & { user?: { display_name: string | null; name: string } }).user
+  const sender = sessionUser?.display_name?.trim() || sessionUser?.name?.trim() || 'The team'
+
+  const location = locationLine(tpl.location)
+  const oneSheetUrl = await getOneSheetUrl(projectId)
+  const subject = mergeTemplate(tpl.followup_subject, { name: previewName, uniqueSentence: previewSentence, oneSheetUrl, sender, guest: previewGuest, location })
+  const body = mergeTemplate(tpl.followup_body, { name: previewName, uniqueSentence: previewSentence, oneSheetUrl, sender, guest: previewGuest, location })
+
+  const domRes = await pool.query<{ name: string }>(
+    `SELECT name FROM sending_domains
+      WHERE status = 'verified' AND active = TRUE
+      ORDER BY (primary_show_id = $1) DESC, created_at ASC
+      LIMIT 1`,
+    [projectId],
+  )
+  const domain = domRes.rows[0]?.name
+  if (!domain) { res.status(400).json({ error: 'no_verified_domain', detail: 'Add + verify a sending domain first.' }); return }
+  const showNameRes = await pool.query<{ name: string }>(`SELECT name FROM projects WHERE id = $1`, [projectId])
+  const showName = showNameRes.rows[0]?.name || 'Straw Hut Media'
+  const fromName = tpl.from_name?.trim() || showName
+  const from = `${fromName} <booking@${domain}>`
+  const replyTo = parseReplyTo(tpl.reply_to)
+
+  try {
+    const send = await resend.emails.send({ from, to, subject: `[TEST] ${subject}`, text: body, replyTo })
+    if (send.error) {
+      const errorMsg = send.error.message ?? String(send.error)
+      logError('outreach followup test-send failed', { projectId, error: send.error })
+      res.status(502).json({ error: 'send_failed', detail: errorMsg })
+      return
+    }
+    logInfo('outreach followup test-send ok', { projectId, to, domain })
+    res.json({ ok: true, from, to, subject: `[TEST] ${subject}`, previewName })
+  } catch (err) {
+    logError('outreach followup test-send threw', { projectId, error: err instanceof Error ? err.message : String(err) })
+    res.status(500).json({ error: 'send_threw', detail: err instanceof Error ? err.message : String(err) })
+  }
 })

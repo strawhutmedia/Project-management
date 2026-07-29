@@ -641,7 +641,27 @@ export type ApiOutreachTemplate = {
   from_name: string | null
   reply_to: string | null
   location: string | null
+  followup_subject: string | null
+  followup_body: string | null
   updated_at: string
+}
+
+export type ApiFollowupEligible = {
+  id: string
+  name: string
+  email: string
+  sentAt: string
+  openCount: number
+  opened: boolean
+  batchLabel: string | null
+}
+
+export type ApiFollowupPreview = {
+  templateReady: boolean
+  minDays: number
+  eligible: ApiFollowupEligible[]
+  followupQueued: number
+  followupSent: number
 }
 
 export type ApiOutreachProspect = {
@@ -1418,6 +1438,32 @@ export const api = {
     request<{ ok: true }>(`/api/outreach/projects/${projectId}/template`, {
       method: 'PUT', body: JSON.stringify(body),
     }),
+  saveFollowupTemplate: (projectId: string, body: { subject: string; body: string }) =>
+    request<{ ok: true }>(`/api/outreach/projects/${projectId}/followup-template`, {
+      method: 'PUT', body: JSON.stringify(body),
+    }),
+  followupPreview: (projectId: string, minDays?: number) =>
+    request<ApiFollowupPreview>(
+      `/api/outreach/projects/${projectId}/followup/preview${minDays != null ? `?minDays=${minDays}` : ''}`,
+    ),
+  sendFollowupCampaign: (
+    projectId: string,
+    opts?: { prospectIds?: string[]; minDays?: number; startPreset?: 'now' | '5am_pt'; startAt?: string },
+  ) =>
+    request<{ ok: true; queued: number; scheduled: boolean; startAt: string; firstAt: string; lastAt: string }>(
+      `/api/outreach/projects/${projectId}/followup/send`,
+      { method: 'POST', body: JSON.stringify({
+        prospectIds: opts?.prospectIds ?? null,
+        minDays: opts?.minDays ?? null,
+        startPreset: opts?.startPreset ?? 'now',
+        startAt: opts?.startAt ?? null,
+      }) },
+    ),
+  testSendFollowup: (projectId: string, to: string) =>
+    request<{ ok: true; from: string; to: string; subject: string; previewName: string }>(
+      `/api/outreach/projects/${projectId}/followup/test-send`,
+      { method: 'POST', body: JSON.stringify({ to }) },
+    ),
   outreachProspects: (projectId: string) =>
     request<{ prospects: ApiOutreachProspect[] }>(`/api/outreach/projects/${projectId}/prospects`),
   addOutreachProspect: (projectId: string, body: {

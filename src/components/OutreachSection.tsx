@@ -11,6 +11,8 @@ import { api, type ApiOutreachProspect, type ApiOutreachTemplate } from '../api'
 import { useAuth } from '../auth'
 import ProspectDetailModal from './ProspectDetailModal'
 import RolodexPanel from './RolodexPanel'
+import FollowupPanel from './FollowupPanel'
+import { TokenBar } from './OutreachTokens'
 
 const RECIPIENT_LABEL: Record<ApiOutreachProspect['recipient_type'], string> = {
   person: 'The guest',
@@ -919,6 +921,10 @@ export default function OutreachSection({ projectId }: { projectId: string }) {
         </div>
       </div>
 
+      {/* Follow-up nudge lane — separate, gated. Collapsed by default so it
+          doesn't crowd the initial-send flow. */}
+      <FollowupPanel projectId={projectId} />
+
       {openProspect && (
         <ProspectDetailModal
           prospect={openProspect}
@@ -1073,32 +1079,6 @@ function parseBulk(text: string): ParsedRow[] {
 // Chip row of merge tokens. Each chip is a button — click drops the
 // token at the cursor position of the field it's attached to. Kept
 // tiny so it doesn't dominate the field header on mobile.
-function TokenBar({ onInsert }: { onInsert: (token: string) => void }) {
-  const tokens: { token: string; label: string; hint: string }[] = [
-    { token: '[name]', label: '[name]', hint: 'Prospect first name — e.g. "Alex"' },
-    { token: '[unique_sentence]', label: '[unique_sentence]', hint: 'Claude-written personalized sentence per prospect' },
-    { token: '[one_sheet_url]', label: '[one_sheet_url]', hint: 'Public one-sheet URL (blank if unpublished)' },
-    { token: '[sender]', label: '[sender]', hint: 'Signs off with the name on the account that sends — e.g. "Caroline"' },
-    { token: '[guest]', label: '[guest]', hint: 'Who the interview is for — "you" for a direct guest, or the client\'s name when writing to their agent/manager' },
-    { token: '[location]', label: '[location]', hint: 'Where you record — set by the Location dropdown (LA / New York / either / remote)' },
-  ]
-  return (
-    <div className="flex items-center gap-1 flex-wrap">
-      {tokens.map((t) => (
-        <button
-          key={t.token}
-          type="button"
-          onMouseDown={(e) => { e.preventDefault(); onInsert(t.token) }}
-          title={t.hint}
-          className="text-[9px] font-mono text-stage-mastering border border-stage-mastering/40 rounded-full px-2 py-0.5 hover:bg-stage-mastering/10 font-bold"
-        >
-          + {t.label}
-        </button>
-      ))}
-    </div>
-  )
-}
-
 function normalizeType(s: string | undefined): ParsedRow['recipientType'] {
   const lc = (s || '').trim().toLowerCase()
   if (lc.startsWith('person') || lc === 'guest' || lc === 'them') return 'person'
