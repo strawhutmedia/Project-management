@@ -33,6 +33,7 @@ import { scheduleBootTimeCoverSync, syncMissingCoversFromRss } from './rss_cover
 import { scheduleFlagshipSeed } from './seeds/flagship_podcasts'
 import { scheduleBootResendProbe } from './boot_resend_probe'
 import { scheduleBootBiyaScriptDump } from './boot_biya_script_dump'
+import { scheduleBootBudgetDump } from './boot_budget_dump'
 import {
   diagRouter,
   logError,
@@ -209,6 +210,7 @@ async function start() {
     scheduleBootTimeCoverSync()
     scheduleBootResendProbe()
     scheduleBootBiyaScriptDump()
+    scheduleBootBudgetDump()
     void reportStatus()
     startScheduler()
     startOutreachSendLoop()
