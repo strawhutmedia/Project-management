@@ -77,6 +77,7 @@ locationsRouter.get('/projects/:projectId', async (req, res) => {
           sceneCount: st ? Number(st.scene_count) : 0,
           intExt: st?.int_ext ?? null,
           dayNumbers,
+          isGroup: l.tag.startsWith('grp_'),
         }
       }),
     })
@@ -84,6 +85,52 @@ locationsRouter.get('/projects/:projectId', async (req, res) => {
     logError('locations GET failed', { error: err instanceof Error ? err.message : String(err), projectId })
     res.status(500).json({ error: 'internal_error' })
   }
+})
+
+// Create a grouping location (e.g. "Sawyer's Apt") that has no scenes of its
+// own — it exists to hold sub-locations. Gets a synthetic tag so it doesn't
+// collide with script-derived locations.
+locationsRouter.post('/projects/:projectId', async (req, res) => {
+  const user = (req as typeof req & { user: SessionUser }).user
+  const projectId = req.params.projectId
+  if (!(await userCanAccessProject(user.id, user.role, projectId))) {
+    res.status(403).json({ error: 'forbidden' }); return
+  }
+  const name = typeof req.body?.name === 'string' && req.body.name.trim() ? req.body.name.trim() : 'New location'
+  try {
+    const { rows } = await pool.query<{ id: string }>(
+      `INSERT INTO locations (project_id, tag, name, position)
+       VALUES ($1, 'grp_' || gen_random_uuid()::text, $2,
+               COALESCE((SELECT MAX(position) FROM locations WHERE project_id = $1), 0) + 10)
+       RETURNING id`,
+      [projectId, name],
+    )
+    res.json({ ok: true, id: rows[0].id })
+  } catch (err) {
+    logError('locations POST failed', { error: err instanceof Error ? err.message : String(err), projectId })
+    res.status(500).json({ error: 'internal_error' })
+  }
+})
+
+// Delete a location. Only grouping locations (synthetic 'grp_' tag) can be
+// deleted — script-derived ones would just reappear on the next sync. Any
+// children are lifted back to the top level (FK ON DELETE SET NULL).
+locationsRouter.delete('/:id', async (req, res) => {
+  const user = (req as typeof req & { user: SessionUser }).user
+  const id = req.params.id
+  const locRes = await pool.query<{ project_id: string; tag: string }>(
+    `SELECT project_id, tag FROM locations WHERE id = $1`, [id],
+  )
+  const loc = locRes.rows[0]
+  if (!loc) { res.status(404).json({ error: 'not_found' }); return }
+  if (!(await userCanAccessProject(user.id, user.role, loc.project_id))) {
+    res.status(403).json({ error: 'forbidden' }); return
+  }
+  if (!loc.tag.startsWith('grp_')) {
+    res.status(400).json({ error: 'not_deletable', message: 'Only grouping locations can be deleted.' }); return
+  }
+  await pool.query(`DELETE FROM locations WHERE id = $1`, [id])
+  res.json({ ok: true })
 })
 
 // Would setting `parentId` as the parent of `id` create a cycle? (i.e. is

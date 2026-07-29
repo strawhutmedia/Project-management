@@ -209,6 +209,7 @@ export type ApiLocation = {
   sceneCount: number
   intExt: string | null
   dayNumbers: number[]
+  isGroup: boolean
 }
 
 export type ApiBudgetLineItem = {
@@ -1058,8 +1059,14 @@ export const api = {
   // Locations
   locations: (projectId: string) =>
     request<{ locations: ApiLocation[] }>(`/api/locations/projects/${projectId}`),
+  createLocation: (projectId: string, name: string) =>
+    request<{ ok: true; id: string }>(`/api/locations/projects/${projectId}`, {
+      method: 'POST', body: JSON.stringify({ name }),
+    }),
   updateLocation: (id: string, patch: { parentId?: string | null; name?: string; position?: number }) =>
     request<{ ok: true }>(`/api/locations/${id}`, { method: 'PATCH', body: JSON.stringify(patch) }),
+  deleteLocation: (id: string) =>
+    request<{ ok: true }>(`/api/locations/${id}`, { method: 'DELETE' }),
   // Stripboard
   stripboard: (projectId: string) =>
     request<ApiStripboard>(`/api/stripboard/projects/${projectId}`),

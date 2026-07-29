@@ -89,6 +89,29 @@ export default function LocationsSection({ projectId, isAdmin }: { projectId: st
     }
   }
 
+  async function addGroup() {
+    try {
+      const { id } = await api.createLocation(projectId, 'New location')
+      await load()
+      setEditingId(id)
+      setEditName('New location')
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'create failed')
+    }
+  }
+
+  async function removeGroup(id: string) {
+    if (!confirm('Delete this grouping location? Its sub-locations move back to the top level.')) return
+    setLocations((prev) => prev?.filter((l) => l.id !== id).map((l) => (l.parentId === id ? { ...l, parentId: null } : l)) ?? prev)
+    try {
+      await api.deleteLocation(id)
+      await load()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'delete failed')
+      await load()
+    }
+  }
+
   const totalDays = useMemo(() => {
     const set = new Set<number>()
     for (const l of locations ?? []) for (const d of l.dayNumbers) set.add(d)
@@ -175,14 +198,23 @@ export default function LocationsSection({ projectId, isAdmin }: { projectId: st
             )}
           </div>
           <div className="shrink-0 text-right">
-            <div className="font-mono font-bold text-sm text-emerald-700">
-              {days.length} shoot day{days.length === 1 ? '' : 's'}
+            <div className="font-mono font-extrabold text-lg leading-none text-emerald-700">
+              {days.length}<span className="text-[10px] font-bold text-muted/80 ml-1 uppercase tracking-wider">day{days.length === 1 ? '' : 's'}</span>
             </div>
-            <div className="text-[10px] text-muted/80">
-              {scenes} scene{scenes === 1 ? '' : 's'}
+            <div className="text-[10px] text-muted/80 mt-0.5">
+              {loc.isGroup && loc.sceneCount === 0 ? 'grouping' : `${scenes} scene${scenes === 1 ? '' : 's'}`}
               {days.length > 0 && <> · days {days.join(', ')}</>}
             </div>
           </div>
+          {isAdmin && loc.isGroup && (
+            <button
+              onClick={() => void removeGroup(loc.id)}
+              className="text-muted/50 hover:text-urgent text-sm shrink-0 px-1"
+              title="Delete grouping location"
+            >
+              ✕
+            </button>
+          )}
         </div>
         {kids.map((k) => renderNode(k, depth + 1))}
       </div>
@@ -193,13 +225,27 @@ export default function LocationsSection({ projectId, isAdmin }: { projectId: st
     <section className="rounded-2xl border border-line bg-panel/60 p-6 space-y-4">
       <div className="flex items-start justify-between gap-3 flex-wrap">
         <div>
-          <h2 className="text-[11px] uppercase tracking-[0.2em] text-muted font-bold">📍 Locations</h2>
+          <h2 className="text-[11px] uppercase tracking-[0.2em] text-muted font-bold">📍 Locations — shooting days breakdown</h2>
           <p className="text-[11px] text-muted/80 mt-1">
             {locations.length} location{locations.length === 1 ? '' : 's'} · {totalDays} shooting day{totalDays === 1 ? '' : 's'} across the schedule
             {isAdmin && ' · drag a location onto another to nest it · double-click to rename'}
           </p>
         </div>
+        {isAdmin && (
+          <button
+            onClick={() => void addGroup()}
+            className="text-[11px] uppercase tracking-wider font-bold border border-emerald-700/50 text-emerald-700 rounded-lg px-3 py-1.5 hover:bg-emerald-500/10 transition shrink-0"
+          >
+            + New grouping location
+          </button>
+        )}
       </div>
+      {isAdmin && (
+        <p className="text-[11px] text-muted/70 -mt-2">
+          Make a parent like <span className="font-semibold text-text">"Sawyer's Apt"</span> with the + button,
+          then drag the specific sets (living room, kitchen…) onto it. The parent shows the total days you shoot there.
+        </p>
+      )}
 
       {locations.length === 0 ? (
         <p className="text-sm text-muted italic py-4 text-center">
