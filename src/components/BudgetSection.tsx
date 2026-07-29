@@ -38,8 +38,15 @@ function fmtMoney(v: number, currency: string): string {
   }
 }
 
-function accountTotal(acc: ApiBudgetAccount): number {
-  return acc.lineItems.reduce((sum, li) => sum + li.total, 0)
+// A "run of shoot" line item is entered once (a per-day rate) but applies to
+// every shooting day, so its real cost is per-day × shoot days. Everything
+// else counts once. `n` is the shoot-day count (budget.runOfShootDayCount).
+function effectiveTotal(li: ApiBudgetLineItem, n: number): number {
+  return li.spansAllShootDays && n > 0 ? li.total * n : li.total
+}
+
+function accountTotal(acc: ApiBudgetAccount, n = 1): number {
+  return acc.lineItems.reduce((sum, li) => sum + effectiveTotal(li, n), 0)
 }
 
 type GoalBucket = 'production' | 'post' | 'marketing' | 'admin'
@@ -60,7 +67,7 @@ function accountInBucket(acc: ApiBudgetAccount, bucket: GoalBucket): boolean {
 function bucketSpend(budget: ApiBudget, bucket: GoalBucket): number {
   const lineItems = budget.accounts
     .filter((a) => accountInBucket(a, bucket))
-    .reduce((s, a) => s + accountTotal(a), 0)
+    .reduce((s, a) => s + accountTotal(a, budget.runOfShootDayCount), 0)
   // Fold the auto-computed day costs (fringes, per diem, hotels, mileage,
   // less the crew half-day discount) into Production — they're real
   // committed spend shown in each day total but never stored as line items.
@@ -200,9 +207,10 @@ export default function BudgetSection({ projectId, isAdmin }: { projectId: strin
     )
   }
 
+  const N = budget.runOfShootDayCount
   const totalsByCategory = CATEGORY_ORDER.map((cat) => {
     const accounts = budget.accounts.filter((a) => a.category === cat)
-    const subtotal = accounts.reduce((s, a) => s + accountTotal(a), 0)
+    const subtotal = accounts.reduce((s, a) => s + accountTotal(a, N), 0)
     return { cat, accounts, subtotal }
   })
   const directTotal = totalsByCategory.reduce((s, c) => s + c.subtotal, 0)
@@ -211,10 +219,10 @@ export default function BudgetSection({ projectId, isAdmin }: { projectId: strin
   // are editable in BudgetSettings.
   const castSubtotal = budget.accounts
     .filter((a) => a.code?.startsWith('14-'))
-    .reduce((s, a) => s + accountTotal(a), 0)
+    .reduce((s, a) => s + accountTotal(a, N), 0)
   const crewSubtotal = budget.accounts
     .filter((a) => a.category === 'production' && !a.code?.startsWith('14-'))
-    .reduce((s, a) => s + accountTotal(a), 0)
+    .reduce((s, a) => s + accountTotal(a, N), 0)
   const castFringes = castSubtotal * (budget.castPayrollPct / 100)
   const crewFringes = crewSubtotal * (budget.crewPayrollPct / 100)
   const fringesTotal = castFringes + crewFringes
@@ -352,30 +360,17 @@ export default function BudgetSection({ projectId, isAdmin }: { projectId: strin
         <Stat label={`Contingency (${budget.contingencyPct}%)`} value={fmtMoney(contingency, budget.currency)} />
         <Stat label={`Bond (${budget.bondPct}%)`} value={fmtMoney(bond, budget.currency)} />
         <Stat label="Grand total" value={fmtMoney(grand, budget.currency)} accent />
-        <Stat
-          label="Sum of day budgets"
-          value={fmtMoney(budget.sumOfDayBudgets, budget.currency)}
-          hint={`${budget.daysWithCost} of ${budget.shootDayCount} days have any cost`}
-        />
       </div>
 
-      {/* Reconciliation banner — the day totals are a SLICE of the grand
-          total (what's been allocated to specific shoot days), not the whole
-          thing. Above/below-line lump sums (cast, crew, gear) live on the
-          top-sheet and aren't pinned to a single day. This makes that
-          explicit so "$18k day × 18 days ≠ grand total" stops being a mystery. */}
-      {budget.daysWithCost < budget.shootDayCount && (
-        <div className="rounded-xl border border-amber-600/40 bg-amber-500/5 px-4 py-3 text-xs text-text/90 space-y-1">
-          <div className="font-bold uppercase tracking-wider text-[10px] text-amber-700">
-            ⚠️ Only {budget.daysWithCost} of {budget.shootDayCount} shoot days have costs entered
-          </div>
-          <div className="text-muted">
-            The <span className="font-semibold text-text">Grand total</span> is the whole top-sheet — cast, crew,
-            and gear are budgeted as lump sums that aren't tied to one day. The{' '}
-            <span className="font-semibold text-text">Sum of day budgets</span> ({fmtMoney(budget.sumOfDayBudgets, budget.currency)})
-            is only the portion pinned to specific days (per-day rates, scene props, per diem, hotels, mileage).
-            They won't match until every day carries its real cast/crew/gear cost.
-          </div>
+      {/* Run-of-shoot explainer — items you enter once and mark "run of shoot"
+          are per-day rates that count on every shooting day, so the total
+          multiplies them by the shoot-day count. Makes the big number legible. */}
+      {budget.runOfShootDayCount > 0 && (
+        <div className="rounded-xl border border-line/60 bg-ink/20 px-4 py-3 text-xs text-text/90">
+          <span className="font-semibold text-text">Run-of-shoot items</span> (your daily crew, gear, catering)
+          are multiplied by <span className="font-semibold text-text">× {budget.runOfShootDayCount} shooting days</span> in
+          every total — enter a $300/day grip once and it counts {fmtMoney(300 * budget.runOfShootDayCount, budget.currency)} across the shoot.
+          Items marked <span className="font-semibold text-text">single day</span> count once.
         </div>
       )}
 
@@ -457,6 +452,7 @@ export default function BudgetSection({ projectId, isAdmin }: { projectId: strin
                       key={acc.id}
                       account={acc}
                       currency={budget.currency}
+                      shootDayCount={budget.runOfShootDayCount}
                       open={open}
                       onToggle={() => {
                         const next = new Set(openAccountIds)
@@ -1077,17 +1073,19 @@ function BudgetSettings({ budget, onSaved }: { budget: ApiBudget; onSaved: () =>
 function BudgetAccount({
   account,
   currency,
+  shootDayCount,
   open,
   onToggle,
   onChanged,
 }: {
   account: ApiBudgetAccount
   currency: string
+  shootDayCount: number
   open: boolean
   onToggle: () => void
   onChanged: () => void | Promise<void>
 }) {
-  const total = useMemo(() => accountTotal(account), [account])
+  const total = useMemo(() => accountTotal(account, shootDayCount), [account, shootDayCount])
   const a = CATEGORY_ACCENT[account.category]
 
   return (
@@ -1115,7 +1113,7 @@ function BudgetAccount({
       </button>
       {open && (
         <div className="border-t border-line/40 p-3">
-          <BudgetItemTable account={account} currency={currency} onChanged={onChanged} />
+          <BudgetItemTable account={account} currency={currency} onChanged={onChanged} shootDayCount={shootDayCount} />
         </div>
       )}
     </div>
@@ -1150,10 +1148,12 @@ function BudgetItemTable({
   account,
   currency,
   onChanged,
+  shootDayCount = 0,
 }: {
   account: ApiBudgetAccount
   currency: string
   onChanged: () => void | Promise<void>
+  shootDayCount?: number
 }) {
   const [draft, setDraft] = useState<Draft>(EMPTY_DRAFT)
   const [busy, setBusy] = useState(false)
@@ -1247,7 +1247,7 @@ function BudgetItemTable({
                 {open && (
                   <div className="p-2 space-y-2 border-t border-line/40">
                     {items.map((item) => (
-                      <BudgetItemCard key={item.id} item={item} currency={currency} onChanged={onChanged} />
+                      <BudgetItemCard key={item.id} item={item} currency={currency} onChanged={onChanged} shootDayCount={shootDayCount} />
                     ))}
                   </div>
                 )}
@@ -1255,12 +1255,12 @@ function BudgetItemTable({
             )
           })}
           {sceneGroups.noScene.map((item) => (
-            <BudgetItemCard key={item.id} item={item} currency={currency} onChanged={onChanged} />
+            <BudgetItemCard key={item.id} item={item} currency={currency} onChanged={onChanged} shootDayCount={shootDayCount} />
           ))}
         </>
       ) : (
         account.lineItems.map((item) => (
-          <BudgetItemCard key={item.id} item={item} currency={currency} onChanged={onChanged} />
+          <BudgetItemCard key={item.id} item={item} currency={currency} onChanged={onChanged} shootDayCount={shootDayCount} />
         ))
       )}
       <div className="rounded-lg border border-dashed border-line/60 bg-ink/20 p-2.5 space-y-2">
@@ -1329,10 +1329,12 @@ function BudgetItemCard({
   item,
   currency,
   onChanged,
+  shootDayCount = 0,
 }: {
   item: ApiBudgetLineItem
   currency: string
   onChanged: () => void | Promise<void>
+  shootDayCount?: number
 }) {
   const [code, setCode] = useState(item.code ?? '')
   const [description, setDescription] = useState(item.description)
@@ -1419,8 +1421,19 @@ function BudgetItemCard({
         <Cell value={vendor} onChange={setVendor} onBlur={() => vendor !== (item.vendor ?? '') && void commit({ vendor })} placeholder="—" />
       </div>
       <div className="flex items-center justify-between gap-2 border-t border-line/30 pt-2">
-        <div className="text-[10px] uppercase tracking-wider text-muted/70 font-bold">Line total</div>
-        <div className="font-mono font-bold text-sm text-text">{fmtMoney(total, currency)}</div>
+        <div className="text-[10px] uppercase tracking-wider text-muted/70 font-bold">
+          {item.spansAllShootDays && shootDayCount > 0 ? `Line total · run of shoot × ${shootDayCount}` : 'Line total'}
+        </div>
+        <div className="font-mono font-bold text-sm text-text">
+          {item.spansAllShootDays && shootDayCount > 0 ? (
+            <>
+              <span className="text-muted/60 font-normal">{fmtMoney(total, currency)}/day → </span>
+              {fmtMoney(total * shootDayCount, currency)}
+            </>
+          ) : (
+            fmtMoney(total, currency)
+          )}
+        </div>
       </div>
     </div>
   )

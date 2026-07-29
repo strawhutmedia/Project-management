@@ -215,6 +215,8 @@ export type ApiBudgetLineItem = {
   total: number
   sceneId: string | null
   sceneNumber: string | null
+  spansAllShootDays?: boolean
+  shootDayId?: string | null
 }
 
 export type ApiBudgetAccount = {
@@ -254,6 +256,7 @@ export type ApiBudget = {
   sumOfDayBudgets: number
   daysWithCost: number
   shootDayCount: number
+  runOfShootDayCount: number
   productionTarget: number | null
   postTarget: number | null
   marketingTarget: number | null

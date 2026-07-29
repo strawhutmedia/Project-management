@@ -92,8 +92,9 @@ budgetsRouter.get('/projects/:projectId', async (req, res) => {
     [budget.id],
   )
   const items = await pool.query(
-    `SELECT li.id, li.account_id, li.scene_id, li.code, li.description, li.amt, li.units,
+    `SELECT li.id, li.account_id, li.scene_id, li.shoot_day_id, li.code, li.description, li.amt, li.units,
             li.x, li.rate, li.vendor, li.dated_at, li.notes, li.position,
+            li.spans_all_shoot_days,
             s.number AS scene_number
      FROM budget_line_items li
      LEFT JOIN scenes s ON s.id = li.scene_id
@@ -118,6 +119,11 @@ budgetsRouter.get('/projects/:projectId', async (req, res) => {
       position: it.position,
       sceneId: it.scene_id,
       sceneNumber: it.scene_number,
+      // "Run of shoot" items are entered once (on a source day) but apply to
+      // every shooting day. The client multiplies their per-day cost by the
+      // shoot-day count in every total so the budget reflects the real spend.
+      spansAllShootDays: Boolean(it.spans_all_shoot_days),
+      shootDayId: it.shoot_day_id,
       total,
     })
   }
@@ -208,6 +214,16 @@ budgetsRouter.get('/projects/:projectId', async (req, res) => {
   }
   const autoDayCosts = autoFringes + autoPerDiem + autoHotels + autoMileage - autoCrewDiscount
 
+  // Actual shooting days = days that are neither the travel day nor a break.
+  // This is the multiplier for "run of shoot" line items (a crew day rate
+  // entered once counts once per shooting day).
+  const shootDayRes = await pool.query<{ n: string }>(
+    `SELECT COUNT(*)::int AS n FROM shoot_days
+      WHERE project_id = $1 AND COALESCE(is_travel, false) = false AND COALESCE(is_break, false) = false`,
+    [projectId],
+  )
+  const runOfShootDayCount = Number(shootDayRes.rows[0]?.n ?? 0)
+
   res.json({
     budget: {
       id: budget.id,
@@ -241,6 +257,8 @@ budgetsRouter.get('/projects/:projectId', async (req, res) => {
       sumOfDayBudgets,
       daysWithCost,
       shootDayCount: dayAgg.rows.length,
+      // Multiplier for run-of-shoot items (real shooting days, not travel/break).
+      runOfShootDayCount,
       productionTarget: numOrNull(budget.production_target),
       postTarget: numOrNull(budget.post_target),
       marketingTarget: numOrNull(budget.marketing_target),

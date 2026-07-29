@@ -55,14 +55,21 @@ async function dumpBudgetReconcile(): Promise<void> {
       `SELECT id, code, name, category FROM budget_accounts WHERE budget_id = $1`,
       [b.id],
     )
-    const liRes = await pool.query<{ account_id: string; code: string | null; total: string; scene_id: string | null; shoot_day_id: string | null }>(
-      `SELECT li.account_id, li.code, li.scene_id, li.shoot_day_id,
+    const liRes = await pool.query<{ account_id: string; code: string | null; total: string; scene_id: string | null; shoot_day_id: string | null; spans_all_shoot_days: boolean }>(
+      `SELECT li.account_id, li.code, li.scene_id, li.shoot_day_id, li.spans_all_shoot_days,
               (li.amt * li.x * li.rate)::numeric AS total
          FROM budget_line_items li
          JOIN budget_accounts a ON a.id = li.account_id
         WHERE a.budget_id = $1`,
       [b.id],
     )
+    // Run-of-shoot multiplier: real shooting days (not travel/break).
+    const shootDayRes = await pool.query<{ n: string }>(
+      `SELECT COUNT(*)::int AS n FROM shoot_days
+        WHERE project_id = $1 AND COALESCE(is_travel,false)=false AND COALESCE(is_break,false)=false`,
+      [BIYA_PROJECT_ID],
+    )
+    const N = Number(shootDayRes.rows[0]?.n ?? 0)
     const accById = new Map(accRes.rows.map((a) => [a.id, a]))
     const perAccount = new Map<string, { code: string; name: string; category: string; total: number; items: number }>()
     let directTotal = 0
@@ -71,7 +78,8 @@ async function dumpBudgetReconcile(): Promise<void> {
     for (const li of liRes.rows) {
       const acc = accById.get(li.account_id)
       if (!acc) continue
-      const t = Number(li.total)
+      // Effective cost: run-of-shoot per-day rates count once per shooting day.
+      const t = Number(li.total) * (li.spans_all_shoot_days && N > 0 ? N : 1)
       directTotal += t
       byCategory[acc.category] = (byCategory[acc.category] ?? 0) + t
       if (acc.code?.startsWith('14-')) castSubtotal += t
