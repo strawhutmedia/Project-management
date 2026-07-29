@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-07-29T17:43:36.767Z",
+  "generatedAt": "2026-07-29T17:48:36.777Z",
   "note": "Read-only operational snapshot. Emails are masked; no full contact list is stored here.",
   "summary": {
     "showsWithOutreach": 1,
@@ -102,21 +102,21 @@
           {
             "name": "Huda Mustafa",
             "emailMasked": "h***@hudamustafaofficial.com",
-            "daysSinceFirstEmail": 13,
+            "daysSinceFirstEmail": 14,
             "opened": false,
             "openCount": 0
           },
           {
             "name": "Francesca Farago",
             "emailMasked": "f***@weareverified.co",
-            "daysSinceFirstEmail": 13,
+            "daysSinceFirstEmail": 14,
             "opened": false,
             "openCount": 0
           },
           {
             "name": "Samantha Jewel",
             "emailMasked": "s***@playmgmt.com",
-            "daysSinceFirstEmail": 13,
+            "daysSinceFirstEmail": 14,
             "opened": false,
             "openCount": 0
           },
