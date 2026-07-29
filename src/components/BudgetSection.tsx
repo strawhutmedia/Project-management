@@ -352,7 +352,32 @@ export default function BudgetSection({ projectId, isAdmin }: { projectId: strin
         <Stat label={`Contingency (${budget.contingencyPct}%)`} value={fmtMoney(contingency, budget.currency)} />
         <Stat label={`Bond (${budget.bondPct}%)`} value={fmtMoney(bond, budget.currency)} />
         <Stat label="Grand total" value={fmtMoney(grand, budget.currency)} accent />
+        <Stat
+          label="Sum of day budgets"
+          value={fmtMoney(budget.sumOfDayBudgets, budget.currency)}
+          hint={`${budget.daysWithCost} of ${budget.shootDayCount} days have any cost`}
+        />
       </div>
+
+      {/* Reconciliation banner — the day totals are a SLICE of the grand
+          total (what's been allocated to specific shoot days), not the whole
+          thing. Above/below-line lump sums (cast, crew, gear) live on the
+          top-sheet and aren't pinned to a single day. This makes that
+          explicit so "$18k day × 18 days ≠ grand total" stops being a mystery. */}
+      {budget.daysWithCost < budget.shootDayCount && (
+        <div className="rounded-xl border border-amber-600/40 bg-amber-500/5 px-4 py-3 text-xs text-text/90 space-y-1">
+          <div className="font-bold uppercase tracking-wider text-[10px] text-amber-700">
+            ⚠️ Only {budget.daysWithCost} of {budget.shootDayCount} shoot days have costs entered
+          </div>
+          <div className="text-muted">
+            The <span className="font-semibold text-text">Grand total</span> is the whole top-sheet — cast, crew,
+            and gear are budgeted as lump sums that aren't tied to one day. The{' '}
+            <span className="font-semibold text-text">Sum of day budgets</span> ({fmtMoney(budget.sumOfDayBudgets, budget.currency)})
+            is only the portion pinned to specific days (per-day rates, scene props, per diem, hotels, mileage).
+            They won't match until every day carries its real cast/crew/gear cost.
+          </div>
+        </div>
+      )}
 
       {/* View mode toggle — flat spreadsheet for scanning vs.
           hierarchical categories for subtotal-style review. */}

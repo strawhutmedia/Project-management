@@ -144,12 +144,17 @@ budgetsRouter.get('/projects/:projectId', async (req, res) => {
   const dayAgg = await pool.query<{
     location_tag: string | null; is_travel: boolean; travel_miles: string | null; travel_hours: string | null;
     cast_count: string; crew_count: string; cast_total: string; crew_total: string;
+    day_items_total: string; scene_items_total: string;
   }>(
     `SELECT sd.location_tag, sd.is_travel, sd.travel_miles, sd.travel_hours,
             COUNT(li.id) FILTER (WHERE li.code = 'CAST') AS cast_count,
             COUNT(li.id) FILTER (WHERE li.code = 'CREW') AS crew_count,
             COALESCE(SUM(li.amt * li.x * li.rate) FILTER (WHERE li.code = 'CAST'), 0) AS cast_total,
-            COALESCE(SUM(li.amt * li.x * li.rate) FILTER (WHERE li.code = 'CREW'), 0) AS crew_total
+            COALESCE(SUM(li.amt * li.x * li.rate) FILTER (WHERE li.code = 'CREW'), 0) AS crew_total,
+            COALESCE(SUM(li.amt * li.x * li.rate), 0) AS day_items_total,
+            COALESCE((SELECT SUM(li2.amt * li2.x * li2.rate)
+                        FROM scenes s2 JOIN budget_line_items li2 ON li2.scene_id = s2.id
+                       WHERE s2.shoot_day_id = sd.id AND (li2.amt * li2.x * li2.rate) >= 1), 0) AS scene_items_total
        FROM shoot_days sd
        LEFT JOIN budget_line_items li ON li.shoot_day_id = sd.id
       WHERE sd.project_id = $1
@@ -166,6 +171,11 @@ budgetsRouter.get('/projects/:projectId', async (req, res) => {
   const mileageRateB = Number(budget.mileage_rate_per_mi ?? 0.70)
   const STUDIO_ZONE_MI = 30
   let autoFringes = 0, autoPerDiem = 0, autoHotels = 0, autoMileage = 0, autoCrewDiscount = 0
+  // The true sum of every day's "Day total" (day-attached items + scene
+  // rollup + that day's fringes/per-diem/hotels/mileage) and how many days
+  // actually carry any cost — so the client can show the day↔total
+  // reconciliation instead of the user having to eyeball it.
+  let sumOfDayBudgets = 0, daysWithCost = 0
   for (const d of dayAgg.rows) {
     const castCount = Number(d.cast_count), crewCount = Number(d.crew_count)
     const castTotal = Number(d.cast_total), crewTotal = Number(d.crew_total)
@@ -175,15 +185,26 @@ budgetsRouter.get('/projects/:projectId', async (req, res) => {
     const travelHours = d.travel_hours != null ? Number(d.travel_hours) : null
     const crewMult = d.is_travel && travelHours != null && travelHours < 4 ? 0.5 : 1
     const effCrew = crewTotal * crewMult
-    autoCrewDiscount += crewTotal - effCrew
-    autoFringes += castTotal * (castPct / 100) + effCrew * (crewPct / 100)
+    const crewReduction = crewTotal - effCrew
+    autoCrewDiscount += crewReduction
+    const dFringes = castTotal * (castPct / 100) + effCrew * (crewPct / 100)
+    autoFringes += dFringes
+    let dPerDiem = 0, dHotels = 0, dMileage = 0
     if (away) {
-      autoPerDiem += castPDd * castCount + crewPDd * crewCount
-      autoHotels += (hotelCastN * castCount + hotelCrewN * crewCount) * (1 + hotelContPct / 100)
+      dPerDiem = castPDd * castCount + crewPDd * crewCount
+      dHotels = (hotelCastN * castCount + hotelCrewN * crewCount) * (1 + hotelContPct / 100)
+      autoPerDiem += dPerDiem
+      autoHotels += dHotels
     }
     if (d.is_travel) {
-      autoMileage += mileageRateB * Math.max(0, travelMiles - STUDIO_ZONE_MI) * (castCount + crewCount)
+      dMileage = mileageRateB * Math.max(0, travelMiles - STUDIO_ZONE_MI) * (castCount + crewCount)
+      autoMileage += dMileage
     }
+    const dayItemsTotal = Number(d.day_items_total) - crewReduction
+    const sceneItemsTotal = Number(d.scene_items_total)
+    const dayTotal = dayItemsTotal + sceneItemsTotal + dFringes + dPerDiem + dHotels + dMileage
+    sumOfDayBudgets += dayTotal
+    if (dayTotal > 0) daysWithCost += 1
   }
   const autoDayCosts = autoFringes + autoPerDiem + autoHotels + autoMileage - autoCrewDiscount
 
@@ -215,6 +236,11 @@ budgetsRouter.get('/projects/:projectId', async (req, res) => {
       autoHotels,
       autoMileage,
       autoCrewDiscount,
+      // Reconciliation: the real sum of every day's Day total, and how many
+      // of the shoot days actually carry any cost yet.
+      sumOfDayBudgets,
+      daysWithCost,
+      shootDayCount: dayAgg.rows.length,
       productionTarget: numOrNull(budget.production_target),
       postTarget: numOrNull(budget.post_target),
       marketingTarget: numOrNull(budget.marketing_target),

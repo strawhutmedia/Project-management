@@ -251,6 +251,9 @@ export type ApiBudget = {
   autoHotels: number
   autoMileage: number
   autoCrewDiscount: number
+  sumOfDayBudgets: number
+  daysWithCost: number
+  shootDayCount: number
   productionTarget: number | null
   postTarget: number | null
   marketingTarget: number | null

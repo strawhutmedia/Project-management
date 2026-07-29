@@ -197,13 +197,27 @@ export async function seedBackInYourArms(): Promise<void> {
          WHERE project_id = $1`,
         [projId],
       )
-      // Used to auto-populate the budget if total spend was $0 — but
-      // that fought with the "Reset all prices" button: every Railway
-      // redeploy after a reset would silently re-stamp the
-      // StudioBinder defaults back on top of Ryan's clean plate. The
-      // populate path is intentionally NOT re-run here on existing
-      // projects; first-time creation in the INSERT branch below
-      // still seeds defaults once.
+      // Apply Ryan's real detailed budget (cast/crew/gear amounts) to the
+      // live project ONCE. The live BIYA project was created before this
+      // populate path existed, so its line items sat at $0 and the whole
+      // budget read as near-empty. The one-time detailed_budget_applied
+      // flag + blank-only setLine mean: blanks get filled once, anything
+      // Ryan already priced is untouched, and a later "Reset all prices"
+      // is respected (it won't re-stamp on the next boot).
+      const budgetRow = await pool.query<{ id: string; detailed_budget_applied: boolean }>(
+        `SELECT id, detailed_budget_applied FROM budgets WHERE project_id = $1`,
+        [projId],
+      )
+      if (budgetRow.rows[0] && !budgetRow.rows[0].detailed_budget_applied) {
+        await populateBiyaBudgetAmounts(pool, budgetRow.rows[0].id)
+        await pool.query(
+          `UPDATE budgets SET detailed_budget_applied = true WHERE id = $1`,
+          [budgetRow.rows[0].id],
+        )
+        logInfo('BIYA seed: applied detailed budget amounts (one-time)', {
+          projectId: projId, budgetId: budgetRow.rows[0].id,
+        })
+      }
       // Pre-fill wardrobe outfit numbers on blank WARDROBE items (never
       // overwrites a number the costume team set). Fills any items that
       // exist now; new ones from a re-analyze get numbered next boot.
@@ -334,13 +348,18 @@ async function setLine(
   rate: number,
 ): Promise<void> {
   await client.query(
+    // Only fill BLANK items (current total = 0) so we never clobber a price
+    // Ryan already entered by hand. Combined with the one-time
+    // detailed_budget_applied guard, this also means a "Reset all prices"
+    // is respected — the reset stays reset on the next boot.
     `UPDATE budget_line_items li
        SET amt = 1, x = 1, rate = $4
      FROM budget_accounts a
      WHERE li.account_id = a.id
        AND a.budget_id = $1
        AND a.code = $2
-       AND lower(li.description) LIKE lower($3)`,
+       AND lower(li.description) LIKE lower($3)
+       AND (li.amt * li.x * li.rate) = 0`,
     [budgetId, accountCode, `%${descMatch}%`, rate],
   )
 }
@@ -361,6 +380,13 @@ async function addLine(
   )
   if (acc.rows.length === 0) return
   const accId = (acc.rows[0] as { id: string }).id
+  // Idempotent: if a line with this exact description already exists in the
+  // account, don't add a duplicate on a re-run.
+  const dupe = await client.query(
+    `SELECT 1 FROM budget_line_items WHERE account_id = $1 AND lower(description) = lower($2) LIMIT 1`,
+    [accId, description],
+  )
+  if (dupe.rows.length > 0) return
   const posRes = await client.query(
     `SELECT COALESCE(MAX(position), 0) + 10 AS next FROM budget_line_items WHERE account_id = $1`,
     [accId],
