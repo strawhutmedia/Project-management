@@ -1,9 +1,9 @@
 {
   "version": "0.2.2",
-  "now": "2026-07-29T03:05:39.414Z",
+  "now": "2026-07-29T03:16:31.870Z",
   "boot": {
-    "startedAt": "2026-07-29T03:05:39.047Z",
-    "completedAt": "2026-07-29T03:05:39.405Z",
+    "startedAt": "2026-07-29T03:16:30.888Z",
+    "completedAt": "2026-07-29T03:16:31.853Z",
     "error": null
   },
   "env": {
@@ -121,7 +121,8 @@
       "085_private_talk_reply_to.sql",
       "086_private_talk_reply_to_booking_only.sql",
       "087_clip_captions.sql",
-      "088_outreach_followup.sql"
+      "088_outreach_followup.sql",
+      "089_biya_detailed_budget_flag.sql"
     ],
     "userCount": 11,
     "projectCount": 16
@@ -129,7 +130,7 @@
   "recentLog": [
     {
       "level": "info",
-      "ts": "2026-07-29T03:05:39.045Z",
+      "ts": "2026-07-29T03:16:30.884Z",
       "msg": "serving client from",
       "data": {
         "clientDir": "/app/dist"
@@ -137,7 +138,7 @@
     },
     {
       "level": "info",
-      "ts": "2026-07-29T03:05:39.047Z",
+      "ts": "2026-07-29T03:16:30.888Z",
       "msg": "boot starting",
       "data": {
         "cwd": "/app",
@@ -148,12 +149,21 @@
     },
     {
       "level": "info",
-      "ts": "2026-07-29T03:05:39.281Z",
+      "ts": "2026-07-29T03:16:31.170Z",
       "msg": "migrations complete"
     },
     {
       "level": "info",
-      "ts": "2026-07-29T03:05:39.399Z",
+      "ts": "2026-07-29T03:16:31.829Z",
+      "msg": "BIYA seed: applied detailed budget amounts (one-time)",
+      "data": {
+        "projectId": "12f53ed1-c6c7-4c11-8d7b-06d91744c9af",
+        "budgetId": "f1ab321d-4914-46cc-850e-6f2a8bad2ecf"
+      }
+    },
+    {
+      "level": "info",
+      "ts": "2026-07-29T03:16:31.843Z",
       "msg": "wardrobe outfits: applied",
       "data": {
         "projectId": "12f53ed1-c6c7-4c11-8d7b-06d91744c9af",
@@ -164,7 +174,7 @@
     },
     {
       "level": "info",
-      "ts": "2026-07-29T03:05:39.399Z",
+      "ts": "2026-07-29T03:16:31.844Z",
       "msg": "BIYA seed: project already exists, ensured shoot days",
       "data": {
         "projectId": "12f53ed1-c6c7-4c11-8d7b-06d91744c9af"
@@ -172,12 +182,12 @@
     },
     {
       "level": "info",
-      "ts": "2026-07-29T03:05:39.405Z",
+      "ts": "2026-07-29T03:16:31.854Z",
       "msg": "listening on :8080"
     },
     {
       "level": "info",
-      "ts": "2026-07-29T03:05:39.405Z",
+      "ts": "2026-07-29T03:16:31.855Z",
       "msg": "scheduler started (every 5 min)"
     }
   ]
