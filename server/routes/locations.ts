@@ -45,7 +45,17 @@ function roomOf(location: string): string {
   return segmentsOf(location).slice(1).filter((s) => !isTimeSeg(s)).join(' - ').trim()
 }
 function titleCase(s: string): string {
-  return s.toLowerCase().replace(/\b\w/g, (c) => c.toUpperCase())
+  // Normalize curly apostrophes to straight, then capitalize the first letter
+  // of each word — but NOT the letter after an apostrophe (so "SAWYER'S" →
+  // "Sawyer's", not "Sawyer'S"). Keep short all-caps acronyms (YMCA, ADU) upper.
+  return s
+    .replace(/[‘’]/g, "'")
+    .split(/\s+/)
+    .map((word) => {
+      if (word.length >= 2 && word.length <= 4 && /^[A-Z]+$/.test(word)) return word // acronym
+      return word.toLowerCase().replace(/^[a-z]/, (c) => c.toUpperCase())
+    })
+    .join(' ')
 }
 
 async function userCanAccessProject(userId: string, role: string, projectId: string): Promise<boolean> {
