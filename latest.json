@@ -1,9 +1,9 @@
 {
   "version": "0.2.2",
-  "now": "2026-07-29T03:16:31.870Z",
+  "now": "2026-07-29T03:31:30.592Z",
   "boot": {
-    "startedAt": "2026-07-29T03:16:30.888Z",
-    "completedAt": "2026-07-29T03:16:31.853Z",
+    "startedAt": "2026-07-29T03:31:29.561Z",
+    "completedAt": "2026-07-29T03:31:30.581Z",
     "error": null
   },
   "env": {
@@ -122,7 +122,8 @@
       "086_private_talk_reply_to_booking_only.sql",
       "087_clip_captions.sql",
       "088_outreach_followup.sql",
-      "089_biya_detailed_budget_flag.sql"
+      "089_biya_detailed_budget_flag.sql",
+      "090_biya_detailed_budget_revert_flag.sql"
     ],
     "userCount": 11,
     "projectCount": 16
@@ -130,7 +131,7 @@
   "recentLog": [
     {
       "level": "info",
-      "ts": "2026-07-29T03:16:30.884Z",
+      "ts": "2026-07-29T03:31:29.560Z",
       "msg": "serving client from",
       "data": {
         "clientDir": "/app/dist"
@@ -138,7 +139,7 @@
     },
     {
       "level": "info",
-      "ts": "2026-07-29T03:16:30.888Z",
+      "ts": "2026-07-29T03:31:29.561Z",
       "msg": "boot starting",
       "data": {
         "cwd": "/app",
@@ -149,13 +150,13 @@
     },
     {
       "level": "info",
-      "ts": "2026-07-29T03:16:31.170Z",
+      "ts": "2026-07-29T03:31:29.806Z",
       "msg": "migrations complete"
     },
     {
       "level": "info",
-      "ts": "2026-07-29T03:16:31.829Z",
-      "msg": "BIYA seed: applied detailed budget amounts (one-time)",
+      "ts": "2026-07-29T03:31:30.567Z",
+      "msg": "BIYA seed: reverted mistakenly-loaded detailed budget amounts (one-time)",
       "data": {
         "projectId": "12f53ed1-c6c7-4c11-8d7b-06d91744c9af",
         "budgetId": "f1ab321d-4914-46cc-850e-6f2a8bad2ecf"
@@ -163,7 +164,7 @@
     },
     {
       "level": "info",
-      "ts": "2026-07-29T03:16:31.843Z",
+      "ts": "2026-07-29T03:31:30.574Z",
       "msg": "wardrobe outfits: applied",
       "data": {
         "projectId": "12f53ed1-c6c7-4c11-8d7b-06d91744c9af",
@@ -174,7 +175,7 @@
     },
     {
       "level": "info",
-      "ts": "2026-07-29T03:16:31.844Z",
+      "ts": "2026-07-29T03:31:30.575Z",
       "msg": "BIYA seed: project already exists, ensured shoot days",
       "data": {
         "projectId": "12f53ed1-c6c7-4c11-8d7b-06d91744c9af"
@@ -182,12 +183,12 @@
     },
     {
       "level": "info",
-      "ts": "2026-07-29T03:16:31.854Z",
+      "ts": "2026-07-29T03:31:30.581Z",
       "msg": "listening on :8080"
     },
     {
       "level": "info",
-      "ts": "2026-07-29T03:16:31.855Z",
+      "ts": "2026-07-29T03:31:30.581Z",
       "msg": "scheduler started (every 5 min)"
     }
   ]
