@@ -197,24 +197,23 @@ export async function seedBackInYourArms(): Promise<void> {
          WHERE project_id = $1`,
         [projId],
       )
-      // Apply Ryan's real detailed budget (cast/crew/gear amounts) to the
-      // live project ONCE. The live BIYA project was created before this
-      // populate path existed, so its line items sat at $0 and the whole
-      // budget read as near-empty. The one-time detailed_budget_applied
-      // flag + blank-only setLine mean: blanks get filled once, anything
-      // Ryan already priced is untouched, and a later "Reset all prices"
-      // is respected (it won't re-stamp on the next boot).
-      const budgetRow = await pool.query<{ id: string; detailed_budget_applied: boolean }>(
-        `SELECT id, detailed_budget_applied FROM budgets WHERE project_id = $1`,
+      // Ryan works entirely in the per-day budget, not the top-sheet lump
+      // sums. An earlier attempt auto-loaded the code's detailed budget
+      // amounts onto the live project's blank lines — numbers Ryan never
+      // typed. Undo that ONCE, precisely (only zeroing lines that still
+      // hold exactly the loaded amount), then never auto-apply again. His
+      // own per-day entries and any hand-typed prices are untouched.
+      const budgetRow = await pool.query<{ id: string; detailed_budget_applied: boolean; detailed_budget_reverted: boolean }>(
+        `SELECT id, detailed_budget_applied, detailed_budget_reverted FROM budgets WHERE project_id = $1`,
         [projId],
       )
-      if (budgetRow.rows[0] && !budgetRow.rows[0].detailed_budget_applied) {
-        await populateBiyaBudgetAmounts(pool, budgetRow.rows[0].id)
+      if (budgetRow.rows[0] && budgetRow.rows[0].detailed_budget_applied && !budgetRow.rows[0].detailed_budget_reverted) {
+        await revertBiyaDetailedBudget(pool, budgetRow.rows[0].id)
         await pool.query(
-          `UPDATE budgets SET detailed_budget_applied = true WHERE id = $1`,
+          `UPDATE budgets SET detailed_budget_reverted = true WHERE id = $1`,
           [budgetRow.rows[0].id],
         )
-        logInfo('BIYA seed: applied detailed budget amounts (one-time)', {
+        logInfo('BIYA seed: reverted mistakenly-loaded detailed budget amounts (one-time)', {
           projectId: projId, budgetId: budgetRow.rows[0].id,
         })
       }
@@ -399,130 +398,138 @@ async function addLine(
   )
 }
 
+// The full detailed BIYA budget as a shared data table so apply and revert
+// use the SAME definitions (a hand-maintained revert list is how you wipe
+// the wrong number). `set` lines match an existing StudioBinder default
+// line by description; `add` lines are extra itemized lines inserted into
+// an account. NOTE: this data is retained only so the one-time REVERT can
+// precisely undo the amounts that were mistakenly loaded onto the live
+// project. It is no longer auto-applied.
+type SetLine = { kind: 'set'; account: string; descMatch: string; rate: number }
+type AddLine = { kind: 'add'; account: string; description: string; rate: number; code: string }
+const BIYA_BUDGET_LINES: Array<SetLine | AddLine> = [
+  { kind: 'set', account: '14-00', descMatch: 'lead cast', rate: 50000 },
+  { kind: 'set', account: '14-00', descMatch: 'supporting cast', rate: 39000 },
+  { kind: 'set', account: '14-00', descMatch: 'day players', rate: 14000 },
+  { kind: 'set', account: '14-00', descMatch: 'stunt coordinators', rate: 5000 },
+  { kind: 'set', account: '14-00', descMatch: 'stunts & adjustments', rate: 3000 },
+  { kind: 'set', account: '14-00', descMatch: 'casting director', rate: 4000 },
+  { kind: 'set', account: '21-00', descMatch: 'background extras', rate: 8000 },
+  { kind: 'set', account: '20-00', descMatch: 'unit production manager', rate: 40000 },
+  { kind: 'set', account: '20-00', descMatch: 'production coordinator', rate: 18000 },
+  { kind: 'set', account: '20-00', descMatch: '1st asst director', rate: 20000 },
+  { kind: 'set', account: '20-00', descMatch: '2nd asst director', rate: 11000 },
+  { kind: 'set', account: '20-00', descMatch: 'script supervisor', rate: 8000 },
+  { kind: 'set', account: '20-00', descMatch: 'production asst (set)', rate: 12000 },
+  { kind: 'set', account: '22-00', descMatch: 'production designer', rate: 22000 },
+  { kind: 'set', account: '25-00', descMatch: 'key grip', rate: 13000 },
+  { kind: 'set', account: '25-00', descMatch: 'best boy grip', rate: 9000 },
+  { kind: 'set', account: '25-00', descMatch: 'grip package rental', rate: 9000 },
+  { kind: 'set', account: '26-00', descMatch: 'set decorator', rate: 11000 },
+  { kind: 'set', account: '28-00', descMatch: 'costume designer', rate: 15000 },
+  { kind: 'set', account: '29-00', descMatch: 'gaffer', rate: 13000 },
+  { kind: 'set', account: '29-00', descMatch: 'best boy electric', rate: 9000 },
+  { kind: 'set', account: '29-00', descMatch: 'lighting package rental', rate: 11000 },
+  { kind: 'set', account: '29-00', descMatch: 'generator', rate: 5000 },
+  { kind: 'set', account: '30-00', descMatch: 'director of photography', rate: 33000 },
+  { kind: 'set', account: '30-00', descMatch: '1st asst camera', rate: 11000 },
+  { kind: 'set', account: '30-00', descMatch: 'dit', rate: 9000 },
+  { kind: 'set', account: '30-00', descMatch: 'camera package rental', rate: 14000 },
+  { kind: 'set', account: '30-00', descMatch: 'expendables', rate: 4000 },
+  { kind: 'set', account: '31-00', descMatch: 'sound mixer', rate: 11000 },
+  { kind: 'set', account: '31-00', descMatch: 'sound package rental', rate: 4000 },
+  { kind: 'set', account: '32-00', descMatch: 'key make-up', rate: 11000 },
+  { kind: 'set', account: '33-00', descMatch: 'vehicle rentals', rate: 8000 },
+  { kind: 'set', account: '33-00', descMatch: 'fuel', rate: 2000 },
+  { kind: 'set', account: '34-00', descMatch: 'location manager', rate: 14000 },
+  { kind: 'set', account: '34-00', descMatch: 'permits', rate: 3000 },
+  { kind: 'set', account: '34-00', descMatch: 'parking', rate: 1000 },
+  { kind: 'add', account: '34-00', description: "Jason Kendrick's house (cleaning)", rate: 3000, code: '34-09' },
+  { kind: 'add', account: '34-00', description: 'ADU / Sawyer Solvang house (cleaning)', rate: 2000, code: '34-10' },
+  { kind: 'add', account: '34-00', description: 'Mall (4 scenes — Day 14)', rate: 12000, code: '34-11' },
+  { kind: 'add', account: '34-00', description: 'Hospital (5 scenes — Day 20)', rate: 5000, code: '34-12' },
+  { kind: 'add', account: '34-00', description: 'Coffee shop (4 scenes — Day 12)', rate: 3000, code: '34-13' },
+  { kind: 'add', account: '34-00', description: 'Bar Solvang + Bar Minneapolis', rate: 4000, code: '34-14' },
+  { kind: 'add', account: '34-00', description: 'Liquor store', rate: 1000, code: '34-15' },
+  { kind: 'add', account: '34-00', description: 'Boutique clothing store', rate: 1000, code: '34-16' },
+  { kind: 'add', account: '34-00', description: 'Goodwill exterior', rate: 500, code: '34-17' },
+  { kind: 'add', account: '34-00', description: 'Hotel conference (Dayanet) + YMCA', rate: 2500, code: '34-18' },
+  { kind: 'add', account: '34-00', description: "Justine & Tom's house + Sawyer's Minneapolis apt", rate: 4000, code: '34-19' },
+  { kind: 'set', account: '35-00', descMatch: 'picture vehicles', rate: 8000 },
+  { kind: 'set', account: '36-00', descMatch: 'sfx materials', rate: 3000 },
+  { kind: 'set', account: '36-00', descMatch: 'sfx tech', rate: 2000 },
+  { kind: 'add', account: '57-00', description: 'Catering / craft service (18 days)', rate: 24000, code: '57-07' },
+  { kind: 'set', account: '45-00', descMatch: 'asst editor', rate: 2000 },
+  { kind: 'set', account: '45-00', descMatch: 'edit suite rental', rate: 2000 },
+  { kind: 'set', account: '45-00', descMatch: 'edit hardware', rate: 1000 },
+  { kind: 'set', account: '46-00', descMatch: 'composer', rate: 20000 },
+  { kind: 'set', account: '46-00', descMatch: 'music licensing', rate: 10000 },
+  { kind: 'set', account: '47-00', descMatch: 'vfx shots', rate: 5000 },
+  { kind: 'set', account: '48-00', descMatch: 'sound designer', rate: 20000 },
+  { kind: 'set', account: '48-00', descMatch: 'mix stage rental', rate: 2000 },
+  { kind: 'set', account: '49-00', descMatch: 'color correction', rate: 20000 },
+  { kind: 'set', account: '49-00', descMatch: 'deliverables', rate: 4000 },
+  { kind: 'set', account: '55-00', descMatch: 'unit publicist', rate: 30000 },
+  { kind: 'set', account: '55-00', descMatch: 'stills photographer', rate: 5000 },
+  { kind: 'set', account: '55-00', descMatch: 'press materials', rate: 4000 },
+  { kind: 'set', account: '55-00', descMatch: 'premiere', rate: 3000 },
+  { kind: 'add', account: '55-00', description: 'Festival submissions', rate: 3000, code: '55-06' },
+  { kind: 'set', account: '56-00', descMatch: 'legal fees', rate: 5000 },
+  { kind: 'set', account: '56-00', descMatch: 'production accountant', rate: 5000 },
+  { kind: 'set', account: '56-00', descMatch: 'payroll service', rate: 1000 },
+  { kind: 'set', account: '57-00', descMatch: 'office rent', rate: 1000 },
+  { kind: 'set', account: '57-00', descMatch: 'office supplies', rate: 1000 },
+  { kind: 'set', account: '57-00', descMatch: 'petty cash', rate: 1000 },
+  { kind: 'set', account: '58-00', descMatch: 'production package', rate: 12000 },
+  { kind: 'set', account: '58-00', descMatch: 'e&o insurance', rate: 4000 },
+]
+
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 async function populateBiyaBudgetAmounts(
   client: PoolClient | typeof pool,
   budgetId: string,
 ): Promise<void> {
-  // CAST (14-00) — Ryan's actual cast budget
-  await setLine(client, budgetId, '14-00', 'lead cast', 50000)         // Sawyer + Kendrick combined
-  await setLine(client, budgetId, '14-00', 'supporting cast', 39000)   // Anna $10k + Aaron $7k + Margo $7k + Justine $4k + Tom $2k + Nadia $2k + Lilly $3k + Alex $2k + Bernard $2k
-  await setLine(client, budgetId, '14-00', 'day players', 14000)
-  await setLine(client, budgetId, '14-00', 'stunt coordinators', 5000)
-  await setLine(client, budgetId, '14-00', 'stunts & adjustments', 3000)
-  await setLine(client, budgetId, '14-00', 'casting director', 4000)
+  for (const line of BIYA_BUDGET_LINES) {
+    if (line.kind === 'set') await setLine(client, budgetId, line.account, line.descMatch, line.rate)
+    else await addLine(client, budgetId, line.account, line.description, line.rate, line.code)
+  }
+}
 
-  // EXTRAS (21-00)
-  await setLine(client, budgetId, '21-00', 'background extras', 8000)
-
-  // PRODUCTION STAFF (20-00) — line producer is the only paid ATL role
-  await setLine(client, budgetId, '20-00', 'unit production manager', 40000)  // Line Producer
-  await setLine(client, budgetId, '20-00', 'production coordinator', 18000)
-  await setLine(client, budgetId, '20-00', '1st asst director', 20000)
-  await setLine(client, budgetId, '20-00', '2nd asst director', 11000)
-  await setLine(client, budgetId, '20-00', 'script supervisor', 8000)
-  await setLine(client, budgetId, '20-00', 'production asst (set)', 12000)  // 3 PAs combined
-
-  // SET DESIGN (22-00)
-  await setLine(client, budgetId, '22-00', 'production designer', 22000)
-
-  // SET OPERATIONS / GRIP (25-00)
-  await setLine(client, budgetId, '25-00', 'key grip', 13000)
-  await setLine(client, budgetId, '25-00', 'best boy grip', 9000)
-  await setLine(client, budgetId, '25-00', 'grip package rental', 9000)
-
-  // SET DRESSING (26-00)
-  await setLine(client, budgetId, '26-00', 'set decorator', 11000)  // combined w/ props
-
-  // WARDROBE (28-00)
-  await setLine(client, budgetId, '28-00', 'costume designer', 15000)
-
-  // ELECTRIC (29-00)
-  await setLine(client, budgetId, '29-00', 'gaffer', 13000)
-  await setLine(client, budgetId, '29-00', 'best boy electric', 9000)
-  await setLine(client, budgetId, '29-00', 'lighting package rental', 11000)
-  await setLine(client, budgetId, '29-00', 'generator', 5000)
-
-  // CAMERA (30-00)
-  await setLine(client, budgetId, '30-00', 'director of photography', 33000)
-  await setLine(client, budgetId, '30-00', '1st asst camera', 11000)
-  await setLine(client, budgetId, '30-00', 'dit', 9000)
-  await setLine(client, budgetId, '30-00', 'camera package rental', 14000)
-  await setLine(client, budgetId, '30-00', 'expendables', 4000)
-
-  // PRODUCTION SOUND (31-00)
-  await setLine(client, budgetId, '31-00', 'sound mixer', 11000)
-  await setLine(client, budgetId, '31-00', 'sound package rental', 4000)
-
-  // MAKE-UP & HAIR (32-00)
-  await setLine(client, budgetId, '32-00', 'key make-up', 11000)  // combined MU + Hair
-
-  // TRANSPORTATION (33-00)
-  await setLine(client, budgetId, '33-00', 'vehicle rentals', 8000)
-  await setLine(client, budgetId, '33-00', 'fuel', 2000)
-
-  // LOCATIONS (34-00)
-  await setLine(client, budgetId, '34-00', 'location manager', 14000)
-  await setLine(client, budgetId, '34-00', 'permits', 3000)
-  await setLine(client, budgetId, '34-00', 'parking', 1000)
-  // Specific location fees as added lines so they're itemized
-  await addLine(client, budgetId, '34-00', "Jason Kendrick's house (cleaning)", 3000, '34-09')
-  await addLine(client, budgetId, '34-00', 'ADU / Sawyer Solvang house (cleaning)', 2000, '34-10')
-  await addLine(client, budgetId, '34-00', 'Mall (4 scenes — Day 14)', 12000, '34-11')
-  await addLine(client, budgetId, '34-00', 'Hospital (5 scenes — Day 20)', 5000, '34-12')
-  await addLine(client, budgetId, '34-00', 'Coffee shop (4 scenes — Day 12)', 3000, '34-13')
-  await addLine(client, budgetId, '34-00', 'Bar Solvang + Bar Minneapolis', 4000, '34-14')
-  await addLine(client, budgetId, '34-00', 'Liquor store', 1000, '34-15')
-  await addLine(client, budgetId, '34-00', 'Boutique clothing store', 1000, '34-16')
-  await addLine(client, budgetId, '34-00', 'Goodwill exterior', 500, '34-17')
-  await addLine(client, budgetId, '34-00', 'Hotel conference (Dayanet) + YMCA', 2500, '34-18')
-  await addLine(client, budgetId, '34-00', "Justine & Tom's house + Sawyer's Minneapolis apt", 4000, '34-19')
-
-  // PICTURE VEHICLES (35-00)
-  await setLine(client, budgetId, '35-00', 'picture vehicles', 8000)  // Defender + Sawyer car + others
-
-  // SPECIAL EFFECTS (36-00) — knife rig
-  await setLine(client, budgetId, '36-00', 'sfx materials', 3000)
-  await setLine(client, budgetId, '36-00', 'sfx tech', 2000)
-
-  // BTL TRAVEL & CATERING — catering bucketed under General Expense for now
-  await addLine(client, budgetId, '57-00', 'Catering / craft service (18 days)', 24000, '57-07')
-
-  // POST PRODUCTION
-  await setLine(client, budgetId, '45-00', 'asst editor', 2000)
-  await setLine(client, budgetId, '45-00', 'edit suite rental', 2000)
-  await setLine(client, budgetId, '45-00', 'edit hardware', 1000)
-
-  await setLine(client, budgetId, '46-00', 'composer', 20000)
-  await setLine(client, budgetId, '46-00', 'music licensing', 10000)  // Sync only — Maggie owns the master
-
-  await setLine(client, budgetId, '47-00', 'vfx shots', 5000)  // XenoSouls touch-ups + blood comp
-
-  await setLine(client, budgetId, '48-00', 'sound designer', 20000)  // Foley + Sound Design combined
-  await setLine(client, budgetId, '48-00', 'mix stage rental', 2000)
-
-  await setLine(client, budgetId, '49-00', 'color correction', 20000)  // Cam
-  await setLine(client, budgetId, '49-00', 'deliverables', 4000)
-
-  // PUBLICITY (Marketing — $50k)
-  await setLine(client, budgetId, '55-00', 'unit publicist', 30000)
-  await setLine(client, budgetId, '55-00', 'stills photographer', 5000)
-  await setLine(client, budgetId, '55-00', 'press materials', 4000)
-  await setLine(client, budgetId, '55-00', 'premiere', 3000)
-  await addLine(client, budgetId, '55-00', 'Festival submissions', 3000, '55-06')
-
-  // LEGAL & ACCOUNTING (Admin)
-  await setLine(client, budgetId, '56-00', 'legal fees', 5000)
-  await setLine(client, budgetId, '56-00', 'production accountant', 5000)
-  await setLine(client, budgetId, '56-00', 'payroll service', 1000)
-
-  // GENERAL EXPENSE (Admin)
-  await setLine(client, budgetId, '57-00', 'office rent', 1000)
-  await setLine(client, budgetId, '57-00', 'office supplies', 1000)
-  await setLine(client, budgetId, '57-00', 'petty cash', 1000)
-
-  // INSURANCE (Admin)
-  await setLine(client, budgetId, '58-00', 'production package', 12000)
-  await setLine(client, budgetId, '58-00', 'e&o insurance', 4000)
+// Precisely UNDO the amounts loaded by populateBiyaBudgetAmounts, WITHOUT
+// touching anything the user entered themselves. For `set` lines: zero the
+// matching item ONLY IF it still holds exactly the loaded rate (so a value
+// the user changed since is preserved). For `add` lines: delete the inserted
+// row ONLY IF it still holds the loaded rate.
+async function revertBiyaDetailedBudget(
+  client: PoolClient | typeof pool,
+  budgetId: string,
+): Promise<void> {
+  for (const line of BIYA_BUDGET_LINES) {
+    if (line.kind === 'set') {
+      await client.query(
+        `UPDATE budget_line_items li
+           SET amt = 0, x = 1, rate = 0
+         FROM budget_accounts a
+         WHERE li.account_id = a.id
+           AND a.budget_id = $1
+           AND a.code = $2
+           AND lower(li.description) LIKE lower($3)
+           AND (li.amt * li.x * li.rate) = $4`,
+        [budgetId, line.account, `%${line.descMatch}%`, line.rate],
+      )
+    } else {
+      await client.query(
+        `DELETE FROM budget_line_items li
+          USING budget_accounts a
+          WHERE li.account_id = a.id
+            AND a.budget_id = $1
+            AND a.code = $2
+            AND lower(li.description) = lower($3)
+            AND (li.amt * li.x * li.rate) = $4`,
+        [budgetId, line.account, line.description, line.rate],
+      )
+    }
+  }
 }
 
 async function ensureFilmTeam(
