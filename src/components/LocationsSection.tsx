@@ -35,7 +35,6 @@ export default function LocationsSection({ projectId, isAdmin }: { projectId: st
       if (!m.has(k)) m.set(k, [])
       m.get(k)!.push(l)
     }
-    for (const arr of m.values()) arr.sort((a, b) => a.position - b.position || a.name.localeCompare(b.name))
     return m
   }, [locations])
 
@@ -135,10 +134,13 @@ export default function LocationsSection({ projectId, isAdmin }: { projectId: st
     )
   }
 
-  const topLevel = childrenOf.get(null) ?? []
+  // Sort most-shot locations to the top so the breakdown reads as a ranking.
+  const sortByDays = (arr: ApiLocation[]) =>
+    [...arr].sort((a, b) => rolledDays(b.id).length - rolledDays(a.id).length || a.name.localeCompare(b.name))
+  const topLevel = sortByDays(childrenOf.get(null) ?? [])
 
   function renderNode(loc: ApiLocation, depth: number) {
-    const kids = childrenOf.get(loc.id) ?? []
+    const kids = sortByDays(childrenOf.get(loc.id) ?? [])
     const days = rolledDays(loc.id)
     const scenes = rolledScenes(loc.id)
     const isDragging = dragId === loc.id

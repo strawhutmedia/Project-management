@@ -20,9 +20,18 @@ async function userCanAccessProject(userId: string, role: string, projectId: str
   return rows.length > 0
 }
 
-// Ensure a locations row exists for every distinct scene location_tag in the
-// project. Never clobbers a name/parent the user set (ON CONFLICT DO NOTHING).
-async function ensureLocationRows(projectId: string): Promise<void> {
+function tagify(s: string): string {
+  return s.toLowerCase().replace(/'/g, '').replace(/[^\w]+/g, '_').replace(/^_+|_+$/g, '').slice(0, 80)
+}
+
+// Ensure a locations row exists for every distinct scene location_tag, and
+// AUTO-ORGANIZE: script headings like "SAWYER'S APARTMENT - LIVING ROOM" get
+// their specific set ("Living Room") nested under an auto-created base group
+// ("Sawyer's Apartment"), so the user sees a clean per-location breakdown
+// without dragging. Only newly-synced rows are auto-nested, so any manual
+// re-nesting the user does afterwards is preserved.
+export async function ensureLocationRows(projectId: string): Promise<void> {
+  // 1. Insert any scene locations not seen before.
   await pool.query(
     `INSERT INTO locations (project_id, tag, name, position)
      SELECT $1, s.location_tag,
@@ -34,6 +43,40 @@ async function ensureLocationRows(projectId: string): Promise<void> {
      ON CONFLICT (project_id, tag) DO NOTHING`,
     [projectId],
   )
+  // 2. Auto-nest any compound location ("SAWYER'S APT - LIVING ROOM") whose
+  //    name still carries the " - " — i.e. hasn't been organized yet. We trim
+  //    the name to just the sub-part ("Living Room") afterwards, and that trim
+  //    is the idempotency marker: a processed or user-un-nested row no longer
+  //    contains " - " and is never touched again. Skip already-synthetic
+  //    group rows (base_/grp_).
+  const compound = await pool.query<{ id: string; name: string }>(
+    `SELECT id, name FROM locations
+      WHERE project_id = $1 AND name ~ '\\S\\s+-\\s+\\S'
+        AND tag NOT LIKE 'base_%' AND tag NOT LIKE 'grp_%'`,
+    [projectId],
+  )
+  for (const row of compound.rows) {
+    const name = row.name ?? ''
+    const dashIdx = name.search(/\s+-\s+/)
+    if (dashIdx < 0) continue
+    const base = name.slice(0, dashIdx).trim()
+    const sub = name.replace(/^.*?\s+-\s+/, '').trim()
+    if (!base || !sub) continue
+    const baseTag = 'base_' + tagify(base)
+    const grp = await pool.query<{ id: string }>(
+      `INSERT INTO locations (project_id, tag, name, position)
+       VALUES ($1, $2, $3, COALESCE((SELECT MAX(position) FROM locations WHERE project_id = $1), 0) + 10)
+       ON CONFLICT (project_id, tag) DO UPDATE SET tag = EXCLUDED.tag
+       RETURNING id`,
+      [projectId, baseTag, base],
+    )
+    const parentId = grp.rows[0]?.id
+    if (!parentId) continue
+    await pool.query(
+      `UPDATE locations SET parent_id = $2, name = $3 WHERE id = $1`,
+      [row.id, parentId, sub],
+    )
+  }
 }
 
 // GET all locations for a project, with per-location scene count + the shoot
@@ -77,7 +120,7 @@ locationsRouter.get('/projects/:projectId', async (req, res) => {
           sceneCount: st ? Number(st.scene_count) : 0,
           intExt: st?.int_ext ?? null,
           dayNumbers,
-          isGroup: l.tag.startsWith('grp_'),
+          isGroup: l.tag.startsWith('grp_') || l.tag.startsWith('base_'),
         }
       }),
     })
@@ -126,7 +169,7 @@ locationsRouter.delete('/:id', async (req, res) => {
   if (!(await userCanAccessProject(user.id, user.role, loc.project_id))) {
     res.status(403).json({ error: 'forbidden' }); return
   }
-  if (!loc.tag.startsWith('grp_')) {
+  if (!loc.tag.startsWith('grp_') && !loc.tag.startsWith('base_')) {
     res.status(400).json({ error: 'not_deletable', message: 'Only grouping locations can be deleted.' }); return
   }
   await pool.query(`DELETE FROM locations WHERE id = $1`, [id])

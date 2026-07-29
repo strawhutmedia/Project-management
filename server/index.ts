@@ -35,6 +35,7 @@ import { scheduleFlagshipSeed } from './seeds/flagship_podcasts'
 import { scheduleBootResendProbe } from './boot_resend_probe'
 import { scheduleBootBiyaScriptDump } from './boot_biya_script_dump'
 import { scheduleBootBudgetDump } from './boot_budget_dump'
+import { scheduleBootLocationsDump } from './boot_locations_dump'
 import {
   diagRouter,
   logError,
@@ -213,6 +214,7 @@ async function start() {
     scheduleBootResendProbe()
     scheduleBootBiyaScriptDump()
     scheduleBootBudgetDump()
+    scheduleBootLocationsDump()
     void reportStatus()
     void import('./ops').then(({ reportOps }) => { void reportOps() })
     startScheduler()
