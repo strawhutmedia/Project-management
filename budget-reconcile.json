@@ -1,19 +1,19 @@
 {
-  "generatedAt": "2026-07-29T03:31:55.666Z",
+  "generatedAt": "2026-07-29T03:35:32.504Z",
   "note": "Diagnostic: three ways of totalling the BIYA budget, to explain why they disagree.",
   "totals": {
-    "grand": 103368,
+    "grand": 125968,
     "production_goalbar": 18847,
     "sumOfDayBudgets": 18847,
-    "directTotal_allLineItems": 88936
+    "directTotal_allLineItems": 108936
   },
   "grandBreakdown": {
-    "directTotal": 88936,
+    "directTotal": 108936,
     "oldModel_fringes": 2540,
     "oldModel_perDiem": 0,
     "oldModel_hotels": 0,
-    "contingency": 9148,
-    "bond": 2744
+    "contingency": 11148,
+    "bond": 3344
   },
   "perDayModel": {
     "autoDayCosts": 1911,
@@ -53,7 +53,7 @@
     "production": 16936,
     "other": 15000,
     "above_line": 0,
-    "post": 57000
+    "post": 77000
   },
   "accounts": [
     {
@@ -62,6 +62,13 @@
       "category": "post",
       "total": 45000,
       "items": 5
+    },
+    {
+      "code": "48-00",
+      "name": "POST PRODUCTION SOUND",
+      "category": "post",
+      "total": 20000,
+      "items": 6
     },
     {
       "code": "55-00",
@@ -293,13 +300,6 @@
       "category": "post",
       "total": 0,
       "items": 4
-    },
-    {
-      "code": "48-00",
-      "name": "POST PRODUCTION SOUND",
-      "category": "post",
-      "total": 0,
-      "items": 6
     },
     {
       "code": "11-00",
