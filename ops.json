@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-07-29T19:33:36.957Z",
+  "generatedAt": "2026-07-29T19:38:36.971Z",
   "note": "Read-only operational snapshot. Emails are masked; no full contact list is stored here.",
   "summary": {
     "showsWithOutreach": 1,
@@ -452,14 +452,14 @@
           {
             "name": "Nicole O'Brien",
             "emailMasked": "a***@abdlents.com",
-            "daysSinceFirstEmail": 13,
+            "daysSinceFirstEmail": 14,
             "opened": false,
             "openCount": 0
           },
           {
             "name": "Olandria Carthen",
             "emailMasked": "o***@gmail.com",
-            "daysSinceFirstEmail": 13,
+            "daysSinceFirstEmail": 14,
             "opened": false,
             "openCount": 0
           },
