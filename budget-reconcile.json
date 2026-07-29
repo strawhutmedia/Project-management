@@ -1,19 +1,19 @@
 {
-  "generatedAt": "2026-07-29T03:16:56.929Z",
+  "generatedAt": "2026-07-29T03:31:55.666Z",
   "note": "Diagnostic: three ways of totalling the BIYA budget, to explain why they disagree.",
   "totals": {
-    "grand": 922449,
-    "production_goalbar": 539847,
+    "grand": 103368,
+    "production_goalbar": 18847,
     "sumOfDayBudgets": 18847,
-    "directTotal_allLineItems": 714936
+    "directTotal_allLineItems": 88936
   },
   "grandBreakdown": {
-    "directTotal": 714936,
-    "oldModel_fringes": 101390,
+    "directTotal": 88936,
+    "oldModel_fringes": 2540,
     "oldModel_perDiem": 0,
     "oldModel_hotels": 0,
-    "contingency": 81633,
-    "bond": 24490
+    "contingency": 9148,
+    "bond": 2744
   },
   "perDayModel": {
     "autoDayCosts": 1911,
@@ -22,7 +22,7 @@
     "autoHotels": 0,
     "autoMileage": 0,
     "autoCrewDiscount": 0,
-    "productionLineItems": 537936
+    "productionLineItems": 16936
   },
   "settings": {
     "shootDays": 18,
@@ -50,40 +50,12 @@
     }
   },
   "byCategory": {
-    "production": 422936,
-    "other": 84000,
-    "above_line": 115000,
-    "post": 93000
+    "production": 16936,
+    "other": 15000,
+    "above_line": 0,
+    "post": 57000
   },
   "accounts": [
-    {
-      "code": "14-00",
-      "name": "CAST",
-      "category": "above_line",
-      "total": 115000,
-      "items": 14
-    },
-    {
-      "code": "20-00",
-      "name": "PRODUCTION STAFF",
-      "category": "production",
-      "total": 109000,
-      "items": 7
-    },
-    {
-      "code": "30-00",
-      "name": "CAMERA",
-      "category": "production",
-      "total": 71000,
-      "items": 8
-    },
-    {
-      "code": "55-00",
-      "name": "PUBLICITY",
-      "category": "other",
-      "total": 54000,
-      "items": 7
-    },
     {
       "code": "46-00",
       "name": "MUSIC",
@@ -92,67 +64,11 @@
       "items": 5
     },
     {
-      "code": "29-00",
-      "name": "ELECTRIC",
-      "category": "production",
-      "total": 43000,
-      "items": 7
-    },
-    {
-      "code": "34-00",
-      "name": "LOCATIONS",
-      "category": "production",
-      "total": 32000,
-      "items": 30
-    },
-    {
-      "code": "25-00",
-      "name": "SET OPERATIONS",
-      "category": "production",
-      "total": 31000,
-      "items": 7
-    },
-    {
-      "code": "28-00",
-      "name": "WARDROBE",
-      "category": "production",
-      "total": 30000,
-      "items": 7
-    },
-    {
-      "code": "22-00",
-      "name": "SET DESIGN",
-      "category": "production",
-      "total": 22000,
-      "items": 5
-    },
-    {
-      "code": "48-00",
-      "name": "POST PRODUCTION SOUND",
-      "category": "post",
-      "total": 22000,
-      "items": 6
-    },
-    {
-      "code": "58-00",
-      "name": "INSURANCE",
+      "code": "55-00",
+      "name": "PUBLICITY",
       "category": "other",
-      "total": 16000,
-      "items": 4
-    },
-    {
-      "code": "49-00",
-      "name": "POST PRODUCTION FILM & LAB",
-      "category": "post",
-      "total": 16000,
-      "items": 5
-    },
-    {
-      "code": "31-00",
-      "name": "PRODUCTION SOUND",
-      "category": "production",
       "total": 15000,
-      "items": 6
+      "items": 7
     },
     {
       "code": "__day_costs__",
@@ -162,67 +78,11 @@
       "items": 32
     },
     {
-      "code": "56-00",
-      "name": "LEGAL & ACCOUNTING",
-      "category": "other",
-      "total": 11000,
-      "items": 5
-    },
-    {
-      "code": "26-00",
-      "name": "SET DRESSING",
-      "category": "production",
-      "total": 11000,
-      "items": 6
-    },
-    {
-      "code": "32-00",
-      "name": "MAKE-UP & HAIR",
-      "category": "production",
-      "total": 11000,
-      "items": 6
-    },
-    {
-      "code": "33-00",
-      "name": "TRANSPORTATION",
-      "category": "production",
-      "total": 10000,
-      "items": 5
-    },
-    {
-      "code": "21-00",
-      "name": "EXTRA TALENT",
-      "category": "production",
-      "total": 8000,
-      "items": 4
-    },
-    {
-      "code": "35-00",
-      "name": "PICTURE VEHICLES & ANIMALS",
-      "category": "production",
-      "total": 8000,
-      "items": 4
-    },
-    {
-      "code": "36-00",
-      "name": "SPECIAL EFFECTS",
-      "category": "production",
-      "total": 5000,
-      "items": 5
-    },
-    {
-      "code": "45-00",
-      "name": "FILM EDITING",
+      "code": "49-00",
+      "name": "POST PRODUCTION FILM & LAB",
       "category": "post",
-      "total": 5000,
+      "total": 12000,
       "items": 5
-    },
-    {
-      "code": "47-00",
-      "name": "VISUAL EFFECTS",
-      "category": "post",
-      "total": 5000,
-      "items": 4
     },
     {
       "code": "__breakdown__",
@@ -232,11 +92,60 @@
       "items": 1509
     },
     {
+      "code": "25-00",
+      "name": "SET OPERATIONS",
+      "category": "production",
+      "total": 0,
+      "items": 7
+    },
+    {
+      "code": "29-00",
+      "name": "ELECTRIC",
+      "category": "production",
+      "total": 0,
+      "items": 7
+    },
+    {
+      "code": "34-00",
+      "name": "LOCATIONS",
+      "category": "production",
+      "total": 0,
+      "items": 30
+    },
+    {
+      "code": "36-00",
+      "name": "SPECIAL EFFECTS",
+      "category": "production",
+      "total": 0,
+      "items": 5
+    },
+    {
+      "code": "56-00",
+      "name": "LEGAL & ACCOUNTING",
+      "category": "other",
+      "total": 0,
+      "items": 5
+    },
+    {
       "code": "57-00",
       "name": "GENERAL EXPENSE",
       "category": "other",
-      "total": 3000,
+      "total": 0,
       "items": 8
+    },
+    {
+      "code": "14-00",
+      "name": "CAST",
+      "category": "above_line",
+      "total": 0,
+      "items": 14
+    },
+    {
+      "code": "20-00",
+      "name": "PRODUCTION STAFF",
+      "category": "production",
+      "total": 0,
+      "items": 7
     },
     {
       "code": "13-00",
@@ -249,6 +158,20 @@
       "code": "15-00",
       "name": "TRAVEL & LIVING",
       "category": "above_line",
+      "total": 0,
+      "items": 5
+    },
+    {
+      "code": "21-00",
+      "name": "EXTRA TALENT",
+      "category": "production",
+      "total": 0,
+      "items": 4
+    },
+    {
+      "code": "22-00",
+      "name": "SET DESIGN",
+      "category": "production",
       "total": 0,
       "items": 5
     },
@@ -274,11 +197,60 @@
       "items": 3
     },
     {
+      "code": "26-00",
+      "name": "SET DRESSING",
+      "category": "production",
+      "total": 0,
+      "items": 6
+    },
+    {
       "code": "27-00",
       "name": "PROPERTY",
       "category": "production",
       "total": 0,
       "items": 5
+    },
+    {
+      "code": "28-00",
+      "name": "WARDROBE",
+      "category": "production",
+      "total": 0,
+      "items": 7
+    },
+    {
+      "code": "30-00",
+      "name": "CAMERA",
+      "category": "production",
+      "total": 0,
+      "items": 8
+    },
+    {
+      "code": "31-00",
+      "name": "PRODUCTION SOUND",
+      "category": "production",
+      "total": 0,
+      "items": 6
+    },
+    {
+      "code": "32-00",
+      "name": "MAKE-UP & HAIR",
+      "category": "production",
+      "total": 0,
+      "items": 6
+    },
+    {
+      "code": "33-00",
+      "name": "TRANSPORTATION",
+      "category": "production",
+      "total": 0,
+      "items": 5
+    },
+    {
+      "code": "35-00",
+      "name": "PICTURE VEHICLES & ANIMALS",
+      "category": "production",
+      "total": 0,
+      "items": 4
     },
     {
       "code": "37-00",
@@ -300,6 +272,34 @@
       "category": "production",
       "total": 0,
       "items": 5
+    },
+    {
+      "code": "58-00",
+      "name": "INSURANCE",
+      "category": "other",
+      "total": 0,
+      "items": 4
+    },
+    {
+      "code": "45-00",
+      "name": "FILM EDITING",
+      "category": "post",
+      "total": 0,
+      "items": 5
+    },
+    {
+      "code": "47-00",
+      "name": "VISUAL EFFECTS",
+      "category": "post",
+      "total": 0,
+      "items": 4
+    },
+    {
+      "code": "48-00",
+      "name": "POST PRODUCTION SOUND",
+      "category": "post",
+      "total": 0,
+      "items": 6
     },
     {
       "code": "11-00",
