@@ -218,6 +218,18 @@ export default function LocationsSection({ projectId, isAdmin }: { projectId: st
             </button>
           )}
         </div>
+        {/* Rooms / sub-areas within this location (auto-detected from the
+            script headings), each with its own shooting days. Read-only. */}
+        {loc.rooms.length > 0 && (
+          <div style={{ marginLeft: depth * 20 + 26 }} className="mb-2 flex flex-wrap gap-1.5">
+            {loc.rooms.map((r) => (
+              <span key={r.name} className="inline-flex items-center gap-1.5 rounded-md border border-line/50 bg-ink/10 px-2 py-1 text-[11px]">
+                <span className="text-text/90">{r.name}</span>
+                <span className="text-muted/70">· {r.dayNumbers.length}d</span>
+              </span>
+            ))}
+          </div>
+        )}
         {kids.map((k) => renderNode(k, depth + 1))}
       </div>
     )
@@ -229,8 +241,7 @@ export default function LocationsSection({ projectId, isAdmin }: { projectId: st
         <div>
           <h2 className="text-[11px] uppercase tracking-[0.2em] text-muted font-bold">📍 Locations — shooting days breakdown</h2>
           <p className="text-[11px] text-muted/80 mt-1">
-            {locations.length} location{locations.length === 1 ? '' : 's'} · {totalDays} shooting day{totalDays === 1 ? '' : 's'} across the schedule
-            {isAdmin && ' · drag a location onto another to nest it · double-click to rename'}
+            {locations.length} location{locations.length === 1 ? '' : 's'} · {totalDays} shooting day{totalDays === 1 ? '' : 's'} across the schedule · auto-organized from your shooting schedule
           </p>
         </div>
         {isAdmin && (
@@ -238,14 +249,14 @@ export default function LocationsSection({ projectId, isAdmin }: { projectId: st
             onClick={() => void addGroup()}
             className="text-[11px] uppercase tracking-wider font-bold border border-emerald-700/50 text-emerald-700 rounded-lg px-3 py-1.5 hover:bg-emerald-500/10 transition shrink-0"
           >
-            + New grouping location
+            + Merge into a group
           </button>
         )}
       </div>
       {isAdmin && (
         <p className="text-[11px] text-muted/70 -mt-2">
-          Make a parent like <span className="font-semibold text-text">"Sawyer's Apt"</span> with the + button,
-          then drag the specific sets (living room, kitchen…) onto it. The parent shows the total days you shoot there.
+          Locations + rooms are pulled from your schedule automatically. Days shown are per location.
+          Drag one location onto another to combine them (e.g. all the Kendrick sets), or use <span className="font-semibold text-text">+ Merge into a group</span>. Double-click a name to rename.
         </p>
       )}
 

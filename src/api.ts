@@ -209,6 +209,7 @@ export type ApiLocation = {
   sceneCount: number
   intExt: string | null
   dayNumbers: number[]
+  rooms: { name: string; sceneCount: number; dayNumbers: number[] }[]
   isGroup: boolean
 }
 

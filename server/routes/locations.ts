@@ -3,11 +3,50 @@ import { pool } from '../db'
 import { requireUser, type SessionUser } from '../auth'
 import { logError } from '../diag'
 
-// Locations: a nestable list of a film's shooting locations, auto-seeded from
-// distinct scenes.location_tag. Users rename them and drag one under another
-// as a sub-location. Shooting-day counts are computed live from the schedule.
+// Locations: a clean, nestable breakdown of a film's shooting locations with
+// how many days are shot at each — derived live from the schedule. Scene
+// headings are messy ("SAWYER'S APARTMENT - LIVING ROOM - NIGHT", curly vs
+// straight apostrophes, time-of-day leakage), so we collapse them to a
+// canonical BASE location (e.g. "Sawyer's Apartment") and list the specific
+// rooms/sub-areas under it. Only base-level rows are persisted (for renames
+// and manual super-grouping); rooms + day counts are computed at query time.
 export const locationsRouter = Router()
 locationsRouter.use(requireUser)
+
+const TIME_TOKENS = [
+  'DAY', 'NIGHT', 'AFTERNOON', 'MORNING', 'EVENING', 'LATER', 'MOMENTS LATER',
+  'CONTINUOUS', 'THE NEXT DAY', 'MAGIC HOUR', 'DAWN', 'DUSK', 'SAME', 'SAME TIME',
+  'MONTAGE', 'BACK TO PRESENT', 'SUNSET', 'SUNRISE', 'TIME PASSES', 'DAYS LATER',
+  'WEEKS LATER', 'INTERCUT', 'SIMULTANEOUS', 'THAT NIGHT', 'LATE NIGHT', 'PRESENT',
+]
+function isTimeSeg(seg: string): boolean {
+  const u = seg.toUpperCase().trim()
+  return TIME_TOKENS.some((t) => u === t || u.startsWith(t + ' ') || u.startsWith(t + ',') || u.startsWith(t + ' -'))
+}
+function stripApostrophes(s: string): string {
+  return s.replace(/[‘’'`]/g, '')
+}
+function segmentsOf(location: string): string[] {
+  return location.split(/\s+-\s+/).map((s) => s.trim()).filter(Boolean)
+}
+// Canonical base = the first segment (the building/place), title-normalized.
+function baseNameOf(location: string): string {
+  const segs = segmentsOf(location)
+  return (segs[0] || location).replace(/\s+/g, ' ').trim()
+}
+// Stable key that merges apostrophe + case variants so "SAWYER'S APARTMENT"
+// (curly) and "SAWYER'S APARTMENT" (straight) become one location.
+function baseTagOf(base: string): string {
+  const norm = stripApostrophes(base).toLowerCase().replace(/[^\w]+/g, '_').replace(/^_+|_+$/g, '').slice(0, 80)
+  return 'base_' + (norm || 'location')
+}
+// Room/sub-area = segments after the base, with time-of-day dropped. May be ''.
+function roomOf(location: string): string {
+  return segmentsOf(location).slice(1).filter((s) => !isTimeSeg(s)).join(' - ').trim()
+}
+function titleCase(s: string): string {
+  return s.toLowerCase().replace(/\b\w/g, (c) => c.toUpperCase())
+}
 
 async function userCanAccessProject(userId: string, role: string, projectId: string): Promise<boolean> {
   if (role === 'admin') return true
@@ -20,67 +59,76 @@ async function userCanAccessProject(userId: string, role: string, projectId: str
   return rows.length > 0
 }
 
-function tagify(s: string): string {
-  return s.toLowerCase().replace(/'/g, '').replace(/[^\w]+/g, '_').replace(/^_+|_+$/g, '').slice(0, 80)
+type SceneRow = { location: string | null; location_tag: string | null; int_ext: string | null; day_number: number | null }
+
+async function loadScenes(projectId: string): Promise<SceneRow[]> {
+  const { rows } = await pool.query<SceneRow>(
+    `SELECT s.location, s.location_tag, s.int_ext, sd.number AS day_number
+       FROM scenes s LEFT JOIN shoot_days sd ON sd.id = s.shoot_day_id
+      WHERE s.project_id = $1 AND (s.location IS NOT NULL OR s.location_tag IS NOT NULL)`,
+    [projectId],
+  )
+  return rows
 }
 
-// Ensure a locations row exists for every distinct scene location_tag, and
-// AUTO-ORGANIZE: script headings like "SAWYER'S APARTMENT - LIVING ROOM" get
-// their specific set ("Living Room") nested under an auto-created base group
-// ("Sawyer's Apartment"), so the user sees a clean per-location breakdown
-// without dragging. Only newly-synced rows are auto-nested, so any manual
-// re-nesting the user does afterwards is preserved.
-export async function ensureLocationRows(projectId: string): Promise<void> {
-  // 1. Insert any scene locations not seen before.
-  await pool.query(
-    `INSERT INTO locations (project_id, tag, name, position)
-     SELECT $1, s.location_tag,
-            COALESCE(MIN(s.location), s.location_tag),
-            (row_number() OVER (ORDER BY MIN(s.script_position)) * 10)::int
-       FROM scenes s
-      WHERE s.project_id = $1 AND s.location_tag IS NOT NULL AND s.location_tag <> ''
-      GROUP BY s.location_tag
-     ON CONFLICT (project_id, tag) DO NOTHING`,
-    [projectId],
-  )
-  // 2. Auto-nest any compound location ("SAWYER'S APT - LIVING ROOM") whose
-  //    name still carries the " - " — i.e. hasn't been organized yet. We trim
-  //    the name to just the sub-part ("Living Room") afterwards, and that trim
-  //    is the idempotency marker: a processed or user-un-nested row no longer
-  //    contains " - " and is never touched again. Skip already-synthetic
-  //    group rows (base_/grp_).
-  const compound = await pool.query<{ id: string; name: string }>(
-    `SELECT id, name FROM locations
-      WHERE project_id = $1 AND name ~ '\\S\\s+-\\s+\\S'
-        AND tag NOT LIKE 'base_%' AND tag NOT LIKE 'grp_%'`,
-    [projectId],
-  )
-  for (const row of compound.rows) {
-    const name = row.name ?? ''
-    const dashIdx = name.search(/\s+-\s+/)
-    if (dashIdx < 0) continue
-    const base = name.slice(0, dashIdx).trim()
-    const sub = name.replace(/^.*?\s+-\s+/, '').trim()
-    if (!base || !sub) continue
-    const baseTag = 'base_' + tagify(base)
-    const grp = await pool.query<{ id: string }>(
-      `INSERT INTO locations (project_id, tag, name, position)
-       VALUES ($1, $2, $3, COALESCE((SELECT MAX(position) FROM locations WHERE project_id = $1), 0) + 10)
-       ON CONFLICT (project_id, tag) DO UPDATE SET tag = EXCLUDED.tag
-       RETURNING id`,
-      [projectId, baseTag, base],
-    )
-    const parentId = grp.rows[0]?.id
-    if (!parentId) continue
+type BaseAgg = {
+  baseTag: string; baseName: string; intExt: string | null
+  days: Set<number>; sceneCount: number
+  rooms: Map<string, { days: Set<number>; sceneCount: number }>
+}
+
+// Group scenes into canonical base locations with their rooms + shoot days.
+function aggregateBases(scenes: SceneRow[]): Map<string, BaseAgg> {
+  const bases = new Map<string, BaseAgg>()
+  for (const s of scenes) {
+    const raw = (s.location || s.location_tag || '').trim()
+    if (!raw) continue
+    const baseName = titleCase(baseNameOf(raw))
+    const baseTag = baseTagOf(baseNameOf(raw))
+    let b = bases.get(baseTag)
+    if (!b) {
+      b = { baseTag, baseName, intExt: s.int_ext, days: new Set(), sceneCount: 0, rooms: new Map() }
+      bases.set(baseTag, b)
+    }
+    b.sceneCount += 1
+    if (s.day_number != null) b.days.add(Number(s.day_number))
+    if (!b.intExt && s.int_ext) b.intExt = s.int_ext
+    const room = roomOf(raw)
+    if (room) {
+      const key = titleCase(room)
+      let r = b.rooms.get(key)
+      if (!r) { r = { days: new Set(), sceneCount: 0 }; b.rooms.set(key, r) }
+      r.sceneCount += 1
+      if (s.day_number != null) r.days.add(Number(s.day_number))
+    }
+  }
+  return bases
+}
+
+// Ensure one persisted row per canonical base (preserving user renames /
+// nesting), and delete stale rows (old per-scene leaves, vanished bases).
+// User-made grouping rows (grp_) are always kept.
+async function ensureBaseRows(projectId: string, bases: Map<string, BaseAgg>): Promise<void> {
+  let pos = 0
+  for (const b of bases.values()) {
+    pos += 10
     await pool.query(
-      `UPDATE locations SET parent_id = $2, name = $3 WHERE id = $1`,
-      [row.id, parentId, sub],
+      `INSERT INTO locations (project_id, tag, name, position)
+       VALUES ($1, $2, $3, $4)
+       ON CONFLICT (project_id, tag) DO NOTHING`,
+      [projectId, b.baseTag, b.baseName, pos],
     )
   }
+  const keepTags = Array.from(bases.keys())
+  await pool.query(
+    `DELETE FROM locations
+      WHERE project_id = $1 AND tag NOT LIKE 'grp_%' AND tag <> ALL($2::text[])`,
+    [projectId, keepTags],
+  )
 }
 
-// GET all locations for a project, with per-location scene count + the shoot
-// day NUMBERS the location appears on (client unions these for parent roll-ups).
+// GET the location breakdown: base locations (with rooms + shoot days),
+// respecting user renames + manual super-grouping (parentId).
 locationsRouter.get('/projects/:projectId', async (req, res) => {
   const user = (req as typeof req & { user: SessionUser }).user
   const projectId = req.params.projectId
@@ -88,39 +136,32 @@ locationsRouter.get('/projects/:projectId', async (req, res) => {
     res.status(403).json({ error: 'forbidden' }); return
   }
   try {
-    await ensureLocationRows(projectId)
-    const locs = await pool.query<{ id: string; tag: string; name: string; parent_id: string | null; position: number }>(
-      `SELECT id, tag, name, parent_id, position FROM locations
-        WHERE project_id = $1 ORDER BY position ASC, name ASC`,
+    const scenes = await loadScenes(projectId)
+    const bases = aggregateBases(scenes)
+    await ensureBaseRows(projectId, bases)
+    const rows = await pool.query<{ id: string; tag: string; name: string; parent_id: string | null; position: number }>(
+      `SELECT id, tag, name, parent_id, position FROM locations WHERE project_id = $1 ORDER BY position ASC, name ASC`,
       [projectId],
     )
-    // Per-tag scene count + the distinct scheduled shoot-day numbers.
-    const stats = await pool.query<{ location_tag: string; scene_count: string; int_ext: string | null; day_numbers: number[] }>(
-      `SELECT s.location_tag,
-              COUNT(*)::int AS scene_count,
-              (array_agg(DISTINCT s.int_ext) FILTER (WHERE s.int_ext IS NOT NULL))[1] AS int_ext,
-              COALESCE(array_agg(DISTINCT sd.number) FILTER (WHERE sd.number IS NOT NULL), '{}') AS day_numbers
-         FROM scenes s
-         LEFT JOIN shoot_days sd ON sd.id = s.shoot_day_id
-        WHERE s.project_id = $1 AND s.location_tag IS NOT NULL AND s.location_tag <> ''
-        GROUP BY s.location_tag`,
-      [projectId],
-    )
-    const statByTag = new Map(stats.rows.map((r) => [r.location_tag, r]))
     res.json({
-      locations: locs.rows.map((l) => {
-        const st = statByTag.get(l.tag)
-        const dayNumbers = (st?.day_numbers ?? []).map(Number).sort((a, b) => a - b)
+      locations: rows.rows.map((l) => {
+        const b = bases.get(l.tag)
+        const rooms = b
+          ? Array.from(b.rooms.entries())
+              .map(([name, r]) => ({ name, sceneCount: r.sceneCount, dayNumbers: Array.from(r.days).sort((a, c) => a - c) }))
+              .sort((a, c) => c.dayNumbers.length - a.dayNumbers.length || a.name.localeCompare(c.name))
+          : []
         return {
           id: l.id,
           tag: l.tag,
           name: l.name,
           parentId: l.parent_id,
           position: l.position,
-          sceneCount: st ? Number(st.scene_count) : 0,
-          intExt: st?.int_ext ?? null,
-          dayNumbers,
-          isGroup: l.tag.startsWith('grp_') || l.tag.startsWith('base_'),
+          sceneCount: b?.sceneCount ?? 0,
+          intExt: b?.intExt ?? null,
+          dayNumbers: b ? Array.from(b.days).sort((a, c) => a - c) : [],
+          rooms,
+          isGroup: l.tag.startsWith('grp_'),
         }
       }),
     })
@@ -130,16 +171,15 @@ locationsRouter.get('/projects/:projectId', async (req, res) => {
   }
 })
 
-// Create a grouping location (e.g. "Sawyer's Apt") that has no scenes of its
-// own — it exists to hold sub-locations. Gets a synthetic tag so it doesn't
-// collide with script-derived locations.
+// Create a manual super-group (e.g. "The Kendrick Compound") to hold several
+// base locations. No scenes of its own.
 locationsRouter.post('/projects/:projectId', async (req, res) => {
   const user = (req as typeof req & { user: SessionUser }).user
   const projectId = req.params.projectId
   if (!(await userCanAccessProject(user.id, user.role, projectId))) {
     res.status(403).json({ error: 'forbidden' }); return
   }
-  const name = typeof req.body?.name === 'string' && req.body.name.trim() ? req.body.name.trim() : 'New location'
+  const name = typeof req.body?.name === 'string' && req.body.name.trim() ? req.body.name.trim() : 'New group'
   try {
     const { rows } = await pool.query<{ id: string }>(
       `INSERT INTO locations (project_id, tag, name, position)
@@ -155,9 +195,8 @@ locationsRouter.post('/projects/:projectId', async (req, res) => {
   }
 })
 
-// Delete a location. Only grouping locations (synthetic 'grp_' tag) can be
-// deleted — script-derived ones would just reappear on the next sync. Any
-// children are lifted back to the top level (FK ON DELETE SET NULL).
+// Delete a manual group (grp_). Base locations can't be deleted (they'd just
+// reappear on the next sync); its children lift back to the top level.
 locationsRouter.delete('/:id', async (req, res) => {
   const user = (req as typeof req & { user: SessionUser }).user
   const id = req.params.id
@@ -169,18 +208,15 @@ locationsRouter.delete('/:id', async (req, res) => {
   if (!(await userCanAccessProject(user.id, user.role, loc.project_id))) {
     res.status(403).json({ error: 'forbidden' }); return
   }
-  if (!loc.tag.startsWith('grp_') && !loc.tag.startsWith('base_')) {
-    res.status(400).json({ error: 'not_deletable', message: 'Only grouping locations can be deleted.' }); return
+  if (!loc.tag.startsWith('grp_')) {
+    res.status(400).json({ error: 'not_deletable', message: 'Only manual groups can be deleted.' }); return
   }
   await pool.query(`DELETE FROM locations WHERE id = $1`, [id])
   res.json({ ok: true })
 })
 
-// Would setting `parentId` as the parent of `id` create a cycle? (i.e. is
-// parentId the same node or one of its descendants?)
 async function wouldCycle(id: string, parentId: string): Promise<boolean> {
   if (id === parentId) return true
-  // Walk up from parentId; if we reach id, nesting id under parentId loops.
   let cursor: string | null = parentId
   const seen = new Set<string>()
   while (cursor) {
@@ -199,30 +235,20 @@ async function wouldCycle(id: string, parentId: string): Promise<boolean> {
 locationsRouter.patch('/:id', async (req, res) => {
   const user = (req as typeof req & { user: SessionUser }).user
   const id = req.params.id
-  const locRes = await pool.query<{ project_id: string }>(
-    `SELECT project_id FROM locations WHERE id = $1`, [id],
-  )
+  const locRes = await pool.query<{ project_id: string }>(`SELECT project_id FROM locations WHERE id = $1`, [id])
   const loc = locRes.rows[0]
   if (!loc) { res.status(404).json({ error: 'not_found' }); return }
   if (!(await userCanAccessProject(user.id, user.role, loc.project_id))) {
     res.status(403).json({ error: 'forbidden' }); return
   }
   const body = req.body as { parentId?: string | null; name?: string; position?: number }
-
   if (body.parentId !== undefined) {
     if (body.parentId === null) {
       await pool.query(`UPDATE locations SET parent_id = NULL WHERE id = $1`, [id])
     } else {
-      // Parent must exist in the same project and not create a cycle.
-      const p = await pool.query<{ project_id: string }>(
-        `SELECT project_id FROM locations WHERE id = $1`, [body.parentId],
-      )
-      if (!p.rows[0] || p.rows[0].project_id !== loc.project_id) {
-        res.status(400).json({ error: 'bad_parent' }); return
-      }
-      if (await wouldCycle(id, body.parentId)) {
-        res.status(400).json({ error: 'would_cycle' }); return
-      }
+      const p = await pool.query<{ project_id: string }>(`SELECT project_id FROM locations WHERE id = $1`, [body.parentId])
+      if (!p.rows[0] || p.rows[0].project_id !== loc.project_id) { res.status(400).json({ error: 'bad_parent' }); return }
+      if (await wouldCycle(id, body.parentId)) { res.status(400).json({ error: 'would_cycle' }); return }
       await pool.query(`UPDATE locations SET parent_id = $2 WHERE id = $1`, [id, body.parentId])
     }
   }
@@ -234,3 +260,22 @@ locationsRouter.patch('/:id', async (req, res) => {
   }
   res.json({ ok: true })
 })
+
+// Pre-warm the sync at boot (called from boot_locations_dump).
+export async function ensureLocationRows(projectId: string): Promise<void> {
+  const scenes = await loadScenes(projectId)
+  await ensureBaseRows(projectId, aggregateBases(scenes))
+}
+
+// Plain data breakdown for diagnostics: [{ name, days:[], rooms:[{name,days}] }]
+export async function debugLocationBreakdown(projectId: string): Promise<Array<{ name: string; days: number[]; sceneCount: number; rooms: Array<{ name: string; days: number[] }> }>> {
+  const bases = aggregateBases(await loadScenes(projectId))
+  return Array.from(bases.values())
+    .map((b) => ({
+      name: b.baseName,
+      sceneCount: b.sceneCount,
+      days: Array.from(b.days).sort((a, c) => a - c),
+      rooms: Array.from(b.rooms.entries()).map(([name, r]) => ({ name, days: Array.from(r.days).sort((a, c) => a - c) })),
+    }))
+    .sort((a, c) => c.days.length - a.days.length || a.name.localeCompare(c.name))
+}
