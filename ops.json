@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-07-30T18:28:40.063Z",
+  "generatedAt": "2026-07-30T18:33:40.079Z",
   "note": "Read-only operational snapshot. Emails are masked; no full contact list is stored here.",
   "summary": {
     "showsWithOutreach": 1,
@@ -242,14 +242,14 @@
           {
             "name": "Zoe Berman",
             "emailMasked": "z***@gersh.com",
-            "daysSinceFirstEmail": 14,
+            "daysSinceFirstEmail": 15,
             "opened": false,
             "openCount": 0
           },
           {
             "name": "Caleb McDaniel",
             "emailMasked": "c***@yahoo.com",
-            "daysSinceFirstEmail": 14,
+            "daysSinceFirstEmail": 15,
             "opened": false,
             "openCount": 0
           },
