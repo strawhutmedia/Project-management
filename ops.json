@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-07-30T21:13:40.547Z",
+  "generatedAt": "2026-07-30T21:18:40.540Z",
   "note": "Read-only operational snapshot. Emails are masked; no full contact list is stored here.",
   "summary": {
     "showsWithOutreach": 1,
@@ -620,14 +620,14 @@
           {
             "name": "CJ Franco",
             "emailMasked": "m***@cjfranco.us",
-            "daysSinceFirstEmail": 13,
+            "daysSinceFirstEmail": 14,
             "opened": false,
             "openCount": 0
           },
           {
             "name": "Casey Johnson",
             "emailMasked": "t***@wilhelmina.com",
-            "daysSinceFirstEmail": 13,
+            "daysSinceFirstEmail": 14,
             "opened": false,
             "openCount": 0
           },
