@@ -1378,6 +1378,24 @@ export async function deriveCarouselPreset(
     ink: hex(parsed.ink, '#F5F5F0'),
     inkDim: hex(parsed.inkDim, '#9A9AA2'),
   }
+  // Readability guard: body text MUST be legible on the background, even if the
+  // model returned a low-contrast pair. Force ink light-on-dark or dark-on-
+  // light based on the background, and nudge accents that vanish into the bg.
+  const lum = (h: string) => {
+    const c = [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16) / 255)
+      .map((v) => (v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4))
+    return 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2]
+  }
+  const contrast = (a: string, b: string) => {
+    const la = lum(a), lb = lum(b)
+    return (Math.max(la, lb) + 0.05) / (Math.min(la, lb) + 0.05)
+  }
+  const bgDark = lum(palette.bg) < 0.4
+  if (contrast(palette.ink, palette.bg) < 4.5) palette.ink = bgDark ? '#F5F5F0' : '#14141A'
+  if (contrast(palette.inkDim, palette.bg) < 2.6) palette.inkDim = bgDark ? '#9EA0A8' : '#5A5A62'
+  // Accents must pop off the bg; if one collapsed into it, swap to a safe one.
+  if (contrast(palette.primary, palette.bg) < 2) palette.primary = bgDark ? '#E8B84B' : '#B4451F'
+  if (contrast(palette.secondary, palette.bg) < 2) palette.secondary = bgDark ? '#5AB0F0' : '#1F6FB4'
   // Two-line wordmark from the show name: split near the middle on a word
   // boundary so it stacks nicely (e.g. "Private Talk" → "PRIVATE" / "TALK").
   const words = showName.trim().split(/\s+/)
