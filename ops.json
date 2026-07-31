@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-07-31T19:15:50.612Z",
+  "generatedAt": "2026-07-31T19:20:50.616Z",
   "note": "Read-only operational snapshot. Emails are masked; no full contact list is stored here.",
   "summary": {
     "showsWithOutreach": 1,
@@ -396,14 +396,14 @@
           {
             "name": "Belle-A Walker",
             "emailMasked": "i***@gmail.com",
-            "daysSinceFirstEmail": 15,
+            "daysSinceFirstEmail": 16,
             "opened": false,
             "openCount": 0
           },
           {
             "name": "Leah Kateb",
             "emailMasked": "l***@unitedtalent.com",
-            "daysSinceFirstEmail": 15,
+            "daysSinceFirstEmail": 16,
             "opened": false,
             "openCount": 0
           },
