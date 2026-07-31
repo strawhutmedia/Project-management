@@ -10,7 +10,7 @@
 import { Router } from 'express'
 import { pool } from '../db'
 import { requireUser, type SessionUser } from '../auth'
-import { hasAnthropicKey, generateCarouselDeck } from '../anthropic'
+import { hasAnthropicKey, generateCarouselDeck, deriveCarouselPreset } from '../anthropic'
 import { loadShowStrategyDocs } from './socials'
 import { logError } from '../diag'
 
@@ -100,5 +100,57 @@ carouselRouter.post('/preview', async (req, res) => {
     // opaque "generation_failed". Truncate so we never leak a 50KB
     // stack trace into the JSON response.
     res.status(500).json({ error: 'generation_failed', detail: msg.slice(0, 600) })
+  }
+})
+
+// Auto-derive (and cache) a show's carousel design from its cover art. The
+// look is modeled on the show's own art — palette + two-line wordmark — so
+// every show's deck is on-brand without a hand-built preset. ?refresh=1
+// forces re-derivation (e.g. after the cover art changes).
+carouselRouter.get('/preset/:projectId', async (req, res) => {
+  const user = (req as typeof req & { user: SessionUser }).user
+  const projectId = req.params.projectId
+  const refresh = req.query.refresh === '1' || req.query.refresh === 'true'
+  const { rows } = await pool.query<{ name: string; slug: string | null; cover_art_url: string | null; carousel_preset: unknown }>(
+    `SELECT p.name, p.slug, p.cover_art_url, p.carousel_preset
+       FROM projects p
+       LEFT JOIN project_members m ON m.project_id = p.id AND m.user_id = $1
+      WHERE p.id = $2 AND ($3 = 'admin' OR p.created_by = $1 OR m.user_id IS NOT NULL)
+      LIMIT 1`,
+    [user.id, projectId, user.role],
+  )
+  const proj = rows[0]
+  if (!proj) { res.status(404).json({ error: 'not_found' }); return }
+  if (proj.carousel_preset && !refresh) {
+    res.json({ preset: proj.carousel_preset, source: 'cached' })
+    return
+  }
+  if (!proj.cover_art_url) {
+    res.json({ preset: null, reason: 'no_cover_art' })
+    return
+  }
+  if (!hasAnthropicKey()) { res.status(503).json({ error: 'anthropic_key_missing' }); return }
+  try {
+    const imgRes = await fetch(proj.cover_art_url)
+    if (!imgRes.ok) { res.status(502).json({ error: 'cover_fetch_failed', status: imgRes.status }); return }
+    const ct = (imgRes.headers.get('content-type') || '').toLowerCase()
+    const mediaType = ct.includes('png') ? 'image/png' as const
+      : ct.includes('webp') ? 'image/webp' as const
+      : 'image/jpeg' as const
+    const bytes = Buffer.from(await imgRes.arrayBuffer())
+    if (bytes.length > 6_000_000) { res.status(400).json({ error: 'cover_too_large' }); return }
+    const derived = await deriveCarouselPreset(bytes, mediaType, proj.name)
+    if (!derived) { res.json({ preset: null, reason: 'derive_failed' }); return }
+    const preset = {
+      key: proj.slug || projectId,
+      displayName: proj.name,
+      logo: derived.logo,
+      palette: derived.palette,
+    }
+    await pool.query(`UPDATE projects SET carousel_preset = $1 WHERE id = $2`, [JSON.stringify(preset), projectId])
+    res.json({ preset, source: 'derived' })
+  } catch (err) {
+    logError('carousel: derive preset failed', { projectId, error: err instanceof Error ? err.message : String(err) })
+    res.status(500).json({ error: 'derive_failed', detail: err instanceof Error ? err.message.slice(0, 300) : String(err) })
   }
 })

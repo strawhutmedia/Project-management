@@ -42,12 +42,21 @@ export default function EpisodeCarousel({
   const [assetRequests, setAssetRequests] = useState<ApiCarouselAssetRequest[]>([])
   const [uploads, setUploads] = useState<UploadedAssets>(EMPTY_UPLOADS)
 
-  // For v1 the preset is hardcoded to Soul & Science. Once per-show
-  // preset config lands, this resolves by project/show.
+  // The design is auto-derived from THIS show's cover art (palette + wordmark)
+  // on the server and cached. Until it loads, fall back to the built-in look.
+  const [derivedPreset, setDerivedPreset] = useState<ShowDeckPreset | null>(null)
+  useEffect(() => {
+    let cancelled = false
+    api.getCarouselPreset(projectId)
+      .then((r) => { if (!cancelled && r.preset) setDerivedPreset(r.preset as ShowDeckPreset) })
+      .catch(() => { /* fall back to default */ })
+    return () => { cancelled = true }
+  }, [projectId])
   const preset = useMemo<ShowDeckPreset>(() => {
+    if (derivedPreset) return derivedPreset
     const guess = showName.toLowerCase().includes('soul') ? 'soul-and-science' : null
     return (guess && findPreset(guess)) || SOUL_AND_SCIENCE_PRESET
-  }, [showName])
+  }, [derivedPreset, showName])
 
   // Find the most recent "done" transcript for this episode so we
   // know whether to enable the Generate button.

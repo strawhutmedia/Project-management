@@ -1300,6 +1300,17 @@ export const api = {
       method: 'POST',
       body: JSON.stringify(body),
     }),
+  // Auto-derived carousel design for a show (palette + wordmark from its cover
+  // art). refresh=true re-derives (e.g. after the cover changes).
+  getCarouselPreset: (projectId: string, refresh = false) =>
+    request<{
+      preset: {
+        key: string; displayName: string
+        logo: { name1: string; name2: string; weight?: 'black' | 'bold' }
+        palette: { primary: string; secondary: string; bg: string; ink: string; inkDim: string }
+      } | null
+      source?: string; reason?: string
+    }>(`/api/carousel/preset/${projectId}${refresh ? '?refresh=1' : ''}`),
   // The /api/integrations/dropbox/file proxy 302-redirects to a fresh
   // 4hr temp link. <img src> works directly with this.
   dropboxFileUrl: (path: string) => `/api/integrations/dropbox/file?path=${encodeURIComponent(path)}`,

@@ -1326,6 +1326,70 @@ function carouselEpisodeBlock(input: CarouselGenerateInput): string {
   ].filter((x) => x !== '').join('\n')
 }
 
+// ─── Auto-derive a carousel design from a show's cover art ───────────
+// Look at the podcast's cover and produce an on-brand carousel palette +
+// two-line wordmark, so every show's deck matches its own art instead of a
+// single hardcoded preset.
+export type DerivedCarouselPreset = {
+  palette: { primary: string; secondary: string; bg: string; ink: string; inkDim: string }
+  logo: { name1: string; name2: string }
+}
+
+const HEX = /^#[0-9a-fA-F]{6}$/
+const CAROUSEL_PALETTE_SYSTEM = `You are a brand designer. You are shown a podcast's cover art. Produce a color palette for an Instagram carousel that feels unmistakably on-brand with that cover — pull the actual dominant and accent colors from the art.
+
+Return ONLY JSON, no prose:
+{
+  "primary": "#RRGGBB",    // the show's signature accent — for headline punch words. Vivid, high-contrast against bg.
+  "secondary": "#RRGGBB",  // a second accent for contrast (a complementary or lighter brand color).
+  "bg": "#RRGGBB",         // deep slide background — usually the cover's darkest brand color or near-black. NOT pure black unless the cover is.
+  "ink": "#RRGGBB",        // body text on bg — near-white, must be clearly readable on bg.
+  "inkDim": "#RRGGBB"      // muted version of ink for secondary text.
+}
+Rules: every value a 6-digit hex. ink must have strong contrast on bg (light text on dark bg, or dark text on light bg). primary and secondary must both pop against bg. Match the cover's mood — bold/neon covers get saturated accents, elegant covers get refined ones.`
+
+export async function deriveCarouselPreset(
+  coverBytes: Buffer,
+  mediaType: 'image/jpeg' | 'image/png' | 'image/webp',
+  showName: string,
+): Promise<DerivedCarouselPreset | null> {
+  if (!hasAnthropicKey()) return null
+  const content: Anthropic.MessageParam['content'] = [
+    { type: 'image' as const, source: { type: 'base64' as const, media_type: mediaType, data: coverBytes.toString('base64') } },
+    { type: 'text' as const, text: `This is the cover art for the podcast "${showName}". Give me the carousel palette.` },
+  ]
+  const response = await createWithRetry({
+    model: VISION_MODEL,
+    max_tokens: 400,
+    system: CAROUSEL_PALETTE_SYSTEM,
+    messages: [{ role: 'user', content }],
+  })
+  const block = response.content.find((b) => b.type === 'text')
+  const text = block && block.type === 'text' ? block.text : ''
+  const s = text.indexOf('{'), e = text.lastIndexOf('}')
+  if (s === -1 || e <= s) return null
+  let parsed: Record<string, unknown>
+  try { parsed = JSON.parse(text.slice(s, e + 1)) as Record<string, unknown> } catch { return null }
+  const hex = (v: unknown, fallback: string) => (typeof v === 'string' && HEX.test(v.trim()) ? v.trim() : fallback)
+  const palette = {
+    primary: hex(parsed.primary, '#E8B84B'),
+    secondary: hex(parsed.secondary, '#4BA3E8'),
+    bg: hex(parsed.bg, '#0E0E12'),
+    ink: hex(parsed.ink, '#F5F5F0'),
+    inkDim: hex(parsed.inkDim, '#9A9AA2'),
+  }
+  // Two-line wordmark from the show name: split near the middle on a word
+  // boundary so it stacks nicely (e.g. "Private Talk" → "PRIVATE" / "TALK").
+  const words = showName.trim().split(/\s+/)
+  let name1 = showName.trim(), name2 = ''
+  if (words.length >= 2) {
+    const mid = Math.ceil(words.length / 2)
+    name1 = words.slice(0, mid).join(' ')
+    name2 = words.slice(mid).join(' ')
+  }
+  return { palette, logo: { name1: name1.toUpperCase(), name2: name2.toUpperCase() } }
+}
+
 export async function generateCarouselDeck(input: CarouselGenerateInput): Promise<CarouselGenerateResult> {
   logInfo('carousel: generating deck', {
     showName: input.showName,
