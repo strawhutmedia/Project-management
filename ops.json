@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-08-01T18:15:10.854Z",
+  "generatedAt": "2026-08-01T18:20:10.853Z",
   "note": "Read-only operational snapshot. Emails are masked; no full contact list is stored here.",
   "summary": {
     "showsWithOutreach": 1,
@@ -200,14 +200,14 @@
           {
             "name": "Sherman Davis",
             "emailMasked": "s***@debonairlawgroup.com",
-            "daysSinceFirstEmail": 16,
+            "daysSinceFirstEmail": 17,
             "opened": false,
             "openCount": 0
           },
           {
             "name": "Kordell Beckham",
             "emailMasked": "k***@caa.com",
-            "daysSinceFirstEmail": 16,
+            "daysSinceFirstEmail": 17,
             "opened": false,
             "openCount": 0
           },
