@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-08-02T18:25:14.174Z",
+  "generatedAt": "2026-08-02T18:30:14.223Z",
   "note": "Read-only operational snapshot. Emails are masked; no full contact list is stored here.",
   "summary": {
     "showsWithOutreach": 1,
@@ -228,21 +228,21 @@
           {
             "name": "Harry Jowsey",
             "emailMasked": "i***@harryjowsey.com",
-            "daysSinceFirstEmail": 17,
+            "daysSinceFirstEmail": 18,
             "opened": false,
             "openCount": 0
           },
           {
             "name": "Jalen Brown",
             "emailMasked": "t***@thisisamplifytalent.com",
-            "daysSinceFirstEmail": 17,
+            "daysSinceFirstEmail": 18,
             "opened": false,
             "openCount": 0
           },
           {
             "name": "Zoe Berman",
             "emailMasked": "z***@gersh.com",
-            "daysSinceFirstEmail": 17,
+            "daysSinceFirstEmail": 18,
             "opened": false,
             "openCount": 0
           },
