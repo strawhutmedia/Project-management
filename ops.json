@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-08-02T21:20:14.265Z",
+  "generatedAt": "2026-08-02T21:25:14.230Z",
   "note": "Read-only operational snapshot. Emails are masked; no full contact list is stored here.",
   "summary": {
     "showsWithOutreach": 1,
@@ -641,7 +641,7 @@
           {
             "name": "Sarah Emig",
             "emailMasked": "e***@gmail.com",
-            "daysSinceFirstEmail": 16,
+            "daysSinceFirstEmail": 17,
             "opened": false,
             "openCount": 0
           }
