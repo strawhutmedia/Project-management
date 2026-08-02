@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-08-02T18:30:14.223Z",
+  "generatedAt": "2026-08-02T18:35:14.165Z",
   "note": "Read-only operational snapshot. Emails are masked; no full contact list is stored here.",
   "summary": {
     "showsWithOutreach": 1,
@@ -249,14 +249,14 @@
           {
             "name": "Caleb McDaniel",
             "emailMasked": "c***@yahoo.com",
-            "daysSinceFirstEmail": 17,
+            "daysSinceFirstEmail": 18,
             "opened": false,
             "openCount": 0
           },
           {
             "name": "Tori Lopez",
             "emailMasked": "t***@soxvla.com",
-            "daysSinceFirstEmail": 17,
+            "daysSinceFirstEmail": 18,
             "opened": false,
             "openCount": 0
           },
