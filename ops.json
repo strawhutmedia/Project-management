@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-08-02T20:40:14.223Z",
+  "generatedAt": "2026-08-02T20:45:14.229Z",
   "note": "Read-only operational snapshot. Emails are masked; no full contact list is stored here.",
   "summary": {
     "showsWithOutreach": 1,
@@ -522,14 +522,14 @@
           {
             "name": "Kenzo Nudo",
             "emailMasked": "c***@gmail.com",
-            "daysSinceFirstEmail": 16,
+            "daysSinceFirstEmail": 17,
             "opened": false,
             "openCount": 0
           },
           {
             "name": "Destiny Davis",
             "emailMasked": "d***@gmail.com",
-            "daysSinceFirstEmail": 16,
+            "daysSinceFirstEmail": 17,
             "opened": false,
             "openCount": 0
           },
