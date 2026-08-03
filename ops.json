@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-08-03T18:45:16.151Z",
+  "generatedAt": "2026-08-03T18:50:16.118Z",
   "note": "Read-only operational snapshot. Emails are masked; no full contact list is stored here.",
   "summary": {
     "showsWithOutreach": 1,
@@ -298,14 +298,14 @@
           {
             "name": "Jenna Wolf",
             "emailMasked": "j***@weareverified.co",
-            "daysSinceFirstEmail": 18,
+            "daysSinceFirstEmail": 19,
             "opened": false,
             "openCount": 0
           },
           {
             "name": "Erica Barry",
             "emailMasked": "e***@unitedtalent.com",
-            "daysSinceFirstEmail": 18,
+            "daysSinceFirstEmail": 19,
             "opened": false,
             "openCount": 0
           },
