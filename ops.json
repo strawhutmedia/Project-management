@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-08-03T21:05:16.186Z",
+  "generatedAt": "2026-08-03T21:10:16.190Z",
   "note": "Read-only operational snapshot. Emails are masked; no full contact list is stored here.",
   "summary": {
     "showsWithOutreach": 1,
@@ -592,14 +592,14 @@
           {
             "name": "Carsten \"Bergie\" Bergersen",
             "emailMasked": "b***@theazureagency.com",
-            "daysSinceFirstEmail": 17,
+            "daysSinceFirstEmail": 18,
             "opened": false,
             "openCount": 0
           },
           {
             "name": "Hannah Wright",
             "emailMasked": "j***@jbsocialgroup.com",
-            "daysSinceFirstEmail": 17,
+            "daysSinceFirstEmail": 18,
             "opened": false,
             "openCount": 0
           },
