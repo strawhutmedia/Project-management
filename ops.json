@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-08-03T21:10:16.190Z",
+  "generatedAt": "2026-08-03T21:15:16.200Z",
   "note": "Read-only operational snapshot. Emails are masked; no full contact list is stored here.",
   "summary": {
     "showsWithOutreach": 1,
@@ -606,21 +606,21 @@
           {
             "name": "Leonardo Dionicio",
             "emailMasked": "c***@leonardodionicio.com",
-            "daysSinceFirstEmail": 17,
+            "daysSinceFirstEmail": 18,
             "opened": false,
             "openCount": 0
           },
           {
             "name": "Kassy Castillo",
             "emailMasked": "c***@kassyc.com",
-            "daysSinceFirstEmail": 17,
+            "daysSinceFirstEmail": 18,
             "opened": false,
             "openCount": 0
           },
           {
             "name": "CJ Franco",
             "emailMasked": "m***@cjfranco.us",
-            "daysSinceFirstEmail": 17,
+            "daysSinceFirstEmail": 18,
             "opened": false,
             "openCount": 0
           },
