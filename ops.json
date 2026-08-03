@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-08-03T20:45:16.186Z",
+  "generatedAt": "2026-08-03T20:50:16.186Z",
   "note": "Read-only operational snapshot. Emails are masked; no full contact list is stored here.",
   "summary": {
     "showsWithOutreach": 1,
@@ -536,14 +536,14 @@
           {
             "name": "Keenan Anunay",
             "emailMasked": "k***@gmail.com",
-            "daysSinceFirstEmail": 17,
+            "daysSinceFirstEmail": 18,
             "opened": false,
             "openCount": 0
           },
           {
             "name": "Greg Metelus",
             "emailMasked": "m***@gmail.com",
-            "daysSinceFirstEmail": 17,
+            "daysSinceFirstEmail": 18,
             "opened": false,
             "openCount": 0
           },
