@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-08-03T18:55:16.129Z",
+  "generatedAt": "2026-08-03T19:00:16.168Z",
   "note": "Read-only operational snapshot. Emails are masked; no full contact list is stored here.",
   "summary": {
     "showsWithOutreach": 1,
@@ -333,14 +333,14 @@
           {
             "name": "Sherman Davis",
             "emailMasked": "s***@debonairlawgroup.com",
-            "daysSinceFirstEmail": 18,
+            "daysSinceFirstEmail": 19,
             "opened": false,
             "openCount": 0
           },
           {
             "name": "Vivian Fullerlove",
             "emailMasked": "v***@vlfmediaandpromotions.com",
-            "daysSinceFirstEmail": 18,
+            "daysSinceFirstEmail": 19,
             "opened": false,
             "openCount": 0
           },
