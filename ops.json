@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-08-04T15:35:19.296Z",
+  "generatedAt": "2026-08-04T15:37:04.044Z",
   "note": "Read-only operational snapshot. Emails are masked; no full contact list is stored here.",
   "summary": {
     "showsWithOutreach": 1,
@@ -646,6 +646,25 @@
             "openCount": 0
           }
         ]
+      },
+      "readiness": {
+        "canSend": false,
+        "followupTemplateSaved": false,
+        "oneSheetApproved": true,
+        "hasVerifiedDomain": true,
+        "verifiedDomains": [
+          "strawhut.media",
+          "strawhutmedia.net",
+          "strawhutshows.com",
+          "strawhutpodcasts.com"
+        ],
+        "blockers": [
+          "follow-up message not written/saved yet"
+        ]
+      },
+      "dataQuality": {
+        "duplicatedAddresses": 2,
+        "duplicateExtraRows": 7
       }
     }
   ]
