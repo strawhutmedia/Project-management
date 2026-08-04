@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-08-04T17:32:04.524Z",
+  "generatedAt": "2026-08-04T17:37:04.570Z",
   "note": "Read-only operational snapshot. Emails are masked; no full contact list is stored here.",
   "summary": {
     "showsWithOutreach": 1,
@@ -67,14 +67,14 @@
           {
             "name": "Olandria Carthen",
             "emailMasked": "i***@align-pr.com",
-            "daysSinceFirstEmail": 19,
+            "daysSinceFirstEmail": 20,
             "opened": false,
             "openCount": 0
           },
           {
             "name": "Olandria Carthen",
             "emailMasked": "t***@unitedtalent.com",
-            "daysSinceFirstEmail": 19,
+            "daysSinceFirstEmail": 20,
             "opened": false,
             "openCount": 0
           },
