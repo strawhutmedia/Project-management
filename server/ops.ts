@@ -59,15 +59,29 @@ type ShowOps = {
     // were first emailed, and whether they opened it. Masked email for ID.
     people: Array<{ name: string; emailMasked: string; daysSinceFirstEmail: number | null; opened: boolean; openCount: number }>
   }
+  // Can Caroline actually send from this show right now? The three send gates,
+  // reported so we can confirm "ready" instead of guessing.
+  readiness: {
+    canSend: boolean
+    followupTemplateSaved: boolean
+    oneSheetApproved: boolean
+    hasVerifiedDomain: boolean
+    verifiedDomains: string[]
+    blockers: string[]
+  }
+  dataQuality: {
+    duplicatedAddresses: number
+    duplicateExtraRows: number
+  }
 }
 
 export async function collectOpsSnapshot() {
   // 1) Outreach funnel per show (only shows that actually have prospects).
   const funnel = await pool.query<{
-    id: string; name: string; total: number; needs_email: number; ready: number;
+    id: string; name: string; one_sheet_approved_at: string | null; total: number; needs_email: number; ready: number;
     queued: number; sent: number; replied: number; bounced: number; opted_out: number; failed: number;
   }>(
-    `SELECT p.id, p.name,
+    `SELECT p.id, p.name, p.one_sheet_approved_at,
             COUNT(op.*)::int AS total,
             COUNT(*) FILTER (WHERE op.status = 'needs_email')::int AS needs_email,
             COUNT(*) FILTER (WHERE op.status = 'ready')::int      AS ready,
@@ -79,9 +93,41 @@ export async function collectOpsSnapshot() {
             COUNT(*) FILTER (WHERE op.status = 'failed')::int     AS failed
        FROM projects p
        JOIN outreach_prospects op ON op.project_id = p.id
-      GROUP BY p.id, p.name
+      GROUP BY p.id, p.name, p.one_sheet_approved_at
       ORDER BY p.name`,
   )
+
+  // Follow-up template readiness per show.
+  const tpls = await pool.query<{ project_id: string; followup_subject: string | null; followup_body: string | null }>(
+    `SELECT project_id, followup_subject, followup_body FROM outreach_templates`,
+  )
+  const tplReady = new Map(tpls.rows.map((r) => [r.project_id, Boolean(r.followup_subject?.trim() && r.followup_body?.trim())]))
+
+  // Verified + active sending domains (a global pool; any one can send, and the
+  // send prefers a domain pinned to the show). Report names + any per-show pin.
+  const doms = await pool.query<{ name: string; primary_show_id: string | null }>(
+    `SELECT name, primary_show_id FROM sending_domains WHERE status = 'verified' AND active = TRUE ORDER BY created_at ASC`,
+  )
+  const allVerifiedDomains = doms.rows.map((r) => r.name)
+
+  // Duplicate email addresses per show (same address on more than one prospect
+  // row). Aggregate only — no addresses stored. duplicatedAddresses = how many
+  // addresses repeat; extraRows = how many rows beyond the first (i.e. how many
+  // duplicate sends a blast would cause).
+  const dupes = await pool.query<{ project_id: string; duplicated_addresses: number; extra_rows: number }>(
+    `SELECT project_id,
+            COUNT(*)::int AS duplicated_addresses,
+            COALESCE(SUM(n - 1), 0)::int AS extra_rows
+       FROM (
+         SELECT project_id, lower(email) AS email, COUNT(*) AS n
+           FROM outreach_prospects
+          WHERE email IS NOT NULL
+          GROUP BY project_id, lower(email)
+         HAVING COUNT(*) > 1
+       ) g
+      GROUP BY project_id`,
+  )
+  const dupeBy = new Map(dupes.rows.map((r) => [r.project_id, r]))
 
   // 2) Follow-up status counts per show.
   const fCounts = await pool.query<{ project_id: string; followup_queued: number; followup_sent: number }>(
@@ -122,6 +168,20 @@ export async function collectOpsSnapshot() {
     const fc = fCountBy.get(r.id)
     const people = eligBy.get(r.id) ?? []
     const capped = people.slice(0, MAX_ELIGIBLE_PER_SHOW)
+
+    // Send readiness — the three gates the follow-up send endpoint enforces.
+    // Domains that pin to this show come first in the list, then the rest of
+    // the pool (any verified domain can send).
+    const pinned = doms.rows.filter((d) => d.primary_show_id === r.id).map((d) => d.name)
+    const showDomains = [...pinned, ...allVerifiedDomains.filter((n) => !pinned.includes(n))]
+    const followupTemplateSaved = tplReady.get(r.id) ?? false
+    const oneSheetApproved = Boolean(r.one_sheet_approved_at)
+    const hasVerifiedDomain = allVerifiedDomains.length > 0
+    const blockers: string[] = []
+    if (!followupTemplateSaved) blockers.push('follow-up message not written/saved yet')
+    if (!oneSheetApproved) blockers.push('one-sheet not approved')
+    if (!hasVerifiedDomain) blockers.push('no verified sending domain')
+
     return {
       projectId: r.id,
       name: r.name,
@@ -142,6 +202,18 @@ export async function collectOpsSnapshot() {
           opened: Boolean(p.first_opened_at),
           openCount: p.open_count,
         })),
+      },
+      readiness: {
+        canSend: blockers.length === 0,
+        followupTemplateSaved,
+        oneSheetApproved,
+        hasVerifiedDomain,
+        verifiedDomains: showDomains,
+        blockers,
+      },
+      dataQuality: {
+        duplicatedAddresses: dupeBy.get(r.id)?.duplicated_addresses ?? 0,
+        duplicateExtraRows: dupeBy.get(r.id)?.extra_rows ?? 0,
       },
     }
   })
