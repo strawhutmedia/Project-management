@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-08-04T17:27:04.497Z",
+  "generatedAt": "2026-08-04T17:32:04.524Z",
   "note": "Read-only operational snapshot. Emails are masked; no full contact list is stored here.",
   "summary": {
     "showsWithOutreach": 1,
@@ -53,14 +53,14 @@
           {
             "name": "Kendall Washington",
             "emailMasked": "k***@underscoretalent.com",
-            "daysSinceFirstEmail": 19,
+            "daysSinceFirstEmail": 20,
             "opened": false,
             "openCount": 0
           },
           {
             "name": "Coye Simmons",
             "emailMasked": "c***@gmail.com",
-            "daysSinceFirstEmail": 19,
+            "daysSinceFirstEmail": 20,
             "opened": false,
             "openCount": 0
           },
