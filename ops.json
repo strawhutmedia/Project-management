@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-08-05T21:05:03.965Z",
+  "generatedAt": "2026-08-05T21:10:03.942Z",
   "note": "Read-only operational snapshot. Emails are masked; no full contact list is stored here.",
   "summary": {
     "showsWithOutreach": 1,
@@ -592,14 +592,14 @@
           {
             "name": "Carsten \"Bergie\" Bergersen",
             "emailMasked": "b***@theazureagency.com",
-            "daysSinceFirstEmail": 19,
+            "daysSinceFirstEmail": 20,
             "opened": false,
             "openCount": 0
           },
           {
             "name": "Hannah Wright",
             "emailMasked": "j***@jbsocialgroup.com",
-            "daysSinceFirstEmail": 19,
+            "daysSinceFirstEmail": 20,
             "opened": false,
             "openCount": 0
           },
@@ -648,8 +648,8 @@
         ]
       },
       "readiness": {
-        "canSend": false,
-        "followupTemplateSaved": false,
+        "canSend": true,
+        "followupTemplateSaved": true,
         "oneSheetApproved": true,
         "hasVerifiedDomain": true,
         "verifiedDomains": [
@@ -658,9 +658,7 @@
           "strawhutshows.com",
           "strawhutpodcasts.com"
         ],
-        "blockers": [
-          "follow-up message not written/saved yet"
-        ]
+        "blockers": []
       },
       "dataQuality": {
         "duplicatedAddresses": 2,
