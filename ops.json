@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-08-05T02:37:06.507Z",
+  "generatedAt": "2026-08-05T02:40:00.341Z",
   "note": "Read-only operational snapshot. Emails are masked; no full contact list is stored here.",
   "summary": {
     "showsWithOutreach": 1,
@@ -665,6 +665,15 @@
       "dataQuality": {
         "duplicatedAddresses": 2,
         "duplicateExtraRows": 7
+      },
+      "delivery": {
+        "attempts": 88,
+        "accepted": 88,
+        "bounced": 0,
+        "complained": 0,
+        "failed": 0,
+        "opensEver": 0,
+        "likelyOpenTrackingOff": true
       }
     }
   ]
