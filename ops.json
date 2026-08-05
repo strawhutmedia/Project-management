@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-08-05T20:55:03.974Z",
+  "generatedAt": "2026-08-05T21:00:03.950Z",
   "note": "Read-only operational snapshot. Emails are masked; no full contact list is stored here.",
   "summary": {
     "showsWithOutreach": 1,
@@ -564,14 +564,14 @@
           {
             "name": "Johnnie Olivia",
             "emailMasked": "j***@theazureagency.com",
-            "daysSinceFirstEmail": 19,
+            "daysSinceFirstEmail": 20,
             "opened": false,
             "openCount": 0
           },
           {
             "name": "Kelly",
             "emailMasked": "k***@kellykpr.com",
-            "daysSinceFirstEmail": 19,
+            "daysSinceFirstEmail": 20,
             "opened": false,
             "openCount": 0
           },
