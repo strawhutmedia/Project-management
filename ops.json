@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-08-05T17:55:03.548Z",
+  "generatedAt": "2026-08-05T18:00:03.564Z",
   "note": "Read-only operational snapshot. Emails are masked; no full contact list is stored here.",
   "summary": {
     "showsWithOutreach": 1,
@@ -137,14 +137,14 @@
           {
             "name": "Kori Sampson",
             "emailMasked": "c***@fortetalentgroup.com",
-            "daysSinceFirstEmail": 20,
+            "daysSinceFirstEmail": 21,
             "opened": false,
             "openCount": 0
           },
           {
             "name": "Ace Greene",
             "emailMasked": "e***@amprgroup.com",
-            "daysSinceFirstEmail": 20,
+            "daysSinceFirstEmail": 21,
             "opened": false,
             "openCount": 0
           },
