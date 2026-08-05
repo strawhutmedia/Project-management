@@ -73,6 +73,20 @@ type ShowOps = {
     duplicatedAddresses: number
     duplicateExtraRows: number
   }
+  // Deliverability signal from the send log. attempts/accepted/bounced/etc are
+  // what Resend reported. opensEver counts opens across ALL sends (real + test):
+  // if that's 0 while accepted > 0, open-tracking is almost certainly OFF (so
+  // "0 opens" is a blind spot, not proof nothing was seen), not a delivery
+  // failure. bounced/failed > 0 is a real delivery problem.
+  delivery: {
+    attempts: number
+    accepted: number
+    bounced: number
+    complained: number
+    failed: number
+    opensEver: number
+    likelyOpenTrackingOff: boolean
+  }
 }
 
 export async function collectOpsSnapshot() {
@@ -128,6 +142,26 @@ export async function collectOpsSnapshot() {
       GROUP BY project_id`,
   )
   const dupeBy = new Map(dupes.rows.map((r) => [r.project_id, r]))
+
+  // Deliverability from the send log (outreach_sends). Counts what Resend
+  // reported per real send, plus total opens across ALL sends (incl. tests) so
+  // we can tell "tracking is off" from "genuinely nobody opened".
+  const deliv = await pool.query<{
+    project_id: string; attempts: number; accepted: number; bounced: number;
+    complained: number; failed: number; opens_ever: number;
+  }>(
+    `SELECT op.project_id,
+            COUNT(*) FILTER (WHERE s.is_test = false)::int AS attempts,
+            COUNT(*) FILTER (WHERE s.is_test = false AND s.status = 'sent')::int AS accepted,
+            COUNT(*) FILTER (WHERE s.is_test = false AND s.status = 'bounced')::int AS bounced,
+            COUNT(*) FILTER (WHERE s.is_test = false AND s.status = 'complained')::int AS complained,
+            COUNT(*) FILTER (WHERE s.is_test = false AND s.status = 'failed')::int AS failed,
+            COALESCE(SUM(s.open_count), 0)::int AS opens_ever
+       FROM outreach_sends s
+       JOIN outreach_prospects op ON op.id = s.prospect_id
+      GROUP BY op.project_id`,
+  )
+  const delivBy = new Map(deliv.rows.map((r) => [r.project_id, r]))
 
   // 2) Follow-up status counts per show.
   const fCounts = await pool.query<{ project_id: string; followup_queued: number; followup_sent: number }>(
@@ -214,6 +248,15 @@ export async function collectOpsSnapshot() {
       dataQuality: {
         duplicatedAddresses: dupeBy.get(r.id)?.duplicated_addresses ?? 0,
         duplicateExtraRows: dupeBy.get(r.id)?.extra_rows ?? 0,
+      },
+      delivery: {
+        attempts: delivBy.get(r.id)?.attempts ?? 0,
+        accepted: delivBy.get(r.id)?.accepted ?? 0,
+        bounced: delivBy.get(r.id)?.bounced ?? 0,
+        complained: delivBy.get(r.id)?.complained ?? 0,
+        failed: delivBy.get(r.id)?.failed ?? 0,
+        opensEver: delivBy.get(r.id)?.opens_ever ?? 0,
+        likelyOpenTrackingOff: (delivBy.get(r.id)?.accepted ?? 0) > 0 && (delivBy.get(r.id)?.opens_ever ?? 0) === 0,
       },
     }
   })
