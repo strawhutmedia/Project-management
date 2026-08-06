@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-08-06T17:35:05.907Z",
+  "generatedAt": "2026-08-06T17:40:05.927Z",
   "note": "Read-only operational snapshot. Emails are masked; no full contact list is stored here.",
   "summary": {
     "showsWithOutreach": 1,
@@ -74,14 +74,14 @@
           {
             "name": "Olandria Carthen",
             "emailMasked": "t***@unitedtalent.com",
-            "daysSinceFirstEmail": 21,
+            "daysSinceFirstEmail": 22,
             "opened": false,
             "openCount": 0
           },
           {
             "name": "Nicolas Vansteenberghe",
             "emailMasked": "v***@caa.com",
-            "daysSinceFirstEmail": 21,
+            "daysSinceFirstEmail": 22,
             "opened": false,
             "openCount": 0
           },
