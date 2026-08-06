@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-08-06T19:10:06.056Z",
+  "generatedAt": "2026-08-06T19:15:06.121Z",
   "note": "Read-only operational snapshot. Emails are masked; no full contact list is stored here.",
   "summary": {
     "showsWithOutreach": 1,
@@ -382,14 +382,14 @@
           {
             "name": "Heather Weiss-Besignano",
             "emailMasked": "h***@icon-publicity.com",
-            "daysSinceFirstEmail": 21,
+            "daysSinceFirstEmail": 22,
             "opened": false,
             "openCount": 0
           },
           {
             "name": "Ace Greene",
             "emailMasked": "c***@realacegreene.com",
-            "daysSinceFirstEmail": 21,
+            "daysSinceFirstEmail": 22,
             "opened": false,
             "openCount": 0
           },
