@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-08-06T18:00:05.957Z",
+  "generatedAt": "2026-08-06T18:05:05.948Z",
   "note": "Read-only operational snapshot. Emails are masked; no full contact list is stored here.",
   "summary": {
     "showsWithOutreach": 1,
@@ -151,14 +151,14 @@
           {
             "name": "Kaylor Martin",
             "emailMasked": "a***@nymmg.com",
-            "daysSinceFirstEmail": 21,
+            "daysSinceFirstEmail": 22,
             "opened": false,
             "openCount": 0
           },
           {
             "name": "Terri Tex",
             "emailMasked": "t***@sparkleagency.org",
-            "daysSinceFirstEmail": 21,
+            "daysSinceFirstEmail": 22,
             "opened": false,
             "openCount": 0
           },
