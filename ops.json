@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-08-06T18:50:06.027Z",
+  "generatedAt": "2026-08-06T18:55:06.039Z",
   "note": "Read-only operational snapshot. Emails are masked; no full contact list is stored here.",
   "summary": {
     "showsWithOutreach": 1,
@@ -312,21 +312,21 @@
           {
             "name": "Jennifer Hyde",
             "emailMasked": "j***@gersh.com",
-            "daysSinceFirstEmail": 21,
+            "daysSinceFirstEmail": 22,
             "opened": false,
             "openCount": 0
           },
           {
             "name": "Harry Jowsey",
             "emailMasked": "c***@align-pr.com",
-            "daysSinceFirstEmail": 21,
+            "daysSinceFirstEmail": 22,
             "opened": false,
             "openCount": 0
           },
           {
             "name": "Madison Stewart",
             "emailMasked": "m***@align-pr.com",
-            "daysSinceFirstEmail": 21,
+            "daysSinceFirstEmail": 22,
             "opened": false,
             "openCount": 0
           },
