@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-08-06T19:05:06.052Z",
+  "generatedAt": "2026-08-06T19:10:06.056Z",
   "note": "Read-only operational snapshot. Emails are masked; no full contact list is stored here.",
   "summary": {
     "showsWithOutreach": 1,
@@ -368,14 +368,14 @@
           {
             "name": "Jessica Lee",
             "emailMasked": "j***@caa.com",
-            "daysSinceFirstEmail": 21,
+            "daysSinceFirstEmail": 22,
             "opened": false,
             "openCount": 0
           },
           {
             "name": "Chloe Veitch",
             "emailMasked": "c***@ingenuity.live",
-            "daysSinceFirstEmail": 21,
+            "daysSinceFirstEmail": 22,
             "opened": false,
             "openCount": 0
           },
