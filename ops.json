@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-08-06T17:50:05.970Z",
+  "generatedAt": "2026-08-06T17:55:05.957Z",
   "note": "Read-only operational snapshot. Emails are masked; no full contact list is stored here.",
   "summary": {
     "showsWithOutreach": 1,
@@ -123,14 +123,14 @@
           {
             "name": "Gabriel Vasconcelos",
             "emailMasked": "i***@gabrielvasconcelos.com",
-            "daysSinceFirstEmail": 21,
+            "daysSinceFirstEmail": 22,
             "opened": false,
             "openCount": 0
           },
           {
             "name": "Jeremiah Brown",
             "emailMasked": "f***@select.co",
-            "daysSinceFirstEmail": 21,
+            "daysSinceFirstEmail": 22,
             "opened": false,
             "openCount": 0
           },
