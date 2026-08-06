@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-08-06T19:35:06.108Z",
+  "generatedAt": "2026-08-06T19:40:06.105Z",
   "note": "Read-only operational snapshot. Emails are masked; no full contact list is stored here.",
   "summary": {
     "showsWithOutreach": 1,
@@ -459,14 +459,14 @@
           {
             "name": "Olandria Carthen",
             "emailMasked": "o***@gmail.com",
-            "daysSinceFirstEmail": 21,
+            "daysSinceFirstEmail": 22,
             "opened": false,
             "openCount": 0
           },
           {
             "name": "Alex Holt",
             "emailMasked": "a***@gersh.com",
-            "daysSinceFirstEmail": 21,
+            "daysSinceFirstEmail": 22,
             "opened": false,
             "openCount": 0
           },
