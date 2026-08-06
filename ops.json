@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-08-06T21:00:06.201Z",
+  "generatedAt": "2026-08-06T21:05:06.187Z",
   "note": "Read-only operational snapshot. Emails are masked; no full contact list is stored here.",
   "summary": {
     "showsWithOutreach": 1,
@@ -578,14 +578,14 @@
           {
             "name": "Marco Donatelli",
             "emailMasked": "m***@rewiredtalent.com",
-            "daysSinceFirstEmail": 20,
+            "daysSinceFirstEmail": 21,
             "opened": false,
             "openCount": 0
           },
           {
             "name": "Taylor Smith",
             "emailMasked": "k***@gmail.com",
-            "daysSinceFirstEmail": 20,
+            "daysSinceFirstEmail": 21,
             "opened": false,
             "openCount": 0
           },
