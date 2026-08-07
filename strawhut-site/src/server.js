@@ -360,10 +360,24 @@ app.use((req, res) => {
     );
 });
 
-app.listen(PORT, () => {
+app.listen(PORT, async () => {
   console.log(`[strawhut-site] listening on :${PORT}`);
   console.log(`[strawhut-site] admin at /admin (password via ADMIN_PASSWORD env)`);
   startScheduler(store);
+
+  // Self-populate: if the database is empty, import every show from the
+  // current strawhutmedia.com automatically (no admin action needed).
+  // Set AUTO_IMPORT=off to disable. Runs once — subsequent boots have shows.
+  try {
+    const s = await store.stats();
+    if (s.shows === 0 && process.env.AUTO_IMPORT !== 'off') {
+      console.log('[import] empty database — auto-importing all shows from strawhutmedia.com…');
+      await importFromSite(store, { onProgress: (m) => console.log('[import]', m) });
+    }
+  } catch (e) {
+    console.error('[import] auto-import failed:', e.message);
+  }
+
   // Build the semantic recommendation index in the background.
   reco.buildIndex(store).catch((e) => console.error('[reco] buildIndex failed:', e.message));
 });
