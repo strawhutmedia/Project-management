@@ -102,6 +102,7 @@ export function showsAdminPage({ shows, flash }) {
       <td class="actions">
         <a class="btn btn-sm" href="/${esc(s.slug)}" target="_blank">View</a>
         <form method="post" action="/admin/shows/${esc(s.id)}/sync" style="display:inline"><button class="btn btn-sm">Sync</button></form>
+        <form method="post" action="/admin/shows/${esc(s.id)}/youtube" style="display:inline"><button class="btn btn-sm" title="Find & link this show's YouTube videos">🎬 Video</button></form>
         <form method="post" action="/admin/shows/${esc(s.id)}/type" style="display:inline"><button class="btn btn-sm">${s.show_type === 'partnered' ? '→ Original' : '→ Partner'}</button></form>
         <form method="post" action="/admin/shows/${esc(s.id)}/feature" style="display:inline"><button class="btn btn-sm">${s.featured ? 'Unfeature' : 'Feature'}</button></form>
         <form method="post" action="/admin/shows/${esc(s.id)}/delete" style="display:inline" onsubmit="return confirm('Delete ${esc(s.title)}? This removes its pages.')"><button class="btn btn-sm btn-danger">Delete</button></form>
@@ -115,6 +116,7 @@ export function showsAdminPage({ shows, flash }) {
     <div style="margin-bottom:18px"><a class="btn btn-primary" href="/admin/shows/new">➕ Add show</a>
       <form method="post" action="/admin/import" style="display:inline;margin-left:8px" onsubmit="return confirm('Import every show from strawhutmedia.com? This runs in the background.')"><button class="btn">⬇ Import all shows from strawhutmedia.com</button></form>
       <form method="post" action="/admin/sync-all" style="display:inline;margin-left:8px"><button class="btn">🔄 Sync all feeds</button></form>
+      <form method="post" action="/admin/youtube-match" style="display:inline;margin-left:8px" onsubmit="return confirm('Find and link YouTube videos for all shows? Runs in the background.')"><button class="btn">🎬 Match YouTube videos (all)</button></form>
     </div>
     <div class="panel">
       <table class="admin-table"><thead><tr><th></th><th>Show</th><th>Episodes</th><th>Type</th><th></th></tr></thead>

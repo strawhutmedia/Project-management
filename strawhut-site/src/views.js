@@ -10,6 +10,7 @@ import {
   podcastSeriesJsonLd,
   podcastEpisodeJsonLd,
   breadcrumbJsonLd,
+  videoObjectJsonLd,
 } from './seo.js';
 
 const FONT =
@@ -306,8 +307,9 @@ export function episodePage({ show, episode, moreFromShow = [], related = [] }) 
       <div>
         <a class="show-link" href="/${esc(show.slug)}">${esc(show.title)}</a>
         <h1>${esc(episode.title)}</h1>
-        <div class="sub">${episode.published_at ? `<time datetime="${esc(new Date(episode.published_at).toISOString())}">${esc(formatDate(episode.published_at))}</time>` : ''}${episode.duration ? ' · ' + esc(formatDuration(episode.duration)) : ''}</div>
+        <div class="sub">${episode.published_at ? `<time datetime="${esc(new Date(episode.published_at).toISOString())}">${esc(formatDate(episode.published_at))}</time>` : ''}${episode.duration ? ' · ' + esc(formatDuration(episode.duration)) : ''}${episode.youtube_id ? ' · <span class="pill on">▶ Watch on video</span>' : ''}</div>
         ${hook ? `<p class="ep-hook">${esc(hook)}</p>` : ''}
+        ${episode.youtube_id ? `<div class="video-embed"><iframe src="https://www.youtube-nocookie.com/embed/${esc(episode.youtube_id)}" title="${esc(episode.title)}" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen loading="lazy"></iframe></div>` : ''}
         ${
           episode.audio_url
             ? `<button class="btn btn-primary play-cta" id="playCta" type="button">▶ Play this episode</button>
@@ -363,6 +365,8 @@ export function episodePage({ show, episode, moreFromShow = [], related = [] }) 
     ogType: 'article',
     jsonLd:
       podcastEpisodeJsonLd(show, episode) +
+      '\n' +
+      videoObjectJsonLd(show, episode) +
       '\n' +
       breadcrumbJsonLd([
         { name: 'Home', path: '/' },

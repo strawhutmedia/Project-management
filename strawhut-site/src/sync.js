@@ -89,13 +89,14 @@ export async function syncAll(store) {
 }
 
 /** Background scheduler — re-checks every feed for new episodes. */
-export function startScheduler(store) {
+export function startScheduler(store, { afterSync } = {}) {
   const minutes = Math.max(5, parseInt(process.env.SYNC_INTERVAL_MINUTES || '30', 10));
   const run = async () => {
     try {
       const results = await syncAll(store);
       const added = results.reduce((n, r) => n + (r.added || 0), 0);
       if (added > 0) console.log(`[sync] scheduled run added ${added} new episode page(s)`);
+      if (afterSync) await afterSync(added);
     } catch (e) {
       console.error('[sync] scheduled run failed:', e.message);
     }

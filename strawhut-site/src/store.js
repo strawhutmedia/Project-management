@@ -127,6 +127,12 @@ class JsonStore {
   async setEpisodeEmbedding(id, vec) {
     if (this.db.episodes[id]) this.db.episodes[id].embedding = vec; // flush batched via save()
   }
+  async setEpisodeYouTube(id, youtubeId) {
+    if (this.db.episodes[id]) {
+      this.db.episodes[id].youtube_id = youtubeId;
+      this._flush();
+    }
+  }
   async save() {
     this._flush();
   }
@@ -207,6 +213,7 @@ class PgStore {
         spotify_url  TEXT,
         apple_url    TEXT,
         show_type    TEXT DEFAULT 'original',
+        youtube_channel_id TEXT,
         featured     BOOLEAN DEFAULT FALSE,
         sort_order   INTEGER DEFAULT 0,
         last_synced  TIMESTAMPTZ,
@@ -226,6 +233,7 @@ class PgStore {
         episode_number INTEGER,
         season        INTEGER,
         embedding     TEXT,
+        youtube_id    TEXT,
         UNIQUE (show_id, guid)
       );
       CREATE INDEX IF NOT EXISTS idx_episodes_show ON episodes(show_id, published_at DESC);
@@ -276,15 +284,15 @@ class PgStore {
     const id = existing?.id || show.id || newId();
     const m = { ...existing, ...show, id };
     await this.pool.query(
-      `INSERT INTO shows (id, slug, title, description, author, image_url, feed_url, link, categories, spotify_url, apple_url, show_type, featured, sort_order, last_synced)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)
+      `INSERT INTO shows (id, slug, title, description, author, image_url, feed_url, link, categories, spotify_url, apple_url, show_type, youtube_channel_id, featured, sort_order, last_synced)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)
        ON CONFLICT (id) DO UPDATE SET
          slug=$2, title=$3, description=$4, author=$5, image_url=$6, feed_url=$7, link=$8,
-         categories=$9, spotify_url=$10, apple_url=$11, show_type=$12, featured=$13, sort_order=$14, last_synced=$15`,
+         categories=$9, spotify_url=$10, apple_url=$11, show_type=$12, youtube_channel_id=$13, featured=$14, sort_order=$15, last_synced=$16`,
       [
         id, m.slug, m.title, m.description, m.author, m.image_url, m.feed_url, m.link,
         JSON.stringify(m.categories || []), m.spotify_url, m.apple_url,
-        m.show_type || 'original', !!m.featured, m.sort_order || 0, m.last_synced || null,
+        m.show_type || 'original', m.youtube_channel_id || null, !!m.featured, m.sort_order || 0, m.last_synced || null,
       ]
     );
     return this.getShowById(id);
@@ -329,24 +337,28 @@ class PgStore {
   async insertEpisode(ep) {
     const id = ep.id || newId();
     await this.pool.query(
-      `INSERT INTO episodes (id, show_id, guid, slug, title, description, audio_url, image_url, duration, published_at, episode_number, season)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
+      `INSERT INTO episodes (id, show_id, guid, slug, title, description, audio_url, image_url, duration, published_at, episode_number, season, youtube_id)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
        ON CONFLICT (show_id, guid) DO NOTHING`,
       [
         id, ep.show_id, ep.guid, ep.slug, ep.title, ep.description, ep.audio_url,
         ep.image_url, ep.duration, ep.published_at || null, ep.episode_number, ep.season,
+        ep.youtube_id || null,
       ]
     );
     return { ...ep, id };
   }
   async allEpisodesRaw() {
     const { rows } = await this.pool.query(
-      `SELECT id, show_id, slug, title, image_url, duration, embedding FROM episodes`
+      `SELECT id, show_id, slug, title, image_url, duration, embedding, youtube_id FROM episodes`
     );
     return rows;
   }
   async setEpisodeEmbedding(id, vec) {
     await this.pool.query(`UPDATE episodes SET embedding=$2 WHERE id=$1`, [id, JSON.stringify(vec)]);
+  }
+  async setEpisodeYouTube(id, youtubeId) {
+    await this.pool.query(`UPDATE episodes SET youtube_id=$2 WHERE id=$1`, [id, youtubeId]);
   }
   async save() {}
   async stats() {

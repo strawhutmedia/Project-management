@@ -16,6 +16,7 @@ import { robotsTxt, sitemapXml, llmsTxt } from './seo.js';
 import { sendAnnouncement, mailConfigured } from './mail.js';
 import { importFromSite } from './importer.js';
 import * as reco from './recommend.js';
+import { matchAllShows, matchShowVideos } from './youtube.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PORT = process.env.PORT || 8080;
@@ -146,6 +147,38 @@ app.post('/admin/shows/:id/type', requireAdmin, async (req, res) => {
 app.post('/admin/shows/:id/delete', requireAdmin, async (req, res) => {
   await store.deleteShow(req.params.id);
   setFlash(res, { type: 'ok', msg: 'Show deleted.' });
+  res.redirect('/admin/shows');
+});
+
+app.post('/admin/youtube-match', requireAdmin, async (req, res) => {
+  setFlash(res, {
+    type: 'ok',
+    msg: 'Matching YouTube videos to episodes in the background — this can take a while for the full catalog. Refresh later.',
+  });
+  res.redirect('/admin/shows');
+  matchAllShows(store, { mode: 'auto', log: (m) => console.log('[youtube]', m) })
+    .then((n) => console.log(`[youtube] done — linked ${n} episodes to video`))
+    .catch((e) => console.error('[youtube] failed:', e.message));
+});
+
+app.post('/admin/shows/:id/youtube', requireAdmin, async (req, res) => {
+  const show = await store.getShowById(req.params.id);
+  if (show) {
+    try {
+      const { channelId, matched } = await matchShowVideos(store, show, {
+        mode: 'full',
+        log: (m) => console.log('[youtube]', m),
+      });
+      setFlash(res, {
+        type: channelId ? 'ok' : 'err',
+        msg: channelId
+          ? `Linked ${matched} episodes of “${show.title}” to their YouTube videos.`
+          : `Couldn't find a matching YouTube channel for “${show.title}”.`,
+      });
+    } catch (e) {
+      setFlash(res, { type: 'err', msg: `YouTube match failed: ${e.message}` });
+    }
+  }
   res.redirect('/admin/shows');
 });
 
@@ -363,7 +396,16 @@ app.use((req, res) => {
 app.listen(PORT, async () => {
   console.log(`[strawhut-site] listening on :${PORT}`);
   console.log(`[strawhut-site] admin at /admin (password via ADMIN_PASSWORD env)`);
-  startScheduler(store);
+  // After each scheduled feed sync: refresh recommendations and attach
+  // YouTube videos to any newly-published episodes.
+  startScheduler(store, {
+    afterSync: async () => {
+      await reco.refresh(store).catch(() => {});
+      if (process.env.YOUTUBE_MATCH !== 'off') {
+        await matchAllShows(store, { mode: 'recent', log: (m) => console.log('[youtube]', m) }).catch(() => {});
+      }
+    },
+  });
 
   // Self-populate: if the database is empty, import every show from the
   // current strawhutmedia.com automatically (no admin action needed).
@@ -378,6 +420,17 @@ app.listen(PORT, async () => {
     console.error('[import] auto-import failed:', e.message);
   }
 
-  // Build the semantic recommendation index in the background.
-  reco.buildIndex(store).catch((e) => console.error('[reco] buildIndex failed:', e.message));
+  // Build the semantic recommendation index in the background, then match
+  // YouTube videos to episodes for any shows not yet processed.
+  reco
+    .buildIndex(store)
+    .catch((e) => console.error('[reco] buildIndex failed:', e.message))
+    .finally(() => {
+      if (process.env.YOUTUBE_MATCH !== 'off') {
+        console.log('[youtube] matching videos to episodes in the background…');
+        matchAllShows(store, { mode: 'auto', log: (m) => console.log('[youtube]', m) })
+          .then((n) => console.log(`[youtube] initial match complete — ${n} episodes linked`))
+          .catch((e) => console.error('[youtube] match failed:', e.message));
+      }
+    });
 });

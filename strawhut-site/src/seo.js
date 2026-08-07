@@ -153,6 +153,21 @@ export function podcastEpisodeJsonLd(show, episode) {
   });
 }
 
+export function videoObjectJsonLd(show, episode) {
+  if (!episode.youtube_id) return '';
+  return jsonLd({
+    '@context': 'https://schema.org',
+    '@type': 'VideoObject',
+    name: episode.title,
+    description: toText(episode.description, 500),
+    thumbnailUrl: `https://i.ytimg.com/vi/${episode.youtube_id}/hqdefault.jpg`,
+    uploadDate: episode.published_at || undefined,
+    embedUrl: `https://www.youtube.com/embed/${episode.youtube_id}`,
+    contentUrl: `https://www.youtube.com/watch?v=${episode.youtube_id}`,
+    publisher: { '@id': BASE + '/#organization' },
+  });
+}
+
 // robots.txt — welcome all crawlers AND explicitly the major AI crawlers,
 // because we WANT AI assistants to read and recommend the site.
 export function robotsTxt() {
