@@ -2,6 +2,7 @@
 // RSS feed. Used by the admin "Import all shows" button and the CLI script.
 
 import { addShowFromFeed } from './sync.js';
+import { IMPORT_OVERRIDES, RETIRE_FEEDS, isPartnerTitle } from './overrides.js';
 
 const UA = 'StrawHutMedia-Importer/1.0';
 
@@ -51,6 +52,15 @@ function extractFeed(html) {
  * @returns {{ ok: number, failed: number, total: number }}
  */
 export async function importFromSite(store, { site = 'https://www.strawhutmedia.com', onProgress = () => {} } = {}) {
+  // Retire superseded feeds first so stale duplicates don't linger (and slugs
+  // free up for the corrected show).
+  for (const s of await store.listShows()) {
+    if (RETIRE_FEEDS.includes(s.feed_url)) {
+      await store.deleteShow(s.id);
+      onProgress(`retired stale feed for "${s.title}"`);
+    }
+  }
+
   onProgress(`Discovering shows on ${site}…`);
   let paths = discoverShowPaths(await get(site + '/'));
   try {
@@ -62,12 +72,20 @@ export async function importFromSite(store, { site = 'https://www.strawhutmedia.
   let failed = 0;
   for (const p of paths) {
     try {
-      const feed = extractFeed(await get(`${site}/${p}`));
+      const ov = IMPORT_OVERRIDES[p] || {};
+      const feed = ov.feed_url || extractFeed(await get(`${site}/${p}`));
       if (!feed) {
         failed++;
         continue;
       }
-      const { show, created, added } = await addShowFromFeed(store, feed);
+      const { show, created, added } = await addShowFromFeed(store, feed, {
+        show_type: ov.show_type,
+      });
+      // Enforce classification even for shows that already existed.
+      const wantType = ov.show_type || (isPartnerTitle(show.title) ? 'partnered' : null);
+      if (wantType && show.show_type !== wantType) {
+        await store.updateShow(show.id, { show_type: wantType });
+      }
       onProgress(`${created ? '+' : '='} ${show.title} (${added} eps)`);
       ok++;
     } catch (e) {
