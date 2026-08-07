@@ -253,6 +253,19 @@ class PgStore {
         sent_at    TIMESTAMPTZ
       );
     `);
+    // Lightweight migrations: CREATE TABLE IF NOT EXISTS won't add columns to
+    // a table that already exists, so add any newer columns idempotently.
+    await this.pool.query(`
+      ALTER TABLE shows    ADD COLUMN IF NOT EXISTS spotify_url        TEXT;
+      ALTER TABLE shows    ADD COLUMN IF NOT EXISTS apple_url          TEXT;
+      ALTER TABLE shows    ADD COLUMN IF NOT EXISTS show_type          TEXT DEFAULT 'original';
+      ALTER TABLE shows    ADD COLUMN IF NOT EXISTS youtube_channel_id TEXT;
+      ALTER TABLE shows    ADD COLUMN IF NOT EXISTS last_synced        TIMESTAMPTZ;
+      ALTER TABLE episodes ADD COLUMN IF NOT EXISTS episode_number     INTEGER;
+      ALTER TABLE episodes ADD COLUMN IF NOT EXISTS season             INTEGER;
+      ALTER TABLE episodes ADD COLUMN IF NOT EXISTS embedding          TEXT;
+      ALTER TABLE episodes ADD COLUMN IF NOT EXISTS youtube_id         TEXT;
+    `);
     console.log('[store] using Postgres store');
   }
   _rowToShow(r) {
