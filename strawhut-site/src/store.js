@@ -1,0 +1,292 @@
+// Storage layer. Two interchangeable backends behind one async interface:
+//   - Postgres  (when DATABASE_URL is set)  -> production, same as Slate
+//   - JSON file (otherwise)                 -> zero-setup local / demo mode
+//
+// A "show" is essentially one podcast RSS feed plus display settings.
+// "episodes" are derived from that feed and refreshed on a schedule.
+
+import fs from 'node:fs';
+import path from 'node:path';
+import crypto from 'node:crypto';
+import { fileURLToPath } from 'node:url';
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const DATA_DIR = path.join(__dirname, '..', 'data');
+const DATA_FILE = path.join(DATA_DIR, 'store.json');
+
+function newId() {
+  return crypto.randomUUID();
+}
+
+// ---------------------------------------------------------------------------
+// JSON-file backend
+// ---------------------------------------------------------------------------
+class JsonStore {
+  constructor() {
+    this.db = { shows: {}, episodes: {} };
+  }
+  async init() {
+    try {
+      if (fs.existsSync(DATA_FILE)) {
+        this.db = JSON.parse(fs.readFileSync(DATA_FILE, 'utf8'));
+        this.db.shows ||= {};
+        this.db.episodes ||= {};
+      } else {
+        fs.mkdirSync(DATA_DIR, { recursive: true });
+        this._flush();
+      }
+    } catch (e) {
+      console.error('[store] failed to load JSON store, starting empty:', e.message);
+      this.db = { shows: {}, episodes: {} };
+    }
+    console.log('[store] using JSON file store at', DATA_FILE);
+  }
+  _flush() {
+    fs.mkdirSync(DATA_DIR, { recursive: true });
+    fs.writeFileSync(DATA_FILE, JSON.stringify(this.db, null, 2));
+  }
+
+  async listShows() {
+    return Object.values(this.db.shows).sort(
+      (a, b) =>
+        Number(b.featured) - Number(a.featured) ||
+        (a.sort_order ?? 0) - (b.sort_order ?? 0) ||
+        a.title.localeCompare(b.title)
+    );
+  }
+  async getShowById(id) {
+    return this.db.shows[id] || null;
+  }
+  async getShowBySlug(slug) {
+    return Object.values(this.db.shows).find((s) => s.slug === slug) || null;
+  }
+  async getShowByFeed(feedUrl) {
+    return Object.values(this.db.shows).find((s) => s.feed_url === feedUrl) || null;
+  }
+  async upsertShow(show) {
+    const existing = show.id ? this.db.shows[show.id] : await this.getShowByFeed(show.feed_url);
+    const id = existing?.id || show.id || newId();
+    const merged = { ...existing, ...show, id };
+    this.db.shows[id] = merged;
+    this._flush();
+    return merged;
+  }
+  async updateShow(id, patch) {
+    if (!this.db.shows[id]) return null;
+    this.db.shows[id] = { ...this.db.shows[id], ...patch, id };
+    this._flush();
+    return this.db.shows[id];
+  }
+  async deleteShow(id) {
+    delete this.db.shows[id];
+    for (const [eid, ep] of Object.entries(this.db.episodes)) {
+      if (ep.show_id === id) delete this.db.episodes[eid];
+    }
+    this._flush();
+  }
+
+  async listEpisodes(showId, { limit = 1000, offset = 0 } = {}) {
+    return Object.values(this.db.episodes)
+      .filter((e) => e.show_id === showId)
+      .sort((a, b) => new Date(b.published_at) - new Date(a.published_at))
+      .slice(offset, offset + limit);
+  }
+  async getEpisodeBySlug(showId, slug) {
+    return (
+      Object.values(this.db.episodes).find((e) => e.show_id === showId && e.slug === slug) || null
+    );
+  }
+  async countEpisodes(showId) {
+    return Object.values(this.db.episodes).filter((e) => e.show_id === showId).length;
+  }
+  async existingGuids(showId) {
+    return new Set(
+      Object.values(this.db.episodes)
+        .filter((e) => e.show_id === showId)
+        .map((e) => e.guid)
+    );
+  }
+  async existingEpisodeSlugs(showId) {
+    return new Set(
+      Object.values(this.db.episodes)
+        .filter((e) => e.show_id === showId)
+        .map((e) => e.slug)
+    );
+  }
+  async insertEpisode(ep) {
+    const id = ep.id || newId();
+    this.db.episodes[id] = { ...ep, id };
+    this._flush();
+    return this.db.episodes[id];
+  }
+  async stats() {
+    return {
+      shows: Object.keys(this.db.shows).length,
+      episodes: Object.keys(this.db.episodes).length,
+    };
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Postgres backend
+// ---------------------------------------------------------------------------
+class PgStore {
+  constructor(pool) {
+    this.pool = pool;
+  }
+  async init() {
+    await this.pool.query(`
+      CREATE TABLE IF NOT EXISTS shows (
+        id           TEXT PRIMARY KEY,
+        slug         TEXT UNIQUE NOT NULL,
+        title        TEXT NOT NULL,
+        description  TEXT,
+        author       TEXT,
+        image_url    TEXT,
+        feed_url     TEXT UNIQUE NOT NULL,
+        link         TEXT,
+        categories   TEXT,
+        spotify_url  TEXT,
+        apple_url    TEXT,
+        show_type    TEXT DEFAULT 'original',
+        featured     BOOLEAN DEFAULT FALSE,
+        sort_order   INTEGER DEFAULT 0,
+        last_synced  TIMESTAMPTZ,
+        created_at   TIMESTAMPTZ DEFAULT now()
+      );
+      CREATE TABLE IF NOT EXISTS episodes (
+        id            TEXT PRIMARY KEY,
+        show_id       TEXT NOT NULL REFERENCES shows(id) ON DELETE CASCADE,
+        guid          TEXT NOT NULL,
+        slug          TEXT NOT NULL,
+        title         TEXT NOT NULL,
+        description   TEXT,
+        audio_url     TEXT,
+        image_url     TEXT,
+        duration      TEXT,
+        published_at  TIMESTAMPTZ,
+        episode_number INTEGER,
+        season        INTEGER,
+        UNIQUE (show_id, guid)
+      );
+      CREATE INDEX IF NOT EXISTS idx_episodes_show ON episodes(show_id, published_at DESC);
+    `);
+    console.log('[store] using Postgres store');
+  }
+  _rowToShow(r) {
+    if (!r) return null;
+    return { ...r, categories: r.categories ? JSON.parse(r.categories) : [] };
+  }
+  async listShows() {
+    const { rows } = await this.pool.query(
+      `SELECT * FROM shows ORDER BY featured DESC, sort_order ASC, title ASC`
+    );
+    return rows.map((r) => this._rowToShow(r));
+  }
+  async getShowById(id) {
+    const { rows } = await this.pool.query(`SELECT * FROM shows WHERE id=$1`, [id]);
+    return this._rowToShow(rows[0]);
+  }
+  async getShowBySlug(slug) {
+    const { rows } = await this.pool.query(`SELECT * FROM shows WHERE slug=$1`, [slug]);
+    return this._rowToShow(rows[0]);
+  }
+  async getShowByFeed(feedUrl) {
+    const { rows } = await this.pool.query(`SELECT * FROM shows WHERE feed_url=$1`, [feedUrl]);
+    return this._rowToShow(rows[0]);
+  }
+  async upsertShow(show) {
+    const existing = show.id
+      ? await this.getShowById(show.id)
+      : await this.getShowByFeed(show.feed_url);
+    const id = existing?.id || show.id || newId();
+    const m = { ...existing, ...show, id };
+    await this.pool.query(
+      `INSERT INTO shows (id, slug, title, description, author, image_url, feed_url, link, categories, spotify_url, apple_url, show_type, featured, sort_order, last_synced)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)
+       ON CONFLICT (id) DO UPDATE SET
+         slug=$2, title=$3, description=$4, author=$5, image_url=$6, feed_url=$7, link=$8,
+         categories=$9, spotify_url=$10, apple_url=$11, show_type=$12, featured=$13, sort_order=$14, last_synced=$15`,
+      [
+        id, m.slug, m.title, m.description, m.author, m.image_url, m.feed_url, m.link,
+        JSON.stringify(m.categories || []), m.spotify_url, m.apple_url,
+        m.show_type || 'original', !!m.featured, m.sort_order || 0, m.last_synced || null,
+      ]
+    );
+    return this.getShowById(id);
+  }
+  async updateShow(id, patch) {
+    const cur = await this.getShowById(id);
+    if (!cur) return null;
+    return this.upsertShow({ ...cur, ...patch, id });
+  }
+  async deleteShow(id) {
+    await this.pool.query(`DELETE FROM shows WHERE id=$1`, [id]);
+  }
+  async listEpisodes(showId, { limit = 1000, offset = 0 } = {}) {
+    const { rows } = await this.pool.query(
+      `SELECT * FROM episodes WHERE show_id=$1 ORDER BY published_at DESC NULLS LAST LIMIT $2 OFFSET $3`,
+      [showId, limit, offset]
+    );
+    return rows;
+  }
+  async getEpisodeBySlug(showId, slug) {
+    const { rows } = await this.pool.query(
+      `SELECT * FROM episodes WHERE show_id=$1 AND slug=$2`,
+      [showId, slug]
+    );
+    return rows[0] || null;
+  }
+  async countEpisodes(showId) {
+    const { rows } = await this.pool.query(
+      `SELECT COUNT(*)::int AS c FROM episodes WHERE show_id=$1`,
+      [showId]
+    );
+    return rows[0].c;
+  }
+  async existingGuids(showId) {
+    const { rows } = await this.pool.query(`SELECT guid FROM episodes WHERE show_id=$1`, [showId]);
+    return new Set(rows.map((r) => r.guid));
+  }
+  async existingEpisodeSlugs(showId) {
+    const { rows } = await this.pool.query(`SELECT slug FROM episodes WHERE show_id=$1`, [showId]);
+    return new Set(rows.map((r) => r.slug));
+  }
+  async insertEpisode(ep) {
+    const id = ep.id || newId();
+    await this.pool.query(
+      `INSERT INTO episodes (id, show_id, guid, slug, title, description, audio_url, image_url, duration, published_at, episode_number, season)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
+       ON CONFLICT (show_id, guid) DO NOTHING`,
+      [
+        id, ep.show_id, ep.guid, ep.slug, ep.title, ep.description, ep.audio_url,
+        ep.image_url, ep.duration, ep.published_at || null, ep.episode_number, ep.season,
+      ]
+    );
+    return { ...ep, id };
+  }
+  async stats() {
+    const s = await this.pool.query(`SELECT COUNT(*)::int AS c FROM shows`);
+    const e = await this.pool.query(`SELECT COUNT(*)::int AS c FROM episodes`);
+    return { shows: s.rows[0].c, episodes: e.rows[0].c };
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Factory
+// ---------------------------------------------------------------------------
+export async function createStore() {
+  if (process.env.DATABASE_URL) {
+    const pg = await import('pg');
+    const pool = new pg.default.Pool({
+      connectionString: process.env.DATABASE_URL,
+      ssl: process.env.DATABASE_URL.includes('localhost') ? false : { rejectUnauthorized: false },
+    });
+    const store = new PgStore(pool);
+    await store.init();
+    return store;
+  }
+  const store = new JsonStore();
+  await store.init();
+  return store;
+}
