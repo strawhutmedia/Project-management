@@ -113,6 +113,7 @@ export function showsAdminPage({ shows, flash }) {
     <h1>Shows</h1>
     ${flash ? `<div class="flash ${flash.type}">${esc(flash.msg)}</div>` : ''}
     <div style="margin-bottom:18px"><a class="btn btn-primary" href="/admin/shows/new">➕ Add show</a>
+      <form method="post" action="/admin/import" style="display:inline;margin-left:8px" onsubmit="return confirm('Import every show from strawhutmedia.com? This runs in the background.')"><button class="btn">⬇ Import all shows from strawhutmedia.com</button></form>
       <form method="post" action="/admin/sync-all" style="display:inline;margin-left:8px"><button class="btn">🔄 Sync all feeds</button></form>
     </div>
     <div class="panel">

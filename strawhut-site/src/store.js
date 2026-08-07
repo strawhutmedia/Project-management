@@ -411,9 +411,13 @@ class PgStore {
 export async function createStore() {
   if (process.env.DATABASE_URL) {
     const pg = await import('pg');
+    const url = process.env.DATABASE_URL;
+    // Railway's internal DB (and localhost) speak plain TCP with no TLS;
+    // external/proxy hosts need SSL. Detect and configure accordingly.
+    const noSsl = /localhost|127\.0\.0\.1|::1|\.railway\.internal/.test(url) || process.env.PGSSL === 'off';
     const pool = new pg.default.Pool({
-      connectionString: process.env.DATABASE_URL,
-      ssl: process.env.DATABASE_URL.includes('localhost') ? false : { rejectUnauthorized: false },
+      connectionString: url,
+      ssl: noSsl ? false : { rejectUnauthorized: false },
     });
     const store = new PgStore(pool);
     await store.init();

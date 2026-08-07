@@ -14,6 +14,7 @@ import * as V from './views.js';
 import * as A from './admin_views.js';
 import { robotsTxt, sitemapXml, llmsTxt } from './seo.js';
 import { sendAnnouncement, mailConfigured } from './mail.js';
+import { importFromSite } from './importer.js';
 import * as reco from './recommend.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -153,6 +154,21 @@ app.post('/admin/sync-all', requireAdmin, async (req, res) => {
   const added = results.reduce((n, r) => n + (r.added || 0), 0);
   setFlash(res, { type: 'ok', msg: `Synced all feeds — ${added} new episodes across ${results.length} shows.` });
   res.redirect('/admin/shows');
+});
+
+app.post('/admin/import', requireAdmin, async (req, res) => {
+  setFlash(res, {
+    type: 'ok',
+    msg: 'Importing all shows from strawhutmedia.com in the background — refresh this page in a minute to watch them appear.',
+  });
+  res.redirect('/admin/shows');
+  // Fire-and-forget: crawl + import continues after the response is sent.
+  importFromSite(store, { onProgress: (m) => console.log('[import]', m) })
+    .then((r) => {
+      console.log('[import] complete', r);
+      reco.refresh(store).catch(() => {});
+    })
+    .catch((e) => console.error('[import] failed:', e.message));
 });
 
 // ---- Admin: announcements ----
