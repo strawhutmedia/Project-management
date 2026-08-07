@@ -64,6 +64,16 @@ img { max-width: 100%; display: block; }
 .hero p { color: var(--muted); font-size: 1.15rem; max-width: 620px; margin: 0; }
 .hero .accent { color: var(--accent); }
 
+/* Moving cover-art marquee */
+.marquee { overflow: hidden; padding: 14px 0 6px; -webkit-mask-image: linear-gradient(90deg, transparent, #000 6%, #000 94%, transparent); mask-image: linear-gradient(90deg, transparent, #000 6%, #000 94%, transparent); }
+.marquee-track { display: flex; gap: 18px; width: max-content; animation: marquee-scroll 80s linear infinite; }
+.marquee:hover .marquee-track { animation-play-state: paused; }
+.marquee-item { flex: 0 0 auto; width: 132px; height: 132px; border-radius: 14px; overflow: hidden; box-shadow: var(--shadow); transition: transform 0.2s; }
+.marquee-item:hover { transform: scale(1.06); }
+.marquee-item img { width: 100%; height: 100%; object-fit: cover; }
+@keyframes marquee-scroll { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+@media (prefers-reduced-motion: reduce) { .marquee-track { animation: none; } }
+
 /* Section heads */
 .section { padding: 34px 0; }
 .section-head { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 22px; }

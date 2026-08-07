@@ -14,6 +14,7 @@ import * as V from './views.js';
 import * as A from './admin_views.js';
 import { robotsTxt, sitemapXml, llmsTxt } from './seo.js';
 import { sendAnnouncement, mailConfigured } from './mail.js';
+import * as reco from './recommend.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PORT = process.env.PORT || 8080;
@@ -310,17 +311,24 @@ app.get('/:showSlug/:episodeSlug', async (req, res, next) => {
   const fromShow = await store.listEpisodes(show.id, { limit: 6 });
   const moreFromShow = fromShow.filter((e) => e.slug !== episode.slug).slice(0, 3);
 
-  const cats = new Set(show.categories || []);
-  const others = (await store.listShows()).filter((s) => s.id !== show.id);
-  others.sort(
-    (a, b) =>
-      ((a.categories || []).some((c) => cats.has(c)) ? 0 : 1) -
-      ((b.categories || []).some((c) => cats.has(c)) ? 0 : 1)
-  );
-  const related = [];
-  for (const s of others.slice(0, 3)) {
-    const eps = await store.listEpisodes(s.id, { limit: 1 });
-    if (eps[0]) related.push({ show: s, episode: eps[0] });
+  // Prefer accurate embedding-based recommendations; fall back to genre-match
+  // while the embedding index is still building.
+  let related = reco.related(episode.id, show.id, { limit: 4 }).map((r) => ({
+    show: { slug: r.showSlug, title: r.showTitle, image_url: r.image_url },
+    episode: { slug: r.slug, title: r.title, image_url: r.image_url, duration: r.duration },
+  }));
+  if (!related.length) {
+    const cats = new Set(show.categories || []);
+    const others = (await store.listShows()).filter((s) => s.id !== show.id);
+    others.sort(
+      (a, b) =>
+        ((a.categories || []).some((c) => cats.has(c)) ? 0 : 1) -
+        ((b.categories || []).some((c) => cats.has(c)) ? 0 : 1)
+    );
+    for (const s of others.slice(0, 3)) {
+      const eps = await store.listEpisodes(s.id, { limit: 1 });
+      if (eps[0]) related.push({ show: s, episode: eps[0] });
+    }
   }
 
   res.send(V.episodePage({ show, episode, moreFromShow, related }));
@@ -340,4 +348,6 @@ app.listen(PORT, () => {
   console.log(`[strawhut-site] listening on :${PORT}`);
   console.log(`[strawhut-site] admin at /admin (password via ADMIN_PASSWORD env)`);
   startScheduler(store);
+  // Build the semantic recommendation index in the background.
+  reco.buildIndex(store).catch((e) => console.error('[reco] buildIndex failed:', e.message));
 });

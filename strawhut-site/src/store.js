@@ -121,6 +121,15 @@ class JsonStore {
     this._flush();
     return this.db.episodes[id];
   }
+  async allEpisodesRaw() {
+    return Object.values(this.db.episodes);
+  }
+  async setEpisodeEmbedding(id, vec) {
+    if (this.db.episodes[id]) this.db.episodes[id].embedding = vec; // flush batched via save()
+  }
+  async save() {
+    this._flush();
+  }
   async stats() {
     return {
       shows: Object.keys(this.db.shows).length,
@@ -216,6 +225,7 @@ class PgStore {
         published_at  TIMESTAMPTZ,
         episode_number INTEGER,
         season        INTEGER,
+        embedding     TEXT,
         UNIQUE (show_id, guid)
       );
       CREATE INDEX IF NOT EXISTS idx_episodes_show ON episodes(show_id, published_at DESC);
@@ -329,6 +339,16 @@ class PgStore {
     );
     return { ...ep, id };
   }
+  async allEpisodesRaw() {
+    const { rows } = await this.pool.query(
+      `SELECT id, show_id, slug, title, image_url, duration, embedding FROM episodes`
+    );
+    return rows;
+  }
+  async setEpisodeEmbedding(id, vec) {
+    await this.pool.query(`UPDATE episodes SET embedding=$2 WHERE id=$1`, [id, JSON.stringify(vec)]);
+  }
+  async save() {}
   async stats() {
     const s = await this.pool.query(`SELECT COUNT(*)::int AS c FROM shows`);
     const e = await this.pool.query(`SELECT COUNT(*)::int AS c FROM episodes`);

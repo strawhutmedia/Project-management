@@ -109,11 +109,21 @@ export function homePage({ shows }) {
       )
       .join('');
 
+  // Moving cover-art strip (the "charm" from the current site) — pure CSS,
+  // duplicated once so the scroll loops seamlessly.
+  const marqueeShows = shows.filter((s) => s.image_url);
+  const marqueeItem = (s) =>
+    `<a class="marquee-item" href="/${esc(s.slug)}" title="${esc(s.title)}"><img src="${esc(s.image_url)}" alt="${esc(s.title)}" loading="lazy"></a>`;
+  const marquee = marqueeShows.length
+    ? `<div class="marquee"><div class="marquee-track">${[...marqueeShows, ...marqueeShows].map(marqueeItem).join('')}</div></div>`
+    : '';
+
   const body = `
   <section class="hero"><div class="container">
     <h1>Podcasts that <span class="accent">matter</span>.</h1>
     <p>Straw Hut Media is an award-winning podcast network — home to ${shows.length}+ original and partner shows.</p>
   </div></section>
+  ${marquee}
 
   ${
     spotlight.length
