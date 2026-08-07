@@ -407,14 +407,14 @@ app.listen(PORT, async () => {
     },
   });
 
-  // Self-populate: if the database is empty, import every show from the
-  // current strawhutmedia.com automatically (no admin action needed).
-  // Set AUTO_IMPORT=off to disable. Runs once — subsequent boots have shows.
+  // Self-populate: on each boot, import every show from the current
+  // strawhutmedia.com. Idempotent — existing shows just re-sync, and any
+  // show missing (or newly published) is added. Set AUTO_IMPORT=off to skip.
   try {
-    const s = await store.stats();
-    if (s.shows === 0 && process.env.AUTO_IMPORT !== 'off') {
-      console.log('[import] empty database — auto-importing all shows from strawhutmedia.com…');
-      await importFromSite(store, { onProgress: (m) => console.log('[import]', m) });
+    if (process.env.AUTO_IMPORT !== 'off') {
+      console.log('[import] syncing full show catalog from strawhutmedia.com…');
+      const r = await importFromSite(store, { onProgress: (m) => console.log('[import]', m) });
+      console.log('[import] catalog sync complete', r);
     }
   } catch (e) {
     console.error('[import] auto-import failed:', e.message);

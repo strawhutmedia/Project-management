@@ -5,11 +5,10 @@ import { addShowFromFeed } from './sync.js';
 
 const UA = 'StrawHutMedia-Importer/1.0';
 
-// Paths on the current site that are NOT shows.
+// Paths on the current site that are NOT shows (nav/marketing pages).
 const NOT_SHOWS = new Set([
   '', 'shows', 'studio', 'advertise', 'press', 'comingshow', 'ourpodcasthosts',
-  'trendingepisode', 'commune-courses-380', 'commune-with-jeff-krasno',
-  'psychoanalyzing-the-patient',
+  'trendingepisode', 'home',
 ]);
 
 async function get(url) {
@@ -28,11 +27,23 @@ function discoverShowPaths(html) {
   return [...paths];
 }
 
+// Find a podcast RSS feed URL on a show page. Host-agnostic: Megaphone,
+// Spreaker, Libsyn, Simplecast, etc. Prefers a direct host feed over the
+// Google Podcasts redirect wrapper.
 function extractFeed(html) {
-  const m =
-    html.match(/https:\/\/feeds\.megaphone\.fm\/[A-Za-z0-9]+/) ||
-    html.match(/href="(https?:\/\/[^"]+(?:\/rss|\.rss|\/feed)[^"]*)"/i);
-  return m ? m[1] || m[0] : null;
+  const patterns = [
+    /https?:\/\/feeds\.megaphone\.fm\/[A-Za-z0-9]+/i,
+    /https?:\/\/(?:www\.|api\.)?spreaker\.com\/(?:show\/\d+\/episodes\/feed|user\/[^"'\s<>]+\/[^"'\s<>]+)/i,
+    /https?:\/\/[^"'\s<>]*(?:libsyn\.com|simplecast\.com|acast\.com|omny\.fm|buzzsprout\.com|anchor\.fm|redcircle\.com|captivate\.fm|transistor\.fm|podbean\.com|rss\.com)[^"'\s<>]*/i,
+    /https?:\/\/[^"'\s<>]+\/(?:rss|feed)(?:\.xml)?(?:\?[^"'\s<>]*)?/i,
+  ];
+  for (const re of patterns) {
+    const m = html.match(re);
+    if (m && !/podcasts\.google\.com|imgix|gstatic|googleapis|\/assets\//i.test(m[0])) {
+      return m[0].replace(/&amp;/g, '&');
+    }
+  }
+  return null;
 }
 
 /**
