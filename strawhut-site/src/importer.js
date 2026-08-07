@@ -2,7 +2,7 @@
 // RSS feed. Used by the admin "Import all shows" button and the CLI script.
 
 import { addShowFromFeed } from './sync.js';
-import { IMPORT_OVERRIDES, RETIRE_FEEDS, isPartnerTitle } from './overrides.js';
+import { IMPORT_OVERRIDES, RETIRE_FEEDS } from './overrides.js';
 
 const UA = 'StrawHutMedia-Importer/1.0';
 
@@ -26,6 +26,34 @@ function discoverShowPaths(html) {
     paths.add(m[1]);
   }
   return [...paths];
+}
+
+// Strip the trailing "-<id>" the site appends to show slugs.
+const baseSlug = (p) => p.replace(/-\d+$/, '');
+
+// Read the /shows page's labeled sections ("Original Shows" / "Branded Shows")
+// to classify each show. Returns Sets of base slugs. This is authoritative —
+// it mirrors exactly how the shows are organized on the current site.
+function classifyShows(html) {
+  if (!html) return { originalBases: new Set(), brandedBases: new Set() };
+  const labels = [...html.matchAll(/class="section-text[^"]*"[^>]*>([^<]+)</g)]
+    .map((m) => [m.index, m[1].trim()])
+    .sort((a, b) => a[0] - b[0]);
+  const ranges = labels.map((l, i) => [l[0], i + 1 < labels.length ? labels[i + 1][0] : html.length, l[1]]);
+  const sectionOf = (pos) => {
+    for (const [s, e, n] of ranges) if (pos >= s && pos < e) return n;
+    return '';
+  };
+  const originalBases = new Set();
+  const brandedBases = new Set();
+  for (const m of html.matchAll(/href="(?:https:\/\/www\.strawhutmedia\.com)?\/([a-z0-9][a-z0-9-]+)"/g)) {
+    const p = m[1];
+    if (NOT_SHOWS.has(p) || p.includes('/')) continue;
+    const sec = sectionOf(m.index);
+    if (/branded/i.test(sec)) brandedBases.add(baseSlug(p));
+    else if (/original/i.test(sec)) originalBases.add(baseSlug(p));
+  }
+  return { originalBases, brandedBases };
 }
 
 // Find a podcast RSS feed URL on a show page. Host-agnostic: Megaphone,
@@ -62,11 +90,15 @@ export async function importFromSite(store, { site = 'https://www.strawhutmedia.
   }
 
   onProgress(`Discovering shows on ${site}…`);
-  let paths = discoverShowPaths(await get(site + '/'));
-  try {
-    paths = [...new Set([...paths, ...discoverShowPaths(await get(site + '/shows'))])];
-  } catch {}
-  onProgress(`Found ${paths.length} candidate show pages.`);
+  const homeHtml = await get(site + '/');
+  let showsHtml = '';
+  try { showsHtml = await get(site + '/shows'); } catch {}
+  let paths = discoverShowPaths(homeHtml);
+  if (showsHtml) paths = [...new Set([...paths, ...discoverShowPaths(showsHtml)])];
+
+  // Authoritative Original vs Branded(partner) classification from /shows.
+  const { originalBases, brandedBases } = classifyShows(showsHtml);
+  onProgress(`Found ${paths.length} candidate show pages (${originalBases.size} original, ${brandedBases.size} branded).`);
 
   let ok = 0;
   let failed = 0;
@@ -78,15 +110,16 @@ export async function importFromSite(store, { site = 'https://www.strawhutmedia.
         failed++;
         continue;
       }
-      const { show, created, added } = await addShowFromFeed(store, feed, {
-        show_type: ov.show_type,
-      });
+      const base = baseSlug(p);
+      const siteType = brandedBases.has(base) ? 'partnered' : originalBases.has(base) ? 'original' : null;
+      const wantType = ov.show_type || siteType;
+
+      const { show, created, added } = await addShowFromFeed(store, feed, { show_type: wantType });
       // Enforce classification even for shows that already existed.
-      const wantType = ov.show_type || (isPartnerTitle(show.title) ? 'partnered' : null);
       if (wantType && show.show_type !== wantType) {
         await store.updateShow(show.id, { show_type: wantType });
       }
-      onProgress(`${created ? '+' : '='} ${show.title} (${added} eps)`);
+      onProgress(`${created ? '+' : '='} ${show.title} [${show.show_type}] (${added} eps)`);
       ok++;
     } catch (e) {
       onProgress(`! failed ${p}: ${e.message}`);
