@@ -277,7 +277,16 @@ export function showPage({ show, episodes, total = episodes.length, pageNum = 1,
   });
 }
 
-export function episodePage({ show, episode }) {
+function epRecCard(showSlug, showTitle, ep, showImage) {
+  return `<a class="show-card" href="/${esc(showSlug)}/${esc(ep.slug)}">
+    <div class="art">${artOrPlaceholder(ep.image_url || showImage, ep.title)}<span class="play-badge">▶</span></div>
+    <div class="body"><h3>${esc(toText(ep.title, 70))}</h3>
+    <div class="meta">${esc(showTitle)}${ep.duration ? ' · ' + esc(formatDuration(ep.duration)) : ''}</div></div>
+  </a>`;
+}
+
+export function episodePage({ show, episode, moreFromShow = [], related = [] }) {
+  const hook = toText(episode.description, 150);
   const body = `
   <article>
   <section class="episode-hero"><div class="container">
@@ -288,17 +297,51 @@ export function episodePage({ show, episode }) {
         <a class="show-link" href="/${esc(show.slug)}">${esc(show.title)}</a>
         <h1>${esc(episode.title)}</h1>
         <div class="sub">${episode.published_at ? `<time datetime="${esc(new Date(episode.published_at).toISOString())}">${esc(formatDate(episode.published_at))}</time>` : ''}${episode.duration ? ' · ' + esc(formatDuration(episode.duration)) : ''}</div>
+        ${hook ? `<p class="ep-hook">${esc(hook)}</p>` : ''}
         ${
           episode.audio_url
-            ? `<audio controls preload="none" src="${esc(episode.audio_url)}"></audio>`
+            ? `<button class="btn btn-primary play-cta" id="playCta" type="button">▶ Play this episode</button>
+               <audio id="epAudio" controls preload="none" src="${esc(episode.audio_url)}"></audio>
+               <script>(function(){var b=document.getElementById('playCta'),a=document.getElementById('epAudio');if(b&&a){b.addEventListener('click',function(){a.play();b.textContent='▶ Playing…';a.scrollIntoView({behavior:'smooth',block:'center'});});}})();</script>`
             : `<p class="sub">Audio unavailable for this episode.</p>`
         }
       </div>
     </div>
   </div></section>
+
   <section class="section"><div class="container">
-    <div class="notes"><h2>Show notes</h2>${episode.description || '<p class="sub">No show notes.</p>'}</div>
+    <div class="notes"><h2>About this episode</h2>${episode.description || '<p class="sub">No show notes.</p>'}</div>
   </div></section>
+
+  <section class="section"><div class="container">
+    <div class="about-show">
+      <div class="art">${artOrPlaceholder(show.image_url, show.title)}</div>
+      <div>
+        <div class="section-head" style="margin-bottom:6px"><h2 style="margin:0">About ${esc(show.title)}</h2></div>
+        ${show.author ? `<div class="author" style="margin-bottom:8px">${esc(show.author)}</div>` : ''}
+        <p style="color:var(--muted);max-width:640px">${esc(toText(show.description, 320))}</p>
+        <a class="btn btn-primary btn-sm" href="/${esc(show.slug)}" style="margin-top:12px">See all episodes →</a>
+      </div>
+    </div>
+  </div></section>
+
+  ${
+    moreFromShow.length
+      ? `<section class="section"><div class="container">
+    <div class="section-head"><h2>More from ${esc(show.title)}</h2><a class="count" href="/${esc(show.slug)}">View all →</a></div>
+    <div class="grid">${moreFromShow.map((e) => epRecCard(show.slug, show.title, e, show.image_url)).join('')}</div>
+  </div></section>`
+      : ''
+  }
+
+  ${
+    related.length
+      ? `<section class="section"><div class="container">
+    <div class="section-head"><h2>You might also like</h2><a class="count" href="/shows">Browse all shows →</a></div>
+    <div class="grid">${related.map((r) => epRecCard(r.show.slug, r.show.title, r.episode, r.show.image_url)).join('')}</div>
+  </div></section>`
+      : ''
+  }
   </article>`;
   return layout({
     title: `${episode.title} — ${show.title} | Straw Hut Media`,

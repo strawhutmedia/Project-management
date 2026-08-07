@@ -305,7 +305,25 @@ app.get('/:showSlug/:episodeSlug', async (req, res, next) => {
   if (!show) return next();
   const episode = await store.getEpisodeBySlug(show.id, req.params.episodeSlug);
   if (!episode) return next();
-  res.send(V.episodePage({ show, episode }));
+
+  // (3) Recommendations — more from this show + similar episodes elsewhere.
+  const fromShow = await store.listEpisodes(show.id, { limit: 6 });
+  const moreFromShow = fromShow.filter((e) => e.slug !== episode.slug).slice(0, 3);
+
+  const cats = new Set(show.categories || []);
+  const others = (await store.listShows()).filter((s) => s.id !== show.id);
+  others.sort(
+    (a, b) =>
+      ((a.categories || []).some((c) => cats.has(c)) ? 0 : 1) -
+      ((b.categories || []).some((c) => cats.has(c)) ? 0 : 1)
+  );
+  const related = [];
+  for (const s of others.slice(0, 3)) {
+    const eps = await store.listEpisodes(s.id, { limit: 1 });
+    if (eps[0]) related.push({ show: s, episode: eps[0] });
+  }
+
+  res.send(V.episodePage({ show, episode, moreFromShow, related }));
 });
 
 app.use((req, res) => {
