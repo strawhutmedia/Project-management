@@ -1,11 +1,11 @@
 {
-  "generatedAt": "2026-08-07T00:05:06.336Z",
+  "generatedAt": "2026-08-07T00:10:06.324Z",
   "note": "Read-only operational snapshot. Emails are masked; no full contact list is stored here.",
   "summary": {
     "showsWithOutreach": 1,
     "totalEligibleForFollowup": 14,
-    "totalFollowupQueued": 3,
-    "totalFollowupSent": 71
+    "totalFollowupQueued": 1,
+    "totalFollowupSent": 73
   },
   "shows": [
     {
@@ -25,8 +25,8 @@
       "followup": {
         "minDaysUsed": 4,
         "eligibleNow": 14,
-        "queued": 3,
-        "alreadySent": 71,
+        "queued": 1,
+        "alreadySent": 73,
         "truncated": false,
         "people": [
           {
@@ -147,8 +147,8 @@
         "duplicateExtraRows": 7
       },
       "delivery": {
-        "attempts": 159,
-        "accepted": 159,
+        "attempts": 161,
+        "accepted": 161,
         "bounced": 0,
         "complained": 0,
         "failed": 0,
