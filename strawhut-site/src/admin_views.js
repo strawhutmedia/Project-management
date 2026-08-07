@@ -11,6 +11,8 @@ function adminLayout({ title, active, body, stats }) {
     ['/admin', '📊 Dashboard'],
     ['/admin/shows', '🎙️ Shows'],
     ['/admin/shows/new', '➕ Add Show'],
+    ['/admin/announcements', '📣 Announcements'],
+    ['/admin/members', '👥 Members'],
   ]
     .map(
       ([href, label]) =>
@@ -68,7 +70,7 @@ export function dashboardPage({ stats, shows, flash }) {
     <div class="stat-row">
       <div class="stat blue"><div class="n">${stats.shows}</div><div class="l">Shows</div></div>
       <div class="stat green"><div class="n">${stats.episodes}</div><div class="l">Episodes</div></div>
-      <div class="stat orange"><div class="n">${shows.filter((s) => s.featured).length}</div><div class="l">Featured</div></div>
+      <div class="stat orange"><div class="n">${stats.subscribers ?? 0}</div><div class="l">Members</div></div>
     </div>
     <div class="panel">
       <h2>Quick add a podcast</h2>
@@ -147,4 +149,67 @@ export function newShowPage({ flash, values = {} } = {}) {
       </form>
     </div>`;
   return adminLayout({ title: 'Add Show', active: '/admin/shows/new', body });
+}
+
+export function announcementsPage({ announcements, subscriberCount, mailReady, flash }) {
+  const rows = announcements
+    .map(
+      (a) => `<tr>
+      <td>${esc(a.subject)}</td>
+      <td>${a.sent ? `<span class="pill on">Sent (${a.sent_count})</span>` : '<span class="pill">Draft</span>'}</td>
+      <td>${esc(formatDate(a.created_at))}</td>
+      <td class="actions">
+        ${a.sent ? '' : `<form method="post" action="/admin/announcements/${esc(a.id)}/send" style="display:inline" onsubmit="return confirm('Send “${esc(a.subject)}” to ${subscriberCount} members now?')"><button class="btn btn-sm btn-primary">Send to ${subscriberCount}</button></form>`}
+        <form method="post" action="/admin/announcements/${esc(a.id)}/delete" style="display:inline" onsubmit="return confirm('Delete this announcement?')"><button class="btn btn-sm btn-danger">Delete</button></form>
+      </td>
+    </tr>`
+    )
+    .join('');
+  const body = `
+    <h1>Announcements</h1>
+    ${flash ? `<div class="flash ${flash.type}">${esc(flash.msg)}</div>` : ''}
+    ${mailReady ? '' : '<div class="flash err">Email sending is not configured yet — set <b>RESEND_API_KEY</b> on the server to send blasts. You can still draft announcements.</div>'}
+    <div class="panel">
+      <h2>New announcement</h2>
+      <form method="post" action="/admin/announcements">
+        <div class="field"><label>Subject</label><input type="text" name="subject" required placeholder="What's new at Straw Hut Media?!"></div>
+        <div class="field"><label>Message (HTML allowed)</label>
+          <textarea name="body_html" rows="7" required style="width:100%;padding:12px 14px;border-radius:10px;border:1px solid var(--border);background:var(--bg-2);color:var(--text);font-family:inherit;font-size:0.95rem" placeholder="Write your announcement… You can use {{unsubscribe}} for the unsubscribe link."></textarea>
+        </div>
+        <button class="btn btn-primary" type="submit">Save draft</button>
+        <span style="color:var(--muted);margin-left:10px;font-size:0.9rem">Then click “Send” below. ${subscriberCount} members will receive it.</span>
+      </form>
+    </div>
+    <div class="panel">
+      <h2>Sent &amp; drafts</h2>
+      <table class="admin-table"><thead><tr><th>Subject</th><th>Status</th><th>Created</th><th></th></tr></thead>
+      <tbody>${rows || '<tr><td colspan="4" style="color:var(--muted)">No announcements yet.</td></tr>'}</tbody></table>
+    </div>`;
+  return adminLayout({ title: 'Announcements', active: '/admin/announcements', body });
+}
+
+export function membersPage({ subscribers, flash }) {
+  const rows = subscribers
+    .map(
+      (s) => `<tr>
+      <td>${esc(s.email)}</td>
+      <td>${esc(s.name || '—')}</td>
+      <td>${esc(formatDate(s.created_at))}</td>
+      <td class="actions"><form method="post" action="/admin/members/${esc(s.id)}/delete" style="display:inline" onsubmit="return confirm('Remove ${esc(s.email)}?')"><button class="btn btn-sm btn-danger">Remove</button></form></td>
+    </tr>`
+    )
+    .join('');
+  const csv = 'data:text/csv;charset=utf-8,' + encodeURIComponent(
+    'email,name,joined\n' + subscribers.map((s) => `${s.email},"${(s.name || '').replace(/"/g, '""')}",${s.created_at}`).join('\n')
+  );
+  const body = `
+    <h1>Members</h1>
+    ${flash ? `<div class="flash ${flash.type}">${esc(flash.msg)}</div>` : ''}
+    <div style="margin-bottom:16px"><a class="btn btn-sm" href="${csv}" download="strawhut-members.csv">⬇ Export CSV</a>
+      <span style="color:var(--muted);margin-left:10px;font-size:0.9rem">${subscribers.length} members collected via the site's “Get updates” form.</span></div>
+    <div class="panel">
+      <table class="admin-table"><thead><tr><th>Email</th><th>Name</th><th>Joined</th><th></th></tr></thead>
+      <tbody>${rows || '<tr><td colspan="4" style="color:var(--muted)">No members yet. The signup form on the homepage will collect them.</td></tr>'}</tbody></table>
+    </div>`;
+  return adminLayout({ title: 'Members', active: '/admin/members', body });
 }

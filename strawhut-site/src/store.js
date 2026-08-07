@@ -23,7 +23,7 @@ function newId() {
 // ---------------------------------------------------------------------------
 class JsonStore {
   constructor() {
-    this.db = { shows: {}, episodes: {} };
+    this.db = { shows: {}, episodes: {}, subscribers: {}, announcements: {} };
   }
   async init() {
     try {
@@ -31,6 +31,8 @@ class JsonStore {
         this.db = JSON.parse(fs.readFileSync(DATA_FILE, 'utf8'));
         this.db.shows ||= {};
         this.db.episodes ||= {};
+        this.db.subscribers ||= {};
+        this.db.announcements ||= {};
       } else {
         fs.mkdirSync(DATA_DIR, { recursive: true });
         this._flush();
@@ -123,7 +125,54 @@ class JsonStore {
     return {
       shows: Object.keys(this.db.shows).length,
       episodes: Object.keys(this.db.episodes).length,
+      subscribers: Object.keys(this.db.subscribers).length,
     };
+  }
+
+  // --- subscribers (members) ---
+  async addSubscriber(email, name) {
+    email = String(email || '').trim().toLowerCase();
+    if (!email) throw new Error('Email required');
+    const existing = Object.values(this.db.subscribers).find((s) => s.email === email);
+    if (existing) return existing;
+    const id = newId();
+    this.db.subscribers[id] = { id, email, name: name || '', created_at: new Date().toISOString() };
+    this._flush();
+    return this.db.subscribers[id];
+  }
+  async listSubscribers() {
+    return Object.values(this.db.subscribers).sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+  }
+  async removeSubscriber(id) {
+    delete this.db.subscribers[id];
+    this._flush();
+  }
+
+  // --- announcements ---
+  async createAnnouncement(a) {
+    const id = newId();
+    this.db.announcements[id] = {
+      id, subject: a.subject, body_html: a.body_html,
+      sent: false, sent_count: 0, created_at: new Date().toISOString(), sent_at: null,
+    };
+    this._flush();
+    return this.db.announcements[id];
+  }
+  async listAnnouncements() {
+    return Object.values(this.db.announcements).sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+  }
+  async getAnnouncement(id) {
+    return this.db.announcements[id] || null;
+  }
+  async markAnnouncementSent(id, count) {
+    if (this.db.announcements[id]) {
+      Object.assign(this.db.announcements[id], { sent: true, sent_count: count, sent_at: new Date().toISOString() });
+      this._flush();
+    }
+  }
+  async deleteAnnouncement(id) {
+    delete this.db.announcements[id];
+    this._flush();
   }
 }
 
@@ -170,6 +219,21 @@ class PgStore {
         UNIQUE (show_id, guid)
       );
       CREATE INDEX IF NOT EXISTS idx_episodes_show ON episodes(show_id, published_at DESC);
+      CREATE TABLE IF NOT EXISTS subscribers (
+        id         TEXT PRIMARY KEY,
+        email      TEXT UNIQUE NOT NULL,
+        name       TEXT,
+        created_at TIMESTAMPTZ DEFAULT now()
+      );
+      CREATE TABLE IF NOT EXISTS announcements (
+        id         TEXT PRIMARY KEY,
+        subject    TEXT NOT NULL,
+        body_html  TEXT,
+        sent       BOOLEAN DEFAULT FALSE,
+        sent_count INTEGER DEFAULT 0,
+        created_at TIMESTAMPTZ DEFAULT now(),
+        sent_at    TIMESTAMPTZ
+      );
     `);
     console.log('[store] using Postgres store');
   }
@@ -268,7 +332,56 @@ class PgStore {
   async stats() {
     const s = await this.pool.query(`SELECT COUNT(*)::int AS c FROM shows`);
     const e = await this.pool.query(`SELECT COUNT(*)::int AS c FROM episodes`);
-    return { shows: s.rows[0].c, episodes: e.rows[0].c };
+    const sub = await this.pool.query(`SELECT COUNT(*)::int AS c FROM subscribers`);
+    return { shows: s.rows[0].c, episodes: e.rows[0].c, subscribers: sub.rows[0].c };
+  }
+
+  // --- subscribers (members) ---
+  async addSubscriber(email, name) {
+    email = String(email || '').trim().toLowerCase();
+    if (!email) throw new Error('Email required');
+    const id = newId();
+    const { rows } = await this.pool.query(
+      `INSERT INTO subscribers (id, email, name) VALUES ($1,$2,$3)
+       ON CONFLICT (email) DO UPDATE SET name=COALESCE(NULLIF($3,''), subscribers.name)
+       RETURNING *`,
+      [id, email, name || '']
+    );
+    return rows[0];
+  }
+  async listSubscribers() {
+    const { rows } = await this.pool.query(`SELECT * FROM subscribers ORDER BY created_at DESC`);
+    return rows;
+  }
+  async removeSubscriber(id) {
+    await this.pool.query(`DELETE FROM subscribers WHERE id=$1`, [id]);
+  }
+
+  // --- announcements ---
+  async createAnnouncement(a) {
+    const id = newId();
+    const { rows } = await this.pool.query(
+      `INSERT INTO announcements (id, subject, body_html) VALUES ($1,$2,$3) RETURNING *`,
+      [id, a.subject, a.body_html]
+    );
+    return rows[0];
+  }
+  async listAnnouncements() {
+    const { rows } = await this.pool.query(`SELECT * FROM announcements ORDER BY created_at DESC`);
+    return rows;
+  }
+  async getAnnouncement(id) {
+    const { rows } = await this.pool.query(`SELECT * FROM announcements WHERE id=$1`, [id]);
+    return rows[0] || null;
+  }
+  async markAnnouncementSent(id, count) {
+    await this.pool.query(
+      `UPDATE announcements SET sent=TRUE, sent_count=$2, sent_at=now() WHERE id=$1`,
+      [id, count]
+    );
+  }
+  async deleteAnnouncement(id) {
+    await this.pool.query(`DELETE FROM announcements WHERE id=$1`, [id]);
   }
 }
 

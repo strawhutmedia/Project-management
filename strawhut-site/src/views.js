@@ -78,6 +78,15 @@ ${jsonLd}
 </body></html>`;
 }
 
+export function messagePage({ title, heading, message }) {
+  const body = `<section class="section"><div class="container"><div class="empty" style="padding:100px 0">
+    <h1 style="font-size:2rem;margin-bottom:10px">${esc(heading)}</h1>
+    <p style="color:var(--muted)">${esc(message)}</p>
+    <p style="margin-top:24px"><a class="btn btn-primary" href="/">← Back to Straw Hut Media</a></p>
+  </div></div></section>`;
+  return layout({ title, description: message, body, path: '/' });
+}
+
 const artOrPlaceholder = (url, alt) =>
   url
     ? `<img src="${esc(url)}" alt="${esc(alt)}" loading="lazy">`
@@ -136,6 +145,17 @@ export function homePage({ shows }) {
       ${SERVICES.map(
         (s) => `<article class="show-card" style="padding:22px 22px 24px"><h3 style="margin-top:0">${esc(s.name)}</h3><p class="meta" style="font-size:0.92rem;line-height:1.5">${esc(s.description)}</p></article>`
       ).join('')}
+    </div>
+  </div></section>
+
+  <section class="section" id="subscribe"><div class="container">
+    <div class="panel" style="max-width:640px;margin:0 auto;text-align:center;background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:34px">
+      <h2 style="margin-top:0">Get updates from Straw Hut Media</h2>
+      <p style="color:var(--muted);margin-top:6px">New shows, new episodes, and behind-the-scenes — straight to your inbox.</p>
+      <form method="post" action="/subscribe" style="display:flex;gap:10px;flex-wrap:wrap;justify-content:center;margin-top:18px">
+        <input type="email" name="email" required placeholder="you@email.com" style="flex:1;min-width:240px;padding:13px 16px;border-radius:999px;border:1px solid var(--border);background:var(--bg-2);color:var(--text);font-family:inherit">
+        <button class="btn btn-primary" type="submit">Subscribe</button>
+      </form>
     </div>
   </div></section>`;
   return layout({

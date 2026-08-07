@@ -13,6 +13,7 @@ import { addShowFromFeed, syncShow, syncAll, startScheduler } from './sync.js';
 import * as V from './views.js';
 import * as A from './admin_views.js';
 import { robotsTxt, sitemapXml, llmsTxt } from './seo.js';
+import { sendAnnouncement, mailConfigured } from './mail.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PORT = process.env.PORT || 8080;
@@ -153,6 +154,61 @@ app.post('/admin/sync-all', requireAdmin, async (req, res) => {
   res.redirect('/admin/shows');
 });
 
+// ---- Admin: announcements ----
+app.get('/admin/announcements', requireAdmin, async (req, res) => {
+  const announcements = await store.listAnnouncements();
+  const subs = await store.listSubscribers();
+  res.send(
+    A.announcementsPage({
+      announcements,
+      subscriberCount: subs.length,
+      mailReady: mailConfigured(),
+      flash: readFlash(req, res),
+    })
+  );
+});
+app.post('/admin/announcements', requireAdmin, async (req, res) => {
+  const subject = (req.body.subject || '').trim();
+  const body_html = (req.body.body_html || '').trim();
+  if (subject && body_html) {
+    await store.createAnnouncement({ subject, body_html });
+    setFlash(res, { type: 'ok', msg: 'Draft saved. Click “Send” to email it to members.' });
+  }
+  res.redirect('/admin/announcements');
+});
+app.post('/admin/announcements/:id/send', requireAdmin, async (req, res) => {
+  const a = await store.getAnnouncement(req.params.id);
+  if (!a) return res.redirect('/admin/announcements');
+  try {
+    const subs = await store.listSubscribers();
+    const { sent, failed, errors } = await sendAnnouncement(subs, { subject: a.subject, html: a.body_html });
+    await store.markAnnouncementSent(a.id, sent);
+    setFlash(res, {
+      type: failed ? 'err' : 'ok',
+      msg: `Sent to ${sent} members${failed ? `, ${failed} failed (${errors.join('; ')})` : ''}.`,
+    });
+  } catch (e) {
+    setFlash(res, { type: 'err', msg: e.message });
+  }
+  res.redirect('/admin/announcements');
+});
+app.post('/admin/announcements/:id/delete', requireAdmin, async (req, res) => {
+  await store.deleteAnnouncement(req.params.id);
+  setFlash(res, { type: 'ok', msg: 'Announcement deleted.' });
+  res.redirect('/admin/announcements');
+});
+
+// ---- Admin: members ----
+app.get('/admin/members', requireAdmin, async (req, res) => {
+  const subscribers = await store.listSubscribers();
+  res.send(A.membersPage({ subscribers, flash: readFlash(req, res) }));
+});
+app.post('/admin/members/:id/delete', requireAdmin, async (req, res) => {
+  await store.removeSubscriber(req.params.id);
+  setFlash(res, { type: 'ok', msg: 'Member removed.' });
+  res.redirect('/admin/members');
+});
+
 // Tiny flash-message helper via short-lived cookie.
 function setFlash(res, flash) {
   res.cookie('shm_flash', Buffer.from(JSON.stringify(flash)).toString('base64'), { maxAge: 10000 });
@@ -195,6 +251,38 @@ app.get('/', async (req, res) => {
 app.get('/shows', async (req, res) => {
   const shows = await withCounts(await store.listShows());
   res.send(V.showsIndexPage({ shows }));
+});
+
+app.post('/subscribe', async (req, res) => {
+  const email = (req.body.email || '').trim();
+  try {
+    await store.addSubscriber(email, req.body.name);
+    res.send(
+      V.messagePage({
+        title: "You're subscribed — Straw Hut Media",
+        heading: "You're on the list! 🎉",
+        message: 'Thanks for subscribing to Straw Hut Media updates.',
+      })
+    );
+  } catch (e) {
+    res.status(400).send(
+      V.messagePage({ title: 'Subscribe', heading: 'Hmm, that didn’t work', message: e.message })
+    );
+  }
+});
+
+app.get('/unsubscribe', async (req, res) => {
+  const email = (req.query.e || '').toString().trim().toLowerCase();
+  const subs = await store.listSubscribers();
+  const found = subs.find((s) => s.email === email);
+  if (found) await store.removeSubscriber(found.id);
+  res.send(
+    V.messagePage({
+      title: 'Unsubscribed — Straw Hut Media',
+      heading: 'You’ve been unsubscribed',
+      message: found ? `${email} will no longer receive updates.` : 'That address wasn’t on our list.',
+    })
+  );
 });
 
 // Show page: /:showSlug
