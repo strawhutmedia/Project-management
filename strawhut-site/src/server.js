@@ -566,14 +566,54 @@ app.get('/:showSlug/:episodeSlug', async (req, res, next) => {
   res.send(V.episodePage({ show, episode, moreFromShow, related }));
 });
 
-app.use((req, res) => {
-  res
-    .status(404)
-    .send(
-      V.homePage
-        ? '<link rel="stylesheet" href="/styles.css"><div class="empty" style="font-family:Poppins,sans-serif"><h1>404</h1><p>Page not found. <a href="/" style="color:#22c55e">Go home</a></p></div>'
-        : 'Not found'
-    );
+// Smart 404: recover old/mistyped URLs by redirecting to the right page,
+// otherwise show an on-brand page with "did you mean…" suggestions.
+const slugTokens = (s) => new Set(String(s || '').toLowerCase().split(/[^a-z0-9]+/).filter(Boolean));
+
+app.use(async (req, res) => {
+  const notFound = (suggestions = []) => res.status(404).send(V.notFoundPage({ suggestions }));
+  // Only try to recover clean-looking page requests (skip assets, admin, etc.).
+  if (req.method !== 'GET' || req.path.includes('.') || req.path.startsWith('/admin')) {
+    return notFound();
+  }
+  try {
+    const parts = req.path.replace(/^\/+|\/+$/g, '').split('/').filter(Boolean);
+    if (!parts.length) return notFound();
+    const shows = await store.listShows();
+    const showBase = parts[0].replace(/-\d+$/, ''); // old slugs had a -<id> suffix
+    const show = shows.find((s) => s.slug === parts[0] || s.slug === showBase);
+
+    if (show) {
+      // Old show URL → redirect to the clean one (or resolve the episode).
+      if (parts.length === 1) return res.redirect(301, `/${show.slug}`);
+      const epBase = parts[1].replace(/-\d+$/, '');
+      const ep =
+        (await store.getEpisodeBySlug(show.id, parts[1])) ||
+        (await store.getEpisodeBySlug(show.id, epBase));
+      return res.redirect(301, ep ? `/${show.slug}/${ep.slug}` : `/${show.slug}`);
+    }
+
+    // No direct match → fuzzy "did you mean" against show slugs.
+    const qt = slugTokens(showBase);
+    const suggestions = shows
+      .map((s) => {
+        const st = slugTokens(s.slug);
+        const inter = [...qt].filter((x) => st.has(x)).length;
+        let score = qt.size ? inter / (qt.size + st.size - inter) : 0;
+        if (showBase && s.slug.includes(showBase)) score = Math.max(score, 0.7); // substring hit
+        for (const q of qt) {
+          if ([...st].some((t) => t.includes(q) || q.includes(t))) score = Math.max(score, 0.5);
+        }
+        return { s, score };
+      })
+      .filter((x) => x.score >= 0.4)
+      .sort((a, b) => b.score - a.score)
+      .slice(0, 3)
+      .map((x) => x.s);
+    return notFound(suggestions);
+  } catch {
+    return notFound();
+  }
 });
 
 app.listen(PORT, async () => {

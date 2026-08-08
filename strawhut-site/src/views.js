@@ -80,6 +80,35 @@ ${jsonLd}
 </body></html>`;
 }
 
+export function notFoundPage({ suggestions = [] }) {
+  const cards = suggestions
+    .map(
+      (s) => `<a class="show-card" href="/${esc(s.slug)}">
+      <div class="art">${s.image_url ? `<img src="${esc(s.image_url)}" alt="${esc(s.title)}" loading="lazy">` : '🎙️'}</div>
+      <div class="body"><h3>${esc(s.title)}</h3></div>
+    </a>`
+    )
+    .join('');
+  const body = `
+  <section class="section"><div class="container" style="text-align:center;padding:70px 0 30px">
+    <div style="font-size:3.4rem;line-height:1">🎙️</div>
+    <h1 style="font-size:clamp(1.9rem,4vw,2.8rem);margin:14px 0 8px">Dead air.</h1>
+    <p style="color:var(--muted);font-size:1.12rem;max-width:520px;margin:0 auto">
+      That page dropped out — but the show goes on. Let's get you back to the good stuff.</p>
+    <div style="margin-top:24px"><a class="btn btn-primary" href="/">Back to home</a>
+      <a class="btn" href="/shows" style="margin-left:8px">Browse all shows</a></div>
+  </div></section>
+  ${
+    suggestions.length
+      ? `<section class="section"><div class="container">
+    <div class="section-head"><h2>Were you looking for…</h2></div>
+    <div class="grid">${cards}</div>
+  </div></section>`
+      : ''
+  }`;
+  return layout({ title: "Dead air — page not found | Straw Hut Media", description: 'Page not found.', body, path: '/404' });
+}
+
 export function messagePage({ title, heading, message }) {
   const body = `<section class="section"><div class="container"><div class="empty" style="padding:100px 0">
     <h1 style="font-size:2rem;margin-bottom:10px">${esc(heading)}</h1>
