@@ -40,18 +40,25 @@ app.use('/public', express.static(path.join(__dirname, '..', 'public')));
 
 // Spotlight = most-downloaded shows (Megaphone). Falls back to the curated
 // monthly rotation only when Megaphone isn't configured or returns no numbers.
+let spotlightStatus = { source: 'pending', megaphoneConfigured: megaphoneConfigured() };
 async function refreshSpotlight() {
   try {
     if (megaphoneConfigured()) {
       const r = await applyPopularSpotlight(store, { log: (m) => console.log('[spotlight]', m) });
       if (r.applied) {
+        spotlightStatus = { source: 'downloads', megaphoneConfigured: true, shows: r.top };
         console.log('[spotlight] by downloads:', r.top.map((t) => t.title).join(', '));
         return;
       }
+      spotlightStatus = { source: 'rotation-fallback', megaphoneConfigured: true, reason: r.reason };
       console.log('[spotlight] Megaphone returned no usable numbers — falling back to rotation:', r.reason);
+    } else {
+      spotlightStatus = { source: 'rotation', megaphoneConfigured: false };
     }
-    await applyMonthlyRotation(store, { log: (m) => console.log('[spotlight]', m) });
+    const rot = await applyMonthlyRotation(store, { log: (m) => console.log('[spotlight]', m) });
+    if (rot.picks) spotlightStatus.picks = rot.picks;
   } catch (e) {
+    spotlightStatus = { source: 'error', megaphoneConfigured: megaphoneConfigured(), error: e.message };
     console.error('[spotlight] failed:', e.message);
   }
 }
@@ -462,7 +469,7 @@ function readFlash(req, res) {
 }
 
 // ---- Health --------------------------------------------------------------
-app.get('/healthz', async (req, res) => res.json({ ok: true, ...(await store.stats()) }));
+app.get('/healthz', async (req, res) => res.json({ ok: true, ...(await store.stats()), spotlight: spotlightStatus }));
 
 // ---- SEO / GEO endpoints --------------------------------------------------
 app.get('/robots.txt', (req, res) => res.type('text/plain').send(robotsTxt()));
