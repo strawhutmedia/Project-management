@@ -81,8 +81,10 @@ export async function refreshPress(store, { log = () => {}, includeShows = true 
   if (includeShows) {
     for (const s of await store.listShows()) {
       if (!s.title) continue;
-      const hint = pressHintFor(s.title); // e.g. ['Phil Rosenthal']
-      const query = hint ? `"${s.title}" ${hint.map((h) => `"${h}"`).join(' ')}` : `"${s.title}"`;
+      const hint = pressHintFor(s.slug); // e.g. ['Phil Rosenthal'] or multiple hosts
+      const query = hint
+        ? `"${s.title}" (${hint.map((h) => `"${h}"`).join(' OR ')})`
+        : `"${s.title}"`;
       jobs.push({ query, show: s, hint });
     }
   }
@@ -95,10 +97,10 @@ export async function refreshPress(store, { log = () => {}, includeShows = true 
       for (const item of items) {
         if (show) {
           const hay = `${item.title} ${item.snippet}`.toLowerCase();
-          // With a hint, require every hint term to appear; otherwise use the
-          // general host/podcast/network relevance gate.
+          // With a hint, require ANY hint term (host) to appear; otherwise use
+          // the general host/podcast/network relevance gate.
           const ok = hint
-            ? hint.every((h) => hay.includes(h.toLowerCase()))
+            ? hint.some((h) => hay.includes(h.toLowerCase()))
             : relevantToShow(item, show);
           if (!ok) continue;
         }

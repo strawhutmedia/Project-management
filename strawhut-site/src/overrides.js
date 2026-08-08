@@ -42,13 +42,16 @@ const norm = (s) => String(s || '').toLowerCase().replace(/\s+/g, ' ').trim();
 export const isPartnerTitle = (title) => PARTNER_SHOWS.some((p) => norm(p) === norm(title));
 
 // Per-show press disambiguation. For shows whose title collides with a famous
-// book/film/person, require these terms in the search AND in the result — so
-// only the real podcast's coverage is posted. Keyed by lowercase show title.
+// book/film/generic phrase, require ANY of these host/keyword terms in the
+// search and in the result — so only the real podcast's coverage is posted.
+// Keyed by the show's slug.
 export const PRESS_SHOW_HINTS = {
-  'naked lunch': ['Phil Rosenthal'], // the podcast with Phil Rosenthal, not the Burroughs novel/film
+  'naked-lunch': ['Phil Rosenthal'], // not the Burroughs novel/film
+  'pride': ['Levi Chambers', 'Caitlynn McDaniel'], // hosts (past & present)
+  'next-city': ['Lucas Grindley'],
+  'confess-your-mess': ['Emile Ennis', 'AJ Gibson'],
 };
-export const pressHintFor = (title) =>
-  PRESS_SHOW_HINTS[String(title || '').toLowerCase().trim()] || null;
+export const pressHintFor = (slug) => PRESS_SHOW_HINTS[String(slug || '').toLowerCase().trim()] || null;
 
 // Press: search queries used to auto-pull media mentions from Google News.
 // Quoted for precision. Override with the PRESS_QUERIES env var (comma-separated).
