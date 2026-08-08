@@ -2,7 +2,7 @@
 // RSS feed. Used by the admin "Import all shows" button and the CLI script.
 
 import { addShowFromFeed } from './sync.js';
-import { IMPORT_OVERRIDES, RETIRE_FEEDS } from './overrides.js';
+import { IMPORT_OVERRIDES, RETIRE_FEEDS, EXCLUDE_SHOW_PATHS } from './overrides.js';
 
 const UA = 'StrawHutMedia-Importer/1.0';
 
@@ -80,12 +80,17 @@ function extractFeed(html) {
  * @returns {{ ok: number, failed: number, total: number }}
  */
 export async function importFromSite(store, { site = 'https://www.strawhutmedia.com', onProgress = () => {} } = {}) {
-  // Retire superseded feeds first so stale duplicates don't linger (and slugs
-  // free up for the corrected show).
+  // Retire superseded feeds and remove excluded (placeholder) shows first, so
+  // stale duplicates don't linger and slugs free up for corrected shows.
+  const excludeBases = new Set(EXCLUDE_SHOW_PATHS.map(baseSlug));
   for (const s of await store.listShows()) {
-    if (RETIRE_FEEDS.includes(s.feed_url)) {
+    if (
+      RETIRE_FEEDS.includes(s.feed_url) ||
+      excludeBases.has(s.slug) ||
+      excludeBases.has(baseSlug(s.slug))
+    ) {
       await store.deleteShow(s.id);
-      onProgress(`retired stale feed for "${s.title}"`);
+      onProgress(`removed "${s.title}"`);
     }
   }
 
@@ -104,6 +109,7 @@ export async function importFromSite(store, { site = 'https://www.strawhutmedia.
   let failed = 0;
   for (const p of paths) {
     try {
+      if (EXCLUDE_SHOW_PATHS.includes(p) || excludeBases.has(baseSlug(p))) continue;
       const ov = IMPORT_OVERRIDES[p] || {};
       const feed = ov.feed_url || extractFeed(await get(`${site}/${p}`));
       if (!feed) {

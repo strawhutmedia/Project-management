@@ -32,6 +32,12 @@ export const RETIRE_FEEDS = [
   'https://www.spreaker.com/show/6055146/episodes/feed', // old Commune Courses (now Megaphone)
 ];
 
+// Show pages on the current site that are NOT real shows (placeholders/mistakes).
+// Skipped on import and removed if already present.
+export const EXCLUDE_SHOW_PATHS = [
+  'untitled-689', // placeholder "Untitled" — not a real show
+];
+
 const norm = (s) => String(s || '').toLowerCase().replace(/\s+/g, ' ').trim();
 export const isPartnerTitle = (title) => PARTNER_SHOWS.some((p) => norm(p) === norm(title));
 
