@@ -10,6 +10,8 @@
 // spotlight reflects real popularity. Inert (no-op) when unconfigured, so the
 // curated FEATURED_SHOWS list stays in charge until the env vars exist.
 
+import { s3Configured, downloadsByPodcastId } from './megaphoneS3.js';
+
 const BASE = 'https://cms.megaphone.fm/api';
 const TOKEN = (process.env.MEGAPHONE_API_TOKEN || '').trim();
 const NETWORK_ID = (process.env.MEGAPHONE_NETWORK_ID || '').trim();
@@ -140,48 +142,49 @@ export async function probe() {
   return out;
 }
 
-/** Map of show slug -> Megaphone download count (only shows we can match). */
+/**
+ * Map of show slug -> real Megaphone download count, from the S3 IAB export.
+ * Maps export podcast_id -> feed via the CMS podcast list, then to our shows.
+ */
 export async function downloadsBySlug(store, { log = () => {} } = {}) {
   const map = new Map();
-  if (!megaphoneConfigured()) return map;
-  const ranked = await computeRankings({ log });
+  if (!s3Configured() || !megaphoneConfigured()) return map;
+  const byPid = await downloadsByPodcastId({ log });
+  if (!byPid || !byPid.size) return map;
+
+  const pods = await listPodcasts(); // id -> { uid, feedUrl, title }
+  const podById = new Map(pods.map((p) => [String(p.id), p]));
   const shows = await store.listShows();
-  for (const r of ranked) {
+  for (const [pid, downloads] of byPid) {
+    const pod = podById.get(pid);
+    if (!pod) continue;
     const show =
-      shows.find((s) => r.uid && s.feed_url && s.feed_url.includes(r.uid)) ||
-      shows.find((s) => norm(s.title) === norm(r.title));
-    if (show) map.set(show.slug, r.downloads);
+      shows.find((s) => pod.uid && s.feed_url && s.feed_url.includes(pod.uid)) ||
+      shows.find((s) => pod.feedUrl && s.feed_url && norm(s.feed_url) === norm(pod.feedUrl)) ||
+      shows.find((s) => norm(s.title) === norm(pod.title));
+    if (show) map.set(show.slug, (map.get(show.slug) || 0) + downloads);
   }
   return map;
 }
 
-/** Rank by Megaphone downloads and set `featured` on the top N shows. */
+/** Rank shows by real Megaphone downloads (S3 export) and feature the top N. */
 export async function applyPopularSpotlight(store, { count = spotlightCount(), log = () => {} } = {}) {
-  if (!megaphoneConfigured()) return { applied: false, reason: 'not configured' };
-  const ranked = await computeRankings({ log });
-  if (!ranked.length) return { applied: false, reason: 'no download numbers returned by API' };
+  if (!s3Configured()) return { applied: false, reason: 'S3 download export not configured' };
+  if (!megaphoneConfigured()) return { applied: false, reason: 'Megaphone API token not configured (needed to map shows)' };
+
+  const dl = await downloadsBySlug(store, { log });
+  if (!dl.size) return { applied: false, reason: 'no downloads matched to shows' };
 
   const shows = await store.listShows();
-  const matchShow = (r) =>
-    shows.find((s) => r.uid && s.feed_url && s.feed_url.includes(r.uid)) ||
-    shows.find((s) => norm(s.title) === norm(r.title));
-
-  const topShowIds = new Set();
-  const topList = [];
-  for (const r of ranked) {
-    const show = matchShow(r);
-    if (show && !topShowIds.has(show.id)) {
-      topShowIds.add(show.id);
-      topList.push({ title: show.title, downloads: r.downloads });
-      if (topShowIds.size >= count) break;
-    }
-  }
-  if (!topShowIds.size) return { applied: false, reason: 'could not match any ranked podcast to a show' };
+  const bySlug = new Map(shows.map((s) => [s.slug, s]));
+  const ranked = [...dl.entries()].sort((a, b) => b[1] - a[1]);
+  const top = ranked.slice(0, count).map(([slug, downloads]) => ({ title: bySlug.get(slug)?.title || slug, slug, downloads }));
+  const topSlugs = new Set(top.map((t) => t.slug));
 
   for (const s of shows) {
-    const shouldFeature = topShowIds.has(s.id);
-    if (!!s.featured !== shouldFeature) await store.updateShow(s.id, { featured: shouldFeature });
+    const want = topSlugs.has(s.slug);
+    if (!!s.featured !== want) await store.updateShow(s.id, { featured: want });
   }
-  log(`megaphone: spotlight → ${topList.map((t) => `${t.title} (${t.downloads})`).join(', ')}`);
-  return { applied: true, top: topList };
+  log(`spotlight by downloads → ${top.map((t) => `${t.title} (${t.downloads})`).join(', ')}`);
+  return { applied: true, top };
 }

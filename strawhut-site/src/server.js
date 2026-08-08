@@ -470,8 +470,12 @@ function readFlash(req, res) {
 
 // ---- Health --------------------------------------------------------------
 app.get('/healthz', async (req, res) => res.json({ ok: true, ...(await store.stats()), spotlight: spotlightStatus }));
-// Temporary Megaphone API diagnostic (returns field shapes only, no secrets).
+// Temporary Megaphone diagnostics (return field shapes only, no secrets).
 app.get('/__mgprobe', async (req, res) => res.json(await megaphoneProbe().catch((e) => ({ error: e.message }))));
+app.get('/__s3probe', async (req, res) => {
+  const { probe } = await import('./megaphoneS3.js');
+  res.json(await probe().catch((e) => ({ error: e.message })));
+});
 
 // ---- SEO / GEO endpoints --------------------------------------------------
 app.get('/robots.txt', (req, res) => res.type('text/plain').send(robotsTxt()));
