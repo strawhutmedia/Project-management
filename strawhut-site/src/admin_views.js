@@ -13,6 +13,7 @@ function adminLayout({ title, active, body, stats }) {
     ['/admin/shows/new', '➕ Add Show'],
     ['/admin/announcements', '📣 Announcements'],
     ['/admin/press', '📰 Press'],
+    ['/admin/landing', '🎯 Landing Pages'],
     ['/admin/members', '👥 Members'],
   ]
     .map(
@@ -224,6 +225,60 @@ export function pressAdminPage({ items, flash }) {
       <tbody>${rows || '<tr><td colspan="4" style="color:var(--muted)">No press yet — click “Refresh mentions”.</td></tr>'}</tbody></table>
     </div>`;
   return adminLayout({ title: 'Press', active: '/admin/press', body });
+}
+
+export function landingsAdminPage({ landings, flash }) {
+  const rows = landings
+    .map(
+      (l) => `<tr>
+      <td>${esc(l.title || l.headline || l.slug)}</td>
+      <td><a href="/lp/${esc(l.slug)}" target="_blank">/lp/${esc(l.slug)}</a></td>
+      <td>${l.indexable ? '<span class="pill on">Indexed</span>' : '<span class="pill">Hidden</span>'}</td>
+      <td class="actions">
+        <a class="btn btn-sm" href="/admin/landing/${esc(l.id)}/edit">Edit</a>
+        <form method="post" action="/admin/landing/${esc(l.id)}/delete" style="display:inline" onsubmit="return confirm('Delete this landing page?')"><button class="btn btn-sm btn-danger">Delete</button></form>
+      </td>
+    </tr>`
+    )
+    .join('');
+  const body = `
+    <h1>Landing Pages</h1>
+    ${flash ? `<div class="flash ${flash.type}">${esc(flash.msg)}</div>` : ''}
+    <p style="color:var(--muted);max-width:640px;margin-top:-8px">Standalone, unlisted pages for Google Ads traffic — like an episode page you can fully customize. Not linked from the site; hidden from search by default.</p>
+    <div style="margin:14px 0"><a class="btn btn-primary" href="/admin/landing/new">➕ New landing page</a></div>
+    <div class="panel">
+      <table class="admin-table"><thead><tr><th>Name</th><th>URL</th><th>Search</th><th></th></tr></thead>
+      <tbody>${rows || '<tr><td colspan="4" style="color:var(--muted)">No landing pages yet.</td></tr>'}</tbody></table>
+    </div>`;
+  return adminLayout({ title: 'Landing Pages', active: '/admin/landing', body });
+}
+
+export function landingFormPage({ flash, values = {}, isEdit = false, actionId } = {}) {
+  const v = values;
+  const ta = 'width:100%;padding:12px 14px;border-radius:10px;border:1px solid var(--border);background:var(--bg-2);color:var(--text);font-family:inherit;font-size:0.95rem';
+  const body = `
+    <h1>${isEdit ? 'Edit' : 'New'} landing page</h1>
+    ${flash ? `<div class="flash ${flash.type}">${esc(flash.msg)}</div>` : ''}
+    <div class="panel">
+      <form method="post" action="${isEdit ? '/admin/landing/' + esc(actionId) : '/admin/landing'}">
+        <div class="field"><label>Internal name *</label><input type="text" name="title" value="${esc(v.title || '')}" required placeholder="e.g. Brandi – July cocaine episode ad"></div>
+        <div class="field"><label>URL slug</label><input type="text" name="slug" value="${esc(v.slug || '')}" placeholder="auto from name if blank — page will be /lp/your-slug"></div>
+        <div class="field"><label>Link to an episode (optional)</label>
+          <input type="text" name="episode_url" value="${esc(v.episode_url || '')}" placeholder="paste the episode URL, e.g. https://…/brandi-glanville-unfiltered/some-episode">
+          <div class="hint">If set, the page uses that episode's audio/video player. Leave blank for a standalone page.</div>
+        </div>
+        <div class="field"><label>Headline</label><input type="text" name="headline" value="${esc(v.headline || '')}" placeholder="defaults to the episode title"></div>
+        <div class="field"><label>Subhead</label><input type="text" name="subhead" value="${esc(v.subhead || '')}"></div>
+        <div class="field"><label>Custom photo URL</label><input type="url" name="hero_image_url" value="${esc(v.hero_image_url || '')}" placeholder="https://… (defaults to episode/show art)"></div>
+        <div class="field"><label>Body copy (HTML allowed)</label><textarea name="body_html" rows="6" style="${ta}" placeholder="Your ad-matched marketing copy. Defaults to the episode notes.">${esc(v.body_html || '')}</textarea></div>
+        <div class="field"><label>Button label</label><input type="text" name="cta_label" value="${esc(v.cta_label || '')}" placeholder="e.g. Listen now"></div>
+        <div class="field"><label>Button link</label><input type="url" name="cta_url" value="${esc(v.cta_url || '')}" placeholder="https://… (Apple/Spotify/subscribe link)"></div>
+        <div class="field"><label>Google Ads / GA measurement ID (optional)</label><input type="text" name="gtag_id" value="${esc(v.gtag_id || '')}" placeholder="AW-XXXXXXXXX or G-XXXXXXXX"></div>
+        <div class="field checkbox"><input type="checkbox" name="indexable" id="idx" ${v.indexable ? 'checked' : ''}><label for="idx" style="margin:0">Allow search engines to index this page (off = hidden, recommended for ad pages)</label></div>
+        <button class="btn btn-primary" type="submit">${isEdit ? 'Save changes' : 'Create landing page'}</button>
+      </form>
+    </div>`;
+  return adminLayout({ title: isEdit ? 'Edit Landing Page' : 'New Landing Page', active: '/admin/landing', body });
 }
 
 export function membersPage({ subscribers, flash }) {

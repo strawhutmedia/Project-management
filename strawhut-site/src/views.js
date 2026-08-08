@@ -218,6 +218,52 @@ export function showsIndexPage({ shows }) {
   });
 }
 
+export function landingPage({ landing, show, episode }) {
+  const ep = episode || {};
+  const heroImg = landing.hero_image_url || ep.image_url || show?.image_url || '';
+  const headline = landing.headline || ep.title || landing.title || 'Listen now';
+  const canon = canonical('/lp/' + landing.slug);
+  const gtag = landing.gtag_id
+    ? `<script async src="https://www.googletagmanager.com/gtag/js?id=${esc(landing.gtag_id)}"></script>
+<script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('js',new Date());gtag('config','${esc(landing.gtag_id)}');</script>`
+    : '';
+  const player = ep.youtube_id
+    ? `<div class="video-embed"><iframe src="https://www.youtube-nocookie.com/embed/${esc(ep.youtube_id)}" title="${esc(headline)}" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen></iframe></div>`
+    : ep.audio_url
+      ? `<audio controls preload="none" src="${esc(ep.audio_url)}"></audio>`
+      : '';
+  const body = landing.body_html || (ep.description ? ep.description : '');
+  return `<!doctype html><html lang="en"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>${esc(headline)} — Straw Hut Media</title>
+<meta name="description" content="${esc(toText(landing.subhead || body, 160))}">
+${landing.indexable ? `<link rel="canonical" href="${esc(canon)}"><meta name="robots" content="index, follow, max-image-preview:large">` : '<meta name="robots" content="noindex, nofollow">'}
+<meta property="og:title" content="${esc(headline)}">
+<meta property="og:description" content="${esc(toText(landing.subhead || body, 160))}">
+${heroImg ? `<meta property="og:image" content="${esc(heroImg)}">` : ''}
+${FONT}<link rel="stylesheet" href="/styles.css">${gtag}
+</head>
+<body>
+<header class="site-header"><div class="container"><a class="brand" href="/">Straw Hut Media<span class="dot">.</span></a></div></header>
+<main><section class="section" style="padding-top:40px"><div class="container" style="max-width:820px">
+  ${heroImg ? `<img src="${esc(heroImg)}" alt="${esc(headline)}" style="width:100%;max-height:420px;object-fit:cover;border-radius:18px;box-shadow:var(--shadow);margin-bottom:26px">` : ''}
+  <h1 style="font-size:clamp(1.8rem,4vw,2.8rem);margin:0 0 12px">${esc(headline)}</h1>
+  ${landing.subhead ? `<p style="color:var(--muted);font-size:1.15rem;margin:0 0 22px">${esc(landing.subhead)}</p>` : ''}
+  ${player}
+  ${landing.cta_url ? `<div style="margin:26px 0"><a class="btn btn-primary" id="lpCta" href="${esc(landing.cta_url)}" style="font-size:1.05rem;padding:14px 30px">${esc(landing.cta_label || 'Listen now')}</a></div>` : ''}
+  ${body ? `<div class="notes">${body}</div>` : ''}
+</div></section></main>
+<script>(function(){
+  // Attribution: keep gclid/utm and append to the CTA so conversions track.
+  try{var qs=new URLSearchParams(location.search);var keep=['gclid','utm_source','utm_medium','utm_campaign'];
+  var cta=document.getElementById('lpCta');
+  if(cta){var u=new URL(cta.href, location.origin);keep.forEach(function(k){if(qs.get(k))u.searchParams.set(k,qs.get(k));});cta.href=u.toString();
+  cta.addEventListener('click',function(){if(window.gtag)gtag('event','conversion',{send_to:'${esc(landing.gtag_id || '')}'});});}
+  }catch(e){}
+})();</script>
+</body></html>`;
+}
+
 export function pressPage({ items }) {
   const rows = items
     .map(

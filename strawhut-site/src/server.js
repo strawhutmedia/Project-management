@@ -279,6 +279,98 @@ app.post('/admin/press/:id/delete', requireAdmin, async (req, res) => {
   res.redirect('/admin/press');
 });
 
+// ---- Admin: landing pages ----
+import { slugify, uniqueSlug } from './util.js';
+
+// Resolve a pasted episode URL/path to { show_id, episode_id }.
+async function resolveEpisodeRef(input) {
+  if (!input) return {};
+  let path = input.trim();
+  try { path = new URL(path).pathname; } catch {}
+  const parts = path.replace(/^\/+|\/+$/g, '').split('/');
+  if (parts.length < 2) return {};
+  const show = await store.getShowBySlug(parts[0]);
+  if (!show) return {};
+  const ep = await store.getEpisodeBySlug(show.id, parts[1]);
+  return { show_id: show.id, episode_id: ep ? ep.id : null };
+}
+
+async function landingFromBody(body) {
+  const { show_id, episode_id } = await resolveEpisodeRef(body.episode_url);
+  const taken = new Set((await store.listLandings()).map((l) => l.slug));
+  const slug = uniqueSlug(slugify(body.slug || body.title || 'landing', 'landing'), taken);
+  return {
+    slug,
+    title: (body.title || '').trim(),
+    headline: (body.headline || '').trim(),
+    subhead: (body.subhead || '').trim(),
+    body_html: body.body_html || '',
+    hero_image_url: (body.hero_image_url || '').trim(),
+    cta_label: (body.cta_label || '').trim(),
+    cta_url: (body.cta_url || '').trim(),
+    gtag_id: (body.gtag_id || '').trim(),
+    indexable: !!body.indexable,
+    show_id,
+    episode_id,
+  };
+}
+
+app.get('/admin/landing', requireAdmin, async (req, res) => {
+  const landings = await store.listLandings();
+  res.send(A.landingsAdminPage({ landings, flash: readFlash(req, res) }));
+});
+app.get('/admin/landing/new', requireAdmin, (req, res) =>
+  res.send(A.landingFormPage({ flash: readFlash(req, res) }))
+);
+app.post('/admin/landing', requireAdmin, async (req, res) => {
+  if (!req.body.title) return res.send(A.landingFormPage({ flash: { type: 'err', msg: 'Name is required.' }, values: req.body }));
+  const lp = await landingFromBody(req.body);
+  const created = await store.createLanding(lp);
+  setFlash(res, { type: 'ok', msg: `Landing page created at /lp/${created.slug}` });
+  res.redirect('/admin/landing');
+});
+app.get('/admin/landing/:id/edit', requireAdmin, async (req, res) => {
+  const l = await store.getLandingById(req.params.id);
+  if (!l) return res.redirect('/admin/landing');
+  // Reconstruct the episode_url field for editing convenience.
+  let episode_url = '';
+  if (l.show_id) {
+    const show = await store.getShowById(l.show_id);
+    if (show && l.episode_id) {
+      const eps = await store.listEpisodes(show.id, { limit: 5000 });
+      const ep = eps.find((e) => e.id === l.episode_id);
+      if (ep) episode_url = `/${show.slug}/${ep.slug}`;
+    }
+  }
+  res.send(A.landingFormPage({ values: { ...l, episode_url }, isEdit: true, actionId: l.id, flash: readFlash(req, res) }));
+});
+app.post('/admin/landing/:id', requireAdmin, async (req, res) => {
+  const existing = await store.getLandingById(req.params.id);
+  if (!existing) return res.redirect('/admin/landing');
+  const { show_id, episode_id } = await resolveEpisodeRef(req.body.episode_url);
+  await store.updateLanding(existing.id, {
+    title: (req.body.title || '').trim(),
+    slug: slugify(req.body.slug || req.body.title || existing.slug, 'landing'),
+    headline: (req.body.headline || '').trim(),
+    subhead: (req.body.subhead || '').trim(),
+    body_html: req.body.body_html || '',
+    hero_image_url: (req.body.hero_image_url || '').trim(),
+    cta_label: (req.body.cta_label || '').trim(),
+    cta_url: (req.body.cta_url || '').trim(),
+    gtag_id: (req.body.gtag_id || '').trim(),
+    indexable: !!req.body.indexable,
+    show_id,
+    episode_id,
+  });
+  setFlash(res, { type: 'ok', msg: 'Landing page saved.' });
+  res.redirect('/admin/landing');
+});
+app.post('/admin/landing/:id/delete', requireAdmin, async (req, res) => {
+  await store.deleteLanding(req.params.id);
+  setFlash(res, { type: 'ok', msg: 'Landing page deleted.' });
+  res.redirect('/admin/landing');
+});
+
 // ---- Admin: members ----
 app.get('/admin/members', requireAdmin, async (req, res) => {
   const subscribers = await store.listSubscribers();
@@ -337,6 +429,21 @@ app.get('/shows', async (req, res) => {
 app.get('/press', async (req, res) => {
   const items = await store.listPressItems({ limit: 200 });
   res.send(V.pressPage({ items }));
+});
+
+app.get('/lp/:slug', async (req, res, next) => {
+  const landing = await store.getLandingBySlug(req.params.slug);
+  if (!landing) return next();
+  let show = null;
+  let episode = null;
+  if (landing.episode_id && landing.show_id) {
+    show = await store.getShowById(landing.show_id);
+    if (show) {
+      const eps = await store.listEpisodes(show.id, { limit: 5000 });
+      episode = eps.find((e) => e.id === landing.episode_id) || null;
+    }
+  }
+  res.send(V.landingPage({ landing, show, episode }));
 });
 
 app.post('/subscribe', async (req, res) => {

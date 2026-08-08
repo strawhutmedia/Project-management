@@ -23,7 +23,7 @@ function newId() {
 // ---------------------------------------------------------------------------
 class JsonStore {
   constructor() {
-    this.db = { shows: {}, episodes: {}, subscribers: {}, announcements: {}, press_items: {} };
+    this.db = { shows: {}, episodes: {}, subscribers: {}, announcements: {}, press_items: {}, landing_pages: {} };
   }
   async init() {
     try {
@@ -34,6 +34,7 @@ class JsonStore {
         this.db.subscribers ||= {};
         this.db.announcements ||= {};
         this.db.press_items ||= {};
+        this.db.landing_pages ||= {};
       } else {
         fs.mkdirSync(DATA_DIR, { recursive: true });
         this._flush();
@@ -211,6 +212,35 @@ class JsonStore {
   async countPressItems() {
     return Object.keys(this.db.press_items).length;
   }
+
+  // --- landing pages ---
+  async createLanding(lp) {
+    const id = lp.id || newId();
+    this.db.landing_pages[id] = { id, created_at: new Date().toISOString(), ...lp };
+    this._flush();
+    return this.db.landing_pages[id];
+  }
+  async listLandings() {
+    return Object.values(this.db.landing_pages).sort(
+      (a, b) => new Date(b.created_at) - new Date(a.created_at)
+    );
+  }
+  async getLandingBySlug(slug) {
+    return Object.values(this.db.landing_pages).find((l) => l.slug === slug) || null;
+  }
+  async getLandingById(id) {
+    return this.db.landing_pages[id] || null;
+  }
+  async updateLanding(id, patch) {
+    if (!this.db.landing_pages[id]) return null;
+    this.db.landing_pages[id] = { ...this.db.landing_pages[id], ...patch, id };
+    this._flush();
+    return this.db.landing_pages[id];
+  }
+  async deleteLanding(id) {
+    delete this.db.landing_pages[id];
+    this._flush();
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -283,6 +313,22 @@ class PgStore {
         query        TEXT,
         published_at TIMESTAMPTZ,
         created_at   TIMESTAMPTZ DEFAULT now()
+      );
+      CREATE TABLE IF NOT EXISTS landing_pages (
+        id            TEXT PRIMARY KEY,
+        slug          TEXT UNIQUE NOT NULL,
+        title         TEXT,
+        headline      TEXT,
+        subhead       TEXT,
+        body_html     TEXT,
+        hero_image_url TEXT,
+        cta_label     TEXT,
+        cta_url       TEXT,
+        show_id       TEXT,
+        episode_id    TEXT,
+        indexable     BOOLEAN DEFAULT FALSE,
+        gtag_id       TEXT,
+        created_at    TIMESTAMPTZ DEFAULT now()
       );
     `);
     // Lightweight migrations: CREATE TABLE IF NOT EXISTS won't add columns to
@@ -484,6 +530,45 @@ class PgStore {
   async countPressItems() {
     const { rows } = await this.pool.query(`SELECT COUNT(*)::int AS c FROM press_items`);
     return rows[0].c;
+  }
+
+  // --- landing pages ---
+  async createLanding(lp) {
+    const id = lp.id || newId();
+    await this.pool.query(
+      `INSERT INTO landing_pages (id, slug, title, headline, subhead, body_html, hero_image_url, cta_label, cta_url, show_id, episode_id, indexable, gtag_id)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)`,
+      [id, lp.slug, lp.title, lp.headline, lp.subhead, lp.body_html, lp.hero_image_url,
+       lp.cta_label, lp.cta_url, lp.show_id || null, lp.episode_id || null, !!lp.indexable, lp.gtag_id || null]
+    );
+    return this.getLandingById(id);
+  }
+  async listLandings() {
+    const { rows } = await this.pool.query(`SELECT * FROM landing_pages ORDER BY created_at DESC`);
+    return rows;
+  }
+  async getLandingBySlug(slug) {
+    const { rows } = await this.pool.query(`SELECT * FROM landing_pages WHERE slug=$1`, [slug]);
+    return rows[0] || null;
+  }
+  async getLandingById(id) {
+    const { rows } = await this.pool.query(`SELECT * FROM landing_pages WHERE id=$1`, [id]);
+    return rows[0] || null;
+  }
+  async updateLanding(id, patch) {
+    const cur = await this.getLandingById(id);
+    if (!cur) return null;
+    const m = { ...cur, ...patch };
+    await this.pool.query(
+      `UPDATE landing_pages SET slug=$2, title=$3, headline=$4, subhead=$5, body_html=$6, hero_image_url=$7,
+         cta_label=$8, cta_url=$9, show_id=$10, episode_id=$11, indexable=$12, gtag_id=$13 WHERE id=$1`,
+      [id, m.slug, m.title, m.headline, m.subhead, m.body_html, m.hero_image_url,
+       m.cta_label, m.cta_url, m.show_id || null, m.episode_id || null, !!m.indexable, m.gtag_id || null]
+    );
+    return this.getLandingById(id);
+  }
+  async deleteLanding(id) {
+    await this.pool.query(`DELETE FROM landing_pages WHERE id=$1`, [id]);
   }
 }
 
