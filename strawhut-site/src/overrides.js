@@ -43,6 +43,12 @@ export const SPOTLIGHT_POOL = [
   // 'only-murders-in-the-building',  // added once we have the official feed (see EXTRA_SHOWS)
 ];
 
+// Evergreen shows: ended but still worth spotlighting (e.g. Wicked keeps
+// pulling downloads). These stay eligible for rotation even when not "active."
+// (When Megaphone is configured, ongoing downloads also keep a show eligible
+// automatically — this list is the manual safety net.)
+export const EVERGREEN_SHOWS = ['wicked-the-official-podcast'];
+
 // Shows to import that are NOT discoverable by crawling strawhutmedia.com
 // (e.g. Only Murders, whose official feed lives elsewhere). Each: { feed_url,
 // show_type, slug? }. slug is optional — otherwise derived from the title.

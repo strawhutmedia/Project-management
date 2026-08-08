@@ -105,6 +105,21 @@ export async function computeRankings({ log = () => {} } = {}) {
 
 const norm = (s) => String(s || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
 
+/** Map of show slug -> Megaphone download count (only shows we can match). */
+export async function downloadsBySlug(store, { log = () => {} } = {}) {
+  const map = new Map();
+  if (!megaphoneConfigured()) return map;
+  const ranked = await computeRankings({ log });
+  const shows = await store.listShows();
+  for (const r of ranked) {
+    const show =
+      shows.find((s) => r.uid && s.feed_url && s.feed_url.includes(r.uid)) ||
+      shows.find((s) => norm(s.title) === norm(r.title));
+    if (show) map.set(show.slug, r.downloads);
+  }
+  return map;
+}
+
 /** Rank by Megaphone downloads and set `featured` on the top N shows. */
 export async function applyPopularSpotlight(store, { count = spotlightCount(), log = () => {} } = {}) {
   if (!megaphoneConfigured()) return { applied: false, reason: 'not configured' };
