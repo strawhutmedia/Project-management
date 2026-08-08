@@ -19,7 +19,7 @@ import * as reco from './recommend.js';
 import { matchAllShows, matchShowVideos } from './youtube.js';
 import { refreshPress } from './press.js';
 import { applyMonthlyRotation } from './spotlight.js';
-import { applyPopularSpotlight, megaphoneConfigured } from './popularity.js';
+import { applyPopularSpotlight, megaphoneConfigured, probe as megaphoneProbe } from './popularity.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PORT = process.env.PORT || 8080;
@@ -470,6 +470,8 @@ function readFlash(req, res) {
 
 // ---- Health --------------------------------------------------------------
 app.get('/healthz', async (req, res) => res.json({ ok: true, ...(await store.stats()), spotlight: spotlightStatus }));
+// Temporary Megaphone API diagnostic (returns field shapes only, no secrets).
+app.get('/__mgprobe', async (req, res) => res.json(await megaphoneProbe().catch((e) => ({ error: e.message }))));
 
 // ---- SEO / GEO endpoints --------------------------------------------------
 app.get('/robots.txt', (req, res) => res.type('text/plain').send(robotsTxt()));

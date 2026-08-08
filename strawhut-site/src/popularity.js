@@ -105,6 +105,41 @@ export async function computeRankings({ log = () => {} } = {}) {
 
 const norm = (s) => String(s || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
 
+/** Diagnostic: inspect what the Megaphone API actually returns for downloads. */
+export async function probe() {
+  if (!megaphoneConfigured()) return { configured: false };
+  const out = { configured: true };
+  try {
+    const { json: pods } = await mg(`/networks/${NETWORK_ID}/podcasts`, { per_page: 5 });
+    out.podcastCount = Array.isArray(pods) ? pods.length : 0;
+    out.podcastKeys = Array.isArray(pods) && pods[0] ? Object.keys(pods[0]) : [];
+    out.sample = (Array.isArray(pods) ? pods.slice(0, 3) : []).map((p) => ({
+      title: p.title, dl: extractDownloads(p),
+    }));
+    const first = Array.isArray(pods) && pods[0] ? pods[0].id || pods[0].uid : null;
+    out.tries = [];
+    for (const ep of first
+      ? [
+          `/networks/${NETWORK_ID}/podcasts/${first}`,
+          `/networks/${NETWORK_ID}/podcasts/${first}/analytics`,
+          `/podcasts/${first}/analytics`,
+          `/networks/${NETWORK_ID}/podcasts/${first}/episodes?per_page=1`,
+        ]
+      : []) {
+      try {
+        const { json } = await mg(ep);
+        const obj = Array.isArray(json) ? json[0] : json;
+        out.tries.push({ ep, ok: true, type: Array.isArray(json) ? 'array' : 'object', keys: obj ? Object.keys(obj) : [], dl: extractDownloads(obj) });
+      } catch (e) {
+        out.tries.push({ ep, ok: false, error: e.message });
+      }
+    }
+  } catch (e) {
+    out.error = e.message;
+  }
+  return out;
+}
+
 /** Map of show slug -> Megaphone download count (only shows we can match). */
 export async function downloadsBySlug(store, { log = () => {} } = {}) {
   const map = new Map();
