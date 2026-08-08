@@ -32,6 +32,8 @@ app.use(cookieParser());
 app.use('/styles.css', express.static(path.join(__dirname, '..', 'public', 'styles.css')));
 // Hidden onboarding app (standalone static; not linked from the site).
 app.use('/onboarding', express.static(path.join(__dirname, '..', 'public', 'onboarding')));
+// Services / packages quote builder (standalone static, from Sales-Quoting).
+app.use('/services', express.static(path.join(__dirname, '..', 'public', 'services')));
 app.use('/public', express.static(path.join(__dirname, '..', 'public')));
 
 // Attach episode_count to shows for list views.

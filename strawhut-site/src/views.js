@@ -35,8 +35,8 @@ function layout({
     ['/', 'Home'],
     ['/shows', 'Shows'],
     ['/studio', 'Studio'],
+    ['/services', 'Services'],
     ['/press', 'Press'],
-    ['/#advertise', 'Advertise'],
     ['/admin', 'Admin'],
   ]
     .map(
