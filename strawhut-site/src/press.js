@@ -3,7 +3,7 @@
 // which we parse, de-dupe, and store for the public Press page.
 
 import { XMLParser } from 'fast-xml-parser';
-import { PRESS_QUERIES } from './overrides.js';
+import { PRESS_QUERIES, pressHintFor } from './overrides.js';
 import { toText } from './util.js';
 
 const parser = new XMLParser({ ignoreAttributes: false, attributeNamePrefix: '@_', cdataPropName: '__cdata' });
@@ -77,20 +77,31 @@ function relevantToShow(item, show) {
  * URL, throttled to be gentle on Google News.
  */
 export async function refreshPress(store, { log = () => {}, includeShows = true } = {}) {
-  const jobs = PRESS_QUERIES.map((q) => ({ query: q, show: null }));
+  const jobs = PRESS_QUERIES.map((q) => ({ query: q, show: null, hint: null }));
   if (includeShows) {
     for (const s of await store.listShows()) {
-      if (s.title) jobs.push({ query: `"${s.title}"`, show: s });
+      if (!s.title) continue;
+      const hint = pressHintFor(s.title); // e.g. ['Phil Rosenthal']
+      const query = hint ? `"${s.title}" ${hint.map((h) => `"${h}"`).join(' ')}` : `"${s.title}"`;
+      jobs.push({ query, show: s, hint });
     }
   }
 
   let added = 0;
-  for (const { query, show } of jobs) {
+  for (const { query, show, hint } of jobs) {
     try {
       const items = await fetchQuery(query, show ? 8 : 25);
       let n = 0;
       for (const item of items) {
-        if (show && !relevantToShow(item, show)) continue; // gate show-title matches
+        if (show) {
+          const hay = `${item.title} ${item.snippet}`.toLowerCase();
+          // With a hint, require every hint term to appear; otherwise use the
+          // general host/podcast/network relevance gate.
+          const ok = hint
+            ? hint.every((h) => hay.includes(h.toLowerCase()))
+            : relevantToShow(item, show);
+          if (!ok) continue;
+        }
         if (await store.upsertPressItem(item)) { added++; n++; }
       }
       if (n) log(`press: ${query} → +${n}`);
