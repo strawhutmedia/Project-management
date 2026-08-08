@@ -19,7 +19,7 @@ import * as reco from './recommend.js';
 import { matchAllShows, matchShowVideos } from './youtube.js';
 import { refreshPress } from './press.js';
 import { applyMonthlyRotation } from './spotlight.js';
-import { applyPopularSpotlight, megaphoneConfigured, probe as megaphoneProbe } from './popularity.js';
+import { applyPopularSpotlight, megaphoneConfigured } from './popularity.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PORT = process.env.PORT || 8080;
@@ -469,12 +469,10 @@ function readFlash(req, res) {
 }
 
 // ---- Health --------------------------------------------------------------
-app.get('/healthz', async (req, res) => res.json({ ok: true, ...(await store.stats()), spotlight: spotlightStatus }));
-// Temporary Megaphone diagnostics (return field shapes only, no secrets).
-app.get('/__mgprobe', async (req, res) => res.json(await megaphoneProbe().catch((e) => ({ error: e.message }))));
-app.get('/__s3probe', async (req, res) => {
-  const { probe } = await import('./megaphoneS3.js');
-  res.json(await probe().catch((e) => ({ error: e.message })));
+app.get('/healthz', async (req, res) => {
+  const sp = spotlightStatus || {};
+  const titles = (sp.shows || []).map((x) => x.title).concat(sp.picks || []);
+  res.json({ ok: true, ...(await store.stats()), spotlight: { source: sp.source, shows: titles } });
 });
 
 // ---- SEO / GEO endpoints --------------------------------------------------
