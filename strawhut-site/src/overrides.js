@@ -34,3 +34,10 @@ export const RETIRE_FEEDS = [
 
 const norm = (s) => String(s || '').toLowerCase().replace(/\s+/g, ' ').trim();
 export const isPartnerTitle = (title) => PARTNER_SHOWS.some((p) => norm(p) === norm(title));
+
+// Press: search queries used to auto-pull media mentions from Google News.
+// Quoted for precision. Override with the PRESS_QUERIES env var (comma-separated).
+export const PRESS_QUERIES = (process.env.PRESS_QUERIES
+  ? process.env.PRESS_QUERIES.split(',')
+  : ['"Straw Hut Media"']
+).map((s) => s.trim()).filter(Boolean);

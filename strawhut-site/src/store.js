@@ -23,7 +23,7 @@ function newId() {
 // ---------------------------------------------------------------------------
 class JsonStore {
   constructor() {
-    this.db = { shows: {}, episodes: {}, subscribers: {}, announcements: {} };
+    this.db = { shows: {}, episodes: {}, subscribers: {}, announcements: {}, press_items: {} };
   }
   async init() {
     try {
@@ -33,6 +33,7 @@ class JsonStore {
         this.db.episodes ||= {};
         this.db.subscribers ||= {};
         this.db.announcements ||= {};
+        this.db.press_items ||= {};
       } else {
         fs.mkdirSync(DATA_DIR, { recursive: true });
         this._flush();
@@ -189,6 +190,27 @@ class JsonStore {
     delete this.db.announcements[id];
     this._flush();
   }
+
+  // --- press items ---
+  async upsertPressItem(item) {
+    const existing = Object.values(this.db.press_items).find((p) => p.url === item.url);
+    if (existing) return false;
+    const id = newId();
+    this.db.press_items[id] = { id, ...item, created_at: new Date().toISOString() };
+    return true; // caller batches save()
+  }
+  async listPressItems({ limit = 200 } = {}) {
+    return Object.values(this.db.press_items)
+      .sort((a, b) => new Date(b.published_at || 0) - new Date(a.published_at || 0))
+      .slice(0, limit);
+  }
+  async deletePressItem(id) {
+    delete this.db.press_items[id];
+    this._flush();
+  }
+  async countPressItems() {
+    return Object.keys(this.db.press_items).length;
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -251,6 +273,16 @@ class PgStore {
         sent_count INTEGER DEFAULT 0,
         created_at TIMESTAMPTZ DEFAULT now(),
         sent_at    TIMESTAMPTZ
+      );
+      CREATE TABLE IF NOT EXISTS press_items (
+        id           TEXT PRIMARY KEY,
+        title        TEXT NOT NULL,
+        url          TEXT UNIQUE NOT NULL,
+        source       TEXT,
+        snippet      TEXT,
+        query        TEXT,
+        published_at TIMESTAMPTZ,
+        created_at   TIMESTAMPTZ DEFAULT now()
       );
     `);
     // Lightweight migrations: CREATE TABLE IF NOT EXISTS won't add columns to
@@ -427,6 +459,31 @@ class PgStore {
   }
   async deleteAnnouncement(id) {
     await this.pool.query(`DELETE FROM announcements WHERE id=$1`, [id]);
+  }
+
+  // --- press items ---
+  async upsertPressItem(item) {
+    const id = newId();
+    const { rowCount } = await this.pool.query(
+      `INSERT INTO press_items (id, title, url, source, snippet, query, published_at)
+       VALUES ($1,$2,$3,$4,$5,$6,$7) ON CONFLICT (url) DO NOTHING`,
+      [id, item.title, item.url, item.source, item.snippet, item.query, item.published_at || null]
+    );
+    return rowCount > 0;
+  }
+  async listPressItems({ limit = 200 } = {}) {
+    const { rows } = await this.pool.query(
+      `SELECT * FROM press_items ORDER BY published_at DESC NULLS LAST LIMIT $1`,
+      [limit]
+    );
+    return rows;
+  }
+  async deletePressItem(id) {
+    await this.pool.query(`DELETE FROM press_items WHERE id=$1`, [id]);
+  }
+  async countPressItems() {
+    const { rows } = await this.pool.query(`SELECT COUNT(*)::int AS c FROM press_items`);
+    return rows[0].c;
   }
 }
 

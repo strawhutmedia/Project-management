@@ -12,6 +12,7 @@ function adminLayout({ title, active, body, stats }) {
     ['/admin/shows', '🎙️ Shows'],
     ['/admin/shows/new', '➕ Add Show'],
     ['/admin/announcements', '📣 Announcements'],
+    ['/admin/press', '📰 Press'],
     ['/admin/members', '👥 Members'],
   ]
     .map(
@@ -189,6 +190,40 @@ export function announcementsPage({ announcements, subscriberCount, mailReady, f
       <tbody>${rows || '<tr><td colspan="4" style="color:var(--muted)">No announcements yet.</td></tr>'}</tbody></table>
     </div>`;
   return adminLayout({ title: 'Announcements', active: '/admin/announcements', body });
+}
+
+export function pressAdminPage({ items, flash }) {
+  const rows = items
+    .map(
+      (p) => `<tr>
+      <td>${esc(p.source || '—')}</td>
+      <td><a href="${esc(p.url)}" target="_blank">${esc(p.title)}</a></td>
+      <td>${p.published_at ? esc(formatDate(p.published_at)) : '—'}</td>
+      <td class="actions"><form method="post" action="/admin/press/${esc(p.id)}/delete" style="display:inline"><button class="btn btn-sm btn-danger">Remove</button></form></td>
+    </tr>`
+    )
+    .join('');
+  const body = `
+    <h1>Press</h1>
+    ${flash ? `<div class="flash ${flash.type}">${esc(flash.msg)}</div>` : ''}
+    <div style="margin-bottom:16px">
+      <form method="post" action="/admin/press/refresh" style="display:inline"><button class="btn btn-primary">🔄 Refresh mentions from Google News</button></form>
+      <span style="color:var(--muted);margin-left:10px;font-size:0.9rem">${items.length} mentions</span>
+    </div>
+    <div class="panel">
+      <h2>Add a press item manually</h2>
+      <form method="post" action="/admin/press">
+        <div class="field"><label>Headline</label><input type="text" name="title" required></div>
+        <div class="field"><label>URL</label><input type="url" name="url" required></div>
+        <div class="field"><label>Outlet</label><input type="text" name="source" placeholder="e.g. Variety"></div>
+        <button class="btn" type="submit">Add</button>
+      </form>
+    </div>
+    <div class="panel">
+      <table class="admin-table"><thead><tr><th>Outlet</th><th>Headline</th><th>Date</th><th></th></tr></thead>
+      <tbody>${rows || '<tr><td colspan="4" style="color:var(--muted)">No press yet — click “Refresh mentions”.</td></tr>'}</tbody></table>
+    </div>`;
+  return adminLayout({ title: 'Press', active: '/admin/press', body });
 }
 
 export function membersPage({ subscribers, flash }) {

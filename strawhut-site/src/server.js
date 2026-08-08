@@ -17,6 +17,7 @@ import { sendAnnouncement, mailConfigured } from './mail.js';
 import { importFromSite } from './importer.js';
 import * as reco from './recommend.js';
 import { matchAllShows, matchShowVideos } from './youtube.js';
+import { refreshPress } from './press.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PORT = process.env.PORT || 8080;
@@ -248,6 +249,36 @@ app.post('/admin/announcements/:id/delete', requireAdmin, async (req, res) => {
   res.redirect('/admin/announcements');
 });
 
+// ---- Admin: press ----
+app.get('/admin/press', requireAdmin, async (req, res) => {
+  const items = await store.listPressItems({ limit: 300 });
+  res.send(A.pressAdminPage({ items, flash: readFlash(req, res) }));
+});
+app.post('/admin/press/refresh', requireAdmin, async (req, res) => {
+  try {
+    const added = await refreshPress(store, { log: (m) => console.log('[press]', m) });
+    setFlash(res, { type: 'ok', msg: `Refreshed — ${added} new mention(s) added.` });
+  } catch (e) {
+    setFlash(res, { type: 'err', msg: `Press refresh failed: ${e.message}` });
+  }
+  res.redirect('/admin/press');
+});
+app.post('/admin/press', requireAdmin, async (req, res) => {
+  const title = (req.body.title || '').trim();
+  const url = (req.body.url || '').trim();
+  if (title && url) {
+    await store.upsertPressItem({ title, url, source: (req.body.source || '').trim(), snippet: '', query: 'manual', published_at: new Date().toISOString() });
+    if (store.save) await store.save();
+    setFlash(res, { type: 'ok', msg: 'Press item added.' });
+  }
+  res.redirect('/admin/press');
+});
+app.post('/admin/press/:id/delete', requireAdmin, async (req, res) => {
+  await store.deletePressItem(req.params.id);
+  setFlash(res, { type: 'ok', msg: 'Press item removed.' });
+  res.redirect('/admin/press');
+});
+
 // ---- Admin: members ----
 app.get('/admin/members', requireAdmin, async (req, res) => {
   const subscribers = await store.listSubscribers();
@@ -301,6 +332,11 @@ app.get('/', async (req, res) => {
 app.get('/shows', async (req, res) => {
   const shows = await withCounts(await store.listShows());
   res.send(V.showsIndexPage({ shows }));
+});
+
+app.get('/press', async (req, res) => {
+  const items = await store.listPressItems({ limit: 200 });
+  res.send(V.pressPage({ items }));
 });
 
 app.post('/subscribe', async (req, res) => {
@@ -404,6 +440,7 @@ app.listen(PORT, async () => {
       if (process.env.YOUTUBE_MATCH !== 'off') {
         await matchAllShows(store, { mode: 'recent', log: (m) => console.log('[youtube]', m) }).catch(() => {});
       }
+      await refreshPress(store, { log: (m) => console.log('[press]', m) }).catch(() => {});
     },
   });
 
@@ -419,6 +456,11 @@ app.listen(PORT, async () => {
   } catch (e) {
     console.error('[import] auto-import failed:', e.message);
   }
+
+  // Pull press mentions in the background so the Press page is populated.
+  refreshPress(store, { log: (m) => console.log('[press]', m) })
+    .then((n) => console.log(`[press] initial pull — ${n} mentions`))
+    .catch((e) => console.error('[press] initial pull failed:', e.message));
 
   // Build the semantic recommendation index in the background, then match
   // YouTube videos to episodes for any shows not yet processed.

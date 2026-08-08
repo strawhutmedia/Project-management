@@ -34,6 +34,7 @@ function layout({
   const nav = [
     ['/', 'Home'],
     ['/shows', 'Shows'],
+    ['/press', 'Press'],
     ['/#advertise', 'Advertise'],
     ['/admin', 'Admin'],
   ]
@@ -214,6 +215,35 @@ export function showsIndexPage({ shows }) {
       { name: 'Home', path: '/' },
       { name: 'Shows', path: '/shows' },
     ]),
+  });
+}
+
+export function pressPage({ items }) {
+  const rows = items
+    .map(
+      (p) => `<a class="press-row" href="${esc(p.url)}" target="_blank" rel="noopener">
+      <div class="press-meta">${esc(p.source || 'Press')}${p.published_at ? ' · <time datetime="' + esc(new Date(p.published_at).toISOString()) + '">' + esc(formatDate(p.published_at)) + '</time>' : ''}</div>
+      <h3 class="press-title">${esc(p.title)}</h3>
+      ${p.snippet ? `<p class="press-snippet">${esc(p.snippet)}</p>` : ''}
+      <span class="press-link">Read on ${esc(p.source || 'source')} →</span>
+    </a>`
+    )
+    .join('');
+  const body = `
+  <section class="hero" style="padding-bottom:20px"><div class="container">
+    <div class="breadcrumb" style="padding:0 0 14px"><a href="/">Home</a> / Press</div>
+    <h1>Straw Hut Media <span class="accent">in the press</span></h1>
+    <p>Media coverage and mentions of Straw Hut Media and our shows.</p>
+  </div></section>
+  <section class="section"><div class="container">
+    ${items.length ? `<div class="press-list">${rows}</div>` : `<div class="empty">Press mentions will appear here.</div>`}
+  </div></section>`;
+  return layout({
+    title: 'Press — Straw Hut Media',
+    description: 'Media coverage and press mentions of Straw Hut Media and its podcasts.',
+    body,
+    activeNav: '/press',
+    path: '/press',
   });
 }
 
