@@ -19,6 +19,7 @@ import * as reco from './recommend.js';
 import { matchAllShows, matchShowVideos } from './youtube.js';
 import { refreshPress } from './press.js';
 import { applyMonthlyRotation } from './spotlight.js';
+import { applyPopularSpotlight, megaphoneConfigured } from './popularity.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PORT = process.env.PORT || 8080;
@@ -36,6 +37,24 @@ app.use('/onboarding', express.static(path.join(__dirname, '..', 'public', 'onbo
 // Services / packages quote builder (standalone static, from Sales-Quoting).
 app.use('/services', express.static(path.join(__dirname, '..', 'public', 'services')));
 app.use('/public', express.static(path.join(__dirname, '..', 'public')));
+
+// Spotlight = most-downloaded shows (Megaphone). Falls back to the curated
+// monthly rotation only when Megaphone isn't configured or returns no numbers.
+async function refreshSpotlight() {
+  try {
+    if (megaphoneConfigured()) {
+      const r = await applyPopularSpotlight(store, { log: (m) => console.log('[spotlight]', m) });
+      if (r.applied) {
+        console.log('[spotlight] by downloads:', r.top.map((t) => t.title).join(', '));
+        return;
+      }
+      console.log('[spotlight] Megaphone returned no usable numbers — falling back to rotation:', r.reason);
+    }
+    await applyMonthlyRotation(store, { log: (m) => console.log('[spotlight]', m) });
+  } catch (e) {
+    console.error('[spotlight] failed:', e.message);
+  }
+}
 
 // Attach episode_count to shows for list views.
 async function withCounts(shows) {
@@ -636,8 +655,7 @@ app.listen(PORT, async () => {
         await matchAllShows(store, { mode: 'recent', log: (m) => console.log('[youtube]', m) }).catch(() => {});
       }
       await refreshPress(store, { log: (m) => console.log('[press]', m) }).catch(() => {});
-      // Recompute the monthly spotlight (flips automatically at month boundary).
-      await applyMonthlyRotation(store, { log: (m) => console.log('[spotlight]', m) }).catch(() => {});
+      await refreshSpotlight();
     },
   });
 
@@ -654,10 +672,9 @@ app.listen(PORT, async () => {
     console.error('[import] auto-import failed:', e.message);
   }
 
-  // Homepage spotlight: rotate monthly through the curated pool.
-  applyMonthlyRotation(store, { log: (m) => console.log('[spotlight]', m) }).catch((e) =>
-    console.error('[spotlight] failed:', e.message)
-  );
+  // Homepage spotlight: prefer the most-downloaded shows (Megaphone); fall
+  // back to the curated monthly rotation only if Megaphone isn't reachable.
+  refreshSpotlight();
 
   // Pull press mentions in the background so the Press page is populated.
   refreshPress(store, { log: (m) => console.log('[press]', m) })
