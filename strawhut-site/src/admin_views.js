@@ -120,6 +120,7 @@ export function showsAdminPage({ shows, flash }) {
       <form method="post" action="/admin/import" style="display:inline;margin-left:8px" onsubmit="return confirm('Import every show from strawhutmedia.com? This runs in the background.')"><button class="btn">⬇ Import all shows from strawhutmedia.com</button></form>
       <form method="post" action="/admin/sync-all" style="display:inline;margin-left:8px"><button class="btn">🔄 Sync all feeds</button></form>
       <form method="post" action="/admin/youtube-match" style="display:inline;margin-left:8px" onsubmit="return confirm('Find and link YouTube videos for all shows? Runs in the background.')"><button class="btn">🎬 Match YouTube videos (all)</button></form>
+      <form method="post" action="/admin/spotlight/rank" style="display:inline;margin-left:8px" onsubmit="return confirm('Rank the homepage spotlight by real Megaphone downloads?')"><button class="btn">🔢 Rank spotlight by downloads</button></form>
     </div>
     <div class="panel">
       <table class="admin-table"><thead><tr><th></th><th>Show</th><th>Episodes</th><th>Type</th><th></th></tr></thead>
