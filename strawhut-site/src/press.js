@@ -22,12 +22,14 @@ function newsUrl(query) {
   return `https://news.google.com/rss/search?q=${encodeURIComponent(query)}&hl=en-US&gl=US&ceid=US:en`;
 }
 
-/** Fetch + parse one query's mentions. */
-async function fetchQuery(query) {
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+/** Fetch + parse one query's mentions (capped to the freshest `limit`). */
+async function fetchQuery(query, limit = 15) {
   const res = await fetch(newsUrl(query), { headers: { 'User-Agent': UA } });
   if (!res.ok) throw new Error(`Google News HTTP ${res.status}`);
   const doc = parser.parse(await res.text());
-  const items = arr(doc?.rss?.channel?.item);
+  const items = arr(doc?.rss?.channel?.item).slice(0, limit);
   return items.map((it) => {
     const rawTitle = text(it.title);
     const source = (it.source && (it.source['#text'] || it.source.__cdata)) || '';
@@ -47,21 +49,57 @@ async function fetchQuery(query) {
   }).filter((i) => i.title && i.url);
 }
 
-/** Fetch all configured queries and upsert into the store. Returns count added. */
-export async function refreshPress(store, { log = () => {} } = {}) {
-  let added = 0;
-  for (const q of PRESS_QUERIES) {
-    try {
-      const items = await fetchQuery(q);
-      for (const item of items) {
-        const isNew = await store.upsertPressItem(item);
-        if (isNew) added++;
-      }
-      log(`press: "${q}" → ${items.length} items`);
-    } catch (e) {
-      log(`press: "${q}" failed — ${e.message}`);
+// Does a show-title mention actually look like it's about THAT show (not a
+// same-named book/film/person)? Require it to reference the podcast, the
+// network, or the host — filtering out name collisions.
+function relevantToShow(item, show) {
+  const hay = `${item.title} ${item.snippet}`.toLowerCase();
+  const needles = ['podcast', 'straw hut'];
+  if (show.author) {
+    const a = show.author.toLowerCase().replace(/\b(inc|llc|media|productions?|network)\b/g, '').trim();
+    if (a.length > 2) needles.push(a);
+  }
+  // Host name(s) after "with" / "w/" in the title (e.g. "…with Jay Kogen").
+  const m = show.title.match(/(?:with|w\/)\s+(.+)$/i);
+  if (m) {
+    for (const part of m[1].toLowerCase().split(/\s+and\s+|,|&/)) {
+      const p = part.trim();
+      if (p.length > 2) needles.push(p);
     }
   }
+  return needles.some((n) => n && hay.includes(n));
+}
+
+/**
+ * Refresh press. Searches the configured company queries PLUS every show's
+ * exact title. Company matches always post; per-show matches must pass a
+ * relevance gate (avoids same-name book/film/person collisions). De-dupes by
+ * URL, throttled to be gentle on Google News.
+ */
+export async function refreshPress(store, { log = () => {}, includeShows = true } = {}) {
+  const jobs = PRESS_QUERIES.map((q) => ({ query: q, show: null }));
+  if (includeShows) {
+    for (const s of await store.listShows()) {
+      if (s.title) jobs.push({ query: `"${s.title}"`, show: s });
+    }
+  }
+
+  let added = 0;
+  for (const { query, show } of jobs) {
+    try {
+      const items = await fetchQuery(query, show ? 8 : 25);
+      let n = 0;
+      for (const item of items) {
+        if (show && !relevantToShow(item, show)) continue; // gate show-title matches
+        if (await store.upsertPressItem(item)) { added++; n++; }
+      }
+      if (n) log(`press: ${query} → +${n}`);
+    } catch (e) {
+      log(`press: ${query} failed — ${e.message}`);
+    }
+    await sleep(350);
+  }
   if (added && store.save) await store.save();
+  log(`press: refresh complete, ${added} new across ${jobs.length} queries`);
   return added;
 }
