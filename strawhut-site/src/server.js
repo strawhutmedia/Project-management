@@ -600,9 +600,10 @@ app.use(async (req, res) => {
         const st = slugTokens(s.slug);
         const inter = [...qt].filter((x) => st.has(x)).length;
         let score = qt.size ? inter / (qt.size + st.size - inter) : 0;
-        if (showBase && s.slug.includes(showBase)) score = Math.max(score, 0.7); // substring hit
+        if (showBase.length >= 4 && s.slug.includes(showBase)) score = Math.max(score, 0.7);
         for (const q of qt) {
-          if ([...st].some((t) => t.includes(q) || q.includes(t))) score = Math.max(score, 0.5);
+          if (q.length < 4) continue; // ignore tiny tokens like "on", "gg"
+          if ([...st].some((t) => t.length >= 4 && (t.includes(q) || q.includes(t)))) score = Math.max(score, 0.5);
         }
         return { s, score };
       })
