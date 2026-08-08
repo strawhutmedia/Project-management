@@ -152,6 +152,12 @@ audio { width: 100%; margin: 14px 0 6px; }
 .site-footer { border-top: 1px solid var(--border); margin-top: 60px; padding: 40px 0; color: var(--muted); }
 .site-footer .container { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 16px; }
 
+/* Studio setup toggle */
+.setup-toggle { display: flex; gap: 10px; flex-wrap: wrap; }
+.setup-opt { flex: 1; min-width: 160px; padding: 14px 18px; border-radius: 12px; border: 1px solid var(--border); background: var(--card); color: var(--text); font-family: inherit; font-size: 0.98rem; font-weight: 600; cursor: pointer; transition: all 0.15s; }
+.setup-opt:hover { border-color: #33404f; }
+.setup-opt.active { background: var(--accent); color: var(--accent-ink); border-color: transparent; }
+
 /* Press */
 .press-list { display: grid; gap: 16px; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); }
 .press-row { display: block; background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 20px 22px; transition: transform 0.15s, border-color 0.15s; }

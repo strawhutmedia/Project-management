@@ -350,6 +350,13 @@ export function studioPage() {
   <section class="section" id="book"><div class="container">
     <div class="section-head"><h2>Book your session</h2></div>
     <p style="color:var(--muted);margin:-8px 0 18px">Choose your session length, then pick a date and time. Payment and confirmation are handled securely at checkout.</p>
+    <div class="field" style="max-width:460px">
+      <label>Which setup?</label>
+      <div id="setupSelect" class="setup-toggle">
+        <button type="button" class="setup-opt active" data-setup="The Podcast Table">🎙️ Podcast Table</button>
+        <button type="button" class="setup-opt" data-setup="The Cozy Couch">🛋️ Cozy Couch</button>
+      </div>
+    </div>
     <div class="field" style="max-width:280px">
       <label>Session length</label>
       <select id="durationSelect" style="width:100%;padding:12px 14px;border-radius:10px;border:1px solid var(--border);background:var(--bg-2);color:var(--text);font-family:inherit;font-size:0.95rem">${opts}</select>
@@ -360,10 +367,19 @@ export function studioPage() {
   <script src="https://link.msgsndr.com/js/form_embed.js"></script>
   <script>(function(){
     var sel=document.getElementById('durationSelect'),f=document.getElementById('bookingIframe'),loader=document.getElementById('bookingLoader');
+    var setupBtns=document.querySelectorAll('.setup-opt'), setup='The Podcast Table';
     if(!sel||!f)return;
-    function load(){ if(loader)loader.style.display='block'; f.style.display='none'; f.src=sel.value; }
+    function srcFor(){
+      // Pass the chosen setup into the GoHighLevel widget so it lands on the
+      // booking (and the calendar invite) via the calendar's "studio_setup" field.
+      var base=sel.value; return base+(base.indexOf('?')>-1?'&':'?')+'studio_setup='+encodeURIComponent(setup);
+    }
+    function load(){ if(loader)loader.style.display='block'; f.style.display='none'; f.src=srcFor(); }
     f.addEventListener('load',function(){ setTimeout(function(){ if(loader)loader.style.display='none'; f.style.display='block'; },800); });
     sel.addEventListener('change',load);
+    setupBtns.forEach(function(b){ b.addEventListener('click',function(){
+      setupBtns.forEach(function(x){x.classList.remove('active');}); b.classList.add('active'); setup=b.getAttribute('data-setup'); load();
+    }); });
     load();
   })();</script>`;
   return layout({
