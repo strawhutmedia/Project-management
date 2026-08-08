@@ -1,0 +1,785 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Straw Hut Media — Podcast Onboarding</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+  <!-- ===== STEP 1: Company Verification Gate ===== -->
+  <section id="gate" class="screen active">
+    <div class="gate-container">
+      <div class="gate-card">
+        <div class="gate-logo">
+          <img src="logo.png" alt="Straw Hut Media" class="logo-img gate-logo-img on-light">
+        </div>
+        <div class="gate-divider"></div>
+        <h2>Podcast Onboarding Portal</h2>
+        <p class="gate-desc">Enter your company name to get started. Your company must be pre-approved before you can access the onboarding form.</p>
+        <div class="form-group">
+          <label for="company-name">Company Name</label>
+          <input type="text" id="company-name" placeholder="e.g. Acme Corp" autocomplete="off">
+          <div id="gate-error" class="error-msg hidden">
+            Company not found. Please check the spelling or contact your Straw Hut Media representative.
+          </div>
+        </div>
+        <button id="gate-submit" class="btn primary full-width">Continue</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== STEP 2: Onboarding Form with Sidebar ===== -->
+  <section id="onboarding" class="screen">
+    <div class="onboarding-layout">
+
+      <!-- Left Sidebar Checklist -->
+      <aside class="sidebar">
+        <div class="sidebar-header">
+          <div class="sidebar-logo">
+            <img src="logo.png" alt="Straw Hut Media" class="logo-img sm">
+          </div>
+          <p class="sidebar-company">Onboarding for <span id="display-company"></span></p>
+        </div>
+
+        <nav class="sidebar-checklist">
+          <ul>
+            <li data-sidebar="1" class="active">
+              <span class="sidebar-check"></span>
+              <span class="sidebar-label">Contact Information</span>
+            </li>
+            <li data-sidebar="2">
+              <span class="sidebar-check"></span>
+              <span class="sidebar-label">Podcast Basics</span>
+            </li>
+            <li data-sidebar="3">
+              <span class="sidebar-check"></span>
+              <span class="sidebar-label">Branding &amp; Guidelines</span>
+            </li>
+            <li data-sidebar="4">
+              <span class="sidebar-check"></span>
+              <span class="sidebar-label">Inspiration &amp; References</span>
+            </li>
+            <li data-sidebar="5">
+              <span class="sidebar-check"></span>
+              <span class="sidebar-label">Music &amp; Audio</span>
+            </li>
+            <li data-sidebar="6">
+              <span class="sidebar-check"></span>
+              <span class="sidebar-label">Social Media &amp; Web</span>
+            </li>
+            <li data-sidebar="7">
+              <span class="sidebar-check"></span>
+              <span class="sidebar-label">Recording &amp; Logistics</span>
+            </li>
+            <li data-sidebar="8">
+              <span class="sidebar-check"></span>
+              <span class="sidebar-label">Marketing &amp; Launch</span>
+            </li>
+            <li data-sidebar="9">
+              <span class="sidebar-check"></span>
+              <span class="sidebar-label">Review &amp; Submit</span>
+            </li>
+          </ul>
+        </nav>
+
+        <div class="sidebar-progress">
+          <div class="sidebar-progress-track">
+            <div id="sidebar-progress-fill" class="sidebar-progress-fill" style="width:0%"></div>
+          </div>
+          <span id="sidebar-progress-text">0% complete</span>
+        </div>
+      </aside>
+
+      <!-- Right: Form Content -->
+      <main class="form-main">
+        <div class="form-main-inner">
+
+          <!-- Mobile progress bar -->
+          <div class="mobile-header">
+            <div class="mobile-logo">
+              <img src="logo.png" alt="Straw Hut Media" class="logo-img sm">
+            </div>
+            <p class="mobile-company">Onboarding for <span id="display-company-mobile"></span></p>
+            <div class="progress-bar">
+              <div class="progress-track">
+                <div id="form-progress" class="progress-fill" style="width: 0%"></div>
+              </div>
+              <span id="progress-label">Section 1 of 9</span>
+            </div>
+          </div>
+
+          <form id="onboarding-form" novalidate>
+
+            <!-- Section 1: Contact Information -->
+            <fieldset class="form-section active" data-section="1">
+              <legend>Contact Information</legend>
+              <p class="section-desc">Tell us who we'll be working with. You can add additional team members below if needed.</p>
+
+              <div class="contact-block" data-contact="0">
+                <div class="contact-block-header">
+                  <span class="contact-block-title">Primary Contact</span>
+                  <label class="radio-label primary-radio selected">
+                    <input type="radio" name="primaryContact" value="0" checked> Primary
+                  </label>
+                </div>
+
+                <div class="form-row">
+                  <div class="form-group">
+                    <label for="contact-first-name">First Name <span class="req">*</span></label>
+                    <input type="text" id="contact-first-name" name="contactFirstName" required placeholder="Jane">
+                  </div>
+                  <div class="form-group">
+                    <label for="contact-last-name">Last Name <span class="req">*</span></label>
+                    <input type="text" id="contact-last-name" name="contactLastName" required placeholder="Smith">
+                  </div>
+                </div>
+
+                <div class="form-group">
+                  <label for="contact-email">Email Address <span class="req">*</span></label>
+                  <input type="email" id="contact-email" name="contactEmail" required placeholder="jane@company.com">
+                </div>
+
+                <div class="form-group">
+                  <label for="contact-phone">Phone Number</label>
+                  <input type="text" id="contact-phone" name="contactPhone" placeholder="(555) 123-4567">
+                </div>
+
+                <div class="form-group">
+                  <label for="contact-role">Role / Title</label>
+                  <input type="text" id="contact-role" name="contactRole" placeholder="e.g. Marketing Director, Host, CEO">
+                </div>
+              </div>
+
+              <div class="form-group">
+                <label for="contact-timezone">Your Timezone</label>
+                <select id="contact-timezone" name="contactTimezone">
+                  <option value="">Select timezone...</option>
+                  <option>Pacific Time (PT)</option>
+                  <option>Mountain Time (MT)</option>
+                  <option>Central Time (CT)</option>
+                  <option>Eastern Time (ET)</option>
+                  <option>Other</option>
+                </select>
+              </div>
+
+              <div class="form-group">
+                <label>Best way to reach you? <span class="req">*</span></label>
+                <div class="radio-group">
+                  <label class="radio-label">
+                    <input type="radio" name="preferredContact" value="email" required> Email
+                  </label>
+                  <label class="radio-label">
+                    <input type="radio" name="preferredContact" value="phone"> Phone Call
+                  </label>
+                  <label class="radio-label">
+                    <input type="radio" name="preferredContact" value="text"> Text
+                  </label>
+                </div>
+              </div>
+
+              <!-- Additional Contacts -->
+              <div id="additional-contacts"></div>
+
+              <button type="button" id="add-contact-btn" class="btn secondary btn-sm add-contact-btn">
+                <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>
+                Add Another Contact
+              </button>
+            </fieldset>
+
+            <!-- Section 2: Podcast Basics -->
+            <fieldset class="form-section" data-section="2">
+              <legend>Podcast Basics</legend>
+              <p class="section-desc">Tell us about your podcast — whether it's brand new or an existing show we're taking over.</p>
+
+              <div class="form-group">
+                <label for="podcast-name">Podcast Name <span class="req">*</span></label>
+                <input type="text" id="podcast-name" name="podcastName" required placeholder="e.g. The Morning Brew Show">
+              </div>
+
+              <div class="form-group">
+                <label for="podcast-description">Podcast Description <span class="req">*</span></label>
+                <textarea id="podcast-description" name="podcastDescription" required rows="4" placeholder="Describe the show — topic, tone, target audience, format..."></textarea>
+              </div>
+
+              <div class="form-row">
+                <div class="form-group">
+                  <label>Podcast Status <span class="req">*</span></label>
+                  <div class="radio-group">
+                    <label class="radio-label">
+                      <input type="radio" name="podcastStatus" value="new" required> I'm starting a new podcast
+                    </label>
+                    <label class="radio-label">
+                      <input type="radio" name="podcastStatus" value="existing"> I already have an existing podcast
+                    </label>
+                  </div>
+                </div>
+                <div class="form-group">
+                  <label>Brand Status <span class="req">*</span></label>
+                  <div class="radio-group">
+                    <label class="radio-label">
+                      <input type="radio" name="brandStatus" value="existing" required> Existing / established brand
+                    </label>
+                    <label class="radio-label">
+                      <input type="radio" name="brandStatus" value="new"> New / unknown brand
+                    </label>
+                  </div>
+                </div>
+              </div>
+
+              <div id="existing-podcast-details" class="conditional hidden">
+                <div class="form-group">
+                  <label for="existing-podcast-url">Existing Podcast URL / RSS Feed</label>
+                  <input type="url" id="existing-podcast-url" name="existingPodcastUrl" placeholder="https://...">
+                </div>
+                <div class="form-group">
+                  <label for="existing-podcast-notes">What should we know about the current state of the show?</label>
+                  <textarea id="existing-podcast-notes" name="existingPodcastNotes" rows="3" placeholder="Episode count, current audience size, hosting platform, what you'd like to change..."></textarea>
+                </div>
+              </div>
+
+              <div class="form-group">
+                <label for="podcast-genre">Genre / Category</label>
+                <select id="podcast-genre" name="podcastGenre">
+                  <option value="">Select a category...</option>
+                  <option>Business</option>
+                  <option>Comedy</option>
+                  <option>Education</option>
+                  <option>Entertainment</option>
+                  <option>Health &amp; Wellness</option>
+                  <option>Lifestyle</option>
+                  <option>Music</option>
+                  <option>News &amp; Politics</option>
+                  <option>Science &amp; Technology</option>
+                  <option>Society &amp; Culture</option>
+                  <option>Sports</option>
+                  <option>True Crime</option>
+                  <option>Other</option>
+                </select>
+              </div>
+
+              <div class="form-group">
+                <label for="target-audience">Target Audience</label>
+                <textarea id="target-audience" name="targetAudience" rows="2" placeholder="Who is this show for? Demographics, interests, listener persona..."></textarea>
+              </div>
+
+              <div class="form-group">
+                <label for="podcast-format">Show Format</label>
+                <select id="podcast-format" name="podcastFormat">
+                  <option value="">Select format...</option>
+                  <option>Solo / Monologue</option>
+                  <option>Interview / Guest-based</option>
+                  <option>Co-hosted conversation</option>
+                  <option>Panel / Roundtable</option>
+                  <option>Narrative / Storytelling</option>
+                  <option>Hybrid / Mixed</option>
+                  <option>Not sure yet</option>
+                </select>
+              </div>
+            </fieldset>
+
+            <!-- Section 3: Branding & Guidelines -->
+            <fieldset class="form-section" data-section="3">
+              <legend>Branding &amp; Guidelines</legend>
+              <p class="section-desc">Share any existing branding so we can stay on-brand from day one.</p>
+
+              <div class="form-group">
+                <label>Do you have existing branding guidelines?</label>
+                <div class="radio-group">
+                  <label class="radio-label">
+                    <input type="radio" name="hasBrandGuidelines" value="yes"> Yes
+                  </label>
+                  <label class="radio-label">
+                    <input type="radio" name="hasBrandGuidelines" value="no"> No — we need you to create them
+                  </label>
+                  <label class="radio-label">
+                    <input type="radio" name="hasBrandGuidelines" value="partial"> Partial — we have some assets but need help
+                  </label>
+                </div>
+              </div>
+
+              <div id="brand-guidelines-upload" class="conditional hidden">
+                <div class="form-group">
+                  <label for="brand-guidelines-file">Upload Branding Guidelines (PDF, images, or zip)</label>
+                  <div class="file-upload-area" id="brand-drop-zone">
+                    <input type="file" id="brand-guidelines-file" name="brandGuidelinesFiles" multiple accept=".pdf,.png,.jpg,.jpeg,.svg,.zip,.ai,.psd">
+                    <div class="upload-placeholder">
+                      <div class="upload-icon">
+                        <svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M17 8l-5-5-5 5M12 3v12"/></svg>
+                      </div>
+                      <p>Drag &amp; drop files here or <span class="link">browse</span></p>
+                      <p class="small">PDF, PNG, JPG, SVG, ZIP, AI, PSD</p>
+                    </div>
+                    <ul id="brand-file-list" class="file-list"></ul>
+                  </div>
+                </div>
+              </div>
+
+              <div class="form-group">
+                <label for="brand-colors">Brand Colors (hex codes, color names, or describe them)</label>
+                <input type="text" id="brand-colors" name="brandColors" placeholder="e.g. #FF5733, navy blue, gold">
+              </div>
+
+              <div class="form-group">
+                <label for="brand-fonts">Preferred Fonts / Typography</label>
+                <input type="text" id="brand-fonts" name="brandFonts" placeholder="e.g. Montserrat, Playfair Display">
+              </div>
+
+              <div class="form-group">
+                <label for="brand-voice">Brand Voice / Tone</label>
+                <textarea id="brand-voice" name="brandVoice" rows="2" placeholder="Professional, casual, humorous, authoritative..."></textarea>
+              </div>
+
+              <div class="form-group">
+                <label for="brand-logos-file">Upload Existing Logos (if any)</label>
+                <div class="file-upload-area" id="logo-drop-zone">
+                  <input type="file" id="brand-logos-file" name="brandLogosFiles" multiple accept=".png,.jpg,.jpeg,.svg,.ai,.psd,.eps,.pdf">
+                  <div class="upload-placeholder">
+                    <div class="upload-icon">
+                      <svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M17 8l-5-5-5 5M12 3v12"/></svg>
+                    </div>
+                    <p>Drag &amp; drop logos or <span class="link">browse</span></p>
+                    <p class="small">PNG, JPG, SVG, AI, PSD, EPS, PDF</p>
+                  </div>
+                  <ul id="logo-file-list" class="file-list"></ul>
+                </div>
+              </div>
+            </fieldset>
+
+            <!-- Section 4: Inspiration & Visual References -->
+            <fieldset class="form-section" data-section="4">
+              <legend>Inspiration &amp; Visual References</legend>
+              <p class="section-desc">Share artwork, podcasts, or brands you admire. This helps us understand your aesthetic. Upload up to 10 images.</p>
+
+              <div class="form-group">
+                <label for="inspiration-files">Upload Inspiration Images</label>
+                <div class="file-upload-area" id="inspo-drop-zone">
+                  <input type="file" id="inspiration-files" name="inspirationFiles" multiple accept=".png,.jpg,.jpeg,.gif,.webp,.svg">
+                  <div class="upload-placeholder">
+                    <div class="upload-icon">
+                      <svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>
+                    </div>
+                    <p>Drag &amp; drop images here or <span class="link">browse</span></p>
+                    <p class="small">PNG, JPG, GIF, WEBP, SVG — max 10 files</p>
+                  </div>
+                  <ul id="inspo-file-list" class="file-list"></ul>
+                </div>
+                <div id="inspo-limit-error" class="error-msg hidden">Maximum 10 files allowed.</div>
+              </div>
+
+              <div class="form-group">
+                <label for="inspo-podcasts">Podcasts You Admire (names or links)</label>
+                <textarea id="inspo-podcasts" name="inspoPodcasts" rows="3" placeholder="List podcasts whose look, feel, or format you like..."></textarea>
+              </div>
+
+              <div class="form-group">
+                <label for="inspo-brands">Brands or Channels You Admire</label>
+                <textarea id="inspo-brands" name="inspoBrands" rows="3" placeholder="YouTube channels, companies, media brands..."></textarea>
+              </div>
+
+              <div class="form-group">
+                <label for="inspo-notes">Additional Notes on Visual Direction</label>
+                <textarea id="inspo-notes" name="inspoNotes" rows="3" placeholder="Anything else about the look and feel you're going for..."></textarea>
+              </div>
+            </fieldset>
+
+            <!-- Section 5: Music & Audio -->
+            <fieldset class="form-section" data-section="5">
+              <legend>Music &amp; Audio</legend>
+              <p class="section-desc">Let us know your preferences for intro/outro music, sound design, and audio production.</p>
+
+              <div class="form-group">
+                <label>Do you need us to create intro/outro music?</label>
+                <div class="radio-group">
+                  <label class="radio-label">
+                    <input type="radio" name="needsMusic" value="yes"> Yes — create everything from scratch
+                  </label>
+                  <label class="radio-label">
+                    <input type="radio" name="needsMusic" value="have-some"> I have some music already
+                  </label>
+                  <label class="radio-label">
+                    <input type="radio" name="needsMusic" value="no"> No — I'll handle music separately
+                  </label>
+                  <label class="radio-label">
+                    <input type="radio" name="needsMusic" value="undecided"> Not sure yet
+                  </label>
+                </div>
+              </div>
+
+              <div id="existing-music-upload" class="conditional hidden">
+                <div class="form-group">
+                  <label for="music-files">Upload Existing Music / Audio Assets</label>
+                  <div class="file-upload-area" id="music-drop-zone">
+                    <input type="file" id="music-files" name="musicFiles" multiple accept=".mp3,.wav,.aac,.m4a,.ogg,.flac">
+                    <div class="upload-placeholder">
+                      <div class="upload-icon">
+                        <svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
+                      </div>
+                      <p>Drag &amp; drop audio files or <span class="link">browse</span></p>
+                      <p class="small">MP3, WAV, AAC, M4A, OGG, FLAC</p>
+                    </div>
+                    <ul id="music-file-list" class="file-list"></ul>
+                  </div>
+                </div>
+              </div>
+
+              <div class="form-group">
+                <label for="music-vibe">What vibe/mood should the music convey?</label>
+                <textarea id="music-vibe" name="musicVibe" rows="2" placeholder="Energetic, chill, cinematic, corporate, lo-fi, upbeat..."></textarea>
+              </div>
+
+              <div class="form-group">
+                <label for="music-references">Music References (songs, artists, or shows with a sound you like)</label>
+                <textarea id="music-references" name="musicReferences" rows="2" placeholder="e.g. 'Something like the Joe Rogan intro but more upbeat'"></textarea>
+              </div>
+
+              <div class="form-group">
+                <label>Do you want sound effects / transitions between segments?</label>
+                <div class="radio-group">
+                  <label class="radio-label">
+                    <input type="radio" name="wantsSFX" value="yes"> Yes
+                  </label>
+                  <label class="radio-label">
+                    <input type="radio" name="wantsSFX" value="minimal"> Minimal / subtle
+                  </label>
+                  <label class="radio-label">
+                    <input type="radio" name="wantsSFX" value="no"> No
+                  </label>
+                  <label class="radio-label">
+                    <input type="radio" name="wantsSFX" value="undecided"> Not sure yet
+                  </label>
+                </div>
+              </div>
+            </fieldset>
+
+            <!-- Section 6: Social Media & Web -->
+            <fieldset class="form-section" data-section="6">
+              <legend>Social Media &amp; Web Presence</legend>
+              <p class="section-desc">Share your existing social media accounts and website details so we can align everything.</p>
+
+              <div class="form-group">
+                <label for="social-website">Website URL</label>
+                <input type="url" id="social-website" name="socialWebsite" placeholder="https://yourcompany.com">
+              </div>
+
+              <div class="form-group">
+                <label for="social-instagram">Instagram Handle</label>
+                <input type="text" id="social-instagram" name="socialInstagram" placeholder="@yourhandle">
+              </div>
+
+              <div class="form-group">
+                <label for="social-twitter">X (Twitter) Handle</label>
+                <input type="text" id="social-twitter" name="socialTwitter" placeholder="@yourhandle">
+              </div>
+
+              <div class="form-group">
+                <label for="social-tiktok">TikTok Handle</label>
+                <input type="text" id="social-tiktok" name="socialTiktok" placeholder="@yourhandle">
+              </div>
+
+              <div class="form-group">
+                <label for="social-youtube">YouTube Channel URL</label>
+                <input type="url" id="social-youtube" name="socialYoutube" placeholder="https://youtube.com/@yourchannel">
+              </div>
+
+              <div class="form-group">
+                <label for="social-linkedin">LinkedIn Page URL</label>
+                <input type="url" id="social-linkedin" name="socialLinkedin" placeholder="https://linkedin.com/company/...">
+              </div>
+
+              <div class="form-group">
+                <label>Do you want us to manage social media for the podcast?</label>
+                <div class="radio-group">
+                  <label class="radio-label">
+                    <input type="radio" name="manageSocial" value="yes"> Yes — full social media management
+                  </label>
+                  <label class="radio-label">
+                    <input type="radio" name="manageSocial" value="partial"> Just create content, we'll post
+                  </label>
+                  <label class="radio-label">
+                    <input type="radio" name="manageSocial" value="no"> No — we handle social ourselves
+                  </label>
+                </div>
+              </div>
+
+              <div class="form-group">
+                <label>Do you want short-form video clips for social (Reels, TikToks, Shorts)?</label>
+                <div class="radio-group">
+                  <label class="radio-label">
+                    <input type="radio" name="wantsClips" value="yes"> Yes
+                  </label>
+                  <label class="radio-label">
+                    <input type="radio" name="wantsClips" value="no"> No
+                  </label>
+                  <label class="radio-label">
+                    <input type="radio" name="wantsClips" value="undecided"> Not sure yet
+                  </label>
+                </div>
+              </div>
+            </fieldset>
+
+            <!-- Section 7: Recording & Logistics -->
+            <fieldset class="form-section" data-section="7">
+              <legend>Recording &amp; Logistics</legend>
+              <p class="section-desc">Help us plan the first recording session and understand your preferences.</p>
+
+              <div class="form-group">
+                <label>Preferred Recording Location <span class="req">*</span></label>
+                <div class="radio-group">
+                  <label class="radio-label">
+                    <input type="radio" name="recordingLocation" value="studio" required> Straw Hut Media Studio
+                  </label>
+                  <label class="radio-label">
+                    <input type="radio" name="recordingLocation" value="virtual"> Virtual / Remote
+                  </label>
+                  <label class="radio-label">
+                    <input type="radio" name="recordingLocation" value="client-location"> Our own location
+                  </label>
+                  <label class="radio-label">
+                    <input type="radio" name="recordingLocation" value="undecided"> Not sure yet — discuss in brainstorm
+                  </label>
+                </div>
+              </div>
+
+              <div id="client-location-details" class="conditional hidden">
+                <div class="form-group">
+                  <label for="location-address">Location Address or Description</label>
+                  <input type="text" id="location-address" name="locationAddress" placeholder="Address or describe the space">
+                </div>
+              </div>
+
+              <div class="form-row">
+                <div class="form-group">
+                  <label for="episode-frequency">Desired Episode Frequency</label>
+                  <select id="episode-frequency" name="episodeFrequency">
+                    <option value="">Select...</option>
+                    <option>Weekly</option>
+                    <option>Bi-weekly</option>
+                    <option>Monthly</option>
+                    <option>Multiple per week</option>
+                    <option>Not sure yet</option>
+                  </select>
+                </div>
+
+                <div class="form-group">
+                  <label for="episode-length">Desired Episode Length</label>
+                  <select id="episode-length" name="episodeLength">
+                    <option value="">Select...</option>
+                    <option>Under 15 minutes</option>
+                    <option>15–30 minutes</option>
+                    <option>30–60 minutes</option>
+                    <option>60–90 minutes</option>
+                    <option>90+ minutes</option>
+                    <option>Not sure yet</option>
+                  </select>
+                </div>
+              </div>
+
+              <div class="form-group">
+                <label for="hosts-info">Host(s) Information <span class="req">*</span></label>
+                <textarea id="hosts-info" name="hostsInfo" required rows="3" placeholder="Names, roles, and any relevant background for each host..."></textarea>
+              </div>
+
+              <div class="form-group">
+                <label>Will the show have guests?</label>
+                <div class="radio-group">
+                  <label class="radio-label">
+                    <input type="radio" name="hasGuests" value="yes"> Yes, regularly
+                  </label>
+                  <label class="radio-label">
+                    <input type="radio" name="hasGuests" value="sometimes"> Sometimes
+                  </label>
+                  <label class="radio-label">
+                    <input type="radio" name="hasGuests" value="no"> No, host(s) only
+                  </label>
+                  <label class="radio-label">
+                    <input type="radio" name="hasGuests" value="undecided"> Not sure yet
+                  </label>
+                </div>
+              </div>
+
+              <div id="guest-booking-details" class="conditional hidden">
+                <div class="form-group">
+                  <label>How would you like guest bookings to be managed?</label>
+                  <p class="field-hint">We work both ways — we can handle everything or you can manage bookings on your end.</p>
+                  <div class="radio-group">
+                    <label class="radio-label">
+                      <input type="radio" name="guestBooking" value="straw-hut"> Straw Hut handles it — find, book, and coordinate guests for us
+                    </label>
+                    <label class="radio-label">
+                      <input type="radio" name="guestBooking" value="client"> We'll handle it — we have our own guests lined up
+                    </label>
+                    <label class="radio-label">
+                      <input type="radio" name="guestBooking" value="collaborate"> Collaborative — we'll both contribute guests
+                    </label>
+                    <label class="radio-label">
+                      <input type="radio" name="guestBooking" value="undecided"> Not sure yet — let's discuss
+                    </label>
+                  </div>
+                </div>
+              </div>
+
+              <div class="form-group">
+                <label>Will the podcast be video as well as audio?</label>
+                <div class="radio-group">
+                  <label class="radio-label">
+                    <input type="radio" name="isVideo" value="yes"> Yes — audio + video (YouTube, Spotify video, etc.)
+                  </label>
+                  <label class="radio-label">
+                    <input type="radio" name="isVideo" value="audio-only"> Audio only
+                  </label>
+                  <label class="radio-label">
+                    <input type="radio" name="isVideo" value="undecided"> Not sure yet
+                  </label>
+                </div>
+              </div>
+
+              <div id="video-reference-details" class="conditional hidden">
+                <div class="form-group">
+                  <label for="video-references">Do you have any video podcast references?</label>
+                  <p class="field-hint">Share links or names of video podcasts whose look and feel you like. This helps us understand your vision for the visual style.</p>
+                  <textarea id="video-references" name="videoReferences" rows="3" placeholder="e.g. Colin &amp; Samir's studio setup, Hot Ones interview style, Diary of a CEO lighting..."></textarea>
+                </div>
+              </div>
+
+              <div class="form-group">
+                <label for="launch-date">Target Launch Date</label>
+                <input type="date" id="launch-date" name="launchDate">
+              </div>
+
+              <div class="form-group">
+                <label for="logistics-notes">Additional Logistics Notes</label>
+                <textarea id="logistics-notes" name="logisticsNotes" rows="3" placeholder="Anything else about recording or scheduling..."></textarea>
+              </div>
+            </fieldset>
+
+            <!-- Section 8: Marketing & Launch Strategy -->
+            <fieldset class="form-section" data-section="8">
+              <legend>Marketing &amp; Launch Strategy</legend>
+              <p class="section-desc">Let's plan how to make a splash when the show goes live.</p>
+
+              <div class="form-group">
+                <label>How many episodes do you want ready at launch?</label>
+                <div class="radio-group">
+                  <label class="radio-label">
+                    <input type="radio" name="launchEpisodes" value="1"> Just the pilot / first episode
+                  </label>
+                  <label class="radio-label">
+                    <input type="radio" name="launchEpisodes" value="3"> 3 episodes (recommended)
+                  </label>
+                  <label class="radio-label">
+                    <input type="radio" name="launchEpisodes" value="5+"> 5 or more
+                  </label>
+                  <label class="radio-label">
+                    <input type="radio" name="launchEpisodes" value="undecided"> Not sure yet
+                  </label>
+                </div>
+              </div>
+
+              <div class="form-group">
+                <label for="teaser-ideas">We'll be creating a 30–60 second teaser for your podcast before launch. Do you have any ideas on the direction of that?</label>
+                <textarea id="teaser-ideas" name="teaserIdeas" rows="3" placeholder="Tone, key messages, clips you'd like featured, any specific vision..."></textarea>
+              </div>
+
+              <div class="form-group">
+                <label for="marketing-notes">Marketing Notes / Launch Ideas</label>
+                <textarea id="marketing-notes" name="marketingNotes" rows="3" placeholder="Any specific promotional ideas, partnerships, or launch tactics you have in mind..."></textarea>
+              </div>
+
+              <div class="form-group">
+                <label for="goals">Overall Goals for the Podcast</label>
+                <textarea id="goals" name="goals" rows="3" placeholder="What does success look like? Brand awareness, lead generation, thought leadership, audience growth..."></textarea>
+              </div>
+            </fieldset>
+
+            <!-- Section 9: Review & Submit -->
+            <fieldset class="form-section" data-section="9">
+              <legend>Review &amp; Submit</legend>
+              <p class="section-desc">Review your information below and hit submit when ready. We'll use this to prepare for our brainstorm meeting.</p>
+
+              <div id="form-summary" class="summary-box"></div>
+
+              <div class="form-group">
+                <label for="anything-else">Anything else we should know?</label>
+                <textarea id="anything-else" name="anythingElse" rows="4" placeholder="Questions, concerns, ideas, special requests..."></textarea>
+              </div>
+
+              <div class="form-group">
+                <label class="checkbox-label">
+                  <input type="checkbox" id="confirm-submit" required>
+                  I confirm the information above is accurate and I'm ready to begin the onboarding process.
+                </label>
+              </div>
+            </fieldset>
+
+            <!-- Navigation -->
+            <div class="form-nav">
+              <button type="button" id="prev-btn" class="btn secondary" disabled>Back</button>
+              <button type="button" id="next-btn" class="btn primary">Save &amp; Continue</button>
+              <button type="submit" id="submit-btn" class="btn primary hidden" disabled>Submit Onboarding</button>
+            </div>
+            <div class="autosave-notice" id="autosave-notice">
+              <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+              <span>Your progress is automatically saved</span>
+            </div>
+          </form>
+
+        </div>
+      </main>
+
+    </div>
+  </section>
+
+  <!-- ===== STEP 3: Success Screen ===== -->
+  <section id="success" class="screen">
+    <div class="success-container">
+      <div class="success-card">
+        <div class="success-icon">
+          <svg width="64" height="64" viewBox="0 0 64 64" fill="none">
+            <circle cx="32" cy="32" r="32" fill="#2dd4a0" opacity="0.15"/>
+            <circle cx="32" cy="32" r="24" fill="#2dd4a0" opacity="0.25"/>
+            <path d="M22 33l7 7 13-14" stroke="#2dd4a0" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </div>
+        <h1>Onboarding Complete</h1>
+        <p class="success-subtitle">Your information has been submitted successfully.</p>
+
+        <div class="success-divider"></div>
+
+        <div class="success-next-steps">
+          <h3>What Happens Next</h3>
+          <ol>
+            <li>
+              <strong>We review your submission</strong>
+              <p>Our team will go through your answers and prepare for the brainstorm meeting.</p>
+            </li>
+            <li>
+              <strong>Brainstorm meeting scheduled</strong>
+              <p>You'll receive a calendar invite within 2 business days to discuss your vision, format, and goals.</p>
+            </li>
+            <li>
+              <strong>Production begins</strong>
+              <p>After the brainstorm, we'll kick off branding, music, and production prep.</p>
+            </li>
+          </ol>
+        </div>
+
+        <div class="success-divider"></div>
+
+        <p class="success-contact">Questions? Reach out to <strong>onboarding@strawhutmedia.com</strong></p>
+
+        <div class="success-footer">
+          <img src="logo.png" alt="Straw Hut Media" class="logo-img sm on-light">
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <script src="config.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

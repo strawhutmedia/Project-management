@@ -30,6 +30,8 @@ const app = express();
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
 app.use('/styles.css', express.static(path.join(__dirname, '..', 'public', 'styles.css')));
+// Hidden onboarding app (standalone static; not linked from the site).
+app.use('/onboarding', express.static(path.join(__dirname, '..', 'public', 'onboarding')));
 app.use('/public', express.static(path.join(__dirname, '..', 'public')));
 
 // Attach episode_count to shows for list views.
