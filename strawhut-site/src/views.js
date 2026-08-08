@@ -34,6 +34,7 @@ function layout({
   const nav = [
     ['/', 'Home'],
     ['/shows', 'Shows'],
+    ['/studio', 'Studio'],
     ['/press', 'Press'],
     ['/#advertise', 'Advertise'],
     ['/admin', 'Admin'],
@@ -291,6 +292,87 @@ ${FONT}<link rel="stylesheet" href="/styles.css">${gtag}
   }catch(e){}
 })();</script>
 </body></html>`;
+}
+
+// Studio booking — embeds the same GoHighLevel widgets the current site uses,
+// so calendar + Stripe payment continue to work through HighLevel unchanged.
+const STUDIO_DURATIONS = [
+  ['1 Hour', 'ZLa4C3UbEh4WbPhXdUSd'], ['1.5 Hours', 'yAVTjHR0vqfciP3pEMlf'],
+  ['2 Hours', 'x6Oz9tKdb0cVJgiOUy2a'], ['2.5 Hours', '9pB7cQ5NrF3nRR19ERgv'],
+  ['3 Hours', 'mm8JdMuhjQver7V95Efv'], ['3.5 Hours', 'IgpH1BTr7WozaNT8RtN1'],
+  ['4 Hours', 'ILScBGtaKr1mq6wUiDEw'], ['4.5 Hours', 'Zarf7wBti0LRV7BYFePz'],
+  ['5 Hours', '5R4GIOck1WZwAyKFyrps'], ['5.5 Hours', 'bQplaFjAQsh88r6PhmS0'],
+  ['6 Hours', 'EyDVEXc1A5boAcHWWrN5'], ['6.5 Hours', 'AcaZjXuJT2IDifZAVfyw'],
+  ['7 Hours', 'yQbzrUSTH74dz8e6irpb'], ['7.5 Hours', 'hbmcanjDNHgYlL4LSNAW'],
+  ['8 Hours', 'SiprxaRVMnRtXcQraTe2'], ['8.5 Hours', 'Fs3Ob4NBHIeBZgJ9HdE3'],
+  ['9 Hours', 'hzr7vAMkVsiwp0WMjsnd'], ['9.5 Hours', 'NtZubTCRsaaSQ0o9dQnX'],
+  ['10 Hours', 'HAoXAenRAlwmGlVeddTu'],
+];
+
+export function studioPage() {
+  const base = 'https://api.leadconnectorhq.com/widget/group/';
+  const opts = STUDIO_DURATIONS.map(
+    ([label, id], i) => `<option value="${base}${id}"${i === 0 ? ' selected' : ''}>${label}</option>`
+  ).join('');
+  const body = `
+  <section class="hero" style="padding-bottom:16px"><div class="container">
+    <div class="breadcrumb" style="padding:0 0 14px"><a href="/">Home</a> / Studio</div>
+    <h1>Book the <span class="accent">Straw Hut Studio</span></h1>
+    <p>A fully-equipped podcast studio in the heart of Hollywood — pick your setup, pick your time, and book instantly.</p>
+  </div></section>
+
+  <section class="section"><div class="container">
+    <div class="section-head"><h2>Rates</h2></div>
+    <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(260px,1fr))">
+      <article class="show-card" style="padding:24px">
+        <div class="press-meta">1080p HD</div>
+        <h3 style="font-size:1.9rem;margin:6px 0">$125<span style="font-size:1rem;color:var(--muted)">/hour</span></h3>
+        <p class="meta">Full audio + video, 1080p. Everything recorded and ready to publish.</p>
+      </article>
+      <article class="show-card" style="padding:24px">
+        <div class="press-meta">4K Ultra HD</div>
+        <h3 style="font-size:1.9rem;margin:6px 0">$150<span style="font-size:1rem;color:var(--muted)">/hour</span></h3>
+        <p class="meta">Full audio + video in stunning 4K, captured on 4× 4K cameras.</p>
+      </article>
+    </div>
+  </div></section>
+
+  <section class="section"><div class="container">
+    <div class="section-head"><h2>Choose your setup</h2></div>
+    <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(300px,1fr))">
+      <article class="show-card" style="padding:24px"><h3 style="margin-top:0">🎙️ The Podcast Table</h3>
+        <p class="meta" style="line-height:1.6">Our classic table setup — mics, headphones, and cameras arranged for a polished, face-to-face conversation. Perfect for interviews and panel shows.</p></article>
+      <article class="show-card" style="padding:24px"><h3 style="margin-top:0">🛋️ The Cozy Couch</h3>
+        <p class="meta" style="line-height:1.6">A relaxed, living-room feel for a looser, more casual vibe. Great for storytelling, hangouts, and laid-back chats.</p></article>
+    </div>
+  </div></section>
+
+  <section class="section" id="book"><div class="container">
+    <div class="section-head"><h2>Book your session</h2></div>
+    <p style="color:var(--muted);margin:-8px 0 18px">Choose your session length, then pick a date and time. Payment and confirmation are handled securely at checkout.</p>
+    <div class="field" style="max-width:280px">
+      <label>Session length</label>
+      <select id="durationSelect" style="width:100%;padding:12px 14px;border-radius:10px;border:1px solid var(--border);background:var(--bg-2);color:var(--text);font-family:inherit;font-size:0.95rem">${opts}</select>
+    </div>
+    <div id="bookingLoader" style="padding:40px 0;color:var(--muted)">Loading booking calendar…</div>
+    <iframe id="bookingIframe" title="Book the Straw Hut Studio" style="display:none;width:100%;min-height:720px;border:1px solid var(--border);border-radius:14px;background:#fff" scrolling="no"></iframe>
+  </div></section>
+  <script src="https://link.msgsndr.com/js/form_embed.js"></script>
+  <script>(function(){
+    var sel=document.getElementById('durationSelect'),f=document.getElementById('bookingIframe'),loader=document.getElementById('bookingLoader');
+    if(!sel||!f)return;
+    function load(){ if(loader)loader.style.display='block'; f.style.display='none'; f.src=sel.value; }
+    f.addEventListener('load',function(){ setTimeout(function(){ if(loader)loader.style.display='none'; f.style.display='block'; },800); });
+    sel.addEventListener('change',load);
+    load();
+  })();</script>`;
+  return layout({
+    title: 'Book the Studio — Straw Hut Media',
+    description: 'Book the Straw Hut Media podcast studio in Hollywood. 1080p at $125/hr or 4K at $150/hr, audio + video included. Choose the podcast table or cozy couch setup.',
+    body,
+    activeNav: '/studio',
+    path: '/studio',
+  });
 }
 
 export function pressPage({ items }) {

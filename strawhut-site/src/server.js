@@ -466,6 +466,8 @@ app.get('/shows', async (req, res) => {
   res.send(V.showsIndexPage({ shows }));
 });
 
+app.get('/studio', (req, res) => res.send(V.studioPage()));
+
 app.get('/press', async (req, res) => {
   const items = await store.listPressItems({ limit: 200 });
   res.send(V.pressPage({ items }));
