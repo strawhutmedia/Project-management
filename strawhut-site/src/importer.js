@@ -2,7 +2,7 @@
 // RSS feed. Used by the admin "Import all shows" button and the CLI script.
 
 import { addShowFromFeed } from './sync.js';
-import { IMPORT_OVERRIDES, RETIRE_FEEDS, EXCLUDE_SHOW_PATHS, isFeatured } from './overrides.js';
+import { IMPORT_OVERRIDES, RETIRE_FEEDS, EXCLUDE_SHOW_PATHS, EXTRA_SHOWS } from './overrides.js';
 
 const UA = 'StrawHutMedia-Importer/1.0';
 
@@ -121,12 +121,8 @@ export async function importFromSite(store, { site = 'https://www.strawhutmedia.
       const wantType = ov.show_type || siteType;
 
       const { show, created, added } = await addShowFromFeed(store, feed, { show_type: wantType });
-      // Enforce classification + curated spotlight, even for existing shows.
-      const patch = {};
-      if (wantType && show.show_type !== wantType) patch.show_type = wantType;
-      const featured = isFeatured(base);
-      if (!!show.featured !== featured) patch.featured = featured;
-      if (Object.keys(patch).length) await store.updateShow(show.id, patch);
+      // Enforce classification even for shows that already existed.
+      if (wantType && show.show_type !== wantType) await store.updateShow(show.id, { show_type: wantType });
       onProgress(`${created ? '+' : '='} ${show.title} [${show.show_type}] (${added} eps)`);
       ok++;
     } catch (e) {
@@ -134,6 +130,19 @@ export async function importFromSite(store, { site = 'https://www.strawhutmedia.
       failed++;
     }
   }
+
+  // Shows not discoverable on the site (e.g. Only Murders' official feed).
+  for (const ex of EXTRA_SHOWS) {
+    try {
+      const { show, created, added } = await addShowFromFeed(store, ex.feed_url, { show_type: ex.show_type });
+      if (ex.show_type && show.show_type !== ex.show_type) await store.updateShow(show.id, { show_type: ex.show_type });
+      onProgress(`${created ? '+' : '='} (extra) ${show.title} (${added} eps)`);
+      ok++;
+    } catch (e) {
+      onProgress(`! extra feed failed ${ex.feed_url}: ${e.message}`);
+    }
+  }
+
   onProgress(`Import done: ${ok} shows imported/updated, ${failed} skipped.`);
   return { ok, failed, total: paths.length };
 }

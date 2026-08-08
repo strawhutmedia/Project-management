@@ -32,10 +32,23 @@ export const RETIRE_FEEDS = [
   'https://www.spreaker.com/show/6055146/episodes/feed', // old Commune Courses (now Megaphone)
 ];
 
-// Shows to spotlight on the homepage (mirrors the current site's "featured
-// podcast" picks — edit here or use the admin Feature toggle). Keyed by slug.
-export const FEATURED_SHOWS = ['naked-lunch', 'the-jordyn-jones-podcast', 'podcasting-tips-weekly'];
-export const isFeatured = (slug) => FEATURED_SHOWS.includes(String(slug || '').toLowerCase().trim());
+// Homepage spotlight pool — shows we're proud to feature. Each month the site
+// rotates through this pool and spotlights a different set of 3 (see
+// src/spotlight.js). Edit this list to change what can be spotlighted.
+export const SPOTLIGHT_POOL = [
+  'naked-lunch',
+  'dont-be-alone-with-jay-kogen',
+  'seen-on-the-screen-with-jacqueline-coley',
+  'wicked-the-official-podcast',
+  // 'only-murders-in-the-building',  // added once we have the official feed (see EXTRA_SHOWS)
+];
+
+// Shows to import that are NOT discoverable by crawling strawhutmedia.com
+// (e.g. Only Murders, whose official feed lives elsewhere). Each: { feed_url,
+// show_type, slug? }. slug is optional — otherwise derived from the title.
+export const EXTRA_SHOWS = [
+  // { feed_url: 'https://feeds.megaphone.fm/OMITB...', show_type: 'partnered', slug: 'only-murders-in-the-building' },
+];
 
 // Show pages on the current site that are NOT real shows (placeholders/mistakes).
 // Skipped on import and removed if already present.

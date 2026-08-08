@@ -18,7 +18,7 @@ import { importFromSite } from './importer.js';
 import * as reco from './recommend.js';
 import { matchAllShows, matchShowVideos } from './youtube.js';
 import { refreshPress } from './press.js';
-import { applyPopularSpotlight, megaphoneConfigured } from './popularity.js';
+import { applyMonthlyRotation } from './spotlight.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PORT = process.env.PORT || 8080;
@@ -153,25 +153,6 @@ app.post('/admin/shows/:id/type', requireAdmin, async (req, res) => {
 app.post('/admin/shows/:id/delete', requireAdmin, async (req, res) => {
   await store.deleteShow(req.params.id);
   setFlash(res, { type: 'ok', msg: 'Show deleted.' });
-  res.redirect('/admin/shows');
-});
-
-app.post('/admin/spotlight/rank', requireAdmin, async (req, res) => {
-  if (!megaphoneConfigured()) {
-    setFlash(res, { type: 'err', msg: 'Set MEGAPHONE_API_TOKEN and MEGAPHONE_NETWORK_ID on this service first (copy from Podbooster).' });
-    return res.redirect('/admin/shows');
-  }
-  try {
-    const r = await applyPopularSpotlight(store, { log: (m) => console.log('[popularity]', m) });
-    setFlash(res, {
-      type: r.applied ? 'ok' : 'err',
-      msg: r.applied
-        ? `Spotlight ranked by Megaphone downloads: ${r.top.map((t) => t.title).join(', ')}.`
-        : `Couldn't rank: ${r.reason}.`,
-    });
-  } catch (e) {
-    setFlash(res, { type: 'err', msg: `Megaphone ranking failed: ${e.message}` });
-  }
   res.redirect('/admin/shows');
 });
 
@@ -655,9 +636,8 @@ app.listen(PORT, async () => {
         await matchAllShows(store, { mode: 'recent', log: (m) => console.log('[youtube]', m) }).catch(() => {});
       }
       await refreshPress(store, { log: (m) => console.log('[press]', m) }).catch(() => {});
-      if (megaphoneConfigured()) {
-        await applyPopularSpotlight(store, { log: (m) => console.log('[popularity]', m) }).catch(() => {});
-      }
+      // Recompute the monthly spotlight (flips automatically at month boundary).
+      await applyMonthlyRotation(store, { log: (m) => console.log('[spotlight]', m) }).catch(() => {});
     },
   });
 
@@ -674,13 +654,10 @@ app.listen(PORT, async () => {
     console.error('[import] auto-import failed:', e.message);
   }
 
-  // If Megaphone is configured, rank shows by real downloads and let that
-  // drive the homepage spotlight (overrides the curated featured picks).
-  if (megaphoneConfigured()) {
-    applyPopularSpotlight(store, { log: (m) => console.log('[popularity]', m) })
-      .then((r) => console.log('[popularity] spotlight:', JSON.stringify(r)))
-      .catch((e) => console.error('[popularity] failed:', e.message));
-  }
+  // Homepage spotlight: rotate monthly through the curated pool.
+  applyMonthlyRotation(store, { log: (m) => console.log('[spotlight]', m) }).catch((e) =>
+    console.error('[spotlight] failed:', e.message)
+  );
 
   // Pull press mentions in the background so the Press page is populated.
   refreshPress(store, { log: (m) => console.log('[press]', m) })
