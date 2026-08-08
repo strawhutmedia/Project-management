@@ -40,7 +40,7 @@ export const SPOTLIGHT_POOL = [
   'dont-be-alone-with-jay-kogen',
   'seen-on-the-screen-with-jacqueline-coley',
   'wicked-the-official-podcast',
-  // 'only-murders-in-the-building',  // added once we have the official feed (see EXTRA_SHOWS)
+  'only-murders-in-the-building',
 ];
 
 // Evergreen shows: ended but still worth spotlighting (e.g. Wicked keeps
@@ -53,7 +53,13 @@ export const EVERGREEN_SHOWS = ['wicked-the-official-podcast'];
 // (e.g. Only Murders, whose official feed lives elsewhere). Each: { feed_url,
 // show_type, slug? }. slug is optional — otherwise derived from the title.
 export const EXTRA_SHOWS = [
-  // { feed_url: 'https://feeds.megaphone.fm/OMITB...', show_type: 'partnered', slug: 'only-murders-in-the-building' },
+  {
+    // Official OMITB podcast (Hulu / Michael Cyril Creighton) — the show's own
+    // Megaphone feed, NOT any Straw Hut feed. Verified via Apple id 1835954447.
+    feed_url: 'https://feeds.megaphone.fm/ESP6559945162',
+    show_type: 'partnered',
+    slug: 'only-murders-in-the-building',
+  },
 ];
 
 // Show pages on the current site that are NOT real shows (placeholders/mistakes).

@@ -135,7 +135,10 @@ export async function importFromSite(store, { site = 'https://www.strawhutmedia.
   for (const ex of EXTRA_SHOWS) {
     try {
       const { show, created, added } = await addShowFromFeed(store, ex.feed_url, { show_type: ex.show_type });
-      if (ex.show_type && show.show_type !== ex.show_type) await store.updateShow(show.id, { show_type: ex.show_type });
+      const patch = {};
+      if (ex.show_type && show.show_type !== ex.show_type) patch.show_type = ex.show_type;
+      if (ex.slug && show.slug !== ex.slug) patch.slug = ex.slug; // clean, stable URL
+      if (Object.keys(patch).length) await store.updateShow(show.id, patch);
       onProgress(`${created ? '+' : '='} (extra) ${show.title} (${added} eps)`);
       ok++;
     } catch (e) {
