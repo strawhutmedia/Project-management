@@ -32,6 +32,11 @@ export const RETIRE_FEEDS = [
   'https://www.spreaker.com/show/6055146/episodes/feed', // old Commune Courses (now Megaphone)
 ];
 
+// Shows to spotlight on the homepage (mirrors the current site's "featured
+// podcast" picks — edit here or use the admin Feature toggle). Keyed by slug.
+export const FEATURED_SHOWS = ['naked-lunch', 'the-jordyn-jones-podcast', 'podcasting-tips-weekly'];
+export const isFeatured = (slug) => FEATURED_SHOWS.includes(String(slug || '').toLowerCase().trim());
+
 // Show pages on the current site that are NOT real shows (placeholders/mistakes).
 // Skipped on import and removed if already present.
 export const EXCLUDE_SHOW_PATHS = [

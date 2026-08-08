@@ -126,7 +126,6 @@ const artOrPlaceholder = (url, alt) =>
 
 export function homePage({ shows }) {
   const featured = shows.filter((s) => s.featured);
-  const spotlight = featured.length ? featured : shows.slice(0, 6);
   const originals = shows.filter((s) => (s.show_type || 'original') !== 'partnered');
   const partners = shows.filter((s) => s.show_type === 'partnered');
   const cards = (list) =>
@@ -152,16 +151,16 @@ export function homePage({ shows }) {
 
   const body = `
   <section class="hero"><div class="container">
-    <h1>Podcasts that <span class="accent">matter</span>.</h1>
-    <p>Straw Hut Media is an award-winning podcast network — home to ${shows.length}+ original and partner shows.</p>
+    <h1>Think outside the <span class="accent">pod</span>.</h1>
+    <p>Welcome to Straw Hut Media — an award-winning podcast agency.</p>
   </div></section>
   ${marquee}
 
   ${
-    spotlight.length
+    featured.length
       ? `<section class="section"><div class="container">
-    <div class="section-head"><h2>${featured.length ? 'Featured Shows' : 'Spotlight'}</h2><a class="count" href="/shows">View all →</a></div>
-    <div class="grid">${cards(spotlight)}</div>
+    <div class="section-head"><h2>Featured Shows</h2><a class="count" href="/shows">View all →</a></div>
+    <div class="spotlight-row">${cards(featured)}</div>
   </div></section>`
       : ''
   }

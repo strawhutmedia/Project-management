@@ -2,7 +2,7 @@
 // RSS feed. Used by the admin "Import all shows" button and the CLI script.
 
 import { addShowFromFeed } from './sync.js';
-import { IMPORT_OVERRIDES, RETIRE_FEEDS, EXCLUDE_SHOW_PATHS } from './overrides.js';
+import { IMPORT_OVERRIDES, RETIRE_FEEDS, EXCLUDE_SHOW_PATHS, isFeatured } from './overrides.js';
 
 const UA = 'StrawHutMedia-Importer/1.0';
 
@@ -121,10 +121,12 @@ export async function importFromSite(store, { site = 'https://www.strawhutmedia.
       const wantType = ov.show_type || siteType;
 
       const { show, created, added } = await addShowFromFeed(store, feed, { show_type: wantType });
-      // Enforce classification even for shows that already existed.
-      if (wantType && show.show_type !== wantType) {
-        await store.updateShow(show.id, { show_type: wantType });
-      }
+      // Enforce classification + curated spotlight, even for existing shows.
+      const patch = {};
+      if (wantType && show.show_type !== wantType) patch.show_type = wantType;
+      const featured = isFeatured(base);
+      if (!!show.featured !== featured) patch.featured = featured;
+      if (Object.keys(patch).length) await store.updateShow(show.id, patch);
       onProgress(`${created ? '+' : '='} ${show.title} [${show.show_type}] (${added} eps)`);
       ok++;
     } catch (e) {

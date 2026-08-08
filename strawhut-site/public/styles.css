@@ -82,6 +82,12 @@ img { max-width: 100%; display: block; }
 
 /* Show grid */
 .grid { display: grid; gap: 22px; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); }
+
+/* Featured spotlight — horizontal, swipeable row (a few shows, not a wall) */
+.spotlight-row { display: flex; gap: 20px; overflow-x: auto; padding: 4px 2px 14px; scroll-snap-type: x mandatory; -webkit-overflow-scrolling: touch; }
+.spotlight-row::-webkit-scrollbar { height: 8px; }
+.spotlight-row::-webkit-scrollbar-thumb { background: var(--border); border-radius: 8px; }
+.spotlight-row .show-card { flex: 0 0 230px; width: 230px; scroll-snap-align: start; }
 .show-card {
   background: var(--card); border: 1px solid var(--border); border-radius: var(--radius);
   overflow: hidden; transition: transform 0.15s, border-color 0.15s; position: relative;
@@ -221,6 +227,11 @@ table.admin-table { width: 100%; border-collapse: collapse; }
 
 @media (max-width: 820px) {
   .nav { display: none; }
+  /* 2-up cover art on mobile instead of one giant image per row */
+  .grid { grid-template-columns: repeat(2, 1fr); gap: 12px; }
+  .show-card h3 { font-size: 0.92rem; }
+  .show-card .meta { font-size: 0.76rem; }
+  .spotlight-row .show-card { flex-basis: 62vw; width: 62vw; max-width: 240px; }
   .show-hero-grid { grid-template-columns: 1fr; }
   .show-hero .art { width: 200px; }
   .episode-hero-grid { grid-template-columns: 1fr; }
