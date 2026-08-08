@@ -103,6 +103,7 @@ export function showsAdminPage({ shows, flash }) {
       <td>${s.show_type === 'partnered' ? '<span class="pill">Partner</span>' : '<span class="pill on">Original</span>'}${s.featured ? ' <span class="pill on">Featured</span>' : ''}</td>
       <td class="actions">
         <a class="btn btn-sm" href="/${esc(s.slug)}" target="_blank">View</a>
+        <a class="btn btn-sm" href="/admin/shows/${esc(s.id)}/episodes">Episodes</a>
         <form method="post" action="/admin/shows/${esc(s.id)}/sync" style="display:inline"><button class="btn btn-sm">Sync</button></form>
         <form method="post" action="/admin/shows/${esc(s.id)}/youtube" style="display:inline"><button class="btn btn-sm" title="Find & link this show's YouTube videos">🎬 Video</button></form>
         <form method="post" action="/admin/shows/${esc(s.id)}/type" style="display:inline"><button class="btn btn-sm">${s.show_type === 'partnered' ? '→ Original' : '→ Partner'}</button></form>
@@ -225,6 +226,58 @@ export function pressAdminPage({ items, flash }) {
       <tbody>${rows || '<tr><td colspan="4" style="color:var(--muted)">No press yet — click “Refresh mentions”.</td></tr>'}</tbody></table>
     </div>`;
   return adminLayout({ title: 'Press', active: '/admin/press', body });
+}
+
+export function episodesAdminPage({ show, episodes, total, pageNum, perPage, flash }) {
+  const pageCount = Math.max(1, Math.ceil(total / perPage));
+  const rows = episodes
+    .map(
+      (e) => `<tr>
+      <td><img class="mini-art" src="${esc(e.image_url || show.image_url || '')}" alt=""></td>
+      <td>${esc(e.title)}${e.youtube_id ? ' <span class="pill on">▶ video</span>' : ''}</td>
+      <td>${e.published_at ? esc(formatDate(e.published_at)) : '—'}</td>
+      <td class="actions">
+        <a class="btn btn-sm" href="/${esc(show.slug)}/${esc(e.slug)}" target="_blank">View</a>
+        <a class="btn btn-sm btn-primary" href="/admin/episodes/${esc(e.id)}/edit">Edit</a>
+      </td>
+    </tr>`
+    )
+    .join('');
+  const pager = pageCount > 1
+    ? `<div style="margin-top:14px">${pageNum > 1 ? `<a class="btn btn-sm" href="/admin/shows/${esc(show.id)}/episodes?page=${pageNum - 1}">← Newer</a> ` : ''}<span class="pill">Page ${pageNum} of ${pageCount}</span>${pageNum < pageCount ? ` <a class="btn btn-sm" href="/admin/shows/${esc(show.id)}/episodes?page=${pageNum + 1}">Older →</a>` : ''}</div>`
+    : '';
+  const body = `
+    <h1>Episodes — ${esc(show.title)}</h1>
+    ${flash ? `<div class="flash ${flash.type}">${esc(flash.msg)}</div>` : ''}
+    <div style="margin-bottom:14px"><a class="btn btn-sm" href="/admin/shows">← All shows</a> <span style="color:var(--muted);margin-left:8px">${total} episodes</span></div>
+    <div class="panel">
+      <table class="admin-table"><thead><tr><th></th><th>Episode</th><th>Date</th><th></th></tr></thead>
+      <tbody>${rows}</tbody></table>
+      ${pager}
+    </div>`;
+  return adminLayout({ title: `Episodes — ${show.title}`, active: '/admin/shows', body });
+}
+
+export function episodeEditPage({ show, episode, flash }) {
+  const e = episode;
+  const ta = 'width:100%;padding:12px 14px;border-radius:10px;border:1px solid var(--border);background:var(--bg-2);color:var(--text);font-family:inherit;font-size:0.95rem';
+  const body = `
+    <h1>Edit episode</h1>
+    ${flash ? `<div class="flash ${flash.type}">${esc(flash.msg)}</div>` : ''}
+    <div style="margin-bottom:14px"><a class="btn btn-sm" href="/admin/shows/${esc(show.id)}/episodes">← ${esc(show.title)} episodes</a>
+      <a class="btn btn-sm" href="/${esc(show.slug)}/${esc(e.slug)}" target="_blank">View page ↗</a></div>
+    <div class="panel">
+      <form method="post" action="/admin/episodes/${esc(e.id)}">
+        <div class="field"><label>Title</label><input type="text" name="title" value="${esc(e.title || '')}" style="${ta}"></div>
+        <div class="field"><label>YouTube video ID or URL <span style="color:var(--muted)">(paste a link to add/replace the video; clear to remove)</span></label>
+          <input type="text" name="youtube_id" value="${esc(e.youtube_id || '')}" style="${ta}" placeholder="e.g. dQw4w9WgXcQ or https://youtu.be/dQw4w9WgXcQ"></div>
+        <div class="field"><label>Cover image URL</label><input type="url" name="image_url" value="${esc(e.image_url || '')}" style="${ta}"></div>
+        <div class="field"><label>Show notes / description (HTML)</label><textarea name="description" rows="10" style="${ta}">${esc(e.description || '')}</textarea></div>
+        <div class="hint" style="margin-bottom:14px">Manual edits stick — feed re-syncs won't overwrite them.</div>
+        <button class="btn btn-primary" type="submit">Save episode</button>
+      </form>
+    </div>`;
+  return adminLayout({ title: 'Edit Episode', active: '/admin/shows', body });
 }
 
 export function landingsAdminPage({ landings, flash }) {

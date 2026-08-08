@@ -279,6 +279,46 @@ app.post('/admin/press/:id/delete', requireAdmin, async (req, res) => {
   res.redirect('/admin/press');
 });
 
+// ---- Admin: episode editor ----
+function parseYouTubeId(input) {
+  const s = (input || '').trim();
+  if (!s) return null;
+  const m = s.match(/(?:youtu\.be\/|v=|embed\/|shorts\/)([A-Za-z0-9_-]{11})/);
+  if (m) return m[1];
+  if (/^[A-Za-z0-9_-]{11}$/.test(s)) return s;
+  return s || null;
+}
+
+app.get('/admin/shows/:id/episodes', requireAdmin, async (req, res) => {
+  const show = await store.getShowById(req.params.id);
+  if (!show) return res.redirect('/admin/shows');
+  const perPage = 50;
+  const pageNum = Math.max(1, parseInt(req.query.page || '1', 10));
+  const total = await store.countEpisodes(show.id);
+  const episodes = await store.listEpisodes(show.id, { limit: perPage, offset: (pageNum - 1) * perPage });
+  res.send(A.episodesAdminPage({ show, episodes, total, pageNum, perPage, flash: readFlash(req, res) }));
+});
+
+app.get('/admin/episodes/:id/edit', requireAdmin, async (req, res) => {
+  const episode = await store.getEpisodeById(req.params.id);
+  if (!episode) return res.redirect('/admin/shows');
+  const show = await store.getShowById(episode.show_id);
+  res.send(A.episodeEditPage({ show, episode, flash: readFlash(req, res) }));
+});
+
+app.post('/admin/episodes/:id', requireAdmin, async (req, res) => {
+  const episode = await store.getEpisodeById(req.params.id);
+  if (!episode) return res.redirect('/admin/shows');
+  await store.updateEpisode(episode.id, {
+    title: (req.body.title || '').trim() || episode.title,
+    description: req.body.description ?? episode.description,
+    image_url: (req.body.image_url || '').trim() || null,
+    youtube_id: parseYouTubeId(req.body.youtube_id),
+  });
+  setFlash(res, { type: 'ok', msg: 'Episode saved.' });
+  res.redirect(`/admin/shows/${episode.show_id}/episodes`);
+});
+
 // ---- Admin: landing pages ----
 import { slugify, uniqueSlug } from './util.js';
 

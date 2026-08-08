@@ -100,6 +100,15 @@ class JsonStore {
       Object.values(this.db.episodes).find((e) => e.show_id === showId && e.slug === slug) || null
     );
   }
+  async getEpisodeById(id) {
+    return this.db.episodes[id] || null;
+  }
+  async updateEpisode(id, patch) {
+    if (!this.db.episodes[id]) return null;
+    this.db.episodes[id] = { ...this.db.episodes[id], ...patch, id };
+    this._flush();
+    return this.db.episodes[id];
+  }
   async countEpisodes(showId) {
     return Object.values(this.db.episodes).filter((e) => e.show_id === showId).length;
   }
@@ -409,6 +418,20 @@ class PgStore {
       [showId, slug]
     );
     return rows[0] || null;
+  }
+  async getEpisodeById(id) {
+    const { rows } = await this.pool.query(`SELECT * FROM episodes WHERE id=$1`, [id]);
+    return rows[0] || null;
+  }
+  async updateEpisode(id, patch) {
+    const cur = await this.getEpisodeById(id);
+    if (!cur) return null;
+    const m = { ...cur, ...patch };
+    await this.pool.query(
+      `UPDATE episodes SET title=$2, description=$3, image_url=$4, youtube_id=$5 WHERE id=$1`,
+      [id, m.title, m.description, m.image_url, m.youtube_id || null]
+    );
+    return this.getEpisodeById(id);
   }
   async countEpisodes(showId) {
     const { rows } = await this.pool.query(
