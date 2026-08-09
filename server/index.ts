@@ -26,8 +26,10 @@ import { exportsRouter } from './routes/exports'
 import { showPageRouter } from './routes/show_page'
 import { outreachDomainsRouter } from './routes/outreach_domains'
 import { outreachRouter, startOutreachSendLoop, enableDomainOpenTracking } from './routes/outreach'
+import { channelsRouter } from './routes/channels'
 import { handleResendWebhook } from './routes/outreach_webhook'
 import { seedBackInYourArms } from './seeds/back_in_your_arms'
+import { seedSquidly } from './seeds/squidly'
 import { ensureRyanIsPodcastEp } from './routes/projects'
 import { startScheduler } from './scheduler'
 import { scheduleBootTimeCoverSync, syncMissingCoversFromRss } from './rss_cover_sync'
@@ -108,6 +110,7 @@ app.use('/api', episodeCutsRouter)
 app.use('/api/exports', exportsRouter)
 app.use('/api/admin/outreach/domains', outreachDomainsRouter)
 app.use('/api/outreach', outreachRouter)
+app.use('/api/channels', channelsRouter)
 
 // Public per-show one-sheet page (guest outreach). Mounted at the root
 // so URLs are /shows/<slug>, and BEFORE the SPA fallback so requests
@@ -200,6 +203,7 @@ async function start() {
     await runMigrations()
     logInfo('migrations complete')
     await seedBackInYourArms()
+    await seedSquidly()
     await ensureRyanIsPodcastEp()
   } catch (err) {
     logError('migrations failed', { error: err instanceof Error ? err.message : String(err) })

@@ -7,6 +7,9 @@ import StripboardPage from './pages/StripboardPage'
 import TranscriptPage from './pages/TranscriptPage'
 import TranscriptsLibraryPage from './pages/TranscriptsLibraryPage'
 import SchedulerPage from './pages/SchedulerPage'
+import ChannelsPage from './pages/ChannelsPage'
+import ChannelPage from './pages/ChannelPage'
+import EpisodePage from './pages/EpisodePage'
 import CarouselPreviewPage from './pages/CarouselPreviewPage'
 import OutreachDomainsPage from './pages/OutreachDomainsPage'
 import OutreachHubPage from './pages/OutreachHubPage'
@@ -50,6 +53,9 @@ export default function App() {
           <Route path="projects/:projectId/transcripts/:transcriptId" element={<TranscriptPage />} />
           <Route path="projects/:projectId/songs/:songId" element={<SongPage />} />
           <Route path="scheduler" element={<SchedulerPage />} />
+          <Route path="channels" element={<ChannelsPage />} />
+          <Route path="channels/:channelId" element={<ChannelPage />} />
+          <Route path="channels/:channelId/episodes/:episodeId" element={<EpisodePage />} />
           <Route path="carousel-preview" element={<CarouselPreviewPage />} />
           <Route path="admin/outreach" element={<OutreachHubPage />} />
           <Route path="admin/outreach/shows/:projectId" element={<OutreachShowPage />} />

@@ -729,6 +729,72 @@ export type ApiSendingDomain = {
   updated_at: string
 }
 
+// ── Faceless YouTube channels ──────────────────────────────────────────
+export type ApiChannelSummary = {
+  id: string
+  name: string
+  subtitle: string | null
+  premise: string | null
+  audience: string | null
+  createdAt: string
+  characterCount: number
+  episodeCount: number
+}
+
+export type ApiChannelCharacter = {
+  id: string
+  name: string
+  role: string | null
+  lookLock: string | null
+  personality: string | null
+  position: number
+}
+
+export type ApiChannelEpisodeSummary = {
+  id: string
+  episodeNumber: number | null
+  title: string
+  feeling: string | null
+  logline: string | null
+  status: 'script' | 'generating' | 'review' | 'published'
+  position: number
+  sceneCount: number
+}
+
+export type ApiChannelDetail = {
+  id: string
+  name: string
+  subtitle: string | null
+  premise: string | null
+  audience: string | null
+  artStyle: string | null
+  createdAt: string
+  characters: ApiChannelCharacter[]
+  episodes: ApiChannelEpisodeSummary[]
+}
+
+export type ApiEpisodeScene = {
+  id: string
+  position: number
+  visual: string | null
+  narration: string | null
+}
+
+export type ApiEpisodeDetail = {
+  id: string
+  channelId: string
+  channelName: string
+  episodeNumber: number | null
+  title: string
+  feeling: string | null
+  logline: string | null
+  youtubeTitle: string | null
+  thumbnailConcept: string | null
+  shortConcept: string | null
+  status: 'script' | 'generating' | 'review' | 'published'
+  scenes: ApiEpisodeScene[]
+}
+
 export const api = {
   me: () => request<{ user: ApiUser | null }>('/api/me'),
   updateMe: (patch: { name?: string; displayName?: string; timezone?: string }) =>
@@ -744,6 +810,10 @@ export const api = {
       body: JSON.stringify({ token }),
     }),
   logout: () => request<{ ok: true }>('/api/auth/logout', { method: 'POST' }),
+  channels: () => request<{ channels: ApiChannelSummary[] }>('/api/channels'),
+  channel: (id: string) => request<{ channel: ApiChannelDetail }>(`/api/channels/${id}`),
+  episode: (episodeId: string) =>
+    request<{ episode: ApiEpisodeDetail }>(`/api/channels/episodes/${episodeId}`),
   projects: () => request<{ projects: ApiProject[] }>('/api/projects'),
   project: (id: string) => request<{ project: ApiProject }>(`/api/projects/${id}`),
   song: (id: string) => request<{ song: ApiSongDetail }>(`/api/songs/${id}`),
