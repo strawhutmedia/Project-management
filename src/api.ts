@@ -780,6 +780,16 @@ export type ApiEpisodeScene = {
   narration: string | null
 }
 
+export type ApiEpisodeShort = {
+  id: string
+  position: number
+  title: string
+  description: string
+  recommendedPublish: string | null
+  madeForKids: boolean
+  linksTo: string
+}
+
 export type ApiEpisodeDetail = {
   id: string
   channelId: string
@@ -792,7 +802,16 @@ export type ApiEpisodeDetail = {
   thumbnailConcept: string | null
   shortConcept: string | null
   status: 'script' | 'generating' | 'review' | 'published'
+  ytDescription: string | null
+  ytTags: string | null
+  ytCategory: string | null
+  madeForKids: boolean
+  playlist: string | null
+  pinnedComment: string | null
+  recommendedPublish: string | null
+  youtubeUrl: string | null
   scenes: ApiEpisodeScene[]
+  shorts: ApiEpisodeShort[]
 }
 
 export const api = {
@@ -814,6 +833,14 @@ export const api = {
   channel: (id: string) => request<{ channel: ApiChannelDetail }>(`/api/channels/${id}`),
   episode: (episodeId: string) =>
     request<{ episode: ApiEpisodeDetail }>(`/api/channels/episodes/${episodeId}`),
+  updateEpisode: (
+    episodeId: string,
+    patch: { youtubeUrl?: string | null; status?: 'script' | 'generating' | 'review' | 'published' },
+  ) =>
+    request<{ ok: true }>(`/api/channels/episodes/${episodeId}`, {
+      method: 'PATCH',
+      body: JSON.stringify(patch),
+    }),
   projects: () => request<{ projects: ApiProject[] }>('/api/projects'),
   project: (id: string) => request<{ project: ApiProject }>(`/api/projects/${id}`),
   song: (id: string) => request<{ song: ApiSongDetail }>(`/api/songs/${id}`),

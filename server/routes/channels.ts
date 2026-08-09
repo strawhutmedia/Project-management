@@ -113,12 +113,18 @@ channelsRouter.get('/:id', async (req, res) => {
   }
 })
 
-// GET /episodes/:episodeId — one episode with its scenes.
+const MAIN_URL_PLACEHOLDER = '[PASTE MAIN VIDEO URL HERE]'
+
+// GET /episodes/:episodeId — one episode with its scenes, publish kit, and
+// shorts. A short's {{MAIN_URL}} token is resolved to the episode's published
+// URL (or a placeholder until it's set).
 channelsRouter.get('/episodes/:episodeId', async (req, res) => {
   try {
     const epRes = await pool.query(
       `SELECT ce.id, ce.channel_id, ce.episode_number, ce.title, ce.feeling, ce.logline,
               ce.youtube_title, ce.thumbnail_concept, ce.short_concept, ce.status,
+              ce.yt_description, ce.yt_tags, ce.yt_category, ce.made_for_kids,
+              ce.playlist, ce.pinned_comment, ce.recommended_publish, ce.youtube_url,
               c.name AS channel_name
          FROM channel_episodes ce JOIN channels c ON c.id = ce.channel_id
         WHERE ce.id = $1`,
@@ -134,6 +140,12 @@ channelsRouter.get('/episodes/:episodeId', async (req, res) => {
         WHERE episode_id = $1 ORDER BY position ASC, created_at ASC`,
       [ep.id],
     )
+    const shorts = await pool.query(
+      `SELECT id, position, title, description, recommended_publish, made_for_kids
+         FROM episode_shorts WHERE episode_id = $1 ORDER BY position ASC, created_at ASC`,
+      [ep.id],
+    )
+    const mainUrl = ep.youtube_url || MAIN_URL_PLACEHOLDER
     res.json({
       episode: {
         id: ep.id,
@@ -147,16 +159,74 @@ channelsRouter.get('/episodes/:episodeId', async (req, res) => {
         thumbnailConcept: ep.thumbnail_concept,
         shortConcept: ep.short_concept,
         status: ep.status,
+        ytDescription: ep.yt_description,
+        ytTags: ep.yt_tags,
+        ytCategory: ep.yt_category,
+        madeForKids: ep.made_for_kids,
+        playlist: ep.playlist,
+        pinnedComment: ep.pinned_comment,
+        recommendedPublish: ep.recommended_publish,
+        youtubeUrl: ep.youtube_url,
         scenes: scenes.rows.map((s) => ({
           id: s.id,
           position: s.position,
           visual: s.visual,
           narration: s.narration,
         })),
+        shorts: shorts.rows.map((s) => ({
+          id: s.id,
+          position: s.position,
+          title: s.title,
+          description: (s.description ?? '').replaceAll('{{MAIN_URL}}', mainUrl),
+          recommendedPublish: s.recommended_publish,
+          madeForKids: s.made_for_kids,
+          linksTo: ep.title,
+        })),
       },
     })
   } catch (err) {
     logError('episode get failed', { error: err instanceof Error ? err.message : String(err) })
+    res.status(500).json({ error: 'internal_error' })
+  }
+})
+
+// PATCH /episodes/:episodeId — update episode fields (admin). The common use
+// is pasting the published main-video URL back in, which completes the shorts.
+channelsRouter.patch('/episodes/:episodeId', async (req, res) => {
+  const fields: Array<[string, string]> = [
+    ['title', 'title'],
+    ['feeling', 'feeling'],
+    ['logline', 'logline'],
+    ['youtubeTitle', 'youtube_title'],
+    ['thumbnailConcept', 'thumbnail_concept'],
+    ['status', 'status'],
+    ['ytDescription', 'yt_description'],
+    ['ytTags', 'yt_tags'],
+    ['ytCategory', 'yt_category'],
+    ['madeForKids', 'made_for_kids'],
+    ['playlist', 'playlist'],
+    ['pinnedComment', 'pinned_comment'],
+    ['recommendedPublish', 'recommended_publish'],
+    ['youtubeUrl', 'youtube_url'],
+  ]
+  const sets: string[] = []
+  const vals: unknown[] = []
+  for (const [key, col] of fields) {
+    if (req.body?.[key] !== undefined) {
+      vals.push(req.body[key])
+      sets.push(`${col} = $${vals.length}`)
+    }
+  }
+  if (sets.length === 0) {
+    res.json({ ok: true })
+    return
+  }
+  vals.push(req.params.episodeId)
+  try {
+    await pool.query(`UPDATE channel_episodes SET ${sets.join(', ')} WHERE id = $${vals.length}`, vals)
+    res.json({ ok: true })
+  } catch (err) {
+    logError('episode patch failed', { error: err instanceof Error ? err.message : String(err) })
     res.status(500).json({ error: 'internal_error' })
   }
 })

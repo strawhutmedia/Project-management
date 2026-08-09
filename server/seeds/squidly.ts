@@ -96,68 +96,155 @@ const EP1_SCENES: SeedScene[] = [
   },
 ]
 
+const EP1_DESCRIPTION = `Squidly the curious little squid finds a mysterious bottle from the world above 🌊 Join Squidly and his best friend Suds as they learn the difference between being curious and being a little too nosy — a gentle story for little kids.
+
+🐙 New Squidly story every week. Subscribe so you never miss one!
+👉 [SUBSCRIBE LINK]
+
+More Squidly: [PLAYLIST LINK]
+
+#kidsstories #bedtimestories #squidly #kidscartoon #storytime`
+
+const EP1_TAGS =
+  'kids story, bedtime story, story for kids, curious squid, squidly, kids cartoon, preschool, read aloud, ocean story'
+
+type SeedShort = { title: string; description: string; recommendedPublish: string }
+
+const EP1_SHORTS: SeedShort[] = [
+  {
+    title: 'When "curious" turns a little too NOSY 🙊 #shorts',
+    description: 'Poor Old Crab 😅 Watch the full Squidly story 👉 {{MAIN_URL}}\n#shorts #kidsstories #squidly #funny',
+    recommendedPublish: 'Tuesday, 3:30 PM PT',
+  },
+  {
+    title: "Did you know a REAL sponge can't move? 🧽 #shorts",
+    description: 'Meet Suds 💛 Full Squidly story 👉 {{MAIN_URL}}\n#shorts #kids #oceanfacts #squidly',
+    recommendedPublish: 'Thursday, 3:30 PM PT',
+  },
+]
+
+// Idempotent per-entity so it self-heals across deploys (e.g. if a Phase 1
+// build seeded the channel before publish-kit columns/shorts existed).
 export async function seedSquidly(): Promise<void> {
   try {
-    const existing = await pool.query('SELECT id FROM channels WHERE name = $1 LIMIT 1', ['Squidly'])
-    if (existing.rows.length > 0) return
-
-    // Attribute the channel to the admin (Ryan) when present.
-    const admin = await pool.query<{ id: string }>(
-      "SELECT id FROM users WHERE role = 'admin' ORDER BY created_at ASC LIMIT 1",
-    )
-    const createdBy = admin.rows[0]?.id ?? null
-
-    const ch = await pool.query<{ id: string }>(
-      `INSERT INTO channels (name, subtitle, premise, audience, art_style, created_by)
-       VALUES ($1, $2, $3, $4, $5, $6) RETURNING id`,
-      [
-        'Squidly',
-        'A curious little squid who dreams of the world above',
-        'Squidly is a small, curious squid who dreams of the world beyond the ocean — and keeps learning where curious ends and nosy begins. Same character, same world every episode; only the feeling changes (calm, silly, or adventurous). A character-driven, faceless kids show in the storybook style of Curious George.',
-        'Little kids, ages 3–6',
-        ART_STYLE,
-        createdBy,
-      ],
-    )
-    const channelId = ch.rows[0].id
-
-    let pos = 0
-    for (const c of CHARACTERS) {
-      pos += 10
-      await pool.query(
-        `INSERT INTO channel_characters (channel_id, name, role, look_lock, personality, position)
-         VALUES ($1, $2, $3, $4, $5, $6)`,
-        [channelId, c.name, c.role, c.lookLock, c.personality, pos],
+    // Channel
+    let channelId: string
+    const existing = await pool.query<{ id: string }>('SELECT id FROM channels WHERE name = $1 LIMIT 1', ['Squidly'])
+    if (existing.rows.length > 0) {
+      channelId = existing.rows[0].id
+    } else {
+      const admin = await pool.query<{ id: string }>(
+        "SELECT id FROM users WHERE role = 'admin' ORDER BY created_at ASC LIMIT 1",
       )
+      const created = await pool.query<{ id: string }>(
+        `INSERT INTO channels (name, subtitle, premise, audience, art_style, created_by)
+         VALUES ($1, $2, $3, $4, $5, $6) RETURNING id`,
+        [
+          'Squidly',
+          'A curious little squid who dreams of the world above',
+          'Squidly is a small, curious squid who dreams of the world beyond the ocean — and keeps learning where curious ends and nosy begins. Same character, same world every episode; only the feeling changes (calm, silly, or adventurous). A character-driven, faceless kids show in the storybook style of Curious George.',
+          'Little kids, ages 3–6',
+          ART_STYLE,
+          admin.rows[0]?.id ?? null,
+        ],
+      )
+      channelId = created.rows[0].id
     }
 
-    const ep = await pool.query<{ id: string }>(
-      `INSERT INTO channel_episodes
-         (channel_id, episode_number, title, feeling, logline, youtube_title,
-          thumbnail_concept, short_concept, status, position)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'script', $9) RETURNING id`,
+    // Characters (only if none yet)
+    const charCount = await pool.query<{ n: string }>(
+      'SELECT COUNT(*) AS n FROM channel_characters WHERE channel_id = $1',
+      [channelId],
+    )
+    if (Number(charCount.rows[0].n) === 0) {
+      let pos = 0
+      for (const c of CHARACTERS) {
+        pos += 10
+        await pool.query(
+          `INSERT INTO channel_characters (channel_id, name, role, look_lock, personality, position)
+           VALUES ($1, $2, $3, $4, $5, $6)`,
+          [channelId, c.name, c.role, c.lookLock, c.personality, pos],
+        )
+      }
+    }
+
+    // Episode 1 — insert if missing, then backfill publish-kit fields if null.
+    let episodeId: string
+    const epExisting = await pool.query<{ id: string }>(
+      'SELECT id FROM channel_episodes WHERE channel_id = $1 AND episode_number = 1 LIMIT 1',
+      [channelId],
+    )
+    if (epExisting.rows.length > 0) {
+      episodeId = epExisting.rows[0].id
+    } else {
+      const created = await pool.query<{ id: string }>(
+        `INSERT INTO channel_episodes
+           (channel_id, episode_number, title, feeling, logline, youtube_title,
+            thumbnail_concept, short_concept, status, position)
+         VALUES ($1, 1, $2, $3, $4, $5, $6, $7, 'script', 10) RETURNING id`,
+        [
+          channelId,
+          'Squidly and the Bottle from Above',
+          'warm & funny, with a gentle adventure',
+          "A bottle drifts down from the surface with a child's drawing inside; Squidly's hunt for its owner tips from curious into nosy until Tuck teaches him to ask instead of snoop.",
+          'Squidly and the Bottle from Above 🐙 | A Curious Little Squid Story for Kids',
+          'Squidly wide-eyed hugging the glowing bottle, Suds squished under his other arm pulling a funny face, bright sunbeams behind them.',
+          'The nap-rock beat (Scene 5) — on-screen hook: "When \'curious\' turns a little too NOSY 🙊"',
+        ],
+      )
+      episodeId = created.rows[0].id
+    }
+    await pool.query(
+      `UPDATE channel_episodes SET
+         yt_description = COALESCE(yt_description, $2),
+         yt_tags = COALESCE(yt_tags, $3),
+         yt_category = COALESCE(yt_category, $4),
+         playlist = COALESCE(playlist, $5),
+         pinned_comment = COALESCE(pinned_comment, $6),
+         recommended_publish = COALESCE(recommended_publish, $7)
+       WHERE id = $1`,
       [
-        channelId,
-        1,
-        'Squidly and the Bottle from Above',
-        'warm & funny, with a gentle adventure',
-        'A bottle drifts down from the surface with a child\'s drawing inside; Squidly\'s hunt for its owner tips from curious into nosy until Tuck teaches him to ask instead of snoop.',
-        'Squidly and the Bottle from Above 🐙 | A Curious Little Squid Story for Kids',
-        'Squidly wide-eyed hugging the glowing bottle, Suds squished under his other arm pulling a funny face, bright sunbeams behind them.',
-        'The nap-rock beat (Scene 5) — on-screen hook: "When \'curious\' turns a little too NOSY 🙊"',
-        10,
+        episodeId,
+        EP1_DESCRIPTION,
+        EP1_TAGS,
+        'Education',
+        'Squidly — Full Episodes',
+        'What do YOU think was in the bottle? 🐙',
+        'Saturday, 7:00 AM PT',
       ],
     )
-    const episodeId = ep.rows[0].id
 
-    let spos = 0
-    for (const s of EP1_SCENES) {
-      spos += 10
-      await pool.query(
-        `INSERT INTO episode_scenes (episode_id, position, visual, narration)
-         VALUES ($1, $2, $3, $4)`,
-        [episodeId, spos, s.visual, s.narration],
-      )
+    // Scenes (only if none yet)
+    const sceneCount = await pool.query<{ n: string }>(
+      'SELECT COUNT(*) AS n FROM episode_scenes WHERE episode_id = $1',
+      [episodeId],
+    )
+    if (Number(sceneCount.rows[0].n) === 0) {
+      let spos = 0
+      for (const s of EP1_SCENES) {
+        spos += 10
+        await pool.query(
+          `INSERT INTO episode_scenes (episode_id, position, visual, narration) VALUES ($1, $2, $3, $4)`,
+          [episodeId, spos, s.visual, s.narration],
+        )
+      }
+    }
+
+    // Shorts (only if none yet)
+    const shortCount = await pool.query<{ n: string }>(
+      'SELECT COUNT(*) AS n FROM episode_shorts WHERE episode_id = $1',
+      [episodeId],
+    )
+    if (Number(shortCount.rows[0].n) === 0) {
+      let shpos = 0
+      for (const s of EP1_SHORTS) {
+        shpos += 10
+        await pool.query(
+          `INSERT INTO episode_shorts (episode_id, position, title, description, recommended_publish)
+           VALUES ($1, $2, $3, $4, $5)`,
+          [episodeId, shpos, s.title, s.description, s.recommendedPublish],
+        )
+      }
     }
 
     logInfo('seeded Squidly channel', { channelId, episodeId })
