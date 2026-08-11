@@ -185,6 +185,13 @@ img { max-width: 100%; display: block; }
 .aplayer:hover .aplayer-knob, .aplayer.is-playing .aplayer-knob { opacity: 1; }
 .aplayer-times { display: flex; justify-content: space-between; font-size: 0.78rem; color: var(--muted); font-variant-numeric: tabular-nums; margin-top: 8px; }
 
+/* Animated waveform — bounces while playing, rests when paused */
+.aplayer-viz { display: flex; align-items: center; justify-content: center; gap: 3px; height: 46px; margin: 2px 0 16px; padding: 0 2px; }
+.aplayer-viz span { flex: 0 0 3px; width: 3px; border-radius: 3px; background: linear-gradient(180deg, var(--accent), #0a7d59); transform: scaleY(0.35); transform-origin: center; opacity: 0.45; transition: opacity 0.25s, transform 0.25s; }
+.aplayer.is-playing .aplayer-viz span { opacity: 1; animation-name: viz-bounce; animation-iteration-count: infinite; animation-timing-function: ease-in-out; animation-direction: alternate; }
+@keyframes viz-bounce { from { transform: scaleY(0.28); } to { transform: scaleY(1); } }
+@media (prefers-reduced-motion: reduce) { .aplayer.is-playing .aplayer-viz span { animation: none; transform: scaleY(0.7); } }
+
 /* Now-playing header (cover art + show/episode title) */
 .aplayer-head { display: flex; align-items: center; gap: 14px; margin-bottom: 18px; }
 .aplayer-art { width: 56px; height: 56px; border-radius: 10px; object-fit: cover; flex: 0 0 auto; box-shadow: 0 4px 12px rgba(0,0,0,0.35); }

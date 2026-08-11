@@ -44,9 +44,17 @@ export function audioPlayer(src, opts = {}) {
           </div>
         </div>`
       : '';
+  const BARS = 48;
+  const viz = `<div class="aplayer-viz" aria-hidden="true">${Array.from({ length: BARS }, (_, i) => {
+    const h = 26 + Math.round(Math.abs(Math.sin(i * 0.7) * 0.6 + Math.sin(i * 1.9) * 0.4) * 74); // 26–100%
+    const delay = ((i % 12) * 0.07).toFixed(2);
+    const dur = (0.65 + (i % 6) * 0.13).toFixed(2);
+    return `<span style="height:${h}%;animation-delay:${delay}s;animation-duration:${dur}s"></span>`;
+  }).join('')}</div>`;
   return `<div class="aplayer" id="${id}">
     <audio preload="none" src="${esc(src)}"></audio>
     ${head}
+    ${viz}
     <div class="aplayer-controls">
       <button class="aplayer-skip" data-skip="back" type="button" aria-label="Back ${SKIP_SECONDS} seconds">${back}</button>
       <button class="aplayer-toggle" type="button" aria-label="Play">
