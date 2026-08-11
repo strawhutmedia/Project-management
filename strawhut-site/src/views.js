@@ -426,6 +426,14 @@ export function studioPage() {
   <section class="section" id="book"><div class="container">
     <div class="section-head"><h2>Book your session</h2></div>
     <p style="color:var(--muted);margin:-8px 0 18px">Choose your session length, then pick a date and time. Payment and confirmation are handled securely at checkout.</p>
+    <div class="booking-note">
+      <h3>Before you book — please read</h3>
+      <ul>
+        <li><strong>Book enough time.</strong> Your reservation needs to cover everything, not just the interview — <strong>studio set-up</strong> at the start and <strong>wrap-up / tear-down</strong> at the end both come out of your booked time.</li>
+        <li><strong>Building in a buffer for remote guests.</strong> If your episode has a virtual guest, leave room for <strong>login and connection issues</strong> — getting a remote guest set up and troubleshooting audio/video can eat into your session, so pad your booking accordingly.</li>
+        <li><strong>Going over your time.</strong> If your session runs past the time you booked, you'll be <strong>charged for every additional half hour</strong> (or part of a half hour) that you go over. Booking a little extra up front is cheaper and less stressful than running long.</li>
+      </ul>
+    </div>
     <div class="field" style="max-width:460px">
       <label>Which setup?</label>
       <div id="setupSelect" class="setup-toggle">
@@ -524,11 +532,16 @@ export function contactPage({ sent = false, error = '', values = {} } = {}) {
 export function pressPage({ items }) {
   const rows = items
     .map(
-      (p) => `<a class="press-row" href="${esc(p.url)}" target="_blank" rel="noopener">
-      <div class="press-meta">${esc(p.source || 'Press')}${p.published_at ? ' · <time datetime="' + esc(new Date(p.published_at).toISOString()) + '">' + esc(formatDate(p.published_at)) + '</time>' : ''}</div>
-      <h3 class="press-title">${esc(p.title)}</h3>
-      ${p.snippet ? `<p class="press-snippet">${esc(p.snippet)}</p>` : ''}
-      <span class="press-link">Read on ${esc(p.source || 'source')} →</span>
+      (p) => `<a class="press-row${p.image_url ? '' : ' noimg'}" href="${esc(p.url)}" target="_blank" rel="noopener">
+      <div class="press-thumb" data-source="${esc((p.source || 'Press').slice(0, 18))}">${
+        p.image_url ? `<img src="${esc(p.image_url)}" alt="" loading="lazy" onerror="this.closest('.press-row').classList.add('noimg')">` : ''
+      }</div>
+      <div class="press-body">
+        <div class="press-meta">${esc(p.source || 'Press')}${p.published_at ? ' · <time datetime="' + esc(new Date(p.published_at).toISOString()) + '">' + esc(formatDate(p.published_at)) + '</time>' : ''}</div>
+        <h3 class="press-title">${esc(p.title)}</h3>
+        ${p.snippet ? `<p class="press-snippet">${esc(p.snippet)}</p>` : ''}
+        <span class="press-link">Read on ${esc(p.source || 'source')} →</span>
+      </div>
     </a>`
     )
     .join('');

@@ -106,6 +106,19 @@ export function pressBlockedSince(text, publishedAt) {
   return false;
 }
 
+// For purging items ALREADY in the DB: remove an excluded person's mentions
+// that are definitively dated on/after the cutoff. Undated existing items are
+// kept (they're part of "the press we currently have").
+export function pressPurgeExisting(text, publishedAt) {
+  if (!publishedAt) return false;
+  const d = new Date(publishedAt);
+  if (isNaN(d.getTime())) return false;
+  const t = String(text || '').toLowerCase();
+  return PRESS_EXCLUDE_SINCE.some(
+    ({ name, since }) => name && t.includes(name.toLowerCase()) && d.getTime() >= new Date(since).getTime()
+  );
+}
+
 // Shows to keep but FREEZE — existing episodes stay; no new episodes are added
 // on sync. Matched by slug (and base slug, ignoring any trailing "-<id>").
 // Override via the FROZEN_SHOWS env var (comma-separated slugs).

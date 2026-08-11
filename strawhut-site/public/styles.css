@@ -222,13 +222,27 @@ img { max-width: 100%; display: block; }
 .setup-opt.active { background: var(--accent); color: var(--accent-ink); border-color: transparent; }
 
 /* Press */
-.press-list { display: grid; gap: 16px; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); }
-.press-row { display: block; background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 20px 22px; transition: transform 0.15s, border-color 0.15s; }
-.press-row:hover { transform: translateY(-3px); border-color: #33404f; }
+.press-list { display: grid; gap: 18px; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); }
+.press-row { display: flex; flex-direction: column; background: var(--card); border: 1px solid var(--border); border-radius: 14px; overflow: hidden; transition: transform 0.15s, border-color 0.15s; }
+.press-row:hover { transform: translateY(-3px); border-color: var(--accent); }
+.press-thumb { position: relative; aspect-ratio: 16 / 9; background: linear-gradient(135deg, var(--card-2), #2b3566); overflow: hidden; }
+.press-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+/* Branded fallback when there's no image: show the outlet name on a gradient. */
+.press-row.noimg .press-thumb::after { content: attr(data-source); position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; padding: 12px; text-align: center; font-weight: 700; font-size: 1.05rem; letter-spacing: 0.02em; color: var(--text); opacity: 0.9; background: linear-gradient(135deg, rgba(0,204,142,0.18), rgba(213,155,30,0.14)); }
+.press-row.noimg .press-thumb img { display: none; }
+.press-body { padding: 18px 20px 20px; }
 .press-meta { color: var(--accent); font-weight: 600; font-size: 0.82rem; text-transform: uppercase; letter-spacing: 0.03em; }
 .press-title { margin: 8px 0 8px; font-size: 1.12rem; line-height: 1.3; }
 .press-snippet { color: var(--muted); font-size: 0.92rem; margin: 0 0 12px; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
 .press-link { color: var(--text); font-weight: 600; font-size: 0.88rem; }
+
+/* Booking note on the Studio page */
+.booking-note { background: rgba(0,204,142,0.06); border: 1px solid rgba(0,204,142,0.28); border-radius: 14px; padding: 20px 24px; margin: 0 0 24px; max-width: 760px; }
+.booking-note h3 { margin: 0 0 12px; font-size: 1.05rem; color: var(--text); }
+.booking-note ul { margin: 0; padding-left: 20px; }
+.booking-note li { color: var(--muted); line-height: 1.6; margin-bottom: 10px; }
+.booking-note li:last-child { margin-bottom: 0; }
+.booking-note strong { color: var(--text); }
 
 /* Contact */
 .contact-form { max-width: 640px; }

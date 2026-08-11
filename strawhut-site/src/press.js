@@ -3,7 +3,7 @@
 // which we parse, de-dupe, and store for the public Press page.
 
 import { XMLParser } from 'fast-xml-parser';
-import { PRESS_QUERIES, pressHintFor, pressBlockedSince } from './overrides.js';
+import { PRESS_QUERIES, pressHintFor, pressBlockedSince, pressPurgeExisting } from './overrides.js';
 import { toText } from './util.js';
 
 const parser = new XMLParser({ ignoreAttributes: false, attributeNamePrefix: '@_', cdataPropName: '__cdata' });
@@ -23,6 +23,30 @@ function newsUrl(query) {
 }
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+// Best-effort: resolve an article's lead image (og:image / twitter:image) so
+// the press card can show a thumbnail. Follows the Google News redirect to the
+// real article. Never throws — returns null on any failure or timeout.
+async function fetchOgImage(url) {
+  try {
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), 6000);
+    const res = await fetch(url, { headers: { 'User-Agent': UA }, redirect: 'follow', signal: ctrl.signal });
+    clearTimeout(timer);
+    if (!res.ok) return null;
+    const html = (await res.text()).slice(0, 200000); // only need the <head>
+    const pick = (re) => { const m = html.match(re); return m && m[1] ? m[1] : null; };
+    let img =
+      pick(/<meta[^>]+property=["']og:image(?::url)?["'][^>]+content=["']([^"']+)["']/i) ||
+      pick(/<meta[^>]+content=["']([^"']+)["'][^>]+property=["']og:image["']/i) ||
+      pick(/<meta[^>]+name=["']twitter:image["'][^>]+content=["']([^"']+)["']/i);
+    if (!img) return null;
+    img = img.replace(/&amp;/g, '&').trim();
+    return /^https?:\/\//i.test(img) ? img : null;
+  } catch {
+    return null;
+  }
+}
 
 /** Fetch + parse one query's mentions (capped to the freshest `limit`). */
 async function fetchQuery(query, limit = 15) {
@@ -77,6 +101,17 @@ function relevantToShow(item, show) {
  * URL, throttled to be gentle on Google News.
  */
 export async function refreshPress(store, { log = () => {}, includeShows = true } = {}) {
+  // Remove any existing post-cutoff mentions of excluded talent (e.g. Brandi
+  // Glanville press dated on/after July 1). Pre-cutoff/undated items are kept.
+  let removed = 0;
+  for (const p of await store.listPressItems({ limit: 1000 })) {
+    if (pressPurgeExisting(`${p.title || ''} ${p.snippet || ''} ${p.source || ''}`, p.published_at)) {
+      await store.deletePressItem(p.id);
+      removed++;
+    }
+  }
+  if (removed) log(`press: removed ${removed} post-cutoff mention(s)`);
+
   const jobs = PRESS_QUERIES.map((q) => ({ query: q, show: null, hint: null }));
   if (includeShows) {
     for (const s of await store.listShows()) {
@@ -107,6 +142,8 @@ export async function refreshPress(store, { log = () => {}, includeShows = true 
             : relevantToShow(item, show);
           if (!ok) continue;
         }
+        // Fetch a lead image so the card isn't text-only (best-effort).
+        item.image_url = await fetchOgImage(item.url);
         if (await store.upsertPressItem(item)) { added++; n++; }
       }
       if (n) log(`press: ${query} → +${n}`);

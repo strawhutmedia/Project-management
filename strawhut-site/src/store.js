@@ -353,6 +353,7 @@ class PgStore {
       ALTER TABLE episodes ADD COLUMN IF NOT EXISTS season             INTEGER;
       ALTER TABLE episodes ADD COLUMN IF NOT EXISTS embedding          TEXT;
       ALTER TABLE episodes ADD COLUMN IF NOT EXISTS youtube_id         TEXT;
+      ALTER TABLE press_items ADD COLUMN IF NOT EXISTS image_url       TEXT;
     `);
     console.log('[store] using Postgres store');
   }
@@ -539,9 +540,9 @@ class PgStore {
   async upsertPressItem(item) {
     const id = newId();
     const { rowCount } = await this.pool.query(
-      `INSERT INTO press_items (id, title, url, source, snippet, query, published_at)
-       VALUES ($1,$2,$3,$4,$5,$6,$7) ON CONFLICT (url) DO NOTHING`,
-      [id, item.title, item.url, item.source, item.snippet, item.query, item.published_at || null]
+      `INSERT INTO press_items (id, title, url, source, snippet, query, published_at, image_url)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8) ON CONFLICT (url) DO NOTHING`,
+      [id, item.title, item.url, item.source, item.snippet, item.query, item.published_at || null, item.image_url || null]
     );
     return rowCount > 0;
   }
