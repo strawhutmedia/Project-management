@@ -83,6 +83,21 @@ export const PRESS_SHOW_HINTS = {
 };
 export const pressHintFor = (slug) => PRESS_SHOW_HINTS[String(slug || '').toLowerCase().trim()] || null;
 
+// People / talent we no longer work with: never pull press mentioning them,
+// and purge any of their existing mentions on the next refresh. Matched as a
+// case-insensitive substring against a mention's title + snippet + source (and
+// against show titles/host hints, so we don't even query for their shows).
+// Override via the PRESS_EXCLUDE env var (comma-separated).
+export const PRESS_EXCLUDE = (process.env.PRESS_EXCLUDE
+  ? process.env.PRESS_EXCLUDE.split(',')
+  : ['Brandi Glanville']
+).map((s) => s.trim()).filter(Boolean);
+
+export const pressExcluded = (text) => {
+  const t = String(text || '').toLowerCase();
+  return PRESS_EXCLUDE.some((term) => term && t.includes(term.toLowerCase()));
+};
+
 // Press: search queries used to auto-pull media mentions from Google News.
 // Quoted for precision. Override with the PRESS_QUERIES env var (comma-separated).
 export const PRESS_QUERIES = (process.env.PRESS_QUERIES
