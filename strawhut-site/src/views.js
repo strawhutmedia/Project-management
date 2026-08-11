@@ -17,6 +17,44 @@ const FONT =
   '<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>' +
   '<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">';
 
+// Custom, on-brand audio player. Renders a self-contained control (play/pause,
+// seekable progress bar, elapsed/duration, mute) styled in the brand palette —
+// replaces the raw <audio> element. Each instance wires only itself, so it works
+// on any page (site layout or standalone landing pages) with no global script.
+let _apSeq = 0;
+export function audioPlayer(src) {
+  const id = 'ap' + _apSeq++;
+  return `<div class="aplayer" id="${id}">
+    <audio preload="none" src="${esc(src)}"></audio>
+    <button class="aplayer-toggle" type="button" aria-label="Play">&#9654;</button>
+    <div class="aplayer-main">
+      <div class="aplayer-bar">
+        <div class="aplayer-track"><div class="aplayer-buffered"></div><div class="aplayer-played"></div></div>
+        <input class="aplayer-seek" type="range" min="0" max="1000" value="0" step="1" aria-label="Seek">
+      </div>
+      <div class="aplayer-times"><span class="aplayer-cur">0:00</span><span class="aplayer-dur">&ndash;&ndash;:&ndash;&ndash;</span></div>
+    </div>
+    <button class="aplayer-vol" type="button" aria-label="Mute">&#128266;</button>
+  </div>
+  <script>(function(){
+    var r=document.getElementById('${id}');if(!r)return;
+    var a=r.querySelector('audio'),tg=r.querySelector('.aplayer-toggle'),seek=r.querySelector('.aplayer-seek'),
+        played=r.querySelector('.aplayer-played'),buf=r.querySelector('.aplayer-buffered'),
+        cur=r.querySelector('.aplayer-cur'),dur=r.querySelector('.aplayer-dur'),vol=r.querySelector('.aplayer-vol'),seeking=false;
+    function fmt(s){if(!isFinite(s)||s<0)s=0;var m=Math.floor(s/60),x=Math.floor(s%60);return m+':'+(x<10?'0':'')+x;}
+    tg.addEventListener('click',function(){a.paused?a.play():a.pause();});
+    a.addEventListener('play',function(){tg.innerHTML='&#10074;&#10074;';tg.setAttribute('aria-label','Pause');});
+    a.addEventListener('pause',function(){tg.innerHTML='&#9654;';tg.setAttribute('aria-label','Play');});
+    a.addEventListener('loadedmetadata',function(){dur.textContent=fmt(a.duration);});
+    a.addEventListener('timeupdate',function(){cur.textContent=fmt(a.currentTime);if(!seeking&&a.duration){var p=a.currentTime/a.duration;played.style.width=(p*100)+'%';seek.value=Math.round(p*1000);}});
+    a.addEventListener('progress',function(){try{if(a.buffered.length&&a.duration){buf.style.width=(a.buffered.end(a.buffered.length-1)/a.duration*100)+'%';}}catch(e){}});
+    a.addEventListener('ended',function(){tg.innerHTML='&#9654;';tg.setAttribute('aria-label','Play');});
+    seek.addEventListener('input',function(){seeking=true;played.style.width=(seek.value/10)+'%';});
+    seek.addEventListener('change',function(){if(a.duration){a.currentTime=(seek.value/1000)*a.duration;}seeking=false;});
+    vol.addEventListener('click',function(){a.muted=!a.muted;vol.innerHTML=a.muted?'&#128263;':'&#128266;';});
+  })();</script>`;
+}
+
 function layout({
   title,
   description,
@@ -259,7 +297,7 @@ export function landingPage({ landing, show, episode }) {
   const player = ep.youtube_id
     ? `<div class="video-embed"><iframe src="https://www.youtube-nocookie.com/embed/${esc(ep.youtube_id)}" title="${esc(headline)}" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen></iframe></div>`
     : ep.audio_url
-      ? `<audio controls preload="none" src="${esc(ep.audio_url)}"></audio>`
+      ? audioPlayer(ep.audio_url)
       : '';
   const body = landing.body_html || (ep.description ? ep.description : '');
   return `<!doctype html><html lang="en"><head>
@@ -514,9 +552,7 @@ export function episodePage({ show, episode, moreFromShow = [], related = [] }) 
         ${episode.youtube_id ? `<div class="video-embed"><iframe src="https://www.youtube-nocookie.com/embed/${esc(episode.youtube_id)}" title="${esc(episode.title)}" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen loading="lazy"></iframe></div>` : ''}
         ${
           episode.audio_url
-            ? `<button class="btn btn-primary play-cta" id="playCta" type="button">▶ Play this episode</button>
-               <audio id="epAudio" controls preload="none" src="${esc(episode.audio_url)}"></audio>
-               <script>(function(){var b=document.getElementById('playCta'),a=document.getElementById('epAudio');if(b&&a){b.addEventListener('click',function(){a.play();b.textContent='▶ Playing…';a.scrollIntoView({behavior:'smooth',block:'center'});});}})();</script>`
+            ? audioPlayer(episode.audio_url)
             : `<p class="sub">Audio unavailable for this episode.</p>`
         }
       </div>
