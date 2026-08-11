@@ -519,7 +519,7 @@ app.post('/contact', async (req, res) => {
     res.send(V.contactPage({ sent: true }));
   } catch (e) {
     console.error('[contact] send failed:', e.message);
-    res.send(V.contactPage({ error: 'Something went wrong sending your message. Please email us directly at ryan@strawhutmedia.com.', values }));
+    res.send(V.contactPage({ error: 'Something went wrong sending your message. Please email us directly at hello@strawhutmedia.com.', values }));
   }
 });
 
