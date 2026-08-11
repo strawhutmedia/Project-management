@@ -83,19 +83,40 @@ export const PRESS_SHOW_HINTS = {
 };
 export const pressHintFor = (slug) => PRESS_SHOW_HINTS[String(slug || '').toLowerCase().trim()] || null;
 
-// People / talent we no longer work with: never pull press mentioning them,
-// and purge any of their existing mentions on the next refresh. Matched as a
-// case-insensitive substring against a mention's title + snippet + source (and
-// against show titles/host hints, so we don't even query for their shows).
-// Override via the PRESS_EXCLUDE env var (comma-separated).
-export const PRESS_EXCLUDE = (process.env.PRESS_EXCLUDE
-  ? process.env.PRESS_EXCLUDE.split(',')
-  : ['Brandi Glanville']
-).map((s) => s.trim()).filter(Boolean);
+// Talent we no longer actively work with. We KEEP their existing show,
+// episodes, and press — but freeze the show (see FROZEN_SHOWS below) so no NEW
+// episodes are added, and stop adding NEW press mentioning them dated on/after
+// `since`. Override via PRESS_EXCLUDE_SINCE_JSON (a JSON array).
+export const PRESS_EXCLUDE_SINCE = process.env.PRESS_EXCLUDE_SINCE_JSON
+  ? JSON.parse(process.env.PRESS_EXCLUDE_SINCE_JSON)
+  : [{ name: 'Brandi Glanville', since: '2026-07-01' }];
 
-export const pressExcluded = (text) => {
+// Block a freshly-fetched mention? True if it names an excluded person AND is
+// dated on/after their cutoff. Undated items are treated as new → blocked.
+// Existing press already in the DB is never touched — this only gates new adds.
+export function pressBlockedSince(text, publishedAt) {
   const t = String(text || '').toLowerCase();
-  return PRESS_EXCLUDE.some((term) => term && t.includes(term.toLowerCase()));
+  for (const { name, since } of PRESS_EXCLUDE_SINCE) {
+    if (!name || !t.includes(name.toLowerCase())) continue;
+    if (!publishedAt) return true;
+    const d = new Date(publishedAt);
+    if (isNaN(d.getTime())) return true;
+    if (d.getTime() >= new Date(since).getTime()) return true;
+  }
+  return false;
+}
+
+// Shows to keep but FREEZE — existing episodes stay; no new episodes are added
+// on sync. Matched by slug (and base slug, ignoring any trailing "-<id>").
+// Override via the FROZEN_SHOWS env var (comma-separated slugs).
+export const FROZEN_SHOWS = (process.env.FROZEN_SHOWS
+  ? process.env.FROZEN_SHOWS.split(',')
+  : ['brandi-glanville-unfiltered']
+).map((s) => s.trim().toLowerCase()).filter(Boolean);
+
+export const isFrozenShow = (slug) => {
+  const s = String(slug || '').toLowerCase().trim();
+  return FROZEN_SHOWS.includes(s) || FROZEN_SHOWS.includes(s.replace(/-\d+$/, ''));
 };
 
 // Press: search queries used to auto-pull media mentions from Google News.

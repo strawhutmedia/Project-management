@@ -3,7 +3,7 @@
 // which we parse, de-dupe, and store for the public Press page.
 
 import { XMLParser } from 'fast-xml-parser';
-import { PRESS_QUERIES, pressHintFor, PRESS_EXCLUDE, pressExcluded } from './overrides.js';
+import { PRESS_QUERIES, pressHintFor, pressBlockedSince } from './overrides.js';
 import { toText } from './util.js';
 
 const parser = new XMLParser({ ignoreAttributes: false, attributeNamePrefix: '@_', cdataPropName: '__cdata' });
@@ -77,26 +77,11 @@ function relevantToShow(item, show) {
  * URL, throttled to be gentle on Google News.
  */
 export async function refreshPress(store, { log = () => {}, includeShows = true } = {}) {
-  // Purge existing mentions of anyone we no longer work with (e.g. Brandi
-  // Glanville) so past pulls don't linger.
-  let removed = 0;
-  if (PRESS_EXCLUDE.length) {
-    for (const p of await store.listPressItems({ limit: 1000 })) {
-      if (pressExcluded(`${p.title || ''} ${p.snippet || ''} ${p.source || ''}`)) {
-        await store.deletePressItem(p.id);
-        removed++;
-      }
-    }
-    if (removed) log(`press: purged ${removed} excluded mention(s)`);
-  }
-
   const jobs = PRESS_QUERIES.map((q) => ({ query: q, show: null, hint: null }));
   if (includeShows) {
     for (const s of await store.listShows()) {
       if (!s.title) continue;
       const hint = pressHintFor(s.slug); // e.g. ['Phil Rosenthal'] or multiple hosts
-      // Skip shows/hosts we've excluded — don't even query for them.
-      if (pressExcluded(s.title) || (hint && hint.some((h) => pressExcluded(h)))) continue;
       const query = hint
         ? `"${s.title}" (${hint.map((h) => `"${h}"`).join(' OR ')})`
         : `"${s.title}"`;
@@ -110,8 +95,9 @@ export async function refreshPress(store, { log = () => {}, includeShows = true 
       const items = await fetchQuery(query, show ? 8 : 25);
       let n = 0;
       for (const item of items) {
-        // Never add a mention of anyone we've excluded, on any query.
-        if (pressExcluded(`${item.title} ${item.snippet}`)) continue;
+        // Keep existing press, but don't add NEW mentions of excluded talent
+        // dated on/after their cutoff (e.g. Brandi Glanville since July 1).
+        if (pressBlockedSince(`${item.title} ${item.snippet}`, item.published_at)) continue;
         if (show) {
           const hay = `${item.title} ${item.snippet}`.toLowerCase();
           // With a hint, require ANY hint term (host) to appear; otherwise use

@@ -6,6 +6,7 @@
 
 import { fetchFeed } from './rss.js';
 import { slugify, uniqueSlug } from './util.js';
+import { isFrozenShow } from './overrides.js';
 
 /** Add a brand-new show from a feed URL (used by the admin "Add show" form). */
 export async function addShowFromFeed(store, feedUrl, opts = {}) {
@@ -55,6 +56,11 @@ export async function syncShow(store, show) {
     apple_url: show.apple_url,
     last_synced: new Date().toISOString(),
   });
+
+  // Frozen shows keep their existing episodes but never gain new ones.
+  if (isFrozenShow(show.slug)) {
+    return { added: 0, total: episodes.length, frozen: true };
+  }
 
   const seenGuids = await store.existingGuids(show.id);
   const takenSlugs = await store.existingEpisodeSlugs(show.id);
