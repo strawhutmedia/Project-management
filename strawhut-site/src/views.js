@@ -13,6 +13,7 @@ import {
   videoObjectJsonLd,
   studioServiceJsonLd,
 } from './seo.js';
+import { resolvePlatformLinks } from './platforms.js';
 
 const FONT =
   '<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>' +
@@ -22,38 +23,73 @@ const FONT =
 // seekable progress bar, elapsed/duration, mute) styled in the brand palette —
 // replaces the raw <audio> element. Each instance wires only itself, so it works
 // on any page (site layout or standalone landing pages) with no global script.
+const SKIP_SECONDS = 15;
 let _apSeq = 0;
 export function audioPlayer(src) {
   const id = 'ap' + _apSeq++;
+  const back = `<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M11.5 4C8.43 4 5.68 5.39 3.85 7.65L2 5.75V11h5.25L5.08 8.83C6.54 7.08 8.68 6 11.5 6c4.14 0 7.5 3.36 7.5 7.5S15.64 21 11.5 21A7.5 7.5 0 0 1 4.1 14H2.08C2.56 18.84 6.6 23 11.5 23c5.25 0 9.5-4.25 9.5-9.5S16.75 4 11.5 4z"/><text x="11.5" y="17.5" text-anchor="middle" font-size="7" font-weight="700" font-family="system-ui,sans-serif">15</text></svg>`;
+  const fwd = `<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12.5 4C15.57 4 18.32 5.39 20.15 7.65L22 5.75V11h-5.25l2.17-2.17C17.46 7.08 15.32 6 12.5 6 8.36 6 5 9.36 5 13.5S8.36 21 12.5 21a7.5 7.5 0 0 0 7.4-6H21.92C21.44 18.84 17.4 23 12.5 23 7.25 23 3 18.75 3 13.5S7.25 4 12.5 4z"/><text x="12.5" y="17.5" text-anchor="middle" font-size="7" font-weight="700" font-family="system-ui,sans-serif">15</text></svg>`;
   return `<div class="aplayer" id="${id}">
     <audio preload="none" src="${esc(src)}"></audio>
-    <button class="aplayer-toggle" type="button" aria-label="Play">&#9654;</button>
-    <div class="aplayer-main">
-      <div class="aplayer-bar">
-        <div class="aplayer-track"><div class="aplayer-buffered"></div><div class="aplayer-played"></div></div>
-        <input class="aplayer-seek" type="range" min="0" max="1000" value="0" step="1" aria-label="Seek">
-      </div>
-      <div class="aplayer-times"><span class="aplayer-cur">0:00</span><span class="aplayer-dur">&ndash;&ndash;:&ndash;&ndash;</span></div>
+    <div class="aplayer-controls">
+      <button class="aplayer-skip" data-skip="back" type="button" aria-label="Back ${SKIP_SECONDS} seconds">${back}</button>
+      <button class="aplayer-toggle" type="button" aria-label="Play">
+        <svg class="ap-ico-play" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><polygon points="7,4 20,12 7,20"/></svg>
+        <svg class="ap-ico-pause" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" style="display:none"><rect x="6" y="4" width="4" height="16" rx="1"/><rect x="14" y="4" width="4" height="16" rx="1"/></svg>
+      </button>
+      <button class="aplayer-skip" data-skip="fwd" type="button" aria-label="Forward ${SKIP_SECONDS} seconds">${fwd}</button>
     </div>
-    <button class="aplayer-vol" type="button" aria-label="Mute">&#128266;</button>
+    <div class="aplayer-bar" tabindex="0" role="slider" aria-label="Seek">
+      <div class="aplayer-track"><div class="aplayer-buffered"></div><div class="aplayer-played"></div><div class="aplayer-knob"></div></div>
+    </div>
+    <div class="aplayer-times"><span class="aplayer-cur">0:00</span><span class="aplayer-dur">&ndash;&ndash;:&ndash;&ndash;</span></div>
   </div>
   <script>(function(){
     var r=document.getElementById('${id}');if(!r)return;
-    var a=r.querySelector('audio'),tg=r.querySelector('.aplayer-toggle'),seek=r.querySelector('.aplayer-seek'),
-        played=r.querySelector('.aplayer-played'),buf=r.querySelector('.aplayer-buffered'),
-        cur=r.querySelector('.aplayer-cur'),dur=r.querySelector('.aplayer-dur'),vol=r.querySelector('.aplayer-vol'),seeking=false;
+    var a=r.querySelector('audio'),tg=r.querySelector('.aplayer-toggle'),
+        ip=r.querySelector('.ap-ico-play'),ie=r.querySelector('.ap-ico-pause'),
+        bar=r.querySelector('.aplayer-bar'),played=r.querySelector('.aplayer-played'),
+        buf=r.querySelector('.aplayer-buffered'),knob=r.querySelector('.aplayer-knob'),
+        cur=r.querySelector('.aplayer-cur'),dur=r.querySelector('.aplayer-dur'),SK=${SKIP_SECONDS};
     function fmt(s){if(!isFinite(s)||s<0)s=0;var m=Math.floor(s/60),x=Math.floor(s%60);return m+':'+(x<10?'0':'')+x;}
+    function setPct(p){p=Math.max(0,Math.min(1,p));played.style.width=(p*100)+'%';knob.style.left=(p*100)+'%';}
     tg.addEventListener('click',function(){a.paused?a.play():a.pause();});
-    a.addEventListener('play',function(){tg.innerHTML='&#10074;&#10074;';tg.setAttribute('aria-label','Pause');});
-    a.addEventListener('pause',function(){tg.innerHTML='&#9654;';tg.setAttribute('aria-label','Play');});
+    a.addEventListener('play',function(){ip.style.display='none';ie.style.display='';tg.setAttribute('aria-label','Pause');r.classList.add('is-playing');});
+    a.addEventListener('pause',function(){ip.style.display='';ie.style.display='none';tg.setAttribute('aria-label','Play');r.classList.remove('is-playing');});
+    a.addEventListener('ended',function(){ip.style.display='';ie.style.display='none';r.classList.remove('is-playing');});
     a.addEventListener('loadedmetadata',function(){dur.textContent=fmt(a.duration);});
-    a.addEventListener('timeupdate',function(){cur.textContent=fmt(a.currentTime);if(!seeking&&a.duration){var p=a.currentTime/a.duration;played.style.width=(p*100)+'%';seek.value=Math.round(p*1000);}});
+    a.addEventListener('timeupdate',function(){cur.textContent=fmt(a.currentTime);if(a.duration)setPct(a.currentTime/a.duration);});
     a.addEventListener('progress',function(){try{if(a.buffered.length&&a.duration){buf.style.width=(a.buffered.end(a.buffered.length-1)/a.duration*100)+'%';}}catch(e){}});
-    a.addEventListener('ended',function(){tg.innerHTML='&#9654;';tg.setAttribute('aria-label','Play');});
-    seek.addEventListener('input',function(){seeking=true;played.style.width=(seek.value/10)+'%';});
-    seek.addEventListener('change',function(){if(a.duration){a.currentTime=(seek.value/1000)*a.duration;}seeking=false;});
-    vol.addEventListener('click',function(){a.muted=!a.muted;vol.innerHTML=a.muted?'&#128263;':'&#128266;';});
+    r.querySelectorAll('.aplayer-skip').forEach(function(b){b.addEventListener('click',function(){
+      var d=b.getAttribute('data-skip')==='back'?-SK:SK;
+      if(a.readyState===0){a.load();}
+      a.currentTime=Math.max(0,Math.min((a.duration||1e9),(a.currentTime||0)+d));
+    });});
+    function seekTo(clientX){var rect=bar.getBoundingClientRect();var p=(clientX-rect.left)/rect.width;if(a.duration){a.currentTime=Math.max(0,Math.min(1,p))*a.duration;}else{setPct(p);}}
+    var dragging=false;
+    bar.addEventListener('mousedown',function(e){dragging=true;seekTo(e.clientX);});
+    document.addEventListener('mousemove',function(e){if(dragging)seekTo(e.clientX);});
+    document.addEventListener('mouseup',function(){dragging=false;});
+    bar.addEventListener('click',function(e){seekTo(e.clientX);});
+    bar.addEventListener('keydown',function(e){if(e.key==='ArrowLeft'){a.currentTime=Math.max(0,(a.currentTime||0)-SK);}else if(e.key==='ArrowRight'){a.currentTime=Math.min((a.duration||1e9),(a.currentTime||0)+SK);}});
   })();</script>`;
+}
+
+// "Listen & subscribe on" row of platform logos for a show, shown under the
+// player. Each logo links to the show on that platform (see platforms.js).
+export function platformRow(show) {
+  const links = resolvePlatformLinks(show);
+  if (!links.length) return '';
+  return `<div class="listen-on">
+    <div class="listen-on-label">Listen &amp; subscribe on</div>
+    <div class="platform-links">
+      ${links
+        .map(
+          (l) => `<a class="platform-link" href="${esc(l.url)}" target="_blank" rel="noopener" style="--pc:${esc(l.color)}" aria-label="${esc(l.label)}" title="${esc(l.label)}"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">${l.icon}</svg><span>${esc(l.label)}</span></a>`
+        )
+        .join('')}
+    </div>
+  </div>`;
 }
 
 function layout({
@@ -473,14 +509,6 @@ export function pressPage({ items }) {
 
 export function showPage({ show, episodes, total = episodes.length, pageNum = 1, perPage = 60 }) {
   const pageCount = Math.max(1, Math.ceil(total / perPage));
-  const platforms = [
-    show.spotify_url && [show.spotify_url, 'Spotify'],
-    show.apple_url && [show.apple_url, 'Apple Podcasts'],
-    show.feed_url && [show.feed_url, 'RSS'],
-  ].filter(Boolean);
-  const platformBtns = platforms
-    .map(([href, label]) => `<a class="btn btn-sm" href="${esc(href)}" target="_blank" rel="noopener">${esc(label)}</a>`)
-    .join('');
 
   const rows = episodes
     .map(
@@ -505,7 +533,7 @@ export function showPage({ show, episodes, total = episodes.length, pageNum = 1,
         <h1>${esc(show.title)}</h1>
         ${show.author ? `<div class="author">${esc(show.author)}</div>` : ''}
         <p class="desc">${esc(toText(show.description, 600))}</p>
-        <div class="platforms">${platformBtns}</div>
+        ${platformRow(show)}
       </div>
     </div>
   </div></section>
@@ -566,8 +594,8 @@ export function episodePage({ show, episode, moreFromShow = [], related = [] }) 
         ${episode.youtube_id ? `<div class="video-embed"><iframe src="https://www.youtube-nocookie.com/embed/${esc(episode.youtube_id)}" title="${esc(episode.title)}" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen loading="lazy"></iframe></div>` : ''}
         ${
           episode.audio_url
-            ? audioPlayer(episode.audio_url)
-            : `<p class="sub">Audio unavailable for this episode.</p>`
+            ? audioPlayer(episode.audio_url) + platformRow(show)
+            : platformRow(show) || `<p class="sub">Audio unavailable for this episode.</p>`
         }
       </div>
     </div>

@@ -2,6 +2,7 @@
 // RSS feed. Used by the admin "Import all shows" button and the CLI script.
 
 import { addShowFromFeed } from './sync.js';
+import { extractPlatformLinks } from './platforms.js';
 import { IMPORT_OVERRIDES, RETIRE_FEEDS, EXCLUDE_SHOW_PATHS, EXTRA_SHOWS } from './overrides.js';
 
 const UA = 'StrawHutMedia-Importer/1.0';
@@ -111,7 +112,9 @@ export async function importFromSite(store, { site = 'https://www.strawhutmedia.
     try {
       if (EXCLUDE_SHOW_PATHS.includes(p) || excludeBases.has(baseSlug(p))) continue;
       const ov = IMPORT_OVERRIDES[p] || {};
-      const feed = ov.feed_url || extractFeed(await get(`${site}/${p}`));
+      let showHtml = '';
+      try { showHtml = await get(`${site}/${p}`); } catch {}
+      const feed = ov.feed_url || extractFeed(showHtml);
       if (!feed) {
         failed++;
         continue;
@@ -123,6 +126,12 @@ export async function importFromSite(store, { site = 'https://www.strawhutmedia.
       const { show, created, added } = await addShowFromFeed(store, feed, { show_type: wantType });
       // Enforce classification even for shows that already existed.
       if (wantType && show.show_type !== wantType) await store.updateShow(show.id, { show_type: wantType });
+      // Curated subscribe links straight off the current site's show page.
+      const links = extractPlatformLinks(showHtml);
+      if (Object.keys(links).length) {
+        const merged = { ...(show.platform_links || {}), ...links };
+        await store.updateShow(show.id, { platform_links: JSON.stringify(merged) });
+      }
       onProgress(`${created ? '+' : '='} ${show.title} [${show.show_type}] (${added} eps)`);
       ok++;
     } catch (e) {

@@ -347,6 +347,7 @@ class PgStore {
       ALTER TABLE shows    ADD COLUMN IF NOT EXISTS apple_url          TEXT;
       ALTER TABLE shows    ADD COLUMN IF NOT EXISTS show_type          TEXT DEFAULT 'original';
       ALTER TABLE shows    ADD COLUMN IF NOT EXISTS youtube_channel_id TEXT;
+      ALTER TABLE shows    ADD COLUMN IF NOT EXISTS platform_links     TEXT;
       ALTER TABLE shows    ADD COLUMN IF NOT EXISTS last_synced        TIMESTAMPTZ;
       ALTER TABLE episodes ADD COLUMN IF NOT EXISTS episode_number     INTEGER;
       ALTER TABLE episodes ADD COLUMN IF NOT EXISTS season             INTEGER;
@@ -357,7 +358,9 @@ class PgStore {
   }
   _rowToShow(r) {
     if (!r) return null;
-    return { ...r, categories: r.categories ? JSON.parse(r.categories) : [] };
+    let platform_links = null;
+    if (r.platform_links) { try { platform_links = JSON.parse(r.platform_links); } catch { platform_links = null; } }
+    return { ...r, categories: r.categories ? JSON.parse(r.categories) : [], platform_links };
   }
   async listShows() {
     const { rows } = await this.pool.query(
@@ -384,15 +387,17 @@ class PgStore {
     const id = existing?.id || show.id || newId();
     const m = { ...existing, ...show, id };
     await this.pool.query(
-      `INSERT INTO shows (id, slug, title, description, author, image_url, feed_url, link, categories, spotify_url, apple_url, show_type, youtube_channel_id, featured, sort_order, last_synced)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)
+      `INSERT INTO shows (id, slug, title, description, author, image_url, feed_url, link, categories, spotify_url, apple_url, show_type, youtube_channel_id, platform_links, featured, sort_order, last_synced)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17)
        ON CONFLICT (id) DO UPDATE SET
          slug=$2, title=$3, description=$4, author=$5, image_url=$6, feed_url=$7, link=$8,
-         categories=$9, spotify_url=$10, apple_url=$11, show_type=$12, youtube_channel_id=$13, featured=$14, sort_order=$15, last_synced=$16`,
+         categories=$9, spotify_url=$10, apple_url=$11, show_type=$12, youtube_channel_id=$13, platform_links=$14, featured=$15, sort_order=$16, last_synced=$17`,
       [
         id, m.slug, m.title, m.description, m.author, m.image_url, m.feed_url, m.link,
         JSON.stringify(m.categories || []), m.spotify_url, m.apple_url,
-        m.show_type || 'original', m.youtube_channel_id || null, !!m.featured, m.sort_order || 0, m.last_synced || null,
+        m.show_type || 'original', m.youtube_channel_id || null,
+        m.platform_links ? (typeof m.platform_links === 'string' ? m.platform_links : JSON.stringify(m.platform_links)) : null,
+        !!m.featured, m.sort_order || 0, m.last_synced || null,
       ]
     );
     return this.getShowById(id);
