@@ -234,6 +234,7 @@ img { max-width: 100%; display: block; }
 .contact-form { max-width: 640px; }
 .contact-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
 .contact-form textarea { width: 100%; padding: 12px 14px; border-radius: 10px; border: 1px solid var(--border); background: var(--bg-2); color: var(--text); font-size: 0.95rem; font-family: inherit; resize: vertical; }
+.contact-select { width: 100%; max-width: 100%; padding: 12px 14px; border-radius: 10px; border: 1px solid var(--border); background: var(--bg-2); color: var(--text); font-size: 0.95rem; font-family: inherit; }
 .contact-form .btn-primary { margin-top: 6px; }
 .contact-thanks { max-width: 640px; background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); padding: 30px 32px; }
 .footer-links a { color: var(--muted); }

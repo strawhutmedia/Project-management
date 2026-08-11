@@ -23,14 +23,23 @@ async function sendOne({ to, subject, html }) {
   return res.json();
 }
 
+// Contact-form routing: each topic goes to the right inbox. Order = the order
+// shown in the dropdown; the first entry is the default.
+export const CONTACT_ROUTES = {
+  general: { label: 'General inquiry', to: 'hello@strawhutmedia.com' },
+  booking: { label: 'Get booked as a guest on a show', to: 'booking@strawhutmedia.com' },
+  press: { label: 'Press / media', to: 'press@strawhutmedia.com' },
+};
+
 /**
- * Deliver a contact-form submission to the admin inbox, with reply-to set to
- * the sender so the admin can just hit reply.
+ * Deliver a contact-form submission to the inbox for its topic, with reply-to
+ * set to the sender so the recipient can just hit reply.
  */
-export async function sendContactEmail({ name, email, company, message }) {
-  const to = process.env.ADMIN_EMAIL || 'ryan@strawhutmedia.com';
+export async function sendContactEmail({ name, email, company, message, topic }) {
+  const route = CONTACT_ROUTES[topic] || CONTACT_ROUTES.general;
   const esc = (s) => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
   const html = `<h2>New contact form message</h2>
+    <p><strong>Regarding:</strong> ${esc(route.label)}</p>
     <p><strong>Name:</strong> ${esc(name)}</p>
     <p><strong>Email:</strong> ${esc(email)}</p>
     ${company ? `<p><strong>Company / show:</strong> ${esc(company)}</p>` : ''}
@@ -42,7 +51,7 @@ export async function sendContactEmail({ name, email, company, message }) {
       Authorization: `Bearer ${process.env.RESEND_API_KEY}`,
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({ from: FROM, to, subject: `Contact form — ${name || 'someone'}`, html, reply_to: email }),
+    body: JSON.stringify({ from: FROM, to: route.to, subject: `[${route.label}] ${name || 'someone'}`, html, reply_to: email }),
   });
   if (!res.ok) {
     const body = await res.text().catch(() => '');

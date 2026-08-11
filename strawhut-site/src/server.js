@@ -505,16 +505,16 @@ app.get('/studio', (req, res) => res.send(V.studioPage()));
 
 app.get('/contact', (req, res) => res.send(V.contactPage()));
 app.post('/contact', async (req, res) => {
-  const { name = '', email = '', company = '', message = '' } = req.body || {};
-  const values = { name, email, company, message };
+  const { name = '', email = '', company = '', message = '', topic = 'general' } = req.body || {};
+  const values = { name, email, company, message, topic };
   if (!name.trim() || !email.trim() || !message.trim()) {
     return res.send(V.contactPage({ error: 'Please fill in your name, email, and a message.', values }));
   }
   try {
     if (mailConfigured()) {
-      await sendContactEmail({ name, email, company, message });
+      await sendContactEmail({ name, email, company, message, topic });
     } else {
-      console.log('[contact] (email not configured) message from', email, '-', message.slice(0, 120));
+      console.log('[contact] (email not configured) message from', email, `[${topic}]`, '-', message.slice(0, 120));
     }
     res.send(V.contactPage({ sent: true }));
   } catch (e) {

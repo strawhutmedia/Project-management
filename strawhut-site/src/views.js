@@ -14,6 +14,7 @@ import {
   studioServiceJsonLd,
 } from './seo.js';
 import { resolvePlatformLinks } from './platforms.js';
+import { CONTACT_ROUTES } from './mail.js';
 
 const FONT =
   '<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>' +
@@ -490,6 +491,13 @@ export function contactPage({ sent = false, error = '', values = {} } = {}) {
            </div>`
         : `<form class="contact-form" method="POST" action="/contact">
              ${error ? `<div class="flash err" style="margin-bottom:18px">${esc(error)}</div>` : ''}
+             <div class="field"><label>What's this regarding?</label>
+               <select name="topic" class="contact-select">
+                 ${Object.entries(CONTACT_ROUTES)
+                   .map(([k, r]) => `<option value="${esc(k)}"${(values.topic || 'general') === k ? ' selected' : ''}>${esc(r.label)}</option>`)
+                   .join('')}
+               </select>
+             </div>
              <div class="contact-grid">
                <div class="field"><label>Your name</label><input type="text" name="name" value="${v('name')}" required></div>
                <div class="field"><label>Email</label><input type="email" name="email" value="${v('email')}" required></div>
