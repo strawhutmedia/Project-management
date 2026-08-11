@@ -13,7 +13,7 @@ import { addShowFromFeed, syncShow, syncAll, startScheduler } from './sync.js';
 import * as V from './views.js';
 import * as A from './admin_views.js';
 import { robotsTxt, sitemapXml, llmsTxt } from './seo.js';
-import { sendAnnouncement, mailConfigured } from './mail.js';
+import { sendAnnouncement, mailConfigured, sendContactEmail } from './mail.js';
 import { importFromSite } from './importer.js';
 import * as reco from './recommend.js';
 import { matchAllShows, matchShowVideos } from './youtube.js';
@@ -502,6 +502,26 @@ app.get('/shows', async (req, res) => {
 });
 
 app.get('/studio', (req, res) => res.send(V.studioPage()));
+
+app.get('/contact', (req, res) => res.send(V.contactPage()));
+app.post('/contact', async (req, res) => {
+  const { name = '', email = '', company = '', message = '' } = req.body || {};
+  const values = { name, email, company, message };
+  if (!name.trim() || !email.trim() || !message.trim()) {
+    return res.send(V.contactPage({ error: 'Please fill in your name, email, and a message.', values }));
+  }
+  try {
+    if (mailConfigured()) {
+      await sendContactEmail({ name, email, company, message });
+    } else {
+      console.log('[contact] (email not configured) message from', email, '-', message.slice(0, 120));
+    }
+    res.send(V.contactPage({ sent: true }));
+  } catch (e) {
+    console.error('[contact] send failed:', e.message);
+    res.send(V.contactPage({ error: 'Something went wrong sending your message. Please email us directly at ryan@strawhutmedia.com.', values }));
+  }
+});
 
 app.get('/press', async (req, res) => {
   const items = await store.listPressItems({ limit: 200 });

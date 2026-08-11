@@ -110,9 +110,8 @@ function layout({
     ['/', 'Home'],
     ['/shows', 'Shows'],
     ['/studio', 'Studio'],
-    ['/services', 'Services'],
     ['/press', 'Press'],
-    ['/admin', 'Admin'],
+    ['/contact', 'Contact'],
   ]
     .map(
       ([href, label]) =>
@@ -153,7 +152,7 @@ ${jsonLd}
 <main>${body}</main>
 <footer class="site-footer"><div class="container">
   <div>© ${new Date().getFullYear()} Straw Hut Media — ${esc('Full-service podcast production & network')}</div>
-  <div>Podcasts that matter.</div>
+  <div class="footer-links"><a href="/contact">Contact</a> · <a href="/admin">Admin</a></div>
 </div></footer>
 </body></html>`;
 }
@@ -471,6 +470,46 @@ export function studioPage() {
         { name: 'Home', path: '/' },
         { name: 'Studio', path: '/studio' },
       ]),
+  });
+}
+
+export function contactPage({ sent = false, error = '', values = {} } = {}) {
+  const v = (k) => esc(values[k] || '');
+  const body = `
+  <section class="hero" style="padding-bottom:20px"><div class="container">
+    <div class="breadcrumb" style="padding:0 0 14px"><a href="/">Home</a> / Contact</div>
+    <h1>Let's make something <span class="accent">worth hearing</span></h1>
+    <p>Straw Hut Media is a full-service podcast production company and network. Producing, distributing, or growing a show — or booking our Hollywood studio — start here and we'll be in touch.</p>
+  </div></section>
+  <section class="section"><div class="container">
+    ${
+      sent
+        ? `<div class="contact-thanks">
+             <h2 style="margin:0 0 8px">Thanks — message received.</h2>
+             <p style="color:var(--muted);margin:0">We read every note and reply personally. Talk soon.</p>
+           </div>`
+        : `<form class="contact-form" method="POST" action="/contact">
+             ${error ? `<div class="flash err" style="margin-bottom:18px">${esc(error)}</div>` : ''}
+             <div class="contact-grid">
+               <div class="field"><label>Your name</label><input type="text" name="name" value="${v('name')}" required></div>
+               <div class="field"><label>Email</label><input type="email" name="email" value="${v('email')}" required></div>
+             </div>
+             <div class="field"><label>Company / show <span style="color:var(--muted);font-weight:400">(optional)</span></label><input type="text" name="company" value="${v('company')}"></div>
+             <div class="field"><label>What can we help with?</label><textarea name="message" rows="6" required>${v('message')}</textarea></div>
+             <button class="btn btn-primary" type="submit">Send message</button>
+           </form>`
+    }
+  </div></section>`;
+  return layout({
+    title: 'Contact — Straw Hut Media',
+    description: 'Get in touch with Straw Hut Media — full-service podcast production, network distribution, advertising, and studio booking in Hollywood.',
+    body,
+    activeNav: '/contact',
+    path: '/contact',
+    jsonLd: breadcrumbJsonLd([
+      { name: 'Home', path: '/' },
+      { name: 'Contact', path: '/contact' },
+    ]),
   });
 }
 

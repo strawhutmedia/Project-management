@@ -230,6 +230,16 @@ img { max-width: 100%; display: block; }
 .press-snippet { color: var(--muted); font-size: 0.92rem; margin: 0 0 12px; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
 .press-link { color: var(--text); font-weight: 600; font-size: 0.88rem; }
 
+/* Contact */
+.contact-form { max-width: 640px; }
+.contact-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.contact-form textarea { width: 100%; padding: 12px 14px; border-radius: 10px; border: 1px solid var(--border); background: var(--bg-2); color: var(--text); font-size: 0.95rem; font-family: inherit; resize: vertical; }
+.contact-form .btn-primary { margin-top: 6px; }
+.contact-thanks { max-width: 640px; background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); padding: 30px 32px; }
+.footer-links a { color: var(--muted); }
+.footer-links a:hover { color: var(--text); }
+@media (max-width: 640px) { .contact-grid { grid-template-columns: 1fr; } }
+
 .breadcrumb { color: var(--muted); font-size: 0.9rem; padding: 22px 0 0; }
 .breadcrumb a:hover { color: var(--text); }
 
@@ -259,7 +269,7 @@ img { max-width: 100%; display: block; }
 .panel h2 { margin: 0 0 16px; font-size: 1.15rem; }
 .field { margin-bottom: 16px; }
 .field label { display: block; font-weight: 600; font-size: 0.9rem; margin-bottom: 6px; }
-.field input[type=text], .field input[type=url], .field input[type=password], .field input[type=number] {
+.field input[type=text], .field input[type=url], .field input[type=password], .field input[type=number], .field input[type=email], .field input[type=tel] {
   width: 100%; padding: 12px 14px; border-radius: 10px; border: 1px solid var(--border);
   background: var(--bg-2); color: var(--text); font-size: 0.95rem; font-family: inherit;
 }

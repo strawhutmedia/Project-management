@@ -24,6 +24,34 @@ async function sendOne({ to, subject, html }) {
 }
 
 /**
+ * Deliver a contact-form submission to the admin inbox, with reply-to set to
+ * the sender so the admin can just hit reply.
+ */
+export async function sendContactEmail({ name, email, company, message }) {
+  const to = process.env.ADMIN_EMAIL || 'ryan@strawhutmedia.com';
+  const esc = (s) => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  const html = `<h2>New contact form message</h2>
+    <p><strong>Name:</strong> ${esc(name)}</p>
+    <p><strong>Email:</strong> ${esc(email)}</p>
+    ${company ? `<p><strong>Company / show:</strong> ${esc(company)}</p>` : ''}
+    <p><strong>Message:</strong></p>
+    <p style="white-space:pre-wrap">${esc(message)}</p>`;
+  const res = await fetch('https://api.resend.com/emails', {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${process.env.RESEND_API_KEY}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ from: FROM, to, subject: `Contact form — ${name || 'someone'}`, html, reply_to: email }),
+  });
+  if (!res.ok) {
+    const body = await res.text().catch(() => '');
+    throw new Error(`Resend HTTP ${res.status}: ${body.slice(0, 200)}`);
+  }
+  return res.json();
+}
+
+/**
  * Send an announcement to a list of subscribers.
  * Sends individually so one bad address doesn't fail the batch, and so each
  * recipient only sees their own address.

@@ -216,7 +216,7 @@ export function robotsTxt() {
     'Applebot-Extended', 'Amazonbot', 'Bytespider', 'CCBot', 'cohere-ai',
   ];
   const lines = ['# Straw Hut Media — all crawlers welcome, including AI assistants.'];
-  lines.push('User-agent: *', 'Allow: /', 'Disallow: /onboarding', '');
+  lines.push('User-agent: *', 'Allow: /', 'Disallow: /onboarding', 'Disallow: /services', '');
   for (const bot of aiBots) lines.push(`User-agent: ${bot}`, 'Allow: /', '');
   lines.push(`Sitemap: ${BASE}/sitemap.xml`);
   return lines.join('\n');
@@ -231,8 +231,8 @@ export function sitemapXml(shows, episodesByShow) {
   add('/');
   add('/shows');
   add('/studio');
-  add('/services');
   add('/press');
+  add('/contact');
   for (const s of shows) {
     add('/' + s.slug, s.last_synced);
     for (const e of episodesByShow[s.id] || []) add(`/${s.slug}/${e.slug}`, e.published_at);
