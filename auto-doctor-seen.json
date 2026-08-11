@@ -446,5 +446,11 @@
     "outcome": "fixed",
     "summary": "Enhanced Dropbox permission error logging with specific operation names (file upload, chunked upload start/append/finish, folder creation) and additional diagnostic data (fileName, fileSize, chunkOffset, errorBody) to improve troubleshooting.",
     "iterations": 13
+  },
+  "outreach: send tick failed::{\"error\":\"\"}": {
+    "attemptedAt": "2026-08-11T16:36:18.493Z",
+    "outcome": "gave_up",
+    "summary": "hit max iterations (20)",
+    "iterations": 20
   }
 }
