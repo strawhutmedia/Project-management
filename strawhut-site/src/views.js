@@ -109,8 +109,10 @@ ${jsonLd}
 <body class="${bodyClass}">
 <header class="site-header"><div class="container">
   <a class="brand" href="/">Straw Hut Media<span class="dot">.</span></a>
-  <nav class="nav">${nav}</nav>
+  <button class="nav-toggle" id="navToggle" type="button" aria-label="Menu" aria-expanded="false" aria-controls="siteNav"><span class="nav-toggle-bars"></span></button>
+  <nav class="nav" id="siteNav">${nav}</nav>
 </div></header>
+<script>(function(){var t=document.getElementById('navToggle'),n=document.getElementById('siteNav');if(!t||!n)return;t.addEventListener('click',function(){var open=n.classList.toggle('open');t.classList.toggle('open',open);t.setAttribute('aria-expanded',open?'true':'false');});n.addEventListener('click',function(e){if(e.target.tagName==='A'){n.classList.remove('open');t.classList.remove('open');t.setAttribute('aria-expanded','false');}});})();</script>
 <main>${body}</main>
 <footer class="site-footer"><div class="container">
   <div>© ${new Date().getFullYear()} Straw Hut Media — ${esc('Full-service podcast production & network')}</div>
