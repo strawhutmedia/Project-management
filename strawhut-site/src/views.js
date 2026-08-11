@@ -11,6 +11,7 @@ import {
   podcastEpisodeJsonLd,
   breadcrumbJsonLd,
   videoObjectJsonLd,
+  studioServiceJsonLd,
 } from './seo.js';
 
 const FONT =
@@ -427,6 +428,13 @@ export function studioPage() {
     body,
     activeNav: '/studio',
     path: '/studio',
+    jsonLd:
+      studioServiceJsonLd() +
+      '\n' +
+      breadcrumbJsonLd([
+        { name: 'Home', path: '/' },
+        { name: 'Studio', path: '/studio' },
+      ]),
   });
 }
 
@@ -456,6 +464,10 @@ export function pressPage({ items }) {
     body,
     activeNav: '/press',
     path: '/press',
+    jsonLd: breadcrumbJsonLd([
+      { name: 'Home', path: '/' },
+      { name: 'Press', path: '/press' },
+    ]),
   });
 }
 

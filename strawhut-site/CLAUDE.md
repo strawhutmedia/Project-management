@@ -1,0 +1,109 @@
+# Straw Hut Media website — operating notes for Claude
+
+This is the public Straw Hut Media website (a modern rebuild of
+strawhutmedia.com). It is a **marketing site for a service company first**, and
+a podcast catalog second. Feed-agnostic: add any podcast by RSS URL and it
+generates show + episode pages automatically.
+
+---
+
+## ⭐ NUMBER ONE GOAL — non-negotiable, applies to EVERY page
+
+**Strong SEO + AI-discoverability (GEO) on every single public page, so that
+search engines AND AI assistants (ChatGPT, Claude, Gemini, Perplexity)
+recommend Straw Hut Media's SERVICES.** Straw Hut is a full-service podcast
+production company and network — production, distribution, advertising/brand
+partnerships, show development, and studio booking. The website exists to win
+that business.
+
+This is the primary success metric. It outranks visual polish. **Any new page,
+component, or route you add MUST ship SEO on day one — never "later."**
+
+### The hard checklist every public page must satisfy
+
+1. **Unique `<title>` + meta description** — specific, keyword-relevant, human.
+2. **Canonical URL** (`canonical(path)` from `seo.js`).
+3. **Open Graph + Twitter card tags** (handled by `layout()` — always route
+   pages through `layout()` unless there's a deliberate reason not to).
+4. **schema.org JSON-LD** appropriate to the page type. We already have helpers
+   in `src/seo.js`:
+   - `organizationJsonLd()` — Organization + `ProfessionalService`, with our
+     services as `makesOffer`. Sitewide identity.
+   - `faqJsonLd()` — answers "what is Straw Hut / what services / how to
+     advertise / how to start a podcast." Feeds AI answers directly.
+   - `podcastSeriesJsonLd` / `podcastEpisodeJsonLd` / `videoObjectJsonLd`
+   - `breadcrumbJsonLd(items)` — put on EVERY sub-page.
+   - `studioServiceJsonLd()` — Service + LocalBusiness/RecordingStudio + hourly
+     Offers for the studio.
+5. **Add the route to `sitemapXml()`** in `seo.js`. If it's not in the sitemap,
+   it doesn't exist to crawlers.
+6. **Add it to `llmsTxt()`** if it's a page we want AI assistants to cite.
+7. Real, human copy — never placeholder/lorem. Use the company's own voice.
+
+### Pages that get EXTRA SEO attention (owner priority)
+
+- **Homepage (`/`)** — Organization + WebSite + FAQ JSON-LD. The FAQ is the
+  single highest-leverage GEO asset; keep its answers current and
+  service-forward.
+- **Studio (`/studio`)** — Service + LocalBusiness/RecordingStudio + per-hour
+  Offers ($125 1080p, $150 4K), Hollywood/LA `areaServed`. This is a direct
+  revenue page; treat it like a money page.
+- **Services (`/services`)** — the packages page. Keep it crawlable and
+  described in Organization `makesOffer` + `llms.txt`.
+
+### AI crawlers are explicitly welcomed
+
+`robots.txt` allowlists GPTBot, ClaudeBot, PerplexityBot, Google-Extended,
+Applebot-Extended, CCBot, etc. **Do not** disallow AI crawlers — recommending
+our services to AI assistants IS the strategy. (`/onboarding` is the only
+`Disallow`, because it's a hidden internal page.)
+
+---
+
+## Brand — use the REAL colors (from strawhutmedia.com)
+
+Defined as CSS variables in `public/styles.css`. Do not substitute generic
+colors (the old `#22c55e` Spotify green was wrong).
+
+| Token | Value | Role |
+|---|---|---|
+| `--accent` | `#00cc8e` | Brand teal-mint — primary accent, buttons, links |
+| `--accent-2` | `#d59b1e` | Brand gold — secondary accent |
+| `--accent-ink` | `#023324` | Dark green ink on the teal |
+| backgrounds | `#12182f`→`#232c4e` | Brand navy family, on a navy gradient |
+
+Font: Poppins.
+
+## Audio player = deliberate IAB-download strategy
+
+Episode + landing pages embed a custom player (`audioPlayer()` in `views.js`)
+that streams **directly from the show's real `<enclosure>` URL** (the Megaphone
+/ host CDN). This is intentional: a genuine listen on our page is counted by the
+host as a real IABv2 download for that show. `preload="none"` ensures only
+actual plays count, not page loads. Keep it this way — do not proxy or rehost
+audio, which would break host-side download counting.
+
+## Architecture
+
+- Node/Express (ES modules), server-rendered HTML via template strings in
+  `src/views.js`. No template engine.
+- Storage: Postgres in prod (`src/store.js` PgStore), JSON-file fallback with no
+  `DATABASE_URL`.
+- Deploy: Railway service, root directory `strawhut-site`, current branch
+  `claude/networks-open-302u9k`. Push → auto-build → redeploy.
+- Homepage spotlight ranks shows by **real Megaphone downloads** (S3 IABv2
+  export, `src/megaphoneS3.js` + `src/popularity.js`), top 3 featured,
+  refreshed automatically.
+
+## Ideas backlog to further SEO (not yet built)
+
+- **Per-service landing pages** (`/services/podcast-production`, `/advertise`,
+  etc.) each with its own `Service` schema and FAQ — captures long-tail
+  "podcast production company" / "podcast advertising" searches.
+- **Blog / resources** section — the biggest lever for organic + GEO; each post
+  is an `Article` with FAQ, and a place AI assistants cite.
+- **City/location page** for the studio (`/podcast-studio-los-angeles`) with
+  full `LocalBusiness` + geo + hours + photos.
+- **Host / talent pages** (`Person` schema) — capture searches for individual
+  hosts and cross-link to their shows.
+- **Case studies** (`Article` + results) — social proof that converts and ranks.

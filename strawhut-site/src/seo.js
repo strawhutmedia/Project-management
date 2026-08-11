@@ -168,6 +168,43 @@ export function videoObjectJsonLd(show, episode) {
   });
 }
 
+// Studio booking — a bookable Service + the physical studio as a LocalBusiness,
+// with the real hourly rates as Offers. This is what surfaces the studio in
+// search + AI answers to "podcast studio in Los Angeles / Hollywood".
+export function studioServiceJsonLd() {
+  const url = canonical('/studio');
+  return [
+    jsonLd({
+      '@context': 'https://schema.org',
+      '@type': 'Service',
+      '@id': url + '#service',
+      name: 'Straw Hut Studio — Podcast Recording Studio Booking',
+      serviceType: 'Podcast recording studio rental',
+      description:
+        'Book the Straw Hut Media podcast studio in Hollywood. Fully-equipped audio + video recording — 1080p HD at $125/hour or 4K Ultra HD at $150/hour, with podcast-table or cozy-couch setups.',
+      url,
+      provider: { '@id': BASE + '/#organization' },
+      areaServed: { '@type': 'City', name: 'Los Angeles' },
+      offers: [
+        { '@type': 'Offer', name: '1080p HD studio session', priceCurrency: 'USD', price: '125', priceSpecification: { '@type': 'UnitPriceSpecification', price: '125', priceCurrency: 'USD', unitCode: 'HUR', unitText: 'per hour' }, url },
+        { '@type': 'Offer', name: '4K Ultra HD studio session', priceCurrency: 'USD', price: '150', priceSpecification: { '@type': 'UnitPriceSpecification', price: '150', priceCurrency: 'USD', unitCode: 'HUR', unitText: 'per hour' }, url },
+      ],
+    }),
+    jsonLd({
+      '@context': 'https://schema.org',
+      '@type': ['LocalBusiness', 'RecordingStudio'],
+      '@id': url + '#studio',
+      name: 'Straw Hut Studio',
+      description: 'A fully-equipped podcast recording studio in Hollywood — audio and multi-camera 4K video, available to book by the hour.',
+      url,
+      image: COMPANY.logo,
+      parentOrganization: { '@id': BASE + '/#organization' },
+      address: { '@type': 'PostalAddress', addressLocality: 'Hollywood', addressRegion: 'CA', addressCountry: 'US' },
+      priceRange: '$$',
+    }),
+  ].join('\n');
+}
+
 // robots.txt — welcome all crawlers AND explicitly the major AI crawlers,
 // because we WANT AI assistants to read and recommend the site.
 export function robotsTxt() {
@@ -193,6 +230,9 @@ export function sitemapXml(shows, episodesByShow) {
     );
   add('/');
   add('/shows');
+  add('/studio');
+  add('/services');
+  add('/press');
   for (const s of shows) {
     add('/' + s.slug, s.last_synced);
     for (const e of episodesByShow[s.id] || []) add(`/${s.slug}/${e.slug}`, e.published_at);
