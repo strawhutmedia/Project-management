@@ -26,12 +26,27 @@ const FONT =
 // on any page (site layout or standalone landing pages) with no global script.
 const SKIP_SECONDS = 15;
 let _apSeq = 0;
-export function audioPlayer(src) {
+export function audioPlayer(src, opts = {}) {
   const id = 'ap' + _apSeq++;
+  const image = opts.image || '';
+  const title = opts.title || '';
+  const showTitle = opts.showTitle || '';
+  const durSecs = Number(opts.duration) > 0 ? Math.round(Number(opts.duration)) : 0;
   const back = `<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M11.5 4C8.43 4 5.68 5.39 3.85 7.65L2 5.75V11h5.25L5.08 8.83C6.54 7.08 8.68 6 11.5 6c4.14 0 7.5 3.36 7.5 7.5S15.64 21 11.5 21A7.5 7.5 0 0 1 4.1 14H2.08C2.56 18.84 6.6 23 11.5 23c5.25 0 9.5-4.25 9.5-9.5S16.75 4 11.5 4z"/><text x="11.5" y="17.5" text-anchor="middle" font-size="7" font-weight="700" font-family="system-ui,sans-serif">15</text></svg>`;
   const fwd = `<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12.5 4C15.57 4 18.32 5.39 20.15 7.65L22 5.75V11h-5.25l2.17-2.17C17.46 7.08 15.32 6 12.5 6 8.36 6 5 9.36 5 13.5S8.36 21 12.5 21a7.5 7.5 0 0 0 7.4-6H21.92C21.44 18.84 17.4 23 12.5 23 7.25 23 3 18.75 3 13.5S7.25 4 12.5 4z"/><text x="12.5" y="17.5" text-anchor="middle" font-size="7" font-weight="700" font-family="system-ui,sans-serif">15</text></svg>`;
+  const head =
+    title || image
+      ? `<div class="aplayer-head">
+          ${image ? `<img class="aplayer-art" src="${esc(image)}" alt="" loading="lazy">` : ''}
+          <div class="aplayer-meta">
+            <div class="aplayer-eyebrow">${showTitle ? esc(showTitle) + ' &middot; ' : ''}<span class="aplayer-status">Ready to play</span></div>
+            ${title ? `<div class="aplayer-title">${esc(title)}</div>` : ''}
+          </div>
+        </div>`
+      : '';
   return `<div class="aplayer" id="${id}">
     <audio preload="none" src="${esc(src)}"></audio>
+    ${head}
     <div class="aplayer-controls">
       <button class="aplayer-skip" data-skip="back" type="button" aria-label="Back ${SKIP_SECONDS} seconds">${back}</button>
       <button class="aplayer-toggle" type="button" aria-label="Play">
@@ -43,7 +58,17 @@ export function audioPlayer(src) {
     <div class="aplayer-bar" tabindex="0" role="slider" aria-label="Seek">
       <div class="aplayer-track"><div class="aplayer-buffered"></div><div class="aplayer-played"></div><div class="aplayer-knob"></div></div>
     </div>
-    <div class="aplayer-times"><span class="aplayer-cur">0:00</span><span class="aplayer-dur">&ndash;&ndash;:&ndash;&ndash;</span></div>
+    <div class="aplayer-times"><span class="aplayer-cur">0:00</span><span class="aplayer-dur" data-secs="${durSecs}">&ndash;&ndash;:&ndash;&ndash;</span></div>
+    <div class="aplayer-util">
+      <button class="aplayer-speed" type="button" aria-label="Playback speed">1&times;</button>
+      <button class="aplayer-vol" type="button" aria-label="Mute">
+        <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M3 10v4h4l5 5V5L7 10H3zm13.5 2A4.5 4.5 0 0 0 14 8v8a4.5 4.5 0 0 0 2.5-4zM14 3.2v2.1a7 7 0 0 1 0 13.4v2.1a9 9 0 0 0 0-17.6z"/></svg>
+      </button>
+      <a class="aplayer-dl" href="${esc(src)}" download target="_blank" rel="noopener" aria-label="Download episode">
+        <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 3v10.6l3.3-3.3 1.4 1.4L12 17.4l-4.7-4.7 1.4-1.4L12 13.6V3h0zM5 19h14v2H5z"/></svg>
+        <span>Download</span>
+      </a>
+    </div>
   </div>
   <script>(function(){
     var r=document.getElementById('${id}');if(!r)return;
@@ -51,13 +76,17 @@ export function audioPlayer(src) {
         ip=r.querySelector('.ap-ico-play'),ie=r.querySelector('.ap-ico-pause'),
         bar=r.querySelector('.aplayer-bar'),played=r.querySelector('.aplayer-played'),
         buf=r.querySelector('.aplayer-buffered'),knob=r.querySelector('.aplayer-knob'),
-        cur=r.querySelector('.aplayer-cur'),dur=r.querySelector('.aplayer-dur'),SK=${SKIP_SECONDS};
+        cur=r.querySelector('.aplayer-cur'),dur=r.querySelector('.aplayer-dur'),
+        spd=r.querySelector('.aplayer-speed'),vol=r.querySelector('.aplayer-vol'),
+        status=r.querySelector('.aplayer-status'),SK=${SKIP_SECONDS};
     function fmt(s){if(!isFinite(s)||s<0)s=0;var m=Math.floor(s/60),x=Math.floor(s%60);return m+':'+(x<10?'0':'')+x;}
     function setPct(p){p=Math.max(0,Math.min(1,p));played.style.width=(p*100)+'%';knob.style.left=(p*100)+'%';}
+    var pre=parseInt(dur.getAttribute('data-secs')||'0',10);if(pre>0)dur.textContent=fmt(pre);
+    function setStatus(t){if(status)status.textContent=t;}
     tg.addEventListener('click',function(){a.paused?a.play():a.pause();});
-    a.addEventListener('play',function(){ip.style.display='none';ie.style.display='';tg.setAttribute('aria-label','Pause');r.classList.add('is-playing');});
-    a.addEventListener('pause',function(){ip.style.display='';ie.style.display='none';tg.setAttribute('aria-label','Play');r.classList.remove('is-playing');});
-    a.addEventListener('ended',function(){ip.style.display='';ie.style.display='none';r.classList.remove('is-playing');});
+    a.addEventListener('play',function(){ip.style.display='none';ie.style.display='';tg.setAttribute('aria-label','Pause');r.classList.add('is-playing');setStatus('Now playing');});
+    a.addEventListener('pause',function(){ip.style.display='';ie.style.display='none';tg.setAttribute('aria-label','Play');r.classList.remove('is-playing');setStatus('Paused');});
+    a.addEventListener('ended',function(){ip.style.display='';ie.style.display='none';r.classList.remove('is-playing');setStatus('Finished');});
     a.addEventListener('loadedmetadata',function(){dur.textContent=fmt(a.duration);});
     a.addEventListener('timeupdate',function(){cur.textContent=fmt(a.currentTime);if(a.duration)setPct(a.currentTime/a.duration);});
     a.addEventListener('progress',function(){try{if(a.buffered.length&&a.duration){buf.style.width=(a.buffered.end(a.buffered.length-1)/a.duration*100)+'%';}}catch(e){}});
@@ -66,6 +95,9 @@ export function audioPlayer(src) {
       if(a.readyState===0){a.load();}
       a.currentTime=Math.max(0,Math.min((a.duration||1e9),(a.currentTime||0)+d));
     });});
+    var rates=[1,1.25,1.5,1.75,2],ri=0;
+    spd.addEventListener('click',function(){ri=(ri+1)%rates.length;a.playbackRate=rates[ri];spd.innerHTML=(rates[ri]%1===0?rates[ri]:rates[ri])+'&times;';});
+    vol.addEventListener('click',function(){a.muted=!a.muted;vol.classList.toggle('muted',a.muted);});
     function seekTo(clientX){var rect=bar.getBoundingClientRect();var p=(clientX-rect.left)/rect.width;if(a.duration){a.currentTime=Math.max(0,Math.min(1,p))*a.duration;}else{setPct(p);}}
     var dragging=false;
     bar.addEventListener('mousedown',function(e){dragging=true;seekTo(e.clientX);});
@@ -336,7 +368,7 @@ export function landingPage({ landing, show, episode }) {
   const player = ep.youtube_id
     ? `<div class="video-embed"><iframe src="https://www.youtube-nocookie.com/embed/${esc(ep.youtube_id)}" title="${esc(headline)}" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen></iframe></div>`
     : ep.audio_url
-      ? audioPlayer(ep.audio_url)
+      ? audioPlayer(ep.audio_url, { title: ep.title, showTitle: landing.show_title || '', image: ep.image_url, duration: ep.duration })
       : '';
   const body = landing.body_html || (ep.description ? ep.description : '');
   return `<!doctype html><html lang="en"><head>
@@ -654,7 +686,7 @@ export function episodePage({ show, episode, moreFromShow = [], related = [] }) 
         ${episode.youtube_id ? `<div class="video-embed"><iframe src="https://www.youtube-nocookie.com/embed/${esc(episode.youtube_id)}" title="${esc(episode.title)}" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen loading="lazy"></iframe></div>` : ''}
         ${
           episode.audio_url
-            ? audioPlayer(episode.audio_url) + platformRow(show)
+            ? audioPlayer(episode.audio_url, { title: episode.title, showTitle: show.title, image: episode.image_url || show.image_url, duration: episode.duration }) + platformRow(show)
             : platformRow(show) || `<p class="sub">Audio unavailable for this episode.</p>`
         }
       </div>
