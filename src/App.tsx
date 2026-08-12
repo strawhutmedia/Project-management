@@ -13,6 +13,7 @@ import OutreachHubPage from './pages/OutreachHubPage'
 import OutreachShowPage from './pages/OutreachShowPage'
 import Login from './pages/Login'
 import Verify from './pages/Verify'
+import PrompterPage from './pages/PrompterPage'
 import Profile from './pages/Profile'
 import Settings from './pages/Settings'
 import { AuthProvider, useAuth } from './auth'
@@ -34,6 +35,8 @@ export default function App() {
       <Routes>
         <Route path="/login" element={<Login />} />
         <Route path="/auth/verify" element={<Verify />} />
+        {/* Public, no-login teleprompter — open on any iPad or computer. */}
+        <Route path="/prompter" element={<PrompterPage />} />
         <Route
           element={
             <Protected>

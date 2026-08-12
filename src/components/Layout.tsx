@@ -103,6 +103,9 @@ export default function Layout() {
                     <NavMenuLink to="/scheduler" onClick={() => setNavOpen(false)}>
                       📅 Scheduler
                     </NavMenuLink>
+                    <NavMenuLink to="/prompter" onClick={() => setNavOpen(false)}>
+                      🎬 Teleprompter
+                    </NavMenuLink>
                     {user?.role === 'admin' && (
                       <>
                         <NavMenuLink to="/admin/outreach" onClick={() => setNavOpen(false)}>
