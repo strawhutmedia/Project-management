@@ -12,6 +12,16 @@ export default function Layout() {
   const [navOpen, setNavOpen] = useState(false)
   const navigate = useNavigate()
 
+  // The teleprompter is a podcast-side tool, so it only appears in the nav
+  // when the podcast workspace is active. (The /prompter URL itself is always
+  // reachable directly.)
+  let isPodcastWorkspace = false
+  try {
+    isPodcastWorkspace = window.localStorage.getItem('slate.dashboard.kindTab') === 'podcast'
+  } catch {
+    /* ignore */
+  }
+
   function switchWorkspace() {
     try { window.sessionStorage.removeItem(PICKED_SESSION_KEY) } catch {}
     navigate('/')
@@ -103,9 +113,11 @@ export default function Layout() {
                     <NavMenuLink to="/scheduler" onClick={() => setNavOpen(false)}>
                       📅 Scheduler
                     </NavMenuLink>
-                    <NavMenuLink to="/prompter" onClick={() => setNavOpen(false)}>
-                      🎬 Teleprompter
-                    </NavMenuLink>
+                    {isPodcastWorkspace && (
+                      <NavMenuLink to="/prompter" onClick={() => setNavOpen(false)}>
+                        🎬 Teleprompter
+                      </NavMenuLink>
+                    )}
                     {user?.role === 'admin' && (
                       <>
                         <NavMenuLink to="/admin/outreach" onClick={() => setNavOpen(false)}>
