@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-08-12T19:05:18.144Z",
+  "generatedAt": "2026-08-12T19:10:18.149Z",
   "note": "Read-only operational snapshot. Emails are masked; no full contact list is stored here.",
   "summary": {
     "showsWithOutreach": 1,
@@ -74,7 +74,7 @@
           {
             "name": "Chloe Veitch",
             "emailMasked": "c***@ingenuity.live",
-            "daysSinceFirstEmail": 27,
+            "daysSinceFirstEmail": 28,
             "opened": false,
             "openCount": 0
           },
