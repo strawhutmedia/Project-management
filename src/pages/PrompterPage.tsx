@@ -344,13 +344,27 @@ function Editor(props: {
           </div>
 
           <button
-            onClick={onRun}
+            onClick={() => {
+              // Request OS fullscreen straight from this click gesture so the
+              // prompter opens edge-to-edge — no Mac dock, no menu-bar clock.
+              try {
+                const el = document.documentElement as any
+                if (!(document as any).fullscreenElement && el.requestFullscreen) {
+                  void el.requestFullscreen().catch(() => {})
+                }
+              } catch {
+                /* ignore — the runner retries and offers a manual toggle */
+              }
+              onRun()
+            }}
             disabled={!canRun}
             className="mt-5 w-full rounded-2xl bg-gradient-to-r from-stage-producing to-stage-mastering text-white font-bold uppercase tracking-wider text-base px-4 py-4 disabled:opacity-40"
           >
             ▶ Start prompter
           </button>
-          <p className="mt-2 text-center text-[11px] text-muted">Fullscreen scroll. Tap the screen or hit space to play / pause.</p>
+          <p className="mt-2 text-center text-[11px] text-muted">
+            Opens full screen (hides the Mac dock &amp; clock). Tap the screen or hit space to play / pause · Esc to exit.
+          </p>
         </div>
 
         {/* Library */}
@@ -686,8 +700,33 @@ function Runner({
   const [countdown, setCountdown] = useState<number | null>(null)
   const [progress, setProgress] = useState(0)
   const [remaining, setRemaining] = useState(0)
+  const [isFs, setIsFs] = useState(false)
 
   const isTouch = useMemo(() => typeof window !== 'undefined' && window.matchMedia?.('(pointer: coarse)').matches, [])
+
+  // Track real (OS-level) fullscreen so the button reflects state. On macOS
+  // this is what hides the dock and the menu-bar clock.
+  useEffect(() => {
+    const on = () => setIsFs(Boolean((document as any).fullscreenElement))
+    document.addEventListener('fullscreenchange', on)
+    on()
+    return () => document.removeEventListener('fullscreenchange', on)
+  }, [])
+
+  // Entering the runner is a user gesture (the Start button), so try to go
+  // fullscreen immediately for a true edge-to-edge prompter. Best-effort —
+  // iOS Safari doesn't grant element fullscreen; the immersive layout covers
+  // that case, plus Add-to-Home-Screen.
+  useEffect(() => {
+    try {
+      const el = document.documentElement as any
+      if (!(document as any).fullscreenElement && el.requestFullscreen) {
+        void el.requestFullscreen().catch(() => {})
+      }
+    } catch {
+      /* ignore */
+    }
+  }, [])
 
   const rafRef = useRef<number | null>(null)
   const lastTsRef = useRef<number | null>(null)
@@ -826,6 +865,17 @@ function Runner({
     }
   }, [])
 
+  // Leaving the prompter should also drop out of OS fullscreen.
+  const handleExit = useCallback(() => {
+    try {
+      const d = document as any
+      if (d.fullscreenElement && d.exitFullscreen) void d.exitFullscreen().catch(() => {})
+    } catch {
+      /* ignore */
+    }
+    onExit()
+  }, [onExit])
+
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       switch (e.key) {
@@ -871,13 +921,13 @@ function Runner({
           toggleFullscreen()
           break
         case 'Escape':
-          onExit()
+          handleExit()
           break
       }
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [settings, setSettings, togglePlay, restart, jump, toggleFullscreen, onExit])
+  }, [settings, setSettings, togglePlay, restart, jump, toggleFullscreen, handleExit])
 
   const transform = `${settings.mirrorX ? 'scaleX(-1)' : ''} ${settings.flipY ? 'scaleY(-1)' : ''}`.trim()
 
@@ -956,7 +1006,7 @@ function Runner({
       <div className={`absolute inset-x-0 bottom-0 transition-opacity duration-300 ${showControls ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
         <div className="mx-auto max-w-3xl m-3 rounded-2xl bg-black/80 backdrop-blur border border-white/10 px-3 py-2.5 text-white">
           <div className="flex items-center justify-between gap-2">
-            <button onClick={onExit} className="text-xs sm:text-sm text-white/70 hover:text-white px-2 py-2">
+            <button onClick={handleExit} className="text-xs sm:text-sm text-white/70 hover:text-white px-2 py-2">
               ✕ Exit
             </button>
 
@@ -1008,8 +1058,14 @@ function Runner({
             <MiniToggle on={settings.flipY} onClick={() => setSettings({ flipY: !settings.flipY })}>
               Flip ↕
             </MiniToggle>
-            <button onClick={toggleFullscreen} className="text-[11px] rounded-lg px-2.5 py-1.5 border border-white/15 text-white/70 hover:text-white">
-              ⤢ Fullscreen
+            <button
+              onClick={toggleFullscreen}
+              className={`text-[11px] rounded-lg px-2.5 py-1.5 border transition ${
+                isFs ? 'border-stage-mastering bg-stage-mastering/20 text-white' : 'border-white/15 text-white/70 hover:text-white'
+              }`}
+              title="Hide the Mac dock and menu bar"
+            >
+              {isFs ? '⤢ Exit full screen' : '⤢ Full screen'}
             </button>
             <span className="text-[11px] text-white/40 tabular-nums px-1">{formatClock(remaining)} left</span>
           </div>
