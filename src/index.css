@@ -26,6 +26,25 @@ body {
   letter-spacing: 0.01em;
 }
 
+/* Teleprompter: hide the scrollbar so the immersive full-screen read isn't
+   broken up by a track on the edge (still scrollable programmatically). */
+.no-scrollbar {
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* old Edge */
+}
+.no-scrollbar::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+  display: none;
+}
+
+/* Placeholder for the empty rich-text script editor. */
+.prompter-editable:empty:before {
+  content: attr(data-empty-text);
+  color: #8a8a8a;
+  pointer-events: none;
+}
+
 .text-rainbow {
   background: linear-gradient(90deg, #fbbf24 0%, #fb923c 18%, #f472b6 36%, #a78bfa 54%, #60a5fa 72%, #2dd4bf 88%, #34d399 100%);
   -webkit-background-clip: text;
