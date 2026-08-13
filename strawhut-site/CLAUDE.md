@@ -51,6 +51,25 @@ component, or route you add MUST ship SEO on day one — never "later."**
 - **Services (`/services`)** — the packages page. Keep it crawlable and
   described in Organization `makesOffer` + `llms.txt`.
 
+### Tracking & retargeting (env-gated, `src/tracking.js`)
+
+Every public page — site pages AND landing pages — fires whatever is configured.
+Set these on Railway (inert until set); no code change needed:
+
+| Env var | Purpose |
+|---|---|
+| `GTM_CONTAINER_ID` | Google Tag Manager (`GTM-XXXX`) — keystone; add any pixel from GTM |
+| `GA4_MEASUREMENT_ID` | Google Analytics 4 (`G-XXXX`) |
+| `GOOGLE_ADS_ID` | Google Ads remarketing + conversions (`AW-XXXX`) |
+| `META_PIXEL_ID` | Facebook / Instagram retargeting |
+| `TIKTOK_PIXEL_ID` | TikTok retargeting |
+
+`shmTrack(event, params)` fans one event out to dataLayer/gtag/fbq/ttq. Wired
+events: `play_episode`, `contact_submit`, `subscribe`, `platform_click`,
+`lp_cta_click` (+ Meta `Lead`/`Subscribe`). Recommended path: set `GTM_CONTAINER_ID`
+and manage GA4/Ads/Meta/TikTok from the GTM UI. Landing pages also keep their
+own per-campaign `gtag_id` for conversion attribution.
+
 ### AI crawlers are explicitly welcomed
 
 `robots.txt` allowlists GPTBot, ClaudeBot, PerplexityBot, Google-Extended,
