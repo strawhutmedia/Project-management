@@ -27,7 +27,7 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 // Best-effort: resolve an article's lead image (og:image / twitter:image) so
 // the press card can show a thumbnail. Follows the Google News redirect to the
 // real article. Never throws — returns null on any failure or timeout.
-async function fetchOgImage(url) {
+export async function fetchOgImage(url) {
   try {
     const ctrl = new AbortController();
     const timer = setTimeout(() => ctrl.abort(), 6000);
