@@ -1,7 +1,11 @@
 // Email sending via Resend's HTTP API (same provider as Slate / Pod Booster).
 // No SDK dependency — just fetch. Requires RESEND_API_KEY at runtime.
 
-const FROM = process.env.FROM_EMAIL || 'Straw Hut Media <news@strawhutmedia.com>';
+// Sender must be a Resend-verified domain. strawhutmedia.com is NOT verified in
+// this account; strawhut.media IS (and reads as "Straw Hut Media"). Mail is
+// still delivered TO the .com inboxes; only the visible sender uses .media.
+// Override with FROM_EMAIL if the verified sender ever changes.
+const FROM = process.env.FROM_EMAIL || 'Straw Hut Media <hello@strawhut.media>';
 
 export function mailConfigured() {
   return !!process.env.RESEND_API_KEY;
