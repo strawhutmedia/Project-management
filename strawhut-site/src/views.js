@@ -282,16 +282,20 @@ export function homePage({ shows }) {
       : ''
   }
 
-  <section class="section" id="original"><div class="container">
-    <div class="section-head"><h2>Original Shows</h2><span class="count">${originals.length} shows</span></div>
-    ${originals.length ? `<div class="grid">${cards(originals)}</div>` : `<div class="empty">No original shows yet. Add one in the <a href="/admin">admin</a>.</div>`}
-  </div></section>
+  ${
+    originals.length
+      ? `<section class="section" id="original"><div class="container">
+    <div class="section-head"><h2>Original Shows</h2><a class="count" href="/shows#original">View all ${originals.length} →</a></div>
+    <div class="spotlight-row">${cards(originals.slice(0, 12))}</div>
+  </div></section>`
+      : ''
+  }
 
   ${
     partners.length
       ? `<section class="section" id="partnered"><div class="container">
-    <div class="section-head"><h2>Partner Shows</h2><span class="count">${partners.length} shows</span></div>
-    <div class="grid">${cards(partners)}</div>
+    <div class="section-head"><h2>Partner Shows</h2><a class="count" href="/shows#partner">View all ${partners.length} →</a></div>
+    <div class="spotlight-row">${cards(partners.slice(0, 12))}</div>
   </div></section>`
       : ''
   }
@@ -336,21 +340,26 @@ const SERVICES = [
 ];
 
 export function showsIndexPage({ shows }) {
-  const cards = shows
-    .map(
-      (s) => `<a class="show-card" href="/${esc(s.slug)}">
+  const card = (s) => `<a class="show-card" href="/${esc(s.slug)}">
       ${s.featured ? '<span class="badge">Featured</span>' : ''}
       <div class="art">${artOrPlaceholder(s.image_url, s.title)}</div>
       <div class="body"><h3>${esc(s.title)}</h3>
       <div class="meta">${s.episode_count != null ? esc(s.episode_count) + ' episodes' : ''}</div></div>
-    </a>`
-    )
-    .join('');
-  const body = `<section class="section"><div class="container">
+    </a>`;
+  const originals = shows.filter((s) => (s.show_type || 'original') !== 'partnered');
+  const partners = shows.filter((s) => s.show_type === 'partnered');
+  const section = (id, heading, list) =>
+    list.length
+      ? `<section class="section" id="${id}"><div class="container">
+    <div class="section-head"><h2>${heading}</h2><span class="count">${list.length} shows</span></div>
+    <div class="grid">${list.map(card).join('')}</div>
+  </div></section>`
+      : '';
+  const body = `<section class="section" style="padding-bottom:0"><div class="container">
     <div class="breadcrumb"><a href="/">Home</a> / Shows</div>
-    <div class="section-head" style="margin-top:14px"><h2>All Shows</h2><span class="count">${shows.length} shows</span></div>
-    ${shows.length ? `<div class="grid">${cards}</div>` : `<div class="empty">No shows yet.</div>`}
-  </div></section>`;
+    <h1 style="margin:14px 0 0">All Shows</h1>
+  </div></section>
+  ${shows.length ? section('original', 'Original Shows', originals) + section('partner', 'Partner Shows', partners) : `<section class="section"><div class="container"><div class="empty">No shows yet.</div></div></section>`}`;
   return layout({
     title: 'All Shows — Straw Hut Media',
     description: `Browse all ${shows.length} podcasts produced and distributed by Straw Hut Media.`,
@@ -412,6 +421,12 @@ ${FONT}<link rel="stylesheet" href="/styles.css">${gtag}
 
 // Studio booking — embeds the same GoHighLevel widgets the current site uses,
 // so calendar + Stripe payment continue to work through HighLevel unchanged.
+// Real studio photos (vendored from the current site into /public/studio).
+const STUDIO_PHOTOS = [
+  'CA6A0788', 'CA6A0790', 'CA6A0792', 'CA6A0793', 'CA6A0794', 'CA6A0795',
+  'CA6A0798', 'CA6A0799', 'CA6A0800', 'CA6A0801', 'CA6A0803',
+].map((n) => `/public/studio/${n}.jpg`);
+
 const STUDIO_DURATIONS = [
   ['1 Hour', 'ZLa4C3UbEh4WbPhXdUSd'], ['1.5 Hours', 'yAVTjHR0vqfciP3pEMlf'],
   ['2 Hours', 'x6Oz9tKdb0cVJgiOUy2a'], ['2.5 Hours', '9pB7cQ5NrF3nRR19ERgv'],
@@ -430,12 +445,23 @@ export function studioPage() {
   const opts = STUDIO_DURATIONS.map(
     ([label, id], i) => `<option value="${base}${id}"${i === 0 ? ' selected' : ''}>${label}</option>`
   ).join('');
+  const gallery = STUDIO_PHOTOS.map(
+    (src, i) => `<a class="studio-shot" href="${esc(src)}" target="_blank" rel="noopener"><img src="${esc(src)}" alt="Straw Hut Studio — Hollywood podcast studio ${i + 1}" loading="lazy"></a>`
+  ).join('');
   const body = `
   <section class="hero" style="padding-bottom:16px"><div class="container">
     <div class="breadcrumb" style="padding:0 0 14px"><a href="/">Home</a> / Studio</div>
     <h1>Book the <span class="accent">Straw Hut Studio</span></h1>
     <p>A fully-equipped podcast studio in the heart of Hollywood — pick your setup, pick your time, and book instantly.</p>
   </div></section>
+
+  ${
+    STUDIO_PHOTOS.length
+      ? `<section class="section" style="padding-top:8px"><div class="container">
+    <div class="studio-gallery">${gallery}</div>
+  </div></section>`
+      : ''
+  }
 
   <section class="section"><div class="container">
     <div class="section-head"><h2>Rates</h2></div>

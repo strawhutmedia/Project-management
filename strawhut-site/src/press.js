@@ -34,7 +34,7 @@ async function fetchOgImage(url) {
     const res = await fetch(url, { headers: { 'User-Agent': UA }, redirect: 'follow', signal: ctrl.signal });
     clearTimeout(timer);
     if (!res.ok) return null;
-    const html = (await res.text()).slice(0, 200000); // only need the <head>
+    const html = (await res.text()).slice(0, 300000); // only need the <head>
     const pick = (re) => { const m = html.match(re); return m && m[1] ? m[1] : null; };
     let img =
       pick(/<meta[^>]+property=["']og:image(?::url)?["'][^>]+content=["']([^"']+)["']/i) ||
@@ -42,7 +42,12 @@ async function fetchOgImage(url) {
       pick(/<meta[^>]+name=["']twitter:image["'][^>]+content=["']([^"']+)["']/i);
     if (!img) return null;
     img = img.replace(/&amp;/g, '&').trim();
-    return /^https?:\/\//i.test(img) ? img : null;
+    if (!/^https?:\/\//i.test(img)) return null;
+    // Google News serves a small cached thumb (…=s0-w300); request a larger one.
+    if (/googleusercontent\.com/i.test(img)) {
+      img = img.replace(/=s\d+(-w\d+)?(-h\d+)?.*$/i, '=s0-w768').replace(/=w\d+-h\d+.*$/i, '=w768-h432');
+    }
+    return img;
   } catch {
     return null;
   }
@@ -111,6 +116,17 @@ export async function refreshPress(store, { log = () => {}, includeShows = true 
     }
   }
   if (removed) log(`press: removed ${removed} post-cutoff mention(s)`);
+
+  // Backfill lead images for items saved before image support (up to a cap per
+  // run so a large table fills in over a few refreshes rather than one long one).
+  let backfilled = 0;
+  const missing = (await store.listPressItems({ limit: 1000 })).filter((p) => !p.image_url);
+  for (const p of missing.slice(0, 60)) {
+    const img = await fetchOgImage(p.url);
+    if (img) { await store.setPressItemImage(p.id, img); backfilled++; }
+    await sleep(120);
+  }
+  if (backfilled) log(`press: backfilled ${backfilled} thumbnail(s)`);
 
   const jobs = PRESS_QUERIES.map((q) => ({ query: q, show: null, hint: null }));
   if (includeShows) {

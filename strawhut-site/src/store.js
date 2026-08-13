@@ -218,6 +218,9 @@ class JsonStore {
     delete this.db.press_items[id];
     this._flush();
   }
+  async setPressItemImage(id, image_url) {
+    if (this.db.press_items[id]) { this.db.press_items[id].image_url = image_url; this._flush(); }
+  }
   async countPressItems() {
     return Object.keys(this.db.press_items).length;
   }
@@ -555,6 +558,9 @@ class PgStore {
   }
   async deletePressItem(id) {
     await this.pool.query(`DELETE FROM press_items WHERE id=$1`, [id]);
+  }
+  async setPressItemImage(id, image_url) {
+    await this.pool.query(`UPDATE press_items SET image_url=$2 WHERE id=$1`, [id, image_url]);
   }
   async countPressItems() {
     const { rows } = await this.pool.query(`SELECT COUNT(*)::int AS c FROM press_items`);
