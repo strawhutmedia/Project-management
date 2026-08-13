@@ -24,30 +24,34 @@ function newsUrl(query) {
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
-// Best-effort: resolve an article's lead image (og:image / twitter:image) so
-// the press card can show a thumbnail. Follows the Google News redirect to the
-// real article. Never throws — returns null on any failure or timeout.
+// Resolve an article's real featured image. Google News uses opaque redirect
+// links and blocks datacenter IPs (Railway), so we can't scrape the article
+// ourselves. Microlink resolves the redirect to the real publisher URL and
+// returns its og:image — the actual featured photo. Free tier is ~50 req/day,
+// so we keep an in-memory daily budget and degrade gracefully (null → the card
+// keeps its branded fallback and we retry the item on a later run/day).
+const ML_DAILY_BUDGET = parseInt(process.env.MICROLINK_DAILY_BUDGET || '45', 10);
+let _mlBudget = { day: '', used: 0 };
+function mlToday() { return new Date().toISOString().slice(0, 10); }
+function mlCanCall() {
+  const d = mlToday();
+  if (_mlBudget.day !== d) _mlBudget = { day: d, used: 0 };
+  return _mlBudget.used < ML_DAILY_BUDGET;
+}
+
 export async function fetchOgImage(url) {
+  if (!url || !mlCanCall()) return null;
+  _mlBudget.used++;
   try {
     const ctrl = new AbortController();
-    const timer = setTimeout(() => ctrl.abort(), 6000);
-    const res = await fetch(url, { headers: { 'User-Agent': UA }, redirect: 'follow', signal: ctrl.signal });
+    const timer = setTimeout(() => ctrl.abort(), 25000);
+    const api = `https://api.microlink.io/?url=${encodeURIComponent(url)}`;
+    const res = await fetch(api, { headers: { 'User-Agent': UA, Accept: 'application/json' }, signal: ctrl.signal });
     clearTimeout(timer);
     if (!res.ok) return null;
-    const html = (await res.text()).slice(0, 300000); // only need the <head>
-    const pick = (re) => { const m = html.match(re); return m && m[1] ? m[1] : null; };
-    let img =
-      pick(/<meta[^>]+property=["']og:image(?::url)?["'][^>]+content=["']([^"']+)["']/i) ||
-      pick(/<meta[^>]+content=["']([^"']+)["'][^>]+property=["']og:image["']/i) ||
-      pick(/<meta[^>]+name=["']twitter:image["'][^>]+content=["']([^"']+)["']/i);
-    if (!img) return null;
-    img = img.replace(/&amp;/g, '&').trim();
-    if (!/^https?:\/\//i.test(img)) return null;
-    // Google News serves a small cached thumb (…=s0-w300); request a larger one.
-    if (/googleusercontent\.com/i.test(img)) {
-      img = img.replace(/=s\d+(-w\d+)?(-h\d+)?.*$/i, '=s0-w768').replace(/=w\d+-h\d+.*$/i, '=w768-h432');
-    }
-    return img;
+    const j = await res.json().catch(() => null);
+    const img = j && j.status === 'success' && j.data && j.data.image && j.data.image.url;
+    return img && /^https?:\/\//i.test(img) ? img : null;
   } catch {
     return null;
   }
@@ -121,10 +125,11 @@ export async function refreshPress(store, { log = () => {}, includeShows = true 
   // run so a large table fills in over a few refreshes rather than one long one).
   let backfilled = 0;
   const missing = (await store.listPressItems({ limit: 1000 })).filter((p) => !p.image_url);
-  for (const p of missing.slice(0, 60)) {
+  for (const p of missing.slice(0, 20)) {
     const img = await fetchOgImage(p.url);
     if (img) { await store.setPressItemImage(p.id, img); backfilled++; }
-    await sleep(120);
+    else if (!mlCanCall()) break; // daily image budget spent; resume next run
+    await sleep(1100); // respect microlink's ~1 req/sec
   }
   if (backfilled) log(`press: backfilled ${backfilled} thumbnail(s)`);
 
