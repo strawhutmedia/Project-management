@@ -11,11 +11,15 @@
 //   META_PIXEL_ID       1234567890    (Facebook / Instagram retargeting)
 //   TIKTOK_PIXEL_ID     XXXXXXXXXX    (TikTok retargeting)
 
-const GTM = (process.env.GTM_CONTAINER_ID || '').trim();
+// Default to the shared Straw Hut / Podbooster GTM container. Every page + event
+// is stamped with `site` so both properties can share one container and still be
+// told apart (filter triggers by it, add it as a GA4 custom dimension, etc.).
+const GTM = (process.env.GTM_CONTAINER_ID || 'GTM-WM7DVH3Z').trim();
 const GA4 = (process.env.GA4_MEASUREMENT_ID || '').trim();
 const ADS = (process.env.GOOGLE_ADS_ID || '').trim();
 const META = (process.env.META_PIXEL_ID || '').trim();
 const TT = (process.env.TIKTOK_PIXEL_ID || '').trim();
+const SITE_ID = (process.env.SITE_ID || 'strawhut-media').trim();
 
 const j = (s) => String(s || '').replace(/[^A-Za-z0-9_-]/g, ''); // hard-sanitize IDs
 
@@ -25,7 +29,9 @@ export function trackingEnabled() {
 
 /** Scripts for <head> — analytics libraries + a unified shmTrack() event helper. */
 export function trackingHead() {
-  let out = '<script>window.dataLayer=window.dataLayer||[];</script>';
+  // Stamp `site` into the dataLayer BEFORE GTM loads, so every tag/trigger and
+  // GA event can see which property it came from.
+  let out = `<script>window.dataLayer=window.dataLayer||[];window.dataLayer.push({site:'${j(SITE_ID)}'});</script>`;
 
   if (GTM) {
     out += `<!-- Google Tag Manager --><script>(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],k=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';k.async=true;k.src='https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(k,f);})(window,document,'script','dataLayer','${j(GTM)}');</script>`;
@@ -47,7 +53,7 @@ export function trackingHead() {
 
   // Unified event helper: pushes to dataLayer (GTM/GA4) AND mirrors to Meta +
   // TikTok so a single call fans out to every platform for conversions/audiences.
-  out += `<script>window.shmTrack=function(ev,params){params=params||{};try{(window.dataLayer=window.dataLayer||[]).push(Object.assign({event:ev},params));}catch(e){}try{if(window.gtag)gtag('event',ev,params);}catch(e){}try{if(window.fbq)fbq('trackCustom',ev,params);}catch(e){}try{if(window.ttq)ttq.track(ev,params);}catch(e){}};</script>`;
+  out += `<script>window.SHM_SITE='${j(SITE_ID)}';window.shmTrack=function(ev,params){params=Object.assign({site:window.SHM_SITE},params||{});try{(window.dataLayer=window.dataLayer||[]).push(Object.assign({event:ev},params));}catch(e){}try{if(window.gtag)gtag('event',ev,params);}catch(e){}try{if(window.fbq)fbq('trackCustom',ev,params);}catch(e){}try{if(window.ttq)ttq.track(ev,params);}catch(e){}};</script>`;
   return out;
 }
 
