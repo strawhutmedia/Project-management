@@ -1,9 +1,9 @@
 {
   "version": "0.2.2",
-  "now": "2026-08-13T05:04:30.471Z",
+  "now": "2026-08-13T06:20:19.520Z",
   "boot": {
-    "startedAt": "2026-08-13T05:04:29.982Z",
-    "completedAt": "2026-08-13T05:04:30.461Z",
+    "startedAt": "2026-08-13T06:20:19.050Z",
+    "completedAt": "2026-08-13T06:20:19.508Z",
     "error": null
   },
   "env": {
@@ -137,7 +137,7 @@
   "recentLog": [
     {
       "level": "info",
-      "ts": "2026-08-13T05:04:29.981Z",
+      "ts": "2026-08-13T06:20:19.049Z",
       "msg": "serving client from",
       "data": {
         "clientDir": "/app/dist"
@@ -145,7 +145,7 @@
     },
     {
       "level": "info",
-      "ts": "2026-08-13T05:04:29.982Z",
+      "ts": "2026-08-13T06:20:19.050Z",
       "msg": "boot starting",
       "data": {
         "cwd": "/app",
@@ -156,12 +156,12 @@
     },
     {
       "level": "info",
-      "ts": "2026-08-13T05:04:30.279Z",
+      "ts": "2026-08-13T06:20:19.311Z",
       "msg": "migrations complete"
     },
     {
       "level": "info",
-      "ts": "2026-08-13T05:04:30.453Z",
+      "ts": "2026-08-13T06:20:19.502Z",
       "msg": "wardrobe outfits: applied",
       "data": {
         "projectId": "12f53ed1-c6c7-4c11-8d7b-06d91744c9af",
@@ -172,7 +172,7 @@
     },
     {
       "level": "info",
-      "ts": "2026-08-13T05:04:30.453Z",
+      "ts": "2026-08-13T06:20:19.502Z",
       "msg": "BIYA seed: project already exists, ensured shoot days",
       "data": {
         "projectId": "12f53ed1-c6c7-4c11-8d7b-06d91744c9af"
@@ -180,12 +180,12 @@
     },
     {
       "level": "info",
-      "ts": "2026-08-13T05:04:30.461Z",
+      "ts": "2026-08-13T06:20:19.508Z",
       "msg": "listening on :8080"
     },
     {
       "level": "info",
-      "ts": "2026-08-13T05:04:30.461Z",
+      "ts": "2026-08-13T06:20:19.508Z",
       "msg": "scheduler started (every 5 min)"
     }
   ]
