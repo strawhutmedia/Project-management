@@ -739,8 +739,107 @@ export type ApiTeleprompterSession = {
   updatedByName: string | null
 }
 
+// ── Contractor invoicing (admin payroll tool) ──
+export type ApiInvoiceLineItem = {
+  desc: string
+  hours: number
+  rateCents: number
+  amountCents: number
+}
+
+export type ApiContractor = {
+  id: string
+  name: string
+  email: string
+  hourlyRateCents: number
+  payMethod: 'ACH' | 'Check' | 'Other'
+  address: string
+  notes: string
+  archived: boolean
+  createdAt: string
+  updatedAt: string
+}
+
+export type ApiInvoice = {
+  id: string
+  number: string
+  contractorId: string | null
+  contractorName: string
+  contractorEmail: string
+  contractorAddress: string
+  payMethod: string
+  period: string
+  issueDate: string
+  lineItems: ApiInvoiceLineItem[]
+  totalCents: number
+  notes: string
+  status: 'draft' | 'unpaid' | 'paid'
+  paidAt: string | null
+  createdAt: string
+  updatedAt: string
+}
+
+export type ApiInvoiceSettings = {
+  companyName: string
+  companyEmail: string
+  companyAddress: string
+  logoDataUrl: string | null
+  invoicePrefix: string
+  nextNumber: number
+}
+
+export type ContractorInput = {
+  name: string
+  email?: string
+  hourlyRateCents?: number
+  payMethod?: 'ACH' | 'Check' | 'Other'
+  address?: string
+  notes?: string
+  archived?: boolean
+}
+
+export type InvoiceInput = {
+  contractorId?: string | null
+  contractorName?: string
+  contractorEmail?: string
+  contractorAddress?: string
+  payMethod?: string
+  period?: string
+  issueDate?: string
+  number?: string
+  notes?: string
+  status?: 'draft' | 'unpaid' | 'paid'
+  lineItems: Array<{ desc: string; hours: number; rateCents: number }>
+}
+
 export const api = {
   me: () => request<{ user: ApiUser | null }>('/api/me'),
+
+  // Contractor invoicing
+  invoiceSettings: () => request<{ settings: ApiInvoiceSettings }>('/api/invoicing/settings'),
+  updateInvoiceSettings: (patch: Partial<ApiInvoiceSettings> & { logoDataUrl?: string | null }) =>
+    request<{ settings: ApiInvoiceSettings }>('/api/invoicing/settings', { method: 'PATCH', body: JSON.stringify(patch) }),
+  contractors: () => request<{ contractors: ApiContractor[] }>('/api/invoicing/contractors'),
+  createContractor: (body: ContractorInput) =>
+    request<{ contractor: ApiContractor }>('/api/invoicing/contractors', { method: 'POST', body: JSON.stringify(body) }),
+  updateContractor: (id: string, body: Partial<ContractorInput>) =>
+    request<{ contractor: ApiContractor }>(`/api/invoicing/contractors/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
+  deleteContractor: (id: string) =>
+    request<{ ok: true }>(`/api/invoicing/contractors/${id}`, { method: 'DELETE' }),
+  invoices: () => request<{ invoices: ApiInvoice[] }>('/api/invoicing/invoices'),
+  invoice: (id: string) => request<{ invoice: ApiInvoice }>(`/api/invoicing/invoices/${id}`),
+  createInvoice: (body: InvoiceInput) =>
+    request<{ invoice: ApiInvoice }>('/api/invoicing/invoices', { method: 'POST', body: JSON.stringify(body) }),
+  updateInvoice: (id: string, body: Partial<InvoiceInput>) =>
+    request<{ invoice: ApiInvoice }>(`/api/invoicing/invoices/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
+  deleteInvoice: (id: string) =>
+    request<{ ok: true }>(`/api/invoicing/invoices/${id}`, { method: 'DELETE' }),
+  invoicePdfUrl: (id: string) => `/api/invoicing/invoices/${id}/pdf`,
+  emailInvoice: (id: string, to?: string) =>
+    request<{ ok: true; sentTo: string }>(`/api/invoicing/invoices/${id}/email`, {
+      method: 'POST',
+      body: JSON.stringify(to ? { to } : {}),
+    }),
 
   // Teleprompter — shared sessions for the podcast team.
   teleprompterList: () => request<{ sessions: ApiTeleprompterSession[] }>('/api/teleprompter'),

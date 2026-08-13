@@ -120,6 +120,9 @@ export default function Layout() {
                     )}
                     {user?.role === 'admin' && (
                       <>
+                        <NavMenuLink to="/invoicing" onClick={() => setNavOpen(false)}>
+                          🧾 Invoices
+                        </NavMenuLink>
                         <NavMenuLink to="/admin/outreach" onClick={() => setNavOpen(false)}>
                           ✉ Outreach
                         </NavMenuLink>

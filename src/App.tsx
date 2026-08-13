@@ -16,6 +16,7 @@ import Verify from './pages/Verify'
 import PrompterPage from './pages/PrompterPage'
 import Profile from './pages/Profile'
 import Settings from './pages/Settings'
+import InvoicingPage from './pages/InvoicingPage'
 import { AuthProvider, useAuth } from './auth'
 
 function Protected({ children }: { children: React.ReactNode }) {
@@ -61,6 +62,7 @@ export default function App() {
           <Route path="projects/:projectId/transcripts/:transcriptId" element={<TranscriptPage />} />
           <Route path="projects/:projectId/songs/:songId" element={<SongPage />} />
           <Route path="scheduler" element={<SchedulerPage />} />
+          <Route path="invoicing" element={<InvoicingPage />} />
           <Route path="carousel-preview" element={<CarouselPreviewPage />} />
           <Route path="admin/outreach" element={<OutreachHubPage />} />
           <Route path="admin/outreach/shows/:projectId" element={<OutreachShowPage />} />

@@ -126,6 +126,48 @@ export async function sendNotificationEmail(args: {
   }
 }
 
+export async function sendInvoiceEmail(args: {
+  to: string
+  replyTo?: string
+  companyName: string
+  contractorName: string
+  invoiceNumber: string
+  period: string
+  totalLabel: string
+  payMethod: string
+  pdf: Buffer
+}) {
+  if (!resend) {
+    console.log(`[slate] (no RESEND_API_KEY) invoice ${args.invoiceNumber} would go to ${args.to}`)
+    return
+  }
+  const result = await resend.emails.send({
+    from: FROM,
+    to: args.to,
+    ...(args.replyTo ? { replyTo: args.replyTo } : {}),
+    subject: `Invoice ${args.invoiceNumber} — ${args.companyName}`,
+    html: `
+      <div style="font-family:system-ui,sans-serif;max-width:520px;margin:0 auto;padding:32px 24px;color:#0b0d12">
+        <h1 style="font-family:Impact,sans-serif;font-size:30px;margin:0 0 16px;color:#A96B12">${escapeHtml(args.companyName)}</h1>
+        <p style="font-size:15px;line-height:1.5">Hi ${escapeHtml(args.contractorName)},</p>
+        <p style="font-size:15px;line-height:1.5">Attached is invoice <strong>${escapeHtml(args.invoiceNumber)}</strong>${args.period ? ` for <strong>${escapeHtml(args.period)}</strong>` : ''}.</p>
+        <p style="font-size:15px;line-height:1.5">Total: <strong>${escapeHtml(args.totalLabel)}</strong></p>
+        <p style="font-size:14px;line-height:1.5;color:#555">You'll receive payment via ${escapeHtml(args.payMethod)}. No action needed on your end.</p>
+        <p style="font-size:15px;line-height:1.5;margin-top:24px">Thanks,<br>${escapeHtml(args.companyName)}</p>
+      </div>
+    `,
+    attachments: [
+      {
+        filename: `${args.invoiceNumber.replace(/[^A-Za-z0-9._-]/g, '_')}.pdf`,
+        content: args.pdf,
+      },
+    ],
+  })
+  if (result.error) {
+    throw new Error(`resend: ${result.error.name || 'send_failed'}: ${result.error.message || JSON.stringify(result.error)}`)
+  }
+}
+
 function escapeHtml(s: string): string {
   return s
     .replace(/&/g, '&amp;')
