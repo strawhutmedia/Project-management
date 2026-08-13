@@ -1,17 +1,20 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { api, type ApiTeleprompterSession } from '../api'
 
 /**
- * Slate Teleprompter — a standalone, full-screen prompter that lives at
- * /prompter (no login). Built for live podcast recording: write or paste a
- * script, hit run, and it scrolls hands-free. Device-adaptive — big touch
- * controls and tap-zones on an iPad, keyboard shortcuts on a computer.
+ * Slate Teleprompter — a full-screen prompter for live podcast recording at
+ * /prompter. Write or paste a script, hit run, and it scrolls hands-free.
+ * Device-adaptive: big touch controls and tap-zones on an iPad, keyboard
+ * shortcuts on a computer.
  *
- * Sessions + settings persist to localStorage on THIS device, so each iPad /
- * laptop keeps its own library. No backend involved.
+ * Sessions (the scripts) are SHARED across the podcast team — they live in
+ * Slate's database, so whoever sits down at the prompter sees the same set
+ * from any device. Only the look-and-feel settings (speed, font size, …)
+ * stay per-device, since those depend on the physical rig in front of you.
  */
 
 // ---------------------------------------------------------------------------
-// Fonts, colors, persistence
+// Fonts, colors
 // ---------------------------------------------------------------------------
 
 const FONTS: Record<string, { label: string; stack: string }> = {
@@ -21,49 +24,39 @@ const FONTS: Record<string, { label: string; stack: string }> = {
   condensed: { label: 'Condensed', stack: '"Arial Narrow", "Roboto Condensed", "Liberation Sans Narrow", sans-serif' },
 }
 
-// The only text colors we offer — kept deliberately small so the toolbar
-// stays clean and anyone can use it at a glance.
-const TEXT_COLORS: Array<{ key: string; hex: string; ring: string }> = [
-  { key: 'White', hex: '#ffffff', ring: '#ffffff' },
-  { key: 'Black', hex: '#000000', ring: '#000000' },
-  { key: 'Red', hex: '#ef4444', ring: '#ef4444' },
-  { key: 'Yellow', hex: '#facc15', ring: '#facc15' },
-  { key: 'Green', hex: '#22c55e', ring: '#22c55e' },
-  { key: 'Blue', hex: '#3b82f6', ring: '#3b82f6' },
+const TEXT_COLORS: Array<{ key: string; hex: string }> = [
+  { key: 'White', hex: '#ffffff' },
+  { key: 'Black', hex: '#000000' },
+  { key: 'Red', hex: '#ef4444' },
+  { key: 'Yellow', hex: '#facc15' },
+  { key: 'Green', hex: '#22c55e' },
+  { key: 'Blue', hex: '#3b82f6' },
 ]
 
 const HIGHLIGHT_BG = '#ffe066'
 const HIGHLIGHT_FG = '#1a1a1a'
 
-const STORE_KEY = 'slate.prompter.v2'
-const LEGACY_KEY = 'slate.prompter.v1'
+// ---------------------------------------------------------------------------
+// Per-device settings (localStorage) — NOT shared, they describe the rig.
+// ---------------------------------------------------------------------------
 
-type Script = {
-  id: string
-  name: string // user-given; '' means "use the date"
-  html: string
-  createdAt: number
-  updatedAt: number
-}
+const SETTINGS_KEY = 'slate.prompter.settings.v2'
+const CURRENT_KEY = 'slate.prompter.currentId'
+const MIGRATED_KEY = 'slate.prompter.migratedToServer'
+const LEGACY_STORE_KEY = 'slate.prompter.v2'
 
 type Settings = {
-  speed: number // 1..100 (maps to px/sec)
-  fontSize: number // px
-  lineHeight: number // unitless
-  maxWidth: number // percent of viewport width (40..100)
+  speed: number
+  fontSize: number
+  lineHeight: number
+  maxWidth: number
   align: 'left' | 'center'
   fontFamily: keyof typeof FONTS
   background: 'black' | 'white'
-  mirrorX: boolean // horizontal flip (beam-splitter glass)
-  flipY: boolean // vertical flip (overhead rig)
-  countdown: boolean // 3-2-1 before scroll starts
-  showGuide: boolean // eye-line marker
-}
-
-type Store = {
-  scripts: Script[]
-  currentId: string | null
-  settings: Settings
+  mirrorX: boolean
+  flipY: boolean
+  countdown: boolean
+  showGuide: boolean
 }
 
 const DEFAULT_SETTINGS: Settings = {
@@ -80,41 +73,55 @@ const DEFAULT_SETTINGS: Settings = {
   showGuide: true,
 }
 
+function loadSettings(): Settings {
+  try {
+    const raw = localStorage.getItem(SETTINGS_KEY)
+    if (raw) return { ...DEFAULT_SETTINGS, ...JSON.parse(raw) }
+    // Fall back to settings embedded in the old device-local store.
+    const legacy = localStorage.getItem(LEGACY_STORE_KEY)
+    if (legacy) {
+      const parsed = JSON.parse(legacy)
+      if (parsed?.settings) return { ...DEFAULT_SETTINGS, ...parsed.settings }
+    }
+  } catch {
+    /* ignore */
+  }
+  return { ...DEFAULT_SETTINGS }
+}
+
+function saveSettings(s: Settings) {
+  try {
+    localStorage.setItem(SETTINGS_KEY, JSON.stringify(s))
+  } catch {
+    /* ignore */
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+type Session = ApiTeleprompterSession
+
 const SAMPLE_HTML =
   '<div>Welcome back to the show.</div><div><br></div>' +
   "<div>Today we're talking about something I've wanted to dig into for a long time — and I think you're going to love where this goes.</div><div><br></div>" +
   '<div>Before we jump in: if you\'re enjoying the podcast, the single best thing you can do is share this episode with one friend. That\'s it. One friend.</div><div><br></div>' +
   "<div>Alright. Let's get into it.</div>"
 
-function uid() {
-  return Math.random().toString(36).slice(2, 10) + Date.now().toString(36)
-}
-
-function escapeHtml(s: string): string {
-  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
-}
-
-function textToHtml(text: string): string {
-  return text
-    .split('\n')
-    .map((line) => (line.trim() ? `<div>${escapeHtml(line)}</div>` : '<div><br></div>'))
-    .join('')
-}
-
 function htmlToText(html: string): string {
   const d = document.createElement('div')
   d.innerHTML = html
-  // block boundaries should read as spaces for word-counting
-  return (d.textContent || '').replace(/ /g, ' ')
+  return d.textContent || ''
 }
 
 function wordCount(html: string): number {
   return htmlToText(html).trim().split(/\s+/).filter(Boolean).length
 }
 
-function formatDate(ts: number): string {
+function formatDate(iso: string): string {
   try {
-    return new Date(ts).toLocaleString(undefined, {
+    return new Date(iso).toLocaleString(undefined, {
       month: 'short',
       day: 'numeric',
       year: 'numeric',
@@ -126,66 +133,10 @@ function formatDate(ts: number): string {
   }
 }
 
-function scriptTitle(s: Script): string {
+function sessionTitle(s: Session): string {
   return s.name.trim() || formatDate(s.createdAt)
 }
 
-function loadStore(): Store {
-  // Current-format store
-  try {
-    const raw = localStorage.getItem(STORE_KEY)
-    if (raw) {
-      const parsed = JSON.parse(raw) as Store
-      return {
-        scripts: Array.isArray(parsed.scripts) ? parsed.scripts : [],
-        currentId: parsed.currentId ?? null,
-        settings: { ...DEFAULT_SETTINGS, ...(parsed.settings || {}) },
-      }
-    }
-  } catch {
-    /* fall through */
-  }
-
-  // Migrate a v1 store (plain-text scripts) if present
-  try {
-    const legacy = localStorage.getItem(LEGACY_KEY)
-    if (legacy) {
-      const old = JSON.parse(legacy) as {
-        scripts?: Array<{ id: string; title?: string; text?: string; updatedAt?: number }>
-        settings?: Partial<Settings>
-      }
-      const scripts: Script[] = (old.scripts || []).map((s) => ({
-        id: s.id || uid(),
-        name: '',
-        html: textToHtml(s.text || ''),
-        createdAt: s.updatedAt || Date.now(),
-        updatedAt: s.updatedAt || Date.now(),
-      }))
-      if (scripts.length) {
-        return {
-          scripts,
-          currentId: scripts[0].id,
-          settings: { ...DEFAULT_SETTINGS, ...(old.settings || {}) },
-        }
-      }
-    }
-  } catch {
-    /* fall through */
-  }
-
-  const first: Script = { id: uid(), name: '', html: SAMPLE_HTML, createdAt: Date.now(), updatedAt: Date.now() }
-  return { scripts: [first], currentId: first.id, settings: { ...DEFAULT_SETTINGS } }
-}
-
-function saveStore(store: Store) {
-  try {
-    localStorage.setItem(STORE_KEY, JSON.stringify(store))
-  } catch {
-    /* storage full / private mode — best effort */
-  }
-}
-
-// speed (1..100) → pixels per second, gently scaled by font size
 function pxPerSecond(speed: number, fontSize: number): number {
   const base = speed * 1.9
   return base * (fontSize / 64) * 0.85 + base * 0.15
@@ -198,85 +149,276 @@ function formatClock(sec: number): string {
   return `${m}:${s.toString().padStart(2, '0')}`
 }
 
+function errText(e: unknown): string {
+  return e instanceof Error ? e.message : String(e)
+}
+
+// One-time lift of anything a user saved on THIS device (old localStorage
+// model) up into the shared server library, so no scripts are lost in the
+// switch. Guarded by a flag; skips the starter sample and empty scripts.
+async function migrateLocalIfNeeded() {
+  try {
+    if (localStorage.getItem(MIGRATED_KEY)) return
+    const raw = localStorage.getItem(LEGACY_STORE_KEY)
+    if (raw) {
+      const parsed = JSON.parse(raw)
+      const scripts = Array.isArray(parsed?.scripts) ? parsed.scripts : []
+      for (const sc of scripts) {
+        const html = typeof sc?.html === 'string' ? sc.html : ''
+        if (!htmlToText(html).trim()) continue
+        if (html === SAMPLE_HTML) continue
+        await api.teleprompterCreate({ name: typeof sc?.name === 'string' ? sc.name : '', html })
+      }
+    }
+    localStorage.setItem(MIGRATED_KEY, '1')
+  } catch {
+    /* best effort — never block the page on migration */
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Root component
 // ---------------------------------------------------------------------------
 
+type SaveState = 'idle' | 'saving' | 'saved' | 'error'
+
 export default function PrompterPage() {
-  const [store, setStore] = useState<Store>(() => loadStore())
+  const [settings, setSettingsState] = useState<Settings>(() => loadSettings())
+  const [sessions, setSessions] = useState<Session[]>([])
+  const [currentId, setCurrentId] = useState<string | null>(() => {
+    try {
+      return localStorage.getItem(CURRENT_KEY)
+    } catch {
+      return null
+    }
+  })
+  const [status, setStatus] = useState<'loading' | 'ready' | 'forbidden' | 'error'>('loading')
+  const [loadError, setLoadError] = useState<string | null>(null)
+  const [saveState, setSaveState] = useState<SaveState>('idle')
   const [mode, setMode] = useState<'edit' | 'run'>('edit')
 
+  useEffect(() => saveSettings(settings), [settings])
   useEffect(() => {
-    saveStore(store)
-  }, [store])
-
-  const current = useMemo(
-    () => store.scripts.find((s) => s.id === store.currentId) ?? store.scripts[0] ?? null,
-    [store.scripts, store.currentId],
-  )
-  const settings = store.settings
+    try {
+      if (currentId) localStorage.setItem(CURRENT_KEY, currentId)
+    } catch {
+      /* ignore */
+    }
+  }, [currentId])
 
   const setSettings = useCallback((patch: Partial<Settings>) => {
-    setStore((s) => ({ ...s, settings: { ...s.settings, ...patch } }))
+    setSettingsState((s) => ({ ...s, ...patch }))
   }, [])
 
-  const updateCurrentHtml = useCallback((html: string) => {
-    setStore((s) => {
-      if (!s.currentId) return s
-      return {
-        ...s,
-        scripts: s.scripts.map((sc) => (sc.id === s.currentId ? { ...sc, html, updatedAt: Date.now() } : sc)),
+  const current = useMemo(
+    () => sessions.find((s) => s.id === currentId) ?? sessions[0] ?? null,
+    [sessions, currentId],
+  )
+
+  // --- initial load --------------------------------------------------------
+  const reload = useCallback(async (opts?: { seedIfEmpty?: boolean }) => {
+    const { sessions: list } = await api.teleprompterList()
+    if (list.length === 0 && opts?.seedIfEmpty) {
+      const { session } = await api.teleprompterCreate({ name: '', html: SAMPLE_HTML })
+      setSessions([session])
+      setCurrentId(session.id)
+      return
+    }
+    setSessions(list)
+    setCurrentId((prev) => (prev && list.some((s) => s.id === prev) ? prev : list[0]?.id ?? null))
+  }, [])
+
+  useEffect(() => {
+    let alive = true
+    ;(async () => {
+      try {
+        await migrateLocalIfNeeded()
+        if (!alive) return
+        await reload({ seedIfEmpty: true })
+        if (!alive) return
+        setStatus('ready')
+      } catch (e) {
+        if (!alive) return
+        if (errText(e).includes('forbidden')) setStatus('forbidden')
+        else {
+          setStatus('error')
+          setLoadError(errText(e))
+        }
       }
-    })
+    })()
+    return () => {
+      alive = false
+    }
+  }, [reload])
+
+  // Refresh the shared list when the tab regains focus, so new sessions from
+  // teammates appear — but keep the copy you're actively editing intact.
+  useEffect(() => {
+    const onFocus = () => {
+      if (mode !== 'edit') return
+      api
+        .teleprompterList()
+        .then(({ sessions: list }) => {
+          setSessions((prev) => {
+            const localCur = prev.find((s) => s.id === currentId)
+            if (!localCur) return list
+            return list.map((s) => (s.id === localCur.id ? localCur : s))
+          })
+        })
+        .catch(() => {})
+    }
+    window.addEventListener('focus', onFocus)
+    return () => window.removeEventListener('focus', onFocus)
+  }, [mode, currentId])
+
+  // --- debounced autosave --------------------------------------------------
+  const saveTimer = useRef<number | null>(null)
+  const pending = useRef<{ id: string; name: string; html: string } | null>(null)
+
+  const flushSave = useCallback(async () => {
+    if (saveTimer.current) {
+      window.clearTimeout(saveTimer.current)
+      saveTimer.current = null
+    }
+    const p = pending.current
+    if (!p) return
+    pending.current = null
+    setSaveState('saving')
+    try {
+      const { updatedAt } = await api.teleprompterUpdate(p.id, { name: p.name, html: p.html })
+      setSessions((prev) => prev.map((s) => (s.id === p.id ? { ...s, updatedAt } : s)))
+      setSaveState('saved')
+    } catch {
+      setSaveState('error')
+    }
   }, [])
 
-  const renameCurrent = useCallback((name: string) => {
-    setStore((s) => {
-      if (!s.currentId) return s
-      return {
-        ...s,
-        scripts: s.scripts.map((sc) => (sc.id === s.currentId ? { ...sc, name } : sc)),
+  const scheduleSave = useCallback(
+    (id: string, name: string, html: string) => {
+      pending.current = { id, name, html }
+      setSaveState('saving')
+      if (saveTimer.current) window.clearTimeout(saveTimer.current)
+      saveTimer.current = window.setTimeout(() => void flushSave(), 700)
+    },
+    [flushSave],
+  )
+
+  // --- session ops ---------------------------------------------------------
+  const updateCurrentHtml = useCallback(
+    (html: string) => {
+      if (!current) return
+      setSessions((prev) => prev.map((s) => (s.id === current.id ? { ...s, html } : s)))
+      scheduleSave(current.id, current.name, html)
+    },
+    [current, scheduleSave],
+  )
+
+  const renameCurrent = useCallback(
+    (name: string) => {
+      if (!current) return
+      setSessions((prev) => prev.map((s) => (s.id === current.id ? { ...s, name } : s)))
+      scheduleSave(current.id, name, current.html)
+    },
+    [current, scheduleSave],
+  )
+
+  const newSession = useCallback(async () => {
+    await flushSave()
+    setSaveState('saving')
+    try {
+      const { session } = await api.teleprompterCreate({ name: '', html: '' })
+      setSessions((prev) => [session, ...prev])
+      setCurrentId(session.id)
+      setSaveState('saved')
+    } catch {
+      setSaveState('error')
+    }
+  }, [flushSave])
+
+  const selectSession = useCallback(
+    (id: string) => {
+      void flushSave()
+      setCurrentId(id)
+    },
+    [flushSave],
+  )
+
+  const deleteSession = useCallback(
+    async (id: string) => {
+      // optimistic
+      setSessions((prev) => prev.filter((s) => s.id !== id))
+      if (pending.current?.id === id) pending.current = null
+      try {
+        await api.teleprompterDelete(id)
+      } catch {
+        // reload to recover truth if the delete failed
+        void reload()
       }
-    })
-  }, [])
+    },
+    [reload],
+  )
 
-  const newScript = useCallback(() => {
-    setStore((s) => {
-      const now = Date.now()
-      const sc: Script = { id: uid(), name: '', html: '', createdAt: now, updatedAt: now }
-      return { ...s, scripts: [sc, ...s.scripts], currentId: sc.id }
-    })
-  }, [])
-
-  const selectScript = useCallback((id: string) => {
-    setStore((s) => ({ ...s, currentId: id }))
-  }, [])
-
-  const deleteScript = useCallback((id: string) => {
-    setStore((s) => {
-      const scripts = s.scripts.filter((sc) => sc.id !== id)
-      const currentId = s.currentId === id ? scripts[0]?.id ?? null : s.currentId
-      return { ...s, scripts, currentId }
-    })
-  }, [])
+  // ---- render -------------------------------------------------------------
+  if (status === 'loading') {
+    return <CenterMsg>Loading the teleprompter…</CenterMsg>
+  }
+  if (status === 'forbidden') {
+    return (
+      <CenterMsg>
+        <p className="text-lg text-text mb-1">Podcast access needed</p>
+        <p className="text-sm text-muted max-w-sm">
+          The teleprompter and its shared sessions are part of the podcast workspace. Ask Ryan to add you to a podcast
+          project, then reload this page.
+        </p>
+        <a href="/" className="mt-4 inline-block text-xs text-stage-mastering underline">
+          ← Back to Slate
+        </a>
+      </CenterMsg>
+    )
+  }
+  if (status === 'error') {
+    return (
+      <CenterMsg>
+        <p className="text-lg text-urgent mb-1">Couldn't load sessions</p>
+        <p className="text-sm text-muted">{loadError}</p>
+        <button onClick={() => location.reload()} className="mt-4 text-xs text-stage-mastering underline">
+          Retry
+        </button>
+      </CenterMsg>
+    )
+  }
 
   if (mode === 'run' && current) {
-    return <Runner script={current} settings={settings} setSettings={setSettings} onExit={() => setMode('edit')} />
+    return <Runner session={current} settings={settings} setSettings={setSettings} onExit={() => setMode('edit')} />
   }
 
   return (
     <Editor
-      store={store}
+      sessions={sessions}
       current={current}
       settings={settings}
       setSettings={setSettings}
+      saveState={saveState}
       onHtml={updateCurrentHtml}
       onRename={renameCurrent}
-      onNew={newScript}
-      onSelect={selectScript}
-      onDelete={deleteScript}
-      onRun={() => current && wordCount(current.html) > 0 && setMode('run')}
+      onNew={newSession}
+      onSelect={selectSession}
+      onDelete={deleteSession}
+      onRun={() => {
+        if (current && wordCount(current.html) > 0) {
+          void flushSave()
+          setMode('run')
+        }
+      }}
     />
+  )
+}
+
+function CenterMsg({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="min-h-screen grid place-items-center px-6 text-center">
+      <div className="text-muted text-sm">{children}</div>
+    </div>
   )
 }
 
@@ -285,10 +427,11 @@ export default function PrompterPage() {
 // ---------------------------------------------------------------------------
 
 function Editor(props: {
-  store: Store
-  current: Script | null
+  sessions: Session[]
+  current: Session | null
   settings: Settings
   setSettings: (p: Partial<Settings>) => void
+  saveState: SaveState
   onHtml: (html: string) => void
   onRename: (name: string) => void
   onNew: () => void
@@ -296,7 +439,7 @@ function Editor(props: {
   onDelete: (id: string) => void
   onRun: () => void
 }) {
-  const { store, current, settings, setSettings, onHtml, onRename, onNew, onSelect, onDelete, onRun } = props
+  const { sessions, current, settings, setSettings, saveState, onHtml, onRename, onNew, onSelect, onDelete, onRun } = props
   const canRun = Boolean(current && wordCount(current.html) > 0)
 
   return (
@@ -316,7 +459,7 @@ function Editor(props: {
       <div className="grid gap-5 lg:grid-cols-[1fr_260px]">
         {/* Script editor */}
         <div className="order-2 lg:order-1">
-          {/* Session name */}
+          {/* Session name + save state */}
           <div className="flex items-center gap-2 mb-2">
             <input
               value={current?.name ?? ''}
@@ -324,9 +467,7 @@ function Editor(props: {
               placeholder={current ? formatDate(current.createdAt) : 'Session name'}
               className="flex-1 rounded-xl bg-panel/60 border border-line text-text px-3 py-2 text-sm outline-none focus:border-stage-mastering"
             />
-            <span className="text-[11px] text-muted whitespace-nowrap">
-              {current ? `${wordCount(current.html)} words` : ''}
-            </span>
+            <SaveBadge state={saveState} />
           </div>
 
           {current && (
@@ -338,6 +479,13 @@ function Editor(props: {
               fontStack={FONTS[settings.fontFamily].stack}
             />
           )}
+
+          <div className="mt-1 flex items-center justify-between">
+            <span className="text-[11px] text-muted">{current ? `${wordCount(current.html)} words` : ''}</span>
+            {current?.updatedByName && (
+              <span className="text-[11px] text-muted">Last edited by {current.updatedByName}</span>
+            )}
+          </div>
 
           <div className="mt-4">
             <SettingsPanel settings={settings} setSettings={setSettings} />
@@ -370,14 +518,14 @@ function Editor(props: {
         {/* Library */}
         <div className="order-1 lg:order-2">
           <div className="flex items-center justify-between mb-2">
-            <label className="text-xs uppercase tracking-wider text-muted">Saved sessions</label>
+            <label className="text-xs uppercase tracking-wider text-muted">Shared sessions</label>
             <button onClick={onNew} className="text-xs text-stage-mastering hover:underline">
               + New
             </button>
           </div>
-          <div className="space-y-2 max-h-[40vh] lg:max-h-[70vh] overflow-y-auto pr-1">
-            {store.scripts.length === 0 && <p className="text-xs text-muted py-4 text-center">No sessions yet.</p>}
-            {store.scripts.map((sc) => {
+          <div className="space-y-2 max-h-[40vh] lg:max-h-[64vh] overflow-y-auto pr-1">
+            {sessions.length === 0 && <p className="text-xs text-muted py-4 text-center">No sessions yet.</p>}
+            {sessions.map((sc) => {
               const active = sc.id === current?.id
               return (
                 <div
@@ -389,15 +537,16 @@ function Editor(props: {
                 >
                   <div className="flex items-start justify-between gap-2">
                     <div className="min-w-0">
-                      <p className="text-sm text-text truncate">{scriptTitle(sc)}</p>
+                      <p className="text-sm text-text truncate">{sessionTitle(sc)}</p>
                       <p className="text-[10px] text-muted mt-0.5">
                         {sc.name.trim() ? formatDate(sc.createdAt) : `${wordCount(sc.html)} words`}
+                        {sc.createdByName ? ` · ${sc.createdByName}` : ''}
                       </p>
                     </div>
                     <button
                       onClick={(e) => {
                         e.stopPropagation()
-                        if (confirm('Delete this session from this device?')) onDelete(sc.id)
+                        if (confirm('Delete this session for the whole team? This can\'t be undone.')) onDelete(sc.id)
                       }}
                       className="opacity-0 group-hover:opacity-100 text-muted hover:text-urgent text-xs shrink-0"
                       title="Delete"
@@ -410,13 +559,24 @@ function Editor(props: {
             })}
           </div>
           <p className="mt-3 text-[10px] text-muted leading-relaxed">
-            Sessions save on this device only. Add <span className="text-text">/prompter</span> to your home screen for a
-            one-tap launch.
+            Sessions are saved in Slate and shared with everyone on the podcast team. Add{' '}
+            <span className="text-text">/prompter</span> to your home screen for a one-tap launch.
           </p>
         </div>
       </div>
     </div>
   )
+}
+
+function SaveBadge({ state }: { state: SaveState }) {
+  const map: Record<SaveState, { text: string; cls: string }> = {
+    idle: { text: 'Shared', cls: 'text-muted' },
+    saving: { text: 'Saving…', cls: 'text-muted' },
+    saved: { text: 'Saved ✓', cls: 'text-stage-mastering' },
+    error: { text: 'Save failed', cls: 'text-urgent' },
+  }
+  const { text, cls } = map[state]
+  return <span className={`text-[11px] whitespace-nowrap ${cls}`}>{text}</span>
 }
 
 // ---------------------------------------------------------------------------
@@ -436,9 +596,6 @@ function RichEditor({
 }) {
   const ref = useRef<HTMLDivElement>(null)
 
-  // Seed the editable div once (keyed by script id from the parent, so a new
-  // script remounts this and reseeds). We deliberately never write innerHTML
-  // back from state afterward — that would fight the caret.
   useEffect(() => {
     if (ref.current) ref.current.innerHTML = initialHtml
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -475,13 +632,10 @@ function RichEditor({
   const isDark = background === 'black'
   const bg = isDark ? '#000000' : '#ffffff'
   const fg = isDark ? '#ffffff' : '#111111'
-
-  // Keep the toolbar from stealing the selection when clicked.
   const hold = (e: React.MouseEvent) => e.preventDefault()
 
   return (
     <div className="rounded-2xl border border-line overflow-hidden">
-      {/* Toolbar */}
       <div className="flex flex-wrap items-center gap-1.5 px-2.5 py-2 bg-panel/70 border-b border-line">
         <TbBtn onMouseDown={hold} onClick={() => exec('bold')} title="Bold">
           <span className="font-bold">B</span>
@@ -506,7 +660,6 @@ function RichEditor({
             className="h-6 w-6 rounded-full border border-line grid place-items-center"
             style={{ background: c.hex }}
           >
-            {/* white swatch needs a visible outline on dark UI */}
             {c.key === 'White' && <span className="h-4 w-4 rounded-full border border-line" />}
           </button>
         ))}
@@ -518,7 +671,6 @@ function RichEditor({
         </TbBtn>
       </div>
 
-      {/* Editable area — mirrors the chosen screen so it's what-you-see */}
       <div
         ref={ref}
         contentEditable
@@ -526,14 +678,13 @@ function RichEditor({
         onInput={sync}
         onBlur={sync}
         onPaste={(e) => {
-          // Paste as plain text so pasted styles can't dirty the script.
           e.preventDefault()
           const text = e.clipboardData.getData('text/plain')
           document.execCommand('insertText', false, text)
           sync()
         }}
         data-empty-text="Write or paste your script here…"
-        className="prompter-editable px-4 py-4 h-[40vh] lg:h-[46vh] overflow-y-auto outline-none leading-relaxed text-[16px]"
+        className="prompter-editable px-4 py-4 h-[38vh] lg:h-[44vh] overflow-y-auto outline-none leading-relaxed text-[16px]"
         style={{ background: bg, color: fg, fontFamily: fontStack }}
       />
     </div>
@@ -570,7 +721,7 @@ function TbBtn({
 function SettingsPanel({ settings, setSettings }: { settings: Settings; setSettings: (p: Partial<Settings>) => void }) {
   return (
     <div className="rounded-2xl border border-line bg-panel/40 p-4">
-      <p className="text-xs uppercase tracking-wider text-muted mb-3">Look & feel</p>
+      <p className="text-xs uppercase tracking-wider text-muted mb-3">Look &amp; feel · this device</p>
       <div className="grid sm:grid-cols-2 gap-x-6 gap-y-4">
         <Slider label="Scroll speed" value={settings.speed} min={4} max={100} step={1} onChange={(v) => setSettings({ speed: v })} />
         <Slider label="Font size" value={settings.fontSize} min={28} max={140} step={2} suffix="px" onChange={(v) => setSettings({ fontSize: v })} />
@@ -578,7 +729,6 @@ function SettingsPanel({ settings, setSettings }: { settings: Settings; setSetti
         <Slider label="Text width" value={settings.maxWidth} min={40} max={100} step={1} suffix="%" onChange={(v) => setSettings({ maxWidth: v })} />
       </div>
 
-      {/* Font + screen */}
       <div className="grid sm:grid-cols-2 gap-x-6 gap-y-4 mt-4">
         <div>
           <p className="text-[11px] text-muted mb-1.5">Font</p>
@@ -684,12 +834,12 @@ function Toggle({ label, on, onClick, hint }: { label: string; on: boolean; onCl
 // ---------------------------------------------------------------------------
 
 function Runner({
-  script,
+  session,
   settings,
   setSettings,
   onExit,
 }: {
-  script: Script
+  session: Session
   settings: Settings
   setSettings: (p: Partial<Settings>) => void
   onExit: () => void
@@ -704,30 +854,6 @@ function Runner({
 
   const isTouch = useMemo(() => typeof window !== 'undefined' && window.matchMedia?.('(pointer: coarse)').matches, [])
 
-  // Track real (OS-level) fullscreen so the button reflects state. On macOS
-  // this is what hides the dock and the menu-bar clock.
-  useEffect(() => {
-    const on = () => setIsFs(Boolean((document as any).fullscreenElement))
-    document.addEventListener('fullscreenchange', on)
-    on()
-    return () => document.removeEventListener('fullscreenchange', on)
-  }, [])
-
-  // Entering the runner is a user gesture (the Start button), so try to go
-  // fullscreen immediately for a true edge-to-edge prompter. Best-effort —
-  // iOS Safari doesn't grant element fullscreen; the immersive layout covers
-  // that case, plus Add-to-Home-Screen.
-  useEffect(() => {
-    try {
-      const el = document.documentElement as any
-      if (!(document as any).fullscreenElement && el.requestFullscreen) {
-        void el.requestFullscreen().catch(() => {})
-      }
-    } catch {
-      /* ignore */
-    }
-  }, [])
-
   const rafRef = useRef<number | null>(null)
   const lastTsRef = useRef<number | null>(null)
   const accRef = useRef(0)
@@ -740,6 +866,28 @@ function Runner({
     speedRef.current = settings.speed
     fontRef.current = settings.fontSize
   }, [settings.speed, settings.fontSize])
+
+  // Track real (OS-level) fullscreen so the button reflects state. On macOS
+  // this is what hides the dock and the menu-bar clock.
+  useEffect(() => {
+    const on = () => setIsFs(Boolean((document as any).fullscreenElement))
+    document.addEventListener('fullscreenchange', on)
+    on()
+    return () => document.removeEventListener('fullscreenchange', on)
+  }, [])
+
+  // Entering the runner is a user gesture (Start), so try to go fullscreen
+  // immediately. Best-effort — iOS Safari doesn't grant element fullscreen.
+  useEffect(() => {
+    try {
+      const el = document.documentElement as any
+      if (!(document as any).fullscreenElement && el.requestFullscreen) {
+        void el.requestFullscreen().catch(() => {})
+      }
+    } catch {
+      /* ignore */
+    }
+  }, [])
 
   // Screen wake lock — don't let the iPad sleep mid-read.
   useEffect(() => {
@@ -938,7 +1086,6 @@ function Runner({
 
   return (
     <div className="fixed inset-0 overflow-hidden select-none" style={{ background: bg, color: fg }}>
-      {/* Scrolling text (the only thing that gets mirrored/flipped) */}
       <div
         ref={scrollRef}
         className="absolute inset-0 overflow-y-scroll no-scrollbar"
@@ -960,12 +1107,11 @@ function Runner({
               fontWeight: 600,
               wordBreak: 'break-word',
             }}
-            dangerouslySetInnerHTML={{ __html: script.html }}
+            dangerouslySetInnerHTML={{ __html: session.html }}
           />
         </div>
       </div>
 
-      {/* Eye-line guide + edge fades (NOT mirrored — drawn on top) */}
       {settings.showGuide && (
         <div className="pointer-events-none absolute inset-x-0" style={{ top: '46vh' }}>
           <div className="mx-auto h-[2px] bg-stage-mastering/70" style={{ width: '92%' }} />
@@ -978,7 +1124,6 @@ function Runner({
       <div className="pointer-events-none absolute inset-x-0 top-0 h-[22vh]" style={{ background: `linear-gradient(to bottom, rgba(${fadeRgb},0.85), transparent)` }} />
       <div className="pointer-events-none absolute inset-x-0 bottom-0 h-[22vh]" style={{ background: `linear-gradient(to top, rgba(${fadeRgb},0.85), transparent)` }} />
 
-      {/* Tap layer — toggles play/pause and reveals controls */}
       <div
         className="absolute inset-0"
         onClick={() => {
@@ -988,7 +1133,6 @@ function Runner({
         onMouseMove={revealControls}
       />
 
-      {/* Countdown */}
       {countdown != null && (
         <div className="absolute inset-0 grid place-items-center pointer-events-none">
           <div className="text-[22vw] font-black tabular-nums leading-none" style={{ color: fg, opacity: 0.9 }}>
@@ -997,12 +1141,10 @@ function Runner({
         </div>
       )}
 
-      {/* Progress bar */}
       <div className="absolute top-0 left-0 right-0 h-1" style={{ background: `rgba(${isDark ? '255,255,255' : '0,0,0'},0.12)` }}>
         <div className="h-full bar-rainbow" style={{ width: `${progress * 100}%` }} />
       </div>
 
-      {/* Control bar (always dark for a consistent, readable affordance) */}
       <div className={`absolute inset-x-0 bottom-0 transition-opacity duration-300 ${showControls ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
         <div className="mx-auto max-w-3xl m-3 rounded-2xl bg-black/80 backdrop-blur border border-white/10 px-3 py-2.5 text-white">
           <div className="flex items-center justify-between gap-2">
@@ -1047,7 +1189,6 @@ function Runner({
             </button>
           </div>
 
-          {/* Secondary row */}
           <div className="flex items-center justify-center gap-2 mt-2 flex-wrap">
             <MiniToggle on={settings.background === 'white'} onClick={() => setSettings({ background: settings.background === 'white' ? 'black' : 'white' })}>
               {settings.background === 'white' ? '○ White' : '● Black'}

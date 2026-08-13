@@ -729,8 +729,33 @@ export type ApiSendingDomain = {
   updated_at: string
 }
 
+export type ApiTeleprompterSession = {
+  id: string
+  name: string
+  html: string
+  createdAt: string
+  updatedAt: string
+  createdByName: string | null
+  updatedByName: string | null
+}
+
 export const api = {
   me: () => request<{ user: ApiUser | null }>('/api/me'),
+
+  // Teleprompter — shared sessions for the podcast team.
+  teleprompterList: () => request<{ sessions: ApiTeleprompterSession[] }>('/api/teleprompter'),
+  teleprompterCreate: (body: { name: string; html: string }) =>
+    request<{ session: ApiTeleprompterSession }>('/api/teleprompter', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+  teleprompterUpdate: (id: string, body: { name: string; html: string }) =>
+    request<{ ok: true; updatedAt: string }>(`/api/teleprompter/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(body),
+    }),
+  teleprompterDelete: (id: string) =>
+    request<{ ok: true }>(`/api/teleprompter/${id}`, { method: 'DELETE' }),
   updateMe: (patch: { name?: string; displayName?: string; timezone?: string }) =>
     request<{ user: ApiUser }>('/api/me', { method: 'PATCH', body: JSON.stringify(patch) }),
   requestLogin: (email: string) =>

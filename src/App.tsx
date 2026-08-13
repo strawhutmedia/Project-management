@@ -35,8 +35,16 @@ export default function App() {
       <Routes>
         <Route path="/login" element={<Login />} />
         <Route path="/auth/verify" element={<Verify />} />
-        {/* Public, no-login teleprompter — open on any iPad or computer. */}
-        <Route path="/prompter" element={<PrompterPage />} />
+        {/* Teleprompter — standalone full-page (no app chrome), but behind
+            login so its sessions can be shared across the podcast team. */}
+        <Route
+          path="/prompter"
+          element={
+            <Protected>
+              <PrompterPage />
+            </Protected>
+          }
+        />
         <Route
           element={
             <Protected>

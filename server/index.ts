@@ -26,6 +26,7 @@ import { exportsRouter } from './routes/exports'
 import { showPageRouter } from './routes/show_page'
 import { outreachDomainsRouter } from './routes/outreach_domains'
 import { outreachRouter, startOutreachSendLoop, enableDomainOpenTracking } from './routes/outreach'
+import { teleprompterRouter } from './routes/teleprompter'
 import { handleResendWebhook } from './routes/outreach_webhook'
 import { seedBackInYourArms } from './seeds/back_in_your_arms'
 import { ensureRyanIsPodcastEp } from './routes/projects'
@@ -108,6 +109,7 @@ app.use('/api', episodeCutsRouter)
 app.use('/api/exports', exportsRouter)
 app.use('/api/admin/outreach/domains', outreachDomainsRouter)
 app.use('/api/outreach', outreachRouter)
+app.use('/api/teleprompter', teleprompterRouter)
 
 // Public per-show one-sheet page (guest outreach). Mounted at the root
 // so URLs are /shows/<slug>, and BEFORE the SPA fallback so requests
