@@ -15,6 +15,7 @@ import {
 } from './seo.js';
 import { resolvePlatformLinks } from './platforms.js';
 import { CONTACT_ROUTES } from './mail.js';
+import { trackingHead, trackingBody } from './tracking.js';
 
 const FONT =
   '<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>' +
@@ -92,7 +93,8 @@ export function audioPlayer(src, opts = {}) {
     var pre=parseInt(dur.getAttribute('data-secs')||'0',10);if(pre>0)dur.textContent=fmt(pre);
     function setStatus(t){if(status)status.textContent=t;}
     tg.addEventListener('click',function(){a.paused?a.play():a.pause();});
-    a.addEventListener('play',function(){ip.style.display='none';ie.style.display='';tg.setAttribute('aria-label','Pause');r.classList.add('is-playing');setStatus('Now playing');});
+    var _tracked=false;
+    a.addEventListener('play',function(){ip.style.display='none';ie.style.display='';tg.setAttribute('aria-label','Pause');r.classList.add('is-playing');setStatus('Now playing');if(!_tracked&&window.shmTrack){_tracked=true;shmTrack('play_episode',{});}});
     a.addEventListener('pause',function(){ip.style.display='';ie.style.display='none';tg.setAttribute('aria-label','Play');r.classList.remove('is-playing');setStatus('Paused');});
     a.addEventListener('ended',function(){ip.style.display='';ie.style.display='none';r.classList.remove('is-playing');setStatus('Finished');});
     a.addEventListener('loadedmetadata',function(){dur.textContent=fmt(a.duration);});
@@ -126,7 +128,7 @@ export function platformRow(show) {
     <div class="platform-links">
       ${links
         .map(
-          (l) => `<a class="platform-link" href="${esc(l.url)}" target="_blank" rel="noopener" style="--pc:${esc(l.color)}" aria-label="${esc(l.label)}" title="${esc(l.label)}"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">${l.icon}</svg><span>${esc(l.label)}</span></a>`
+          (l) => `<a class="platform-link" href="${esc(l.url)}" target="_blank" rel="noopener" style="--pc:${esc(l.color)}" aria-label="${esc(l.label)}" title="${esc(l.label)}" onclick="window.shmTrack&&shmTrack('platform_click',{platform:'${esc(l.label)}'})"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">${l.icon}</svg><span>${esc(l.label)}</span></a>`
         )
         .join('')}
     </div>
@@ -179,11 +181,13 @@ ${image ? `<meta property="og:image" content="${esc(image)}">` : ''}
 <meta name="twitter:description" content="${esc(desc)}">
 ${image ? `<meta name="twitter:image" content="${esc(image)}">` : ''}
 ${feedUrl ? `<link rel="alternate" type="application/rss+xml" title="${esc(title)}" href="${esc(feedUrl)}">` : ''}
+${trackingHead()}
 ${FONT}
 <link rel="stylesheet" href="/styles.css">
 ${jsonLd}
 </head>
 <body class="${bodyClass}">
+${trackingBody()}
 <header class="site-header"><div class="container">
   <a class="brand" href="/">Straw Hut Media<span class="dot">.</span></a>
   <button class="nav-toggle" id="navToggle" type="button" aria-label="Menu" aria-expanded="false" aria-controls="siteNav"><span class="nav-toggle-bars"></span></button>
@@ -314,7 +318,7 @@ export function homePage({ shows }) {
     <div class="panel" style="max-width:640px;margin:0 auto;text-align:center;background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:34px">
       <h2 style="margin-top:0">Get updates from Straw Hut Media</h2>
       <p style="color:var(--muted);margin-top:6px">New shows, new episodes, and behind-the-scenes — straight to your inbox.</p>
-      <form method="post" action="/subscribe" style="display:flex;gap:10px;flex-wrap:wrap;justify-content:center;margin-top:18px">
+      <form method="post" action="/subscribe" onsubmit="window.shmTrack&&shmTrack('subscribe',{});window.fbq&&fbq('track','Subscribe');" style="display:flex;gap:10px;flex-wrap:wrap;justify-content:center;margin-top:18px">
         <input type="email" name="email" required placeholder="you@email.com" style="flex:1;min-width:240px;padding:13px 16px;border-radius:999px;border:1px solid var(--border);background:var(--bg-2);color:var(--text);font-family:inherit">
         <button class="btn btn-primary" type="submit">Subscribe</button>
       </form>
@@ -396,9 +400,10 @@ ${landing.indexable ? `<link rel="canonical" href="${esc(canon)}"><meta name="ro
 <meta property="og:title" content="${esc(headline)}">
 <meta property="og:description" content="${esc(toText(landing.subhead || body, 160))}">
 ${heroImg ? `<meta property="og:image" content="${esc(heroImg)}">` : ''}
-${FONT}<link rel="stylesheet" href="/styles.css">${gtag}
+${trackingHead()}${FONT}<link rel="stylesheet" href="/styles.css">${gtag}
 </head>
 <body>
+${trackingBody()}
 <header class="site-header"><div class="container"><a class="brand" href="/">Straw Hut Media<span class="dot">.</span></a></div></header>
 <main><section class="section" style="padding-top:40px"><div class="container" style="max-width:820px">
   ${heroImg ? `<img src="${esc(heroImg)}" alt="${esc(headline)}" style="width:100%;max-height:420px;object-fit:cover;border-radius:18px;box-shadow:var(--shadow);margin-bottom:26px">` : ''}
@@ -413,7 +418,7 @@ ${FONT}<link rel="stylesheet" href="/styles.css">${gtag}
   try{var qs=new URLSearchParams(location.search);var keep=['gclid','utm_source','utm_medium','utm_campaign'];
   var cta=document.getElementById('lpCta');
   if(cta){var u=new URL(cta.href, location.origin);keep.forEach(function(k){if(qs.get(k))u.searchParams.set(k,qs.get(k));});cta.href=u.toString();
-  cta.addEventListener('click',function(){if(window.gtag)gtag('event','conversion',{send_to:'${esc(landing.gtag_id || '')}'});});}
+  cta.addEventListener('click',function(){if(window.gtag)gtag('event','conversion',{send_to:'${esc(landing.gtag_id || '')}'});if(window.shmTrack)shmTrack('lp_cta_click',{slug:'${esc(landing.slug)}'});if(window.fbq)fbq('track','Lead');});}
   }catch(e){}
 })();</script>
 </body></html>`;
@@ -562,7 +567,8 @@ export function contactPage({ sent = false, error = '', values = {} } = {}) {
         ? `<div class="contact-thanks">
              <h2 style="margin:0 0 8px">Thanks — message received.</h2>
              <p style="color:var(--muted);margin:0">We read every note and reply personally. Talk soon.</p>
-           </div>`
+           </div>
+           <script>window.shmTrack&&shmTrack('contact_submit',{topic:'${esc(values.topic || 'general')}'});window.fbq&&fbq('track','Lead');</script>`
         : `<form class="contact-form" method="POST" action="/contact">
              ${error ? `<div class="flash err" style="margin-bottom:18px">${esc(error)}</div>` : ''}
              <div class="field"><label>What's this regarding?</label>
