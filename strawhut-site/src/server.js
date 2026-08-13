@@ -475,6 +475,23 @@ app.get('/healthz', async (req, res) => {
   res.json({ ok: true, ...(await store.stats()), spotlight: { source: sp.source, shows: titles } });
 });
 
+// TEMP diagnostic — surface the real Resend result for the contact form.
+// Remove after verifying email works.
+app.get('/__mailprobe', async (req, res) => {
+  const out = {
+    configured: mailConfigured(),
+    from: process.env.FROM_EMAIL || 'Straw Hut Media <news@strawhutmedia.com>',
+  };
+  try {
+    await sendContactEmail({ name: 'probe', email: 'ryan@strawhutmedia.com', company: '', message: 'mail probe', topic: 'general' });
+    out.ok = true;
+  } catch (e) {
+    out.ok = false;
+    out.error = e.message;
+  }
+  res.json(out);
+});
+
 // ---- SEO / GEO endpoints --------------------------------------------------
 app.get('/robots.txt', (req, res) => res.type('text/plain').send(robotsTxt()));
 
