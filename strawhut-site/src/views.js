@@ -412,13 +412,17 @@ ${trackingHead()}${FONT}<link rel="stylesheet" href="/styles.css">${gtag}
 ${trackingBody()}
 <main class="lp-wrap"><div class="lp-card">
   <a class="lp-brand" href="/">Straw Hut Media<span class="dot">.</span></a>
-  ${show ? `<div class="lp-eyebrow">${esc(show.title)}</div>` : ''}
-  ${cover ? `<img class="lp-cover" src="${esc(cover)}" alt="${esc(headline)}">` : ''}
-  <h1 class="lp-title">${esc(headline)}</h1>
-  ${dateline ? `<div class="lp-date">${esc(dateline)}</div>` : ''}
-  ${landing.subhead ? `<p class="lp-sub">${esc(landing.subhead)}</p>` : ''}
-  ${player ? `<div class="lp-playcue"><span class="lp-playcue-arrow">▼</span> Press play — listen free</div>${player}` : ''}
+  <div class="lp-head">
+    ${cover ? `<img class="lp-cover" src="${esc(cover)}" alt="${esc(headline)}">` : ''}
+    <div class="lp-head-text">
+      ${show ? `<div class="lp-eyebrow">${esc(show.title)}</div>` : ''}
+      <h1 class="lp-title">${esc(headline)}</h1>
+      ${dateline ? `<div class="lp-date">${esc(dateline)}</div>` : ''}
+    </div>
+  </div>
+  ${player ? `<div class="lp-playcue"><span class="lp-playcue-arrow">▶</span> Press play — listen free</div>${player}` : ''}
   ${landing.cta_url ? `<a class="btn btn-primary lp-cta-btn" id="lpCta" href="${esc(landing.cta_url)}">${esc(landing.cta_label || 'Listen now')}</a>` : ''}
+  ${landing.subhead ? `<p class="lp-sub">${esc(landing.subhead)}</p>` : ''}
   ${
     show
       ? `<div class="lp-subscribe">
