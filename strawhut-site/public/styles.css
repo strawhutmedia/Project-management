@@ -288,6 +288,18 @@ img { max-width: 100%; display: block; }
 .booking-note li:last-child { margin-bottom: 0; }
 .booking-note strong { color: var(--text); }
 
+/* Landing page — play-first, subscribe-second */
+.lp-playcue { text-align: center; font-weight: 700; color: var(--accent); font-size: 0.95rem; letter-spacing: 0.01em; margin: 8px 0 4px; }
+.lp-playcue-arrow { display: inline-block; animation: lp-bob 1.4s ease-in-out infinite; }
+@keyframes lp-bob { 0%,100% { transform: translateY(0); } 50% { transform: translateY(4px); } }
+@media (prefers-reduced-motion: reduce) { .lp-playcue-arrow { animation: none; } }
+.lp-player { display: flex; justify-content: center; }
+.lp-player .aplayer { width: 100%; }
+.lp-subscribe { margin-top: 32px; padding-top: 26px; border-top: 1px solid var(--border); }
+.lp-subscribe .listen-on { max-width: 100%; text-align: center; }
+.lp-subscribe .listen-on-label { display: none; }
+.lp-subscribe .platform-links { justify-content: center; }
+
 /* Contact */
 .contact-form { max-width: 640px; }
 .contact-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }

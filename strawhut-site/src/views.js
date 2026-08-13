@@ -405,13 +405,27 @@ ${trackingHead()}${FONT}<link rel="stylesheet" href="/styles.css">${gtag}
 <body>
 ${trackingBody()}
 <header class="site-header"><div class="container"><a class="brand" href="/">Straw Hut Media<span class="dot">.</span></a></div></header>
-<main><section class="section" style="padding-top:40px"><div class="container" style="max-width:820px">
-  ${heroImg ? `<img src="${esc(heroImg)}" alt="${esc(headline)}" style="width:100%;max-height:420px;object-fit:cover;border-radius:18px;box-shadow:var(--shadow);margin-bottom:26px">` : ''}
-  <h1 style="font-size:clamp(1.8rem,4vw,2.8rem);margin:0 0 12px">${esc(headline)}</h1>
-  ${landing.subhead ? `<p style="color:var(--muted);font-size:1.15rem;margin:0 0 22px">${esc(landing.subhead)}</p>` : ''}
-  ${player}
-  ${landing.cta_url ? `<div style="margin:26px 0"><a class="btn btn-primary" id="lpCta" href="${esc(landing.cta_url)}" style="font-size:1.05rem;padding:14px 30px">${esc(landing.cta_label || 'Listen now')}</a></div>` : ''}
-  ${body ? `<div class="notes">${body}</div>` : ''}
+<main><section class="section" style="padding-top:40px"><div class="container" style="max-width:760px">
+  ${heroImg ? `<img src="${esc(heroImg)}" alt="${esc(headline)}" style="width:100%;max-height:420px;object-fit:cover;border-radius:18px;box-shadow:var(--shadow);margin-bottom:24px">` : ''}
+  <h1 style="font-size:clamp(1.8rem,4vw,2.8rem);margin:0 0 12px;text-align:center">${esc(headline)}</h1>
+  ${landing.subhead ? `<p style="color:var(--muted);font-size:1.15rem;margin:0 0 20px;text-align:center">${esc(landing.subhead)}</p>` : ''}
+  ${
+    player
+      ? `<div class="lp-playcue"><span class="lp-playcue-arrow">▼</span> Press play — listen free, right here</div>
+         <div class="lp-player">${player}</div>`
+      : ''
+  }
+  ${landing.cta_url ? `<div style="margin:22px 0;text-align:center"><a class="btn btn-primary" id="lpCta" href="${esc(landing.cta_url)}" style="font-size:1.05rem;padding:14px 30px">${esc(landing.cta_label || 'Listen now')}</a></div>` : ''}
+  ${
+    show
+      ? `<div class="lp-subscribe">
+           <h2 style="margin:0 0 4px;font-size:1.35rem;text-align:center">Love it? Follow ${esc(show.title)}</h2>
+           <p style="color:var(--muted);text-align:center;margin:0 0 4px">Subscribe on your favorite app so you never miss an episode.</p>
+           ${platformRow(show)}
+         </div>`
+      : ''
+  }
+  ${body ? `<div class="notes" style="margin-top:30px">${body}</div>` : ''}
 </div></section></main>
 <script>(function(){
   // Attribution: keep gclid/utm and append to the CTA so conversions track.

@@ -703,6 +703,36 @@ app.listen(PORT, async () => {
     console.error('[import] auto-import failed:', e.message);
   }
 
+  // Seed a demo Google-Ads landing page for review (Seen on the Screen).
+  // Idempotent: only creates it if it doesn't already exist, so editing or
+  // deleting it in the admin sticks. Set SEED_DEMO_LANDING=off to skip.
+  try {
+    if (process.env.SEED_DEMO_LANDING !== 'off' && !(await store.getLandingBySlug('seen-on-the-screen'))) {
+      const show = (await store.listShows()).find((s) => s.slug === 'seen-on-the-screen-with-jacqueline-coley');
+      const eps = show ? await store.listEpisodes(show.id, { limit: 1 }) : [];
+      const ep = eps[0];
+      if (show && ep) {
+        await store.createLanding({
+          slug: 'seen-on-the-screen',
+          title: 'Seen on the Screen — Google Ads LP (demo)',
+          headline: ep.title,
+          subhead: `Hollywood's smartest movie & TV conversations with Jacqueline Coley — press play and listen free.`,
+          body_html: ep.description || '',
+          hero_image_url: ep.image_url || show.image_url || '',
+          cta_label: '',
+          cta_url: '',
+          show_id: show.id,
+          episode_id: ep.id,
+          indexable: false,
+          gtag_id: '',
+        });
+        console.log('[seed] demo landing page created → /lp/seen-on-the-screen');
+      }
+    }
+  } catch (e) {
+    console.error('[seed] demo landing failed:', e.message);
+  }
+
   // Homepage spotlight: prefer the most-downloaded shows (Megaphone); fall
   // back to the curated monthly rotation only if Megaphone isn't reachable.
   refreshSpotlight();
