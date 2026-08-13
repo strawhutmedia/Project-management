@@ -123,6 +123,10 @@ export async function refreshPress(store, { log = () => {}, includeShows = true 
 
   // Backfill lead images for items saved before image support (up to a cap per
   // run so a large table fills in over a few refreshes rather than one long one).
+  // Clear any placeholder value left by the diagnostic so it re-resolves.
+  for (const p of await store.listPressItems({ limit: 1000 })) {
+    if (p.image_url && p.image_url.includes('example.com')) await store.setPressItemImage(p.id, null);
+  }
   let backfilled = 0;
   const missing = (await store.listPressItems({ limit: 1000 })).filter((p) => !p.image_url);
   for (const p of missing.slice(0, 20)) {

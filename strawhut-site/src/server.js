@@ -475,27 +475,6 @@ app.get('/healthz', async (req, res) => {
   res.json({ ok: true, ...(await store.stats()), spotlight: { source: sp.source, shows: titles } });
 });
 
-// TEMP diagnostic — why are press thumbnails empty? Remove after fixing.
-app.get('/__pressimg', async (req, res) => {
-  const { fetchOgImage } = await import('./press.js');
-  const items = await store.listPressItems({ limit: 500 });
-  const withImg = items.filter((p) => p.image_url).length;
-  const sample = items.slice(0, 4);
-  const tries = [];
-  for (const p of sample) {
-    let og = null, err = null, t0 = Date.now();
-    try { og = await fetchOgImage(p.url); } catch (e) { err = e.message; }
-    tries.push({ source: p.source, url: p.url.slice(0, 70), ms: Date.now() - t0, og: og ? og.slice(0, 90) : null, err });
-  }
-  // try persisting one to confirm the write path works
-  let writeOk = null, writeErr = null;
-  if (sample[0]) {
-    try { await store.setPressItemImage(sample[0].id, tries[0]?.og || 'https://example.com/test.jpg'); writeOk = true; }
-    catch (e) { writeOk = false; writeErr = e.message; }
-  }
-  res.json({ total: items.length, withImg, tries, writeOk, writeErr });
-});
-
 // ---- SEO / GEO endpoints --------------------------------------------------
 app.get('/robots.txt', (req, res) => res.type('text/plain').send(robotsTxt()));
 
