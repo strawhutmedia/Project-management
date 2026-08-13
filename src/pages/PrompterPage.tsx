@@ -513,6 +513,8 @@ function Editor(props: {
           <p className="mt-2 text-center text-[11px] text-muted">
             Opens full screen (hides the Mac dock &amp; clock). Tap the screen or hit space to play / pause · Esc to exit.
           </p>
+
+          <RemoteHelp />
         </div>
 
         {/* Library */}
@@ -577,6 +579,90 @@ function SaveBadge({ state }: { state: SaveState }) {
   }
   const { text, cls } = map[state]
   return <span className={`text-[11px] whitespace-nowrap ${cls}`}>{text}</span>
+}
+
+// ---------------------------------------------------------------------------
+// Remote / keyboard helper — how to drive the prompter hands-free, plus a
+// live key readout so you can identify what your Bluetooth remote sends.
+// ---------------------------------------------------------------------------
+
+function RemoteHelp() {
+  const [open, setOpen] = useState(false)
+  const [lastKey, setLastKey] = useState<string | null>(null)
+  const [count, setCount] = useState(0)
+
+  useEffect(() => {
+    if (!open) return
+    const onKey = (e: KeyboardEvent) => {
+      // Ignore keys typed into the script/name fields — we only want the
+      // remote's buttons, pressed while focus is outside a text box.
+      const t = e.target as HTMLElement | null
+      if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return
+      const code = e.code && e.code !== e.key ? `  ·  code: ${e.code}` : ''
+      setLastKey(`${e.key === ' ' ? 'Space' : e.key}${code}`)
+      setCount((c) => c + 1)
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [open])
+
+  return (
+    <div className="mt-3 rounded-2xl border border-line bg-panel/40">
+      <button
+        onClick={() => setOpen((v) => !v)}
+        className="w-full flex items-center justify-between px-4 py-3 text-left"
+      >
+        <span className="text-xs uppercase tracking-wider text-muted">🎛️ Using an iPad / Bluetooth remote?</span>
+        <span className="text-muted text-xs">{open ? '▲' : '▼'}</span>
+      </button>
+      {open && (
+        <div className="px-4 pb-4 space-y-3">
+          <p className="text-[12px] text-muted leading-relaxed">
+            If your remote pairs as a Bluetooth <span className="text-text">keyboard</span> (most page-turner / clicker
+            remotes do), it already works. Buttons map like this:
+          </p>
+          <ul className="text-[12px] text-text/90 space-y-1">
+            <li>
+              <span className="text-stage-mastering">Space · Enter</span> — play / pause
+            </li>
+            <li>
+              <span className="text-stage-mastering">↑ ↓</span> — scroll speed
+            </li>
+            <li>
+              <span className="text-stage-mastering">← →</span> — font size
+            </li>
+            <li>
+              <span className="text-stage-mastering">Page Up / Page Down</span> — jump back / ahead
+            </li>
+          </ul>
+
+          <div className="rounded-xl border border-line bg-ink/30 p-3">
+            <p className="text-[11px] text-muted mb-1">
+              Test it: click this box, then press a button on your remote.
+            </p>
+            <div
+              tabIndex={0}
+              className="rounded-lg bg-panel/60 border border-line px-3 py-3 text-center outline-none focus:border-stage-mastering cursor-pointer"
+            >
+              {lastKey ? (
+                <span className="text-text text-sm font-mono">{lastKey}</span>
+              ) : (
+                <span className="text-muted text-xs">Waiting for a key… (press a remote button)</span>
+              )}
+            </div>
+            {count > 0 && <p className="text-[10px] text-muted mt-1 text-center">{count} press{count === 1 ? '' : 'es'} detected</p>}
+          </div>
+
+          <p className="text-[11px] text-muted leading-relaxed">
+            Nothing showing up? Your remote is probably a <span className="text-text">volume / camera-shutter</span> type
+            — iPads don't pass those buttons to web pages. Look for a mode switch on the remote (often an iOS/keyboard
+            mode) and try again. Once you see the keys above, tell me which buttons you want mapped to what and I'll set
+            it up.
+          </p>
+        </div>
+      )}
+    </div>
+  )
 }
 
 // ---------------------------------------------------------------------------
@@ -1029,6 +1115,7 @@ function Runner({
       switch (e.key) {
         case ' ':
         case 'Spacebar':
+        case 'Enter': // many Bluetooth clicker remotes send Enter/Return
           e.preventDefault()
           togglePlay()
           break
