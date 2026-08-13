@@ -600,12 +600,46 @@ function Party({ label, lines }: { label: string; lines: string[] }) {
 }
 
 // ── Contractors ───────────────────────────────────────────────────────
+function W9Chip({ status }: { status: string }) {
+  const map: Record<string, { c: string; t: string }> = {
+    on_file: { c: 'text-stage-done bg-stage-done/10 border-stage-done/40', t: 'W9 on file' },
+    requested: { c: 'text-stage-tracking bg-stage-tracking/10 border-stage-tracking/40', t: 'W9 requested' },
+    none: { c: 'text-muted bg-line/30 border-line', t: 'No W9' },
+  }
+  const m = map[status] || map.none
+  return <span className={`inline-flex items-center text-[11px] uppercase tracking-wider font-bold border rounded-full px-2.5 py-1 ${m.c}`}>{m.t}</span>
+}
+
 function Contractors({ contractors, onChanged, flash }: {
   contractors: ApiContractor[]; onChanged: () => Promise<void>; flash: (m: string) => void
 }) {
   const [editing, setEditing] = useState<ApiContractor | null | 'new'>(null)
+  const [linking, setLinking] = useState<string | null>(null)
+  const [vaultReady, setVaultReady] = useState(true)
+
+  useEffect(() => { api.vaultStatus().then((v) => setVaultReady(v.ready)).catch(() => {}) }, [])
+
+  async function makeLink(c: ApiContractor) {
+    setLinking(c.id)
+    try {
+      const { url } = await api.createIntakeLink(c.id)
+      try { await navigator.clipboard.writeText(url) } catch { /* fall through */ }
+      await onChanged()
+      flash('W9 link copied — send it to ' + c.name)
+      window.prompt('Send this private W9 link to ' + c.name + ' (expires in 21 days):', url)
+    } catch (e) {
+      flash(e instanceof Error ? e.message : 'Could not create link')
+    } finally { setLinking(null) }
+  }
+
   return (
     <div className="space-y-4">
+      {!vaultReady && (
+        <div className="rounded-2xl border border-urgent/40 bg-urgent/10 p-4 text-sm">
+          <b className="text-urgent">Secure W9 storage isn’t turned on yet.</b>
+          <span className="text-muted"> Vendors can’t submit until the encryption key <code>INVOICING_ENC_KEY</code> is set on the Railway service. Contractor profiles and invoicing still work.</span>
+        </div>
+      )}
       <div className="flex justify-end"><Btn variant="primary" onClick={() => setEditing('new')}>+ Add contractor</Btn></div>
       <div className={card}>
         {contractors.length === 0 ? (
@@ -613,12 +647,18 @@ function Contractors({ contractors, onChanged, flash }: {
         ) : (
           <div className="divide-y divide-line">
             {contractors.map((c) => (
-              <div key={c.id} className="flex items-center gap-4 px-4 py-3">
+              <div key={c.id} className="flex items-center gap-3 px-4 py-3 flex-wrap">
                 <div className="min-w-0 flex-1">
-                  <div className="font-semibold">{c.name}</div>
-                  <div className="text-xs text-muted">{c.email || 'no email'} · {c.payMethod}</div>
+                  <div className="font-semibold flex items-center gap-2">{c.name} <W9Chip status={c.w9Status} /></div>
+                  <div className="text-xs text-muted">
+                    {c.email || 'no email'} · {c.payMethod}
+                    {c.w9Status === 'on_file' && c.tinMasked && <> · {c.tinType.toUpperCase()} {c.tinMasked}</>}
+                  </div>
                 </div>
                 <div className="text-sm tabular-nums text-muted">{c.hourlyRateCents ? `${money(c.hourlyRateCents)}/hr` : '—'}</div>
+                <Btn variant="ghost" onClick={() => makeLink(c)} disabled={linking === c.id}>
+                  {linking === c.id ? '…' : c.w9Status === 'on_file' ? '↻ New W9 link' : '🔗 W9 link'}
+                </Btn>
                 <Btn variant="ghost" onClick={() => setEditing(c)}>Edit</Btn>
                 <Btn variant="ghost" onClick={async () => {
                   if (!confirm(`Delete ${c.name}? Their saved invoices remain.`)) return

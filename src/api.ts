@@ -758,6 +758,41 @@ export type ApiContractor = {
   archived: boolean
   createdAt: string
   updatedAt: string
+  // W9 / vendor intake (TIN never returned in full — only masked last-4)
+  w9Status: 'none' | 'requested' | 'on_file'
+  w9SubmittedAt: string | null
+  legalName: string
+  businessName: string
+  taxClassification: string
+  tinType: string
+  tinMasked: string
+  phone: string
+  prefersAch: boolean
+  w9Signature: string
+  w9SignedAt: string | null
+}
+
+export type ApiIntakeContext = {
+  companyName: string
+  companyLogo: string | null
+  contractorName: string
+  alreadyOnFile: boolean
+  vaultReady: boolean
+}
+
+export type IntakeSubmission = {
+  legalName: string
+  businessName?: string
+  taxClassification: string
+  tinType: 'ssn' | 'ein'
+  tin: string
+  address?: string
+  email?: string
+  phone?: string
+  isUsPerson: boolean
+  prefersAch: boolean
+  signature: string
+  certified: boolean
 }
 
 export type ApiInvoice = {
@@ -826,6 +861,14 @@ export const api = {
     request<{ contractor: ApiContractor }>(`/api/invoicing/contractors/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
   deleteContractor: (id: string) =>
     request<{ ok: true }>(`/api/invoicing/contractors/${id}`, { method: 'DELETE' }),
+  vaultStatus: () => request<{ ready: boolean }>('/api/invoicing/vault-status'),
+  createIntakeLink: (contractorId: string) =>
+    request<{ url: string; expiresInDays: number; vaultReady: boolean }>(
+      `/api/invoicing/contractors/${contractorId}/intake-link`, { method: 'POST' }),
+  // Public (no auth) — the vendor's W9 intake form
+  intakeContext: (token: string) => request<ApiIntakeContext>(`/api/intake/${token}`),
+  intakeSubmit: (token: string, body: IntakeSubmission) =>
+    request<{ ok: true }>(`/api/intake/${token}`, { method: 'POST', body: JSON.stringify(body) }),
   invoices: () => request<{ invoices: ApiInvoice[] }>('/api/invoicing/invoices'),
   invoice: (id: string) => request<{ invoice: ApiInvoice }>(`/api/invoicing/invoices/${id}`),
   createInvoice: (body: InvoiceInput) =>

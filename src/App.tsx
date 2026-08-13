@@ -17,6 +17,7 @@ import PrompterPage from './pages/PrompterPage'
 import Profile from './pages/Profile'
 import Settings from './pages/Settings'
 import InvoicingPage from './pages/InvoicingPage'
+import VendorIntakePage from './pages/VendorIntakePage'
 import { AuthProvider, useAuth } from './auth'
 
 function Protected({ children }: { children: React.ReactNode }) {
@@ -36,6 +37,8 @@ export default function App() {
       <Routes>
         <Route path="/login" element={<Login />} />
         <Route path="/auth/verify" element={<Verify />} />
+        {/* Public vendor W9 intake — token-gated, no login required. */}
+        <Route path="/vendor/:token" element={<VendorIntakePage />} />
         {/* Teleprompter — standalone full-page (no app chrome), but behind
             login so its sessions can be shared across the podcast team. */}
         <Route

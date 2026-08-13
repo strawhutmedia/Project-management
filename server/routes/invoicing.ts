@@ -1,9 +1,11 @@
 import { Router } from 'express'
+import crypto from 'crypto'
 import { pool } from '../db'
-import { requireOwner, type SessionUser } from '../auth'
+import { requireOwner, makeToken, type SessionUser } from '../auth'
 import { logError } from '../diag'
 import { renderInvoicePdf, type InvoiceLineItem } from '../invoice_pdf'
 import { sendInvoiceEmail } from '../email'
+import { vaultReady } from '../crypto_vault'
 
 // Contractor invoicing — Ryan's payroll tool. Admin-only. Turns a
 // freelancer's monthly hours into a saved, numbered invoice with a clear
@@ -52,13 +54,29 @@ type ContractorRow = {
   id: string; name: string; email: string; hourly_rate_cents: number
   pay_method: string; address: string; notes: string; archived: boolean
   created_at: string; updated_at: string
+  legal_name?: string; business_name?: string; tax_classification?: string
+  tin_type?: string; tin_last4?: string; phone?: string
+  is_us_person?: boolean; prefers_ach?: boolean
+  w9_signature?: string; w9_signed_at?: string | null
+  w9_status?: string; w9_submitted_at?: string | null
 }
 
 function mapContractor(r: ContractorRow) {
+  const maskedTin = r.tin_last4
+    ? (r.tin_type === 'ein' ? `••-•••${r.tin_last4}` : `•••-••-${r.tin_last4}`)
+    : ''
   return {
     id: r.id, name: r.name, email: r.email, hourlyRateCents: r.hourly_rate_cents,
     payMethod: r.pay_method, address: r.address, notes: r.notes, archived: r.archived,
     createdAt: r.created_at, updatedAt: r.updated_at,
+    // W9 / vendor intake (TIN is never returned in full — only masked last-4)
+    w9Status: r.w9_status || 'none',
+    w9SubmittedAt: r.w9_submitted_at || null,
+    legalName: r.legal_name || '', businessName: r.business_name || '',
+    taxClassification: r.tax_classification || '', tinType: r.tin_type || '',
+    tinMasked: maskedTin, phone: r.phone || '',
+    prefersAch: r.prefers_ach ?? false, w9Signature: r.w9_signature || '',
+    w9SignedAt: r.w9_signed_at || null,
   }
 }
 
@@ -210,6 +228,37 @@ invoicingRouter.delete('/contractors/:id', async (req, res) => {
     res.json({ ok: true })
   } catch (err) {
     logError('contractors DELETE failed', { error: err instanceof Error ? err.message : String(err) })
+    res.status(500).json({ error: 'internal_error' })
+  }
+})
+
+// Is secure W9 storage configured? (INVOICING_ENC_KEY present)
+invoicingRouter.get('/vault-status', (_req, res) => {
+  res.json({ ready: vaultReady() })
+})
+
+// Generate (or regenerate) a private vendor intake link for a contractor.
+// The raw token is returned once; only its sha256 hash is stored.
+invoicingRouter.post('/contractors/:id/intake-link', async (req, res) => {
+  try {
+    const { rows } = await pool.query<{ id: string }>(`SELECT id FROM contractors WHERE id = $1`, [req.params.id])
+    if (!rows[0]) { res.status(404).json({ error: 'not_found' }); return }
+    const token = makeToken(24)
+    const tokenHash = crypto.createHash('sha256').update(token).digest('hex')
+    const days = 21
+    await pool.query(
+      `UPDATE contractors
+         SET intake_token_hash = $2,
+             intake_expires_at = now() + ($3 || ' days')::interval,
+             w9_status = CASE WHEN w9_status = 'on_file' THEN w9_status ELSE 'requested' END,
+             updated_at = now()
+       WHERE id = $1`,
+      [req.params.id, tokenHash, String(days)],
+    )
+    const base = (process.env.APP_BASE_URL || 'https://slate.strawhutmedia.com').replace(/\/+$/, '')
+    res.json({ url: `${base}/vendor/${token}`, expiresInDays: days, vaultReady: vaultReady() })
+  } catch (err) {
+    logError('intake-link POST failed', { error: err instanceof Error ? err.message : String(err) })
     res.status(500).json({ error: 'internal_error' })
   }
 })

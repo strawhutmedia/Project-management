@@ -53,6 +53,16 @@ emails the admin (Ryan) a "Recovered" alert automatically.
 | `ADMIN_EMAIL` | Defaults to `ryan@strawhutmedia.com` if not set |
 | `APP_BASE_URL` | Defaults to `https://slate.strawhutmedia.com` if not set |
 | `PORT` | Auto-injected by Railway, defaults to 8080 |
+| `INVOICING_ENC_KEY` | AES-256 key (64 hex chars, `openssl rand -hex 32`) that encrypts contractor W9 TINs. **Required** for vendors to submit W9s; without it the intake form refuses submissions (never stores plaintext). Keep stable — rotating makes stored TINs undecryptable. |
+| `INVOICING_OWNER_EMAIL` | Sole account allowed into the Invoices/payroll section. Defaults to `ryan@strawhutmedia.com`. |
+
+## Invoicing / payroll (admin owner-only)
+
+The `/invoicing` section + `/api/invoicing/*` are locked to a single owner
+(`INVOICING_OWNER_EMAIL`, default Ryan) — not just any admin. Contractors submit
+their W9 + address via a private, expiring, token link (`/vendor/:token`,
+public route, `/api/intake/:token`). The TIN is stored encrypted
+(`server/crypto_vault.ts`); bank details are collected in Melio, not here.
 
 ## Pipeline (album default)
 
