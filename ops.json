@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-08-13T19:14:29.411Z",
+  "generatedAt": "2026-08-13T19:19:29.422Z",
   "note": "Read-only operational snapshot. Emails are masked; no full contact list is stored here.",
   "summary": {
     "showsWithOutreach": 1,
@@ -81,7 +81,7 @@
           {
             "name": "Belle-A Walker",
             "emailMasked": "i***@gmail.com",
-            "daysSinceFirstEmail": 28,
+            "daysSinceFirstEmail": 29,
             "opened": false,
             "openCount": 0
           },
