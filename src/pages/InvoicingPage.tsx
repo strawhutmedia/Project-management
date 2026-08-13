@@ -788,6 +788,51 @@ function SettingsPanel({ settings, onSaved, flash }: {
         </div>
         <div className="flex justify-end"><Btn variant="primary" onClick={save} disabled={saving}>{saving ? 'Saving…' : 'Save settings'}</Btn></div>
       </div>
+
+      <QuickBooksCard flash={flash} />
+    </div>
+  )
+}
+
+function QuickBooksCard({ flash }: { flash: (m: string) => void }) {
+  const [status, setStatus] = useState<{ configured: boolean; connected: boolean; env: string; realmId: string | null } | null>(null)
+  const load = useCallback(() => { api.qbStatus().then(setStatus).catch(() => setStatus(null)) }, [])
+  useEffect(() => {
+    load()
+    const qs = new URLSearchParams(window.location.search)
+    const qbp = qs.get('qb')
+    if (qbp) {
+      flash(qbp === 'connected' ? 'QuickBooks connected ✓' : qbp === 'state' ? 'Connection expired — try again' : 'QuickBooks connection failed')
+      window.history.replaceState({}, '', '/invoicing')
+    }
+  }, [load, flash])
+
+  return (
+    <div className={`${card} p-5 space-y-3`}>
+      <div className="flex items-center justify-between">
+        <h2 className="font-display text-xl">QuickBooks</h2>
+        {status?.connected
+          ? <span className="text-[11px] uppercase tracking-wider font-bold text-stage-done bg-stage-done/10 border border-stage-done/40 rounded-full px-2.5 py-1">Connected</span>
+          : <span className="text-[11px] uppercase tracking-wider font-bold text-muted bg-line/30 border border-line rounded-full px-2.5 py-1">Not connected</span>}
+      </div>
+      <p className="text-sm text-muted">Connect QuickBooks to draft and send client estimates &amp; invoices from Slate.</p>
+      {status && !status.configured && (
+        <div className="text-xs text-urgent bg-urgent/10 border border-urgent/40 rounded-xl p-3">
+          Not configured yet — <code>QB_CLIENT_ID</code> / <code>QB_CLIENT_SECRET</code> need to be set on Railway.
+        </div>
+      )}
+      {status?.connected ? (
+        <div className="flex items-center gap-3 flex-wrap">
+          <span className="text-xs text-muted">Company {status.realmId} · <b className="text-text">{status.env}</b></span>
+          <Btn variant="ghost" onClick={async () => { await api.qbDisconnect(); load(); flash('QuickBooks disconnected') }}>Disconnect</Btn>
+        </div>
+      ) : (
+        <a href="/api/qb/connect"
+          className={`inline-flex items-center gap-1.5 rounded-full px-3.5 py-2 text-sm font-semibold transition ${status?.configured ? 'bg-gradient-to-r from-stage-stems to-stage-mixing text-white hover:opacity-90' : 'border border-line text-muted pointer-events-none opacity-50'}`}>
+          Connect to QuickBooks
+        </a>
+      )}
+      {status && <p className="text-[11px] text-muted">Environment: {status.env}. Add this redirect URI in your Intuit app: <code>{window.location.origin}/api/qb/callback</code></p>}
     </div>
   )
 }

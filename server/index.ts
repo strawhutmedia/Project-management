@@ -29,6 +29,7 @@ import { outreachRouter, startOutreachSendLoop, enableDomainOpenTracking } from 
 import { teleprompterRouter } from './routes/teleprompter'
 import { invoicingRouter } from './routes/invoicing'
 import { intakeRouter } from './routes/intake'
+import { quickbooksRouter } from './routes/quickbooks'
 import { handleResendWebhook } from './routes/outreach_webhook'
 import { seedBackInYourArms } from './seeds/back_in_your_arms'
 import { ensureRyanIsPodcastEp } from './routes/projects'
@@ -115,6 +116,7 @@ app.use('/api/teleprompter', teleprompterRouter)
 app.use('/api/invoicing', invoicingRouter)
 // PUBLIC (token-gated, no login) — vendors submit their W9 via a private link.
 app.use('/api/intake', intakeRouter)
+app.use('/api/qb', quickbooksRouter)
 
 // Public per-show one-sheet page (guest outreach). Mounted at the root
 // so URLs are /shows/<slug>, and BEFORE the SPA fallback so requests

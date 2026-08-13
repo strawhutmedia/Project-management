@@ -883,6 +883,9 @@ export const api = {
       method: 'POST',
       body: JSON.stringify(to ? { to } : {}),
     }),
+  // QuickBooks connection (AR side)
+  qbStatus: () => request<{ configured: boolean; connected: boolean; env: string; realmId: string | null; redirectUri: string }>('/api/qb/status'),
+  qbDisconnect: () => request<{ ok: true }>('/api/qb/disconnect', { method: 'POST' }),
 
   // Teleprompter — shared sessions for the podcast team.
   teleprompterList: () => request<{ sessions: ApiTeleprompterSession[] }>('/api/teleprompter'),
