@@ -394,6 +394,10 @@ export function landingPage({ landing, show, episode }) {
       ? `<div class="video-embed"><iframe src="https://www.youtube-nocookie.com/embed/${esc(ep.youtube_id)}" title="${esc(headline)}" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen></iframe></div>`
       : '';
   const body = landing.body_html || (ep.description ? ep.description : '');
+  const cover = ep.image_url || show?.image_url || heroImg || '';
+  const dateline = [ep.published_at ? formatDate(ep.published_at) : '', ep.duration ? formatDuration(ep.duration) : '']
+    .filter(Boolean)
+    .join(' · ');
   return `<!doctype html><html lang="en"><head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <title>${esc(headline)} — Straw Hut Media</title>
@@ -404,31 +408,27 @@ ${landing.indexable ? `<link rel="canonical" href="${esc(canon)}"><meta name="ro
 ${heroImg ? `<meta property="og:image" content="${esc(heroImg)}">` : ''}
 ${trackingHead()}${FONT}<link rel="stylesheet" href="/styles.css">${gtag}
 </head>
-<body>
+<body class="lp-body">
 ${trackingBody()}
-<header class="site-header"><div class="container"><a class="brand" href="/">Straw Hut Media<span class="dot">.</span></a></div></header>
-<main><section class="section" style="padding-top:40px"><div class="container" style="max-width:760px">
-  ${heroImg ? `<img src="${esc(heroImg)}" alt="${esc(headline)}" style="width:100%;max-height:420px;object-fit:cover;border-radius:18px;box-shadow:var(--shadow);margin-bottom:24px">` : ''}
-  <h1 style="font-size:clamp(1.8rem,4vw,2.8rem);margin:0 0 12px;text-align:center">${esc(headline)}</h1>
-  ${landing.subhead ? `<p style="color:var(--muted);font-size:1.15rem;margin:0 0 20px;text-align:center">${esc(landing.subhead)}</p>` : ''}
-  ${
-    player
-      ? `<div class="lp-playcue"><span class="lp-playcue-arrow">▼</span> Press play — listen free, right here</div>
-         <div class="lp-player">${player}</div>`
-      : ''
-  }
-  ${landing.cta_url ? `<div style="margin:22px 0;text-align:center"><a class="btn btn-primary" id="lpCta" href="${esc(landing.cta_url)}" style="font-size:1.05rem;padding:14px 30px">${esc(landing.cta_label || 'Listen now')}</a></div>` : ''}
+<main class="lp-wrap"><div class="lp-card">
+  <a class="lp-brand" href="/">Straw Hut Media<span class="dot">.</span></a>
+  ${show ? `<div class="lp-eyebrow">${esc(show.title)}</div>` : ''}
+  ${cover ? `<img class="lp-cover" src="${esc(cover)}" alt="${esc(headline)}">` : ''}
+  <h1 class="lp-title">${esc(headline)}</h1>
+  ${dateline ? `<div class="lp-date">${esc(dateline)}</div>` : ''}
+  ${landing.subhead ? `<p class="lp-sub">${esc(landing.subhead)}</p>` : ''}
+  ${player ? `<div class="lp-playcue"><span class="lp-playcue-arrow">▼</span> Press play — listen free</div>${player}` : ''}
+  ${landing.cta_url ? `<a class="btn btn-primary lp-cta-btn" id="lpCta" href="${esc(landing.cta_url)}">${esc(landing.cta_label || 'Listen now')}</a>` : ''}
   ${
     show
       ? `<div class="lp-subscribe">
-           <h2 style="margin:0 0 4px;font-size:1.35rem;text-align:center">Love it? Follow ${esc(show.title)}</h2>
-           <p style="color:var(--muted);text-align:center;margin:0 0 4px">Subscribe on your favorite app so you never miss an episode.</p>
+           <div class="lp-sub-label">Subscribe to ${esc(show.title)}</div>
            ${platformRow(show)}
          </div>`
       : ''
   }
-  ${body ? `<div class="notes" style="margin-top:30px">${body}</div>` : ''}
-</div></section></main>
+  ${body ? `<div class="lp-desc notes">${body}</div>` : ''}
+</div></main>
 <script>(function(){
   // Attribution: keep gclid/utm and append to the CTA so conversions track.
   try{var qs=new URLSearchParams(location.search);var keep=['gclid','utm_source','utm_medium','utm_campaign'];

@@ -288,17 +288,35 @@ img { max-width: 100%; display: block; }
 .booking-note li:last-child { margin-bottom: 0; }
 .booking-note strong { color: var(--text); }
 
-/* Landing page — play-first, subscribe-second */
-.lp-playcue { text-align: center; font-weight: 700; color: var(--accent); font-size: 0.95rem; letter-spacing: 0.01em; margin: 8px 0 4px; }
+/* Landing page — one clean centered card (play-first, subscribe-second) */
+.lp-body { background: var(--bg); }
+.lp-wrap { min-height: 100vh; display: flex; justify-content: center; align-items: flex-start; padding: 26px 16px 60px; }
+.lp-card { width: 100%; max-width: 540px; background: var(--card); border: 1px solid var(--border); border-radius: 24px; padding: 32px 26px 28px; text-align: center; box-shadow: var(--shadow); }
+.lp-brand { display: inline-block; font-weight: 700; font-size: 1.02rem; letter-spacing: 0.02em; color: var(--text); margin-bottom: 20px; }
+.lp-brand .dot { color: var(--accent); }
+.lp-eyebrow { font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.12em; color: var(--accent); margin-bottom: 16px; }
+.lp-cover { width: 196px; height: 196px; border-radius: 20px; object-fit: cover; margin: 0 auto 20px; box-shadow: 0 16px 40px rgba(0,204,142,0.22); }
+.lp-title { font-size: 1.5rem; font-weight: 800; line-height: 1.3; margin: 0 0 6px; }
+.lp-date { font-size: 0.85rem; color: var(--muted); margin: 0 0 20px; }
+.lp-sub { color: var(--muted); font-size: 1.02rem; line-height: 1.55; margin: 0 0 20px; }
+.lp-cta-btn { margin: 6px 0 2px; font-size: 1.05rem; padding: 14px 30px; }
+/* play cue + player, contained inside the card */
+.lp-playcue { font-weight: 700; color: var(--accent); font-size: 0.9rem; margin: 6px 0 6px; }
 .lp-playcue-arrow { display: inline-block; animation: lp-bob 1.4s ease-in-out infinite; }
 @keyframes lp-bob { 0%,100% { transform: translateY(0); } 50% { transform: translateY(4px); } }
 @media (prefers-reduced-motion: reduce) { .lp-playcue-arrow { animation: none; } }
-.lp-player { display: flex; justify-content: center; }
-.lp-player .aplayer { width: 100%; }
-.lp-subscribe { margin-top: 32px; padding-top: 26px; border-top: 1px solid var(--border); }
-.lp-subscribe .listen-on { max-width: 100%; text-align: center; }
+.lp-card .aplayer { max-width: 100%; margin: 0 0 4px; background: rgba(0,204,142,0.05); border-color: rgba(0,204,142,0.2); box-shadow: none; }
+.lp-card .aplayer-head { display: none; } /* card already shows cover + title */
+/* subscribe row, compact + centered */
+.lp-subscribe { margin-top: 24px; padding-top: 22px; border-top: 1px solid var(--border); }
+.lp-sub-label { font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; color: var(--muted); margin-bottom: 14px; }
+.lp-subscribe .listen-on { max-width: 100%; margin: 0; }
 .lp-subscribe .listen-on-label { display: none; }
-.lp-subscribe .platform-links { justify-content: center; }
+.lp-subscribe .platform-links { justify-content: center; gap: 7px; }
+.lp-subscribe .platform-link { padding: 6px 11px; font-size: 0.76rem; }
+/* description, quiet + left-aligned below a divider */
+.lp-desc { text-align: left; margin-top: 22px; padding-top: 20px; border-top: 1px solid var(--border); color: var(--muted); font-size: 0.92rem; line-height: 1.7; }
+.lp-desc :where(h1,h2,h3) { font-size: 1rem; color: var(--text); }
 
 /* Contact */
 .contact-form { max-width: 640px; }
