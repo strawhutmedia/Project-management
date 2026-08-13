@@ -98,3 +98,24 @@ export async function requireAdmin(req: Request, res: Response, next: NextFuncti
   ;(req as Request & { user: SessionUser }).user = u
   next()
 }
+
+// The invoicing / payroll tool is locked to a SINGLE owner account — not
+// just any admin. Contractor pay is nobody else's business. Defaults to
+// Ryan; override with the INVOICING_OWNER_EMAIL env var if ownership moves.
+export function ownerEmail(): string {
+  return (process.env.INVOICING_OWNER_EMAIL || 'ryan@strawhutmedia.com').trim().toLowerCase()
+}
+
+export function isOwner(user: { email: string }): boolean {
+  return (user.email || '').trim().toLowerCase() === ownerEmail()
+}
+
+export async function requireOwner(req: Request, res: Response, next: NextFunction) {
+  const u = await getSessionUser(req)
+  if (!u || !isOwner(u)) {
+    res.status(403).json({ error: 'forbidden' })
+    return
+  }
+  ;(req as Request & { user: SessionUser }).user = u
+  next()
+}

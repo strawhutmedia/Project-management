@@ -1,6 +1,6 @@
 import { Router } from 'express'
 import { pool } from '../db'
-import { requireAdmin, type SessionUser } from '../auth'
+import { requireOwner, type SessionUser } from '../auth'
 import { logError } from '../diag'
 import { renderInvoicePdf, type InvoiceLineItem } from '../invoice_pdf'
 import { sendInvoiceEmail } from '../email'
@@ -9,7 +9,9 @@ import { sendInvoiceEmail } from '../email'
 // freelancer's monthly hours into a saved, numbered invoice with a clear
 // total to pay by credit card via Melio. See migration 095_invoicing.sql.
 export const invoicingRouter = Router()
-invoicingRouter.use(requireAdmin)
+// Locked to the single owner account (ryan@strawhutmedia.com) — every
+// endpoint below returns 403 for anyone else, admins included.
+invoicingRouter.use(requireOwner)
 
 // ── helpers ───────────────────────────────────────────────────────────
 function money(cents: number): string {

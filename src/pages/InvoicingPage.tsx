@@ -85,6 +85,11 @@ function StatusChip({ status }: { status: string }) {
   )
 }
 
+// Locked to a single owner account — must match the server's
+// INVOICING_OWNER_EMAIL (defaults to ryan@strawhutmedia.com). The server
+// enforces this on every request; this is the matching UI gate.
+const OWNER_EMAIL = 'ryan@strawhutmedia.com'
+
 // ── main page ─────────────────────────────────────────────────────────
 export default function InvoicingPage() {
   const { user } = useAuth()
@@ -111,8 +116,8 @@ export default function InvoicingPage() {
   useEffect(() => { void reload().finally(() => setLoading(false)) }, [reload])
 
   if (!user) return null
-  if (user.role !== 'admin') {
-    return <div className="max-w-2xl"><div className={`${card} p-8 text-center text-muted`}>Invoicing is admin-only.</div></div>
+  if ((user.email || '').trim().toLowerCase() !== OWNER_EMAIL) {
+    return <div className="max-w-2xl"><div className={`${card} p-8 text-center text-muted`}>This section is private.</div></div>
   }
   if (loading || !settings) return <div className="text-muted text-sm">Loading invoicing…</div>
 

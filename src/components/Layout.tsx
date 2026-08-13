@@ -118,11 +118,13 @@ export default function Layout() {
                         🎬 Teleprompter
                       </NavMenuLink>
                     )}
+                    {user?.email?.trim().toLowerCase() === 'ryan@strawhutmedia.com' && (
+                      <NavMenuLink to="/invoicing" onClick={() => setNavOpen(false)}>
+                        🧾 Invoices
+                      </NavMenuLink>
+                    )}
                     {user?.role === 'admin' && (
                       <>
-                        <NavMenuLink to="/invoicing" onClick={() => setNavOpen(false)}>
-                          🧾 Invoices
-                        </NavMenuLink>
                         <NavMenuLink to="/admin/outreach" onClick={() => setNavOpen(false)}>
                           ✉ Outreach
                         </NavMenuLink>
