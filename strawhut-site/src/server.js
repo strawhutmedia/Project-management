@@ -475,21 +475,33 @@ app.get('/healthz', async (req, res) => {
   res.json({ ok: true, ...(await store.stats()), spotlight: { source: sp.source, shows: titles } });
 });
 
-// TEMP diagnostic — surface the real Resend result for the contact form.
-// Remove after verifying email works.
+// TEMP diagnostic — test which FROM domain is verified in Resend.
+// Remove after verifying email works. Sends a tiny probe to `to` (default
+// ryan@) from each candidate FROM and reports which succeed.
 app.get('/__mailprobe', async (req, res) => {
-  const out = {
-    configured: mailConfigured(),
-    from: process.env.FROM_EMAIL || 'Straw Hut Media <news@strawhutmedia.com>',
-  };
-  try {
-    await sendContactEmail({ name: 'probe', email: 'ryan@strawhutmedia.com', company: '', message: 'mail probe', topic: 'general' });
-    out.ok = true;
-  } catch (e) {
-    out.ok = false;
-    out.error = e.message;
+  const to = req.query.to || 'ryan@strawhutmedia.com';
+  const froms = req.query.from
+    ? [req.query.from]
+    : [
+        'Straw Hut Media <news@strawhutmedia.net>',
+        'Straw Hut Media <hello@strawhutmedia.net>',
+        'Straw Hut Media <news@strawhutmedia.com>',
+      ];
+  const results = [];
+  for (const from of froms) {
+    try {
+      const r = await fetch('https://api.resend.com/emails', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${process.env.RESEND_API_KEY}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ from, to, subject: 'Straw Hut mail probe', html: '<p>Mail probe — verifying sender domain.</p>' }),
+      });
+      const body = await r.text();
+      results.push({ from, status: r.status, ok: r.ok, body: body.slice(0, 220) });
+    } catch (e) {
+      results.push({ from, error: e.message });
+    }
   }
-  res.json(out);
+  res.json({ configured: mailConfigured(), envFrom: process.env.FROM_EMAIL || '(unset → default .com)', to, results });
 });
 
 // ---- SEO / GEO endpoints --------------------------------------------------
