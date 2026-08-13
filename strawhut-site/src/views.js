@@ -423,7 +423,7 @@ ${FONT}<link rel="stylesheet" href="/styles.css">${gtag}
 // so calendar + Stripe payment continue to work through HighLevel unchanged.
 // Real studio photos (vendored from the current site into /public/studio).
 const STUDIO_PHOTOS = [
-  'CA6A0788', 'CA6A0790', 'CA6A0792', 'CA6A0793', 'CA6A0794', 'CA6A0795',
+  'CA6A0795', 'CA6A0788', 'CA6A0790', 'CA6A0792', 'CA6A0793', 'CA6A0794',
   'CA6A0798', 'CA6A0799', 'CA6A0800', 'CA6A0801', 'CA6A0803',
 ].map((n) => `/public/studio/${n}.jpg`);
 
