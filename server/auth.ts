@@ -119,3 +119,35 @@ export async function requireOwner(req: Request, res: Response, next: NextFuncti
   ;(req as Request & { user: SessionUser }).user = u
   next()
 }
+
+function safeEqual(a: string, b: string): boolean {
+  const ba = Buffer.from(a)
+  const bb = Buffer.from(b)
+  if (ba.length !== bb.length) return false
+  return crypto.timingSafeEqual(ba, bb)
+}
+
+// Like requireOwner, but ALSO accepts a service token (INVOICING_SERVICE_TOKEN)
+// via `X-Invoicing-Token` or `Authorization: Bearer` header. This lets the
+// monthly invoice automation create/save invoices without a browser session.
+// When authenticated by token, the request acts AS the owner account (so
+// created_by is attributed to Ryan). The token is only honored when the env
+// var is set; rotating or clearing it immediately revokes automation access.
+export async function requireOwnerOrService(req: Request, res: Response, next: NextFunction) {
+  const expected = (process.env.INVOICING_SERVICE_TOKEN || '').trim()
+  const authHeader = typeof req.headers.authorization === 'string' ? req.headers.authorization : ''
+  const header =
+    (typeof req.headers['x-invoicing-token'] === 'string' ? (req.headers['x-invoicing-token'] as string).trim() : '') ||
+    (authHeader.startsWith('Bearer ') ? authHeader.slice(7).trim() : '')
+  if (expected && header && safeEqual(header, expected)) {
+    const { rows } = await pool.query(
+      `SELECT id, email, name, display_name, role, timezone FROM users WHERE lower(email) = $1 LIMIT 1`,
+      [ownerEmail()],
+    )
+    if (!rows[0]) { res.status(500).json({ error: 'owner_user_missing' }); return }
+    ;(req as Request & { user: SessionUser }).user = rows[0] as SessionUser
+    next()
+    return
+  }
+  return requireOwner(req, res, next)
+}

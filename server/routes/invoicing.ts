@@ -1,7 +1,7 @@
 import { Router } from 'express'
 import crypto from 'crypto'
 import { pool } from '../db'
-import { requireOwner, makeToken, type SessionUser } from '../auth'
+import { requireOwnerOrService, makeToken, type SessionUser } from '../auth'
 import { logError } from '../diag'
 import { renderInvoicePdf, type InvoiceLineItem } from '../invoice_pdf'
 import { sendInvoiceEmail } from '../email'
@@ -12,8 +12,9 @@ import { vaultReady } from '../crypto_vault'
 // total to pay by credit card via Melio. See migration 095_invoicing.sql.
 export const invoicingRouter = Router()
 // Locked to the single owner account (ryan@strawhutmedia.com) — every
-// endpoint below returns 403 for anyone else, admins included.
-invoicingRouter.use(requireOwner)
+// endpoint below returns 403 for anyone else, admins included. Also accepts
+// the INVOICING_SERVICE_TOKEN header for the monthly invoice automation.
+invoicingRouter.use(requireOwnerOrService)
 
 // ── helpers ───────────────────────────────────────────────────────────
 function money(cents: number): string {
