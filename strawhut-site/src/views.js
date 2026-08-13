@@ -386,10 +386,12 @@ export function landingPage({ landing, show, episode }) {
     ? `<script async src="https://www.googletagmanager.com/gtag/js?id=${esc(landing.gtag_id)}"></script>
 <script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('js',new Date());gtag('config','${esc(landing.gtag_id)}');</script>`
     : '';
-  const player = ep.youtube_id
-    ? `<div class="video-embed"><iframe src="https://www.youtube-nocookie.com/embed/${esc(ep.youtube_id)}" title="${esc(headline)}" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen></iframe></div>`
-    : ep.audio_url
-      ? audioPlayer(ep.audio_url, { title: ep.title, showTitle: landing.show_title || '', image: ep.image_url, duration: ep.duration })
+  // Prefer the branded AUDIO player: a play streams from Megaphone and counts
+  // as a real IAB download (the goal). Fall back to YouTube only if no audio.
+  const player = ep.audio_url
+    ? audioPlayer(ep.audio_url, { title: ep.title, showTitle: landing.show_title || show?.title || '', image: ep.image_url || show?.image_url, duration: ep.duration })
+    : ep.youtube_id
+      ? `<div class="video-embed"><iframe src="https://www.youtube-nocookie.com/embed/${esc(ep.youtube_id)}" title="${esc(headline)}" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen></iframe></div>`
       : '';
   const body = landing.body_html || (ep.description ? ep.description : '');
   return `<!doctype html><html lang="en"><head>
