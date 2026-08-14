@@ -32,12 +32,21 @@ const store = await createStore();
 const app = express();
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
-app.use('/styles.css', express.static(path.join(__dirname, '..', 'public', 'styles.css')));
+// Static caching: images/fonts never change → cache hard (30d, immutable);
+// CSS can change on deploy → 1h (repeat views cached, then a cheap revalidate).
+const IMMUTABLE = /\.(jpe?g|png|webp|gif|svg|ico|woff2?|mp3|m4a)$/i;
+const staticOpts = {
+  maxAge: '1h',
+  setHeaders(res, p) {
+    if (IMMUTABLE.test(p)) res.setHeader('Cache-Control', 'public, max-age=2592000, immutable');
+  },
+};
+app.use('/styles.css', express.static(path.join(__dirname, '..', 'public', 'styles.css'), { maxAge: '1h' }));
 // Hidden onboarding app (standalone static; not linked from the site).
-app.use('/onboarding', express.static(path.join(__dirname, '..', 'public', 'onboarding')));
+app.use('/onboarding', express.static(path.join(__dirname, '..', 'public', 'onboarding'), staticOpts));
 // Services / packages quote builder (standalone static, from Sales-Quoting).
-app.use('/services', express.static(path.join(__dirname, '..', 'public', 'services')));
-app.use('/public', express.static(path.join(__dirname, '..', 'public')));
+app.use('/services', express.static(path.join(__dirname, '..', 'public', 'services'), staticOpts));
+app.use('/public', express.static(path.join(__dirname, '..', 'public'), staticOpts));
 
 // Spotlight = most-downloaded shows (Megaphone). Falls back to the curated
 // monthly rotation only when Megaphone isn't configured or returns no numbers.

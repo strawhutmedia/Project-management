@@ -147,8 +147,9 @@ export function podcastEpisodeJsonLd(show, episode) {
     duration: secondsToISO(episode.duration),
     partOfSeries: { '@type': 'PodcastSeries', name: show.title, url: canonical('/' + show.slug) },
     associatedMedia: episode.audio_url
-      ? { '@type': 'MediaObject', contentUrl: episode.audio_url, encodingFormat: 'audio/mpeg' }
+      ? { '@type': 'AudioObject', contentUrl: episode.audio_url, encodingFormat: 'audio/mpeg', duration: secondsToISO(episode.duration) }
       : undefined,
+    speakable: { '@type': 'SpeakableSpecification', cssSelector: ['h1', '.ep-hook'] },
     publisher: { '@id': BASE + '/#organization' },
   });
 }
@@ -223,10 +224,15 @@ export function robotsTxt() {
 }
 
 export function sitemapXml(shows, episodesByShow) {
+  const xmlEsc = (s) => String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
   const urls = [];
-  const add = (loc, lastmod) =>
+  // Image sitemap entries (image:image) help cover art rank in Google Images.
+  const add = (loc, { lastmod, image } = {}) =>
     urls.push(
-      `<url><loc>${canonical(loc)}</loc>${lastmod ? `<lastmod>${new Date(lastmod).toISOString()}</lastmod>` : ''}</url>`
+      `<url><loc>${canonical(loc)}</loc>` +
+        (lastmod ? `<lastmod>${new Date(lastmod).toISOString()}</lastmod>` : '') +
+        (image ? `<image:image><image:loc>${xmlEsc(image)}</image:loc></image:image>` : '') +
+        `</url>`
     );
   add('/');
   add('/shows');
@@ -234,11 +240,12 @@ export function sitemapXml(shows, episodesByShow) {
   add('/press');
   add('/contact');
   for (const s of shows) {
-    add('/' + s.slug, s.last_synced);
-    for (const e of episodesByShow[s.id] || []) add(`/${s.slug}/${e.slug}`, e.published_at);
+    add('/' + s.slug, { lastmod: s.last_synced, image: s.image_url });
+    for (const e of episodesByShow[s.id] || [])
+      add(`/${s.slug}/${e.slug}`, { lastmod: e.published_at, image: e.image_url || s.image_url });
   }
   return `<?xml version="1.0" encoding="UTF-8"?>
-<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:image="http://www.google.com/schemas/sitemap-image/1.1">
 ${urls.join('\n')}
 </urlset>`;
 }
