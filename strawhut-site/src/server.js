@@ -15,6 +15,7 @@ import * as A from './admin_views.js';
 import { robotsTxt, sitemapXml, llmsTxt } from './seo.js';
 import { sendAnnouncement, mailConfigured, sendContactEmail } from './mail.js';
 import { importFromSite } from './importer.js';
+import { writeLandingCopy, aiConfigured } from './ai.js';
 import * as reco from './recommend.js';
 import { matchAllShows, matchShowVideos } from './youtube.js';
 import { refreshPress } from './press.js';
@@ -370,12 +371,30 @@ async function landingFromBody(body) {
   const { show_id, episode_id } = await resolveEpisodeRef(body.episode_url);
   const taken = new Set((await store.listLandings()).map((l) => l.slug));
   const slug = uniqueSlug(slugify(body.slug || body.title || 'landing', 'landing'), taken);
+  let headline = (body.headline || '').trim();
+  let subhead = (body.subhead || '').trim();
+  let body_html = body.body_html || '';
+  // Auto-write copy from the episode's materials when the admin left it blank.
+  if (episode_id && show_id && !(headline && subhead && body_html)) {
+    try {
+      const show = await store.getShowById(show_id);
+      const episode = (await store.listEpisodes(show_id, { limit: 5000 })).find((e) => e.id === episode_id);
+      if (episode) {
+        const copy = await writeLandingCopy({ show, episode, log: (m) => console.log('[ai]', m) });
+        headline = headline || copy.headline;
+        subhead = subhead || copy.subhead;
+        body_html = body_html || copy.body_html;
+      }
+    } catch (e) {
+      console.error('[ai] landing copy failed:', e.message);
+    }
+  }
   return {
     slug,
     title: (body.title || '').trim(),
-    headline: (body.headline || '').trim(),
-    subhead: (body.subhead || '').trim(),
-    body_html: body.body_html || '',
+    headline,
+    subhead,
+    body_html,
     hero_image_url: (body.hero_image_url || '').trim(),
     cta_label: (body.cta_label || '').trim(),
     cta_url: (body.cta_url || '').trim(),
@@ -707,35 +726,39 @@ app.listen(PORT, async () => {
   // Idempotent: only creates it if it doesn't already exist, so editing or
   // deleting it in the admin sticks. Set SEED_DEMO_LANDING=off to skip.
   try {
-    const DEMO_SUBHEAD = `Hollywood's smartest movie & TV conversations, hosted by Jacqueline Coley.`;
+    const show = (await store.listShows()).find((s) => s.slug === 'seen-on-the-screen-with-jacqueline-coley');
+    const eps = show ? await store.listEpisodes(show.id, { limit: 1 }) : [];
+    const ep = eps[0];
     const existingLp = await store.getLandingBySlug('seen-on-the-screen');
-    if (existingLp) {
-      // Clean up earlier salesy copy on the already-seeded demo.
-      if (/listen free/i.test(existingLp.subhead || '')) {
-        await store.updateLanding(existingLp.id, { ...existingLp, subhead: DEMO_SUBHEAD });
-        console.log('[seed] cleaned demo landing subhead');
+    if (existingLp && show && ep) {
+      // Regenerate AI copy on the demo while it's still placeholder/unedited
+      // (headline == raw episode title, empty subhead, or old salesy copy).
+      const unedited =
+        !existingLp.subhead ||
+        /listen free/i.test(existingLp.subhead) ||
+        existingLp.headline === ep.title;
+      if (unedited) {
+        const copy = await writeLandingCopy({ show, episode: ep, log: (m) => console.log('[ai]', m) });
+        await store.updateLanding(existingLp.id, { ...existingLp, ...copy });
+        console.log('[seed] regenerated demo landing copy (ai:' + aiConfigured() + ')');
       }
-    } else if (process.env.SEED_DEMO_LANDING !== 'off') {
-      const show = (await store.listShows()).find((s) => s.slug === 'seen-on-the-screen-with-jacqueline-coley');
-      const eps = show ? await store.listEpisodes(show.id, { limit: 1 }) : [];
-      const ep = eps[0];
-      if (show && ep) {
-        await store.createLanding({
-          slug: 'seen-on-the-screen',
-          title: 'Seen on the Screen — Google Ads LP (demo)',
-          headline: ep.title,
-          subhead: DEMO_SUBHEAD,
-          body_html: ep.description || '',
-          hero_image_url: ep.image_url || show.image_url || '',
-          cta_label: '',
-          cta_url: '',
-          show_id: show.id,
-          episode_id: ep.id,
-          indexable: false,
-          gtag_id: '',
-        });
-        console.log('[seed] demo landing page created → /lp/seen-on-the-screen');
-      }
+    } else if (!existingLp && process.env.SEED_DEMO_LANDING !== 'off' && show && ep) {
+      const copy = await writeLandingCopy({ show, episode: ep, log: (m) => console.log('[ai]', m) });
+      await store.createLanding({
+        slug: 'seen-on-the-screen',
+        title: 'Seen on the Screen — Google Ads LP (demo)',
+        headline: copy.headline,
+        subhead: copy.subhead,
+        body_html: copy.body_html,
+        hero_image_url: ep.image_url || show.image_url || '',
+        cta_label: '',
+        cta_url: '',
+        show_id: show.id,
+        episode_id: ep.id,
+        indexable: false,
+        gtag_id: '',
+      });
+      console.log('[seed] demo landing page created → /lp/seen-on-the-screen (ai:' + aiConfigured() + ')');
     }
   } catch (e) {
     console.error('[seed] demo landing failed:', e.message);
