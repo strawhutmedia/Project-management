@@ -213,9 +213,6 @@ img { max-width: 100%; display: block; }
 .aplayer-vol svg { width: 18px; height: 18px; }
 .aplayer-vol:hover { color: var(--text); border-color: var(--accent); }
 .aplayer-vol.muted { color: #ff8080; }
-.aplayer-dl { margin-left: auto; display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: 8px; border: 1px solid var(--border); background: var(--bg-2); color: var(--muted); font-size: 0.8rem; font-weight: 600; transition: border-color 0.15s, color 0.15s; }
-.aplayer-dl svg { width: 15px; height: 15px; }
-.aplayer-dl:hover { color: var(--text); border-color: var(--accent); }
 
 /* Listen & subscribe on — platform logo row */
 .listen-on { margin: 22px 0 6px; max-width: 560px; }

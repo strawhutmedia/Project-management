@@ -73,10 +73,6 @@ export function audioPlayer(src, opts = {}) {
       <button class="aplayer-vol" type="button" aria-label="Mute">
         <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M3 10v4h4l5 5V5L7 10H3zm13.5 2A4.5 4.5 0 0 0 14 8v8a4.5 4.5 0 0 0 2.5-4zM14 3.2v2.1a7 7 0 0 1 0 13.4v2.1a9 9 0 0 0 0-17.6z"/></svg>
       </button>
-      <a class="aplayer-dl" href="${esc(src)}" download target="_blank" rel="noopener" aria-label="Download episode">
-        <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 3v10.6l3.3-3.3 1.4 1.4L12 17.4l-4.7-4.7 1.4-1.4L12 13.6V3h0zM5 19h14v2H5z"/></svg>
-        <span>Download</span>
-      </a>
     </div>
   </div>
   <script>(function(){
