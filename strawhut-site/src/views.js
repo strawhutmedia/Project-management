@@ -416,7 +416,7 @@ ${trackingBody()}
       ${dateline ? `<div class="lp-date">${esc(dateline)}</div>` : ''}
     </div>
   </div>
-  ${player ? `<div class="lp-playcue"><span class="lp-playcue-arrow">▶</span> Press play — listen free</div>${player}` : ''}
+  ${player ? `<div class="lp-playcue"><span class="lp-playcue-arrow">▶</span> Press play</div>${player}` : ''}
   ${landing.cta_url ? `<a class="btn btn-primary lp-cta-btn" id="lpCta" href="${esc(landing.cta_url)}">${esc(landing.cta_label || 'Listen now')}</a>` : ''}
   ${landing.subhead ? `<p class="lp-sub">${esc(landing.subhead)}</p>` : ''}
   ${

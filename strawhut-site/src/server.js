@@ -707,7 +707,15 @@ app.listen(PORT, async () => {
   // Idempotent: only creates it if it doesn't already exist, so editing or
   // deleting it in the admin sticks. Set SEED_DEMO_LANDING=off to skip.
   try {
-    if (process.env.SEED_DEMO_LANDING !== 'off' && !(await store.getLandingBySlug('seen-on-the-screen'))) {
+    const DEMO_SUBHEAD = `Hollywood's smartest movie & TV conversations, hosted by Jacqueline Coley.`;
+    const existingLp = await store.getLandingBySlug('seen-on-the-screen');
+    if (existingLp) {
+      // Clean up earlier salesy copy on the already-seeded demo.
+      if (/listen free/i.test(existingLp.subhead || '')) {
+        await store.updateLanding(existingLp.id, { ...existingLp, subhead: DEMO_SUBHEAD });
+        console.log('[seed] cleaned demo landing subhead');
+      }
+    } else if (process.env.SEED_DEMO_LANDING !== 'off') {
       const show = (await store.listShows()).find((s) => s.slug === 'seen-on-the-screen-with-jacqueline-coley');
       const eps = show ? await store.listEpisodes(show.id, { limit: 1 }) : [];
       const ep = eps[0];
@@ -716,7 +724,7 @@ app.listen(PORT, async () => {
           slug: 'seen-on-the-screen',
           title: 'Seen on the Screen — Google Ads LP (demo)',
           headline: ep.title,
-          subhead: `Hollywood's smartest movie & TV conversations with Jacqueline Coley — press play and listen free.`,
+          subhead: DEMO_SUBHEAD,
           body_html: ep.description || '',
           hero_image_url: ep.image_url || show.image_url || '',
           cta_label: '',
