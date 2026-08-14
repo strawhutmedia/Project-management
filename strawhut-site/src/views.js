@@ -21,6 +21,13 @@ const FONT =
   '<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>' +
   '<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">';
 
+// Warm up third-party origins the page will hit (tags, audio CDN, video thumbs)
+// so the first request to each is faster.
+const RESOURCE_HINTS =
+  '<link rel="preconnect" href="https://www.googletagmanager.com">' +
+  '<link rel="dns-prefetch" href="https://traffic.megaphone.fm">' +
+  '<link rel="dns-prefetch" href="https://i.ytimg.com">';
+
 // Custom, on-brand audio player. Renders a self-contained control (play/pause,
 // seekable progress bar, elapsed/duration, mute) styled in the brand palette —
 // replaces the raw <audio> element. Each instance wires only itself, so it works
@@ -177,6 +184,7 @@ ${image ? `<meta property="og:image" content="${esc(image)}">` : ''}
 <meta name="twitter:description" content="${esc(desc)}">
 ${image ? `<meta name="twitter:image" content="${esc(image)}">` : ''}
 ${feedUrl ? `<link rel="alternate" type="application/rss+xml" title="${esc(title)}" href="${esc(feedUrl)}">` : ''}
+${RESOURCE_HINTS}
 ${trackingHead()}
 ${FONT}
 <link rel="stylesheet" href="/styles.css">
