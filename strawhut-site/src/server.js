@@ -15,7 +15,7 @@ import * as A from './admin_views.js';
 import { robotsTxt, sitemapXml, llmsTxt } from './seo.js';
 import { sendAnnouncement, mailConfigured, sendContactEmail } from './mail.js';
 import { importFromSite } from './importer.js';
-import { writeLandingCopy, aiConfigured } from './ai.js';
+import { writeLandingCopy, generateLandingCopy, fallbackLandingCopy, aiConfigured } from './ai.js';
 import * as reco from './recommend.js';
 import { matchAllShows, matchShowVideos } from './youtube.js';
 import { refreshPress } from './press.js';
@@ -559,6 +559,79 @@ app.get('/lp/:slug', async (req, res, next) => {
       episode = eps.find((e) => e.id === landing.episode_id) || null;
     }
   }
+  res.send(V.landingPage({ landing, show, episode }));
+});
+
+// ---- Campaign landing pages (Google Ads destinations) --------------------
+// Every episode gets a campaign-ready landing page at /go/<show>/<episode>.
+// Podbooster points a Straw Hut campaign's final URL here; the page renders the
+// clean landing card with AI-written copy (generated once, cached, noindex,
+// fully tracked). Reuses any hand-made landing tied to the same episode.
+async function resolveOrCreateEpisodeLanding(show, episode) {
+  const landings = await store.listLandings();
+  const existing = landings.find((l) => l.episode_id === episode.id);
+  if (existing) return existing;
+  const fb = fallbackLandingCopy({ show, episode });
+  const slug = uniqueSlug(slugify('go-' + (episode.slug || episode.title), 'go'), new Set(landings.map((l) => l.slug)));
+  const landing = await store.createLanding({
+    slug,
+    title: 'Auto LP — ' + episode.title,
+    headline: fb.headline,
+    subhead: fb.subhead,
+    body_html: fb.body_html,
+    hero_image_url: episode.image_url || show.image_url || '',
+    cta_label: '',
+    cta_url: '',
+    show_id: show.id,
+    episode_id: episode.id,
+    indexable: false,
+    gtag_id: '',
+  });
+  // Upgrade to AI copy in the background so the first hit stays fast.
+  if (aiConfigured()) {
+    generateLandingCopy({ show, episode })
+      .then((copy) => (copy && copy.headline ? store.updateLanding(landing.id, { ...landing, ...copy }) : null))
+      .catch(() => {});
+  }
+  return landing;
+}
+
+const _norm = (s) => String(s || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+
+// Resolver for Podbooster: given a show title + episode title (and/or the audio
+// URL), return the canonical /go URL (and warm its copy). Rarely called — once
+// per campaign launch.
+app.get('/go/resolve', async (req, res) => {
+  try {
+    const audio = (req.query.audio || '').toString().trim();
+    const showT = _norm(req.query.show);
+    const epT = _norm(req.query.episode);
+    const shows = await store.listShows();
+    let mShow = showT ? shows.find((s) => _norm(s.title) === showT) || shows.find((s) => _norm(s.title).includes(showT)) : null;
+    let mEp = null;
+    if (mShow) {
+      const eps = await store.listEpisodes(mShow.id, { limit: 5000 });
+      mEp =
+        (audio && eps.find((e) => e.audio_url === audio)) ||
+        eps.find((e) => _norm(e.title) === epT) ||
+        (epT && eps.find((e) => _norm(e.title).includes(epT))) ||
+        null;
+    }
+    if (!mShow || !mEp) return res.status(404).json({ ok: false, error: 'episode not found' });
+    await resolveOrCreateEpisodeLanding(mShow, mEp);
+    const base = (process.env.APP_BASE_URL || `https://${req.headers.host}`).replace(/\/+$/, '');
+    res.json({ ok: true, url: `${base}/go/${mShow.slug}/${mEp.slug}`, show: mShow.title, episode: mEp.title });
+  } catch (e) {
+    res.status(500).json({ ok: false, error: e.message });
+  }
+});
+
+app.get('/go/:showSlug/:episodeSlug', async (req, res, next) => {
+  const show = await store.getShowBySlug(req.params.showSlug);
+  if (!show) return next();
+  const episode = await store.getEpisodeBySlug(show.id, req.params.episodeSlug);
+  if (!episode) return next();
+  const landing = await resolveOrCreateEpisodeLanding(show, episode);
   res.send(V.landingPage({ landing, show, episode }));
 });
 
