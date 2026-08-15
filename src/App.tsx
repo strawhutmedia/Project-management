@@ -14,6 +14,7 @@ import OutreachShowPage from './pages/OutreachShowPage'
 import Login from './pages/Login'
 import Verify from './pages/Verify'
 import PrompterPage from './pages/PrompterPage'
+import RemotePage from './pages/RemotePage'
 import Profile from './pages/Profile'
 import Settings from './pages/Settings'
 import InvoicingPage from './pages/InvoicingPage'
@@ -49,6 +50,10 @@ export default function App() {
             </Protected>
           }
         />
+        {/* Phone-as-remote — public, no login, no app. /r to type a code,
+            or /r/CODE from the QR the prompter shows. */}
+        <Route path="/r" element={<RemotePage />} />
+        <Route path="/r/:code" element={<RemotePage />} />
         <Route
           element={
             <Protected>

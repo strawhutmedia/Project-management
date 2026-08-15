@@ -27,6 +27,7 @@ import { showPageRouter } from './routes/show_page'
 import { outreachDomainsRouter } from './routes/outreach_domains'
 import { outreachRouter, startOutreachSendLoop, enableDomainOpenTracking } from './routes/outreach'
 import { teleprompterRouter } from './routes/teleprompter'
+import { teleprompterRemoteRouter } from './routes/teleprompter_remote'
 import { invoicingRouter } from './routes/invoicing'
 import { intakeRouter } from './routes/intake'
 import { quickbooksRouter } from './routes/quickbooks'
@@ -112,6 +113,11 @@ app.use('/api', episodeCutsRouter)
 app.use('/api/exports', exportsRouter)
 app.use('/api/admin/outreach/domains', outreachDomainsRouter)
 app.use('/api/outreach', outreachRouter)
+// Remote-control channel (phone-as-remote) — mounted BEFORE the main
+// teleprompter router so its public /remote/:code endpoints don't hit that
+// router's login + podcast-access gate. The host /remote/stream route
+// enforces login itself.
+app.use('/api/teleprompter/remote', teleprompterRemoteRouter)
 app.use('/api/teleprompter', teleprompterRouter)
 app.use('/api/invoicing', invoicingRouter)
 // PUBLIC (token-gated, no login) — vendors submit their W9 via a private link.

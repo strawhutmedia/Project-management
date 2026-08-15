@@ -901,6 +901,15 @@ export const api = {
     }),
   teleprompterDelete: (id: string) =>
     request<{ ok: true }>(`/api/teleprompter/${id}`, { method: 'DELETE' }),
+  // Phone-as-remote: send a button press to a paired prompter, and check
+  // whether a prompter is listening on a code.
+  teleprompterRemoteCmd: (code: string, action: string) =>
+    request<{ ok: true }>(`/api/teleprompter/remote/${code}/cmd`, {
+      method: 'POST',
+      body: JSON.stringify({ action }),
+    }),
+  teleprompterRemoteStatus: (code: string) =>
+    request<{ ok: true; connected: boolean }>(`/api/teleprompter/remote/${code}/status`),
   updateMe: (patch: { name?: string; displayName?: string; timezone?: string }) =>
     request<{ user: ApiUser }>('/api/me', { method: 'PATCH', body: JSON.stringify(patch) }),
   requestLogin: (email: string) =>

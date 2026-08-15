@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import QRCode from 'qrcode'
 import { api, type ApiTeleprompterSession } from '../api'
 
 /**
@@ -197,6 +198,20 @@ export default function PrompterPage() {
   const [saveState, setSaveState] = useState<SaveState>('idle')
   const [mode, setMode] = useState<'edit' | 'run'>('edit')
 
+  // --- phone-as-remote (this device HOSTS a control channel) ---------------
+  const [remoteOpen, setRemoteOpen] = useState(false) // pairing overlay visible
+  const [remoteCode, setRemoteCode] = useState<string | null>(null)
+  const [remotePhoneSeen, setRemotePhoneSeen] = useState(false)
+  // A monotonically-bumped signal so the Runner reacts to run-control presses
+  // (play/pause, restart, exit) even when the same button is pressed twice.
+  const [runnerCmd, setRunnerCmd] = useState<{ action: string; n: number }>({ action: '', n: 0 })
+  const esRef = useRef<EventSource | null>(null)
+  const suggestRef = useRef<string>('')
+  const modeRef = useRef(mode)
+  useEffect(() => {
+    modeRef.current = mode
+  }, [mode])
+
   useEffect(() => saveSettings(settings), [settings])
   useEffect(() => {
     try {
@@ -214,6 +229,87 @@ export default function PrompterPage() {
     () => sessions.find((s) => s.id === currentId) ?? sessions[0] ?? null,
     [sessions, currentId],
   )
+  const currentRef = useRef(current)
+  useEffect(() => {
+    currentRef.current = current
+  }, [current])
+
+  // Apply a button press coming from a paired phone. Settings-level presses
+  // (speed / size) are handled here; run controls are forwarded to the Runner.
+  const handleRemoteAction = useCallback((action: string) => {
+    setRemotePhoneSeen(true)
+    switch (action) {
+      case 'faster':
+        setSettingsState((s) => ({ ...s, speed: Math.min(100, s.speed + 2) }))
+        break
+      case 'slower':
+        setSettingsState((s) => ({ ...s, speed: Math.max(1, s.speed - 2) }))
+        break
+      case 'bigger':
+        setSettingsState((s) => ({ ...s, fontSize: Math.min(160, s.fontSize + 4) }))
+        break
+      case 'smaller':
+        setSettingsState((s) => ({ ...s, fontSize: Math.max(20, s.fontSize - 4) }))
+        break
+      case 'playpause':
+      case 'start':
+        // From the setup screen, "play" starts the run; otherwise toggle.
+        if (modeRef.current === 'edit') {
+          const cur = currentRef.current
+          if (cur && wordCount(cur.html) > 0) setMode('run')
+        } else {
+          setRunnerCmd((c) => ({ action: action === 'start' ? 'top' : 'playpause', n: c.n + 1 }))
+        }
+        break
+      case 'restart':
+        setRunnerCmd((c) => ({ action: 'restart', n: c.n + 1 }))
+        break
+      case 'exit':
+        setRunnerCmd((c) => ({ action: 'exit', n: c.n + 1 }))
+        break
+    }
+  }, [])
+
+  // Open (and keep open) the SSE host channel this device listens on. The
+  // phone POSTs button presses to the code; they arrive here as `cmd` events.
+  const startRemote = useCallback(() => {
+    setRemoteOpen(true)
+    if (esRef.current) return // already hosting
+    if (!suggestRef.current) {
+      const A = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'
+      let c = ''
+      for (let i = 0; i < 4; i++) c += A[Math.floor(Math.random() * A.length)]
+      suggestRef.current = c
+    }
+    const es = new EventSource(`/api/teleprompter/remote/stream?suggest=${suggestRef.current}`, {
+      withCredentials: true,
+    })
+    esRef.current = es
+    es.addEventListener('code', (e) => {
+      try {
+        const { code } = JSON.parse((e as MessageEvent).data)
+        if (code) setRemoteCode(code)
+      } catch {
+        /* ignore */
+      }
+    })
+    es.addEventListener('cmd', (e) => {
+      try {
+        const { action } = JSON.parse((e as MessageEvent).data)
+        if (action) handleRemoteAction(action)
+      } catch {
+        /* ignore */
+      }
+    })
+  }, [handleRemoteAction])
+
+  // Tear down the channel when leaving the prompter entirely.
+  useEffect(() => {
+    return () => {
+      esRef.current?.close()
+      esRef.current = null
+    }
+  }, [])
 
   // --- initial load --------------------------------------------------------
   const reload = useCallback(async (opts?: { seedIfEmpty?: boolean }) => {
@@ -388,29 +484,117 @@ export default function PrompterPage() {
     )
   }
 
+  const remoteOverlay = remoteOpen ? (
+    <RemoteOverlay
+      code={remoteCode}
+      phoneSeen={remotePhoneSeen}
+      onClose={() => setRemoteOpen(false)}
+    />
+  ) : null
+
   if (mode === 'run' && current) {
-    return <Runner session={current} settings={settings} setSettings={setSettings} onExit={() => setMode('edit')} />
+    return (
+      <>
+        <Runner
+          session={current}
+          settings={settings}
+          setSettings={setSettings}
+          onExit={() => setMode('edit')}
+          onOpenRemote={startRemote}
+          remoteActive={Boolean(remoteCode)}
+          command={runnerCmd}
+        />
+        {remoteOverlay}
+      </>
+    )
   }
 
   return (
-    <Editor
-      sessions={sessions}
-      current={current}
-      settings={settings}
-      setSettings={setSettings}
-      saveState={saveState}
-      onHtml={updateCurrentHtml}
-      onRename={renameCurrent}
-      onNew={newSession}
-      onSelect={selectSession}
-      onDelete={deleteSession}
-      onRun={() => {
-        if (current && wordCount(current.html) > 0) {
-          void flushSave()
-          setMode('run')
-        }
-      }}
-    />
+    <>
+      <Editor
+        sessions={sessions}
+        current={current}
+        settings={settings}
+        setSettings={setSettings}
+        saveState={saveState}
+        onHtml={updateCurrentHtml}
+        onRename={renameCurrent}
+        onNew={newSession}
+        onSelect={selectSession}
+        onDelete={deleteSession}
+        onOpenRemote={startRemote}
+        remoteActive={Boolean(remoteCode)}
+        onRun={() => {
+          if (current && wordCount(current.html) > 0) {
+            void flushSave()
+            setMode('run')
+          }
+        }}
+      />
+      {remoteOverlay}
+    </>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Remote pairing overlay — shows the QR + code to pair a phone.
+// ---------------------------------------------------------------------------
+
+function RemoteOverlay({
+  code,
+  phoneSeen,
+  onClose,
+}: {
+  code: string | null
+  phoneSeen: boolean
+  onClose: () => void
+}) {
+  const [qr, setQr] = useState<string>('')
+  const url = code ? `${window.location.origin}/r/${code}` : ''
+
+  useEffect(() => {
+    if (!url) return
+    QRCode.toDataURL(url, { margin: 1, width: 240 })
+      .then(setQr)
+      .catch(() => setQr(''))
+  }, [url])
+
+  return (
+    <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur grid place-items-center px-5" onClick={onClose}>
+      <div
+        className="w-full max-w-sm rounded-3xl border border-line bg-panel p-6 text-center"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <p className="text-[10px] uppercase tracking-[0.3em] text-muted mb-1">Phone remote</p>
+        <h2 className="font-display text-2xl mb-4">Point a phone here</h2>
+
+        {code ? (
+          <>
+            <div className="bg-white rounded-2xl p-3 inline-block mb-3">
+              {qr ? <img src={qr} alt="Scan to open remote" className="w-[220px] h-[220px]" /> : <div className="w-[220px] h-[220px]" />}
+            </div>
+            <p className="text-sm text-muted mb-1">Scan it, or on any phone open</p>
+            <p className="text-text font-mono text-sm mb-3">{window.location.host}/r</p>
+            <p className="text-xs text-muted mb-1">and enter code</p>
+            <p className="font-display text-4xl tracking-[0.3em] text-rainbow mb-4">{code}</p>
+            <div className="flex items-center justify-center gap-2 mb-4">
+              <span className={`h-2.5 w-2.5 rounded-full ${phoneSeen ? 'bg-emerald-400' : 'bg-amber-400'}`} />
+              <span className="text-xs text-muted">{phoneSeen ? 'Phone connected — you can close this' : 'Waiting for a phone…'}</span>
+            </div>
+          </>
+        ) : (
+          <p className="text-sm text-muted py-10">Setting up…</p>
+        )}
+
+        <button
+          onClick={onClose}
+          className="w-full rounded-xl bg-gradient-to-r from-stage-producing to-stage-mastering text-white font-bold uppercase tracking-wider text-sm px-4 py-3"
+        >
+          Done
+        </button>
+        <p className="text-[10px] text-muted mt-3">No app needed. Keep the prompter open on this device.</p>
+      </div>
+    </div>
   )
 }
 
@@ -438,8 +622,10 @@ function Editor(props: {
   onSelect: (id: string) => void
   onDelete: (id: string) => void
   onRun: () => void
+  onOpenRemote: () => void
+  remoteActive: boolean
 }) {
-  const { sessions, current, settings, setSettings, saveState, onHtml, onRename, onNew, onSelect, onDelete, onRun } = props
+  const { sessions, current, settings, setSettings, saveState, onHtml, onRename, onNew, onSelect, onDelete, onRun, onOpenRemote, remoteActive } = props
   const canRun = Boolean(current && wordCount(current.html) > 0)
 
   return (
@@ -512,6 +698,16 @@ function Editor(props: {
           </button>
           <p className="mt-2 text-center text-[11px] text-muted">
             Opens full screen (hides the Mac dock &amp; clock). Tap the screen or hit space to play / pause · Esc to exit.
+          </p>
+
+          <button
+            onClick={onOpenRemote}
+            className="mt-3 w-full rounded-2xl border border-stage-mastering/50 bg-stage-mastering/10 text-text font-semibold px-4 py-3 flex items-center justify-center gap-2"
+          >
+            📱 {remoteActive ? 'Show phone-remote code' : 'Use my phone as a remote'}
+          </button>
+          <p className="mt-1 text-center text-[11px] text-muted">
+            Control this teleprompter from any phone — no app, nothing to buy.
           </p>
 
           <RemoteHelp />
@@ -924,11 +1120,17 @@ function Runner({
   settings,
   setSettings,
   onExit,
+  onOpenRemote,
+  remoteActive,
+  command,
 }: {
   session: Session
   settings: Settings
   setSettings: (p: Partial<Settings>) => void
   onExit: () => void
+  onOpenRemote: () => void
+  remoteActive: boolean
+  command: { action: string; n: number }
 }) {
   const scrollRef = useRef<HTMLDivElement>(null)
   const [playing, setPlaying] = useState(false)
@@ -1109,6 +1311,27 @@ function Runner({
     }
     onExit()
   }, [onExit])
+
+  // React to run-control presses relayed from a paired phone.
+  const lastCmdRef = useRef(0)
+  useEffect(() => {
+    if (command.n === lastCmdRef.current) return
+    lastCmdRef.current = command.n
+    switch (command.action) {
+      case 'playpause':
+        togglePlay()
+        break
+      case 'restart':
+        restart()
+        break
+      case 'top':
+        restart()
+        break
+      case 'exit':
+        handleExit()
+        break
+    }
+  }, [command, togglePlay, restart, handleExit])
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -1294,6 +1517,15 @@ function Runner({
               title="Hide the Mac dock and menu bar"
             >
               {isFs ? '⤢ Exit full screen' : '⤢ Full screen'}
+            </button>
+            <button
+              onClick={onOpenRemote}
+              className={`text-[11px] rounded-lg px-2.5 py-1.5 border transition ${
+                remoteActive ? 'border-stage-mastering bg-stage-mastering/20 text-white' : 'border-white/15 text-white/70 hover:text-white'
+              }`}
+              title="Control from a phone"
+            >
+              📱 Phone
             </button>
             <span className="text-[11px] text-white/40 tabular-nums px-1">{formatClock(remaining)} left</span>
           </div>
