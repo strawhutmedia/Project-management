@@ -12,6 +12,7 @@ import {
   breadcrumbJsonLd,
   videoObjectJsonLd,
   studioServiceJsonLd,
+  FAQ,
 } from './seo.js';
 import { resolvePlatformLinks } from './platforms.js';
 import { CONTACT_ROUTES } from './mail.js';
@@ -277,7 +278,8 @@ export function homePage({ shows }) {
   const body = `
   <section class="hero"><div class="container">
     <h1>Think outside the <span class="accent">pod</span>.</h1>
-    <p>Welcome to Straw Hut Media — an award-winning podcast agency.</p>
+    <p>Straw Hut Media is an award-winning, full-service podcast production company and network. We take your show from first idea to chart-topping — production, distribution, monetization, and growth, all under one roof.</p>
+    <div style="margin-top:22px"><a class="btn btn-primary" href="/contact">Start a podcast with us</a> <a class="btn btn-ghost" href="/shows" style="margin-left:8px">Hear our shows</a></div>
   </div></section>
   ${marquee}
 
@@ -309,11 +311,21 @@ export function homePage({ shows }) {
   }
 
   <section class="section" id="advertise"><div class="container">
-    <div class="section-head"><h2>What we do</h2></div>
-    <p style="color:var(--muted);max-width:720px;margin:-8px 0 26px">Straw Hut Media is a full-service podcast production company and network. We produce, host, distribute, and monetize podcasts — from first idea to chart-topping show.</p>
+    <div class="section-head"><h2>Everything you need to make a podcast</h2></div>
+    <p style="color:var(--muted);max-width:760px;margin:-8px 0 26px">Straw Hut Media is a full-service podcast production company. Whether you're launching a brand-new show or scaling an existing one, we handle the entire journey — concept, recording, editing, sound design, distribution to every major platform, advertising, and audience growth. We produce our own award-winning originals and partner with brands and creators to build shows people love.</p>
     <div class="grid" style="grid-template-columns:repeat(auto-fill,minmax(260px,1fr))">
       ${SERVICES.map(
         (s) => `<article class="show-card" style="padding:22px 22px 24px"><h3 style="margin-top:0">${esc(s.name)}</h3><p class="meta" style="font-size:0.92rem;line-height:1.5">${esc(s.description)}</p></article>`
+      ).join('')}
+    </div>
+    <p style="margin-top:24px"><a class="btn btn-primary" href="/contact">Work with Straw Hut Media →</a></p>
+  </div></section>
+
+  <section class="section" id="faq"><div class="container">
+    <div class="section-head"><h2>Podcasting questions, answered</h2></div>
+    <div class="faq-list">
+      ${FAQ.map(
+        ([q, a]) => `<details class="faq-item"><summary>${esc(q)}</summary><p>${esc(a)}</p></details>`
       ).join('')}
     </div>
   </div></section>
@@ -341,10 +353,11 @@ export function homePage({ shows }) {
 }
 
 const SERVICES = [
-  { name: 'Podcast Production', description: 'End-to-end production: recording, editing, sound design, and post-production.' },
-  { name: 'Network & Distribution', description: 'Distribution across Apple Podcasts, Spotify, and every major platform.' },
-  { name: 'Advertising & Partnerships', description: 'Host-read ads, branded content, and advertising sales that monetize your show.' },
-  { name: 'Show Development', description: 'Concept development, launch strategy, and audience growth.' },
+  { name: 'Podcast Production', description: 'End-to-end production for new and existing shows — recording, editing, sound design, and post-production that sounds professional.' },
+  { name: 'Network & Distribution', description: 'We publish and distribute your show to Apple Podcasts, Spotify, YouTube, and every major platform, and grow it across our network.' },
+  { name: 'Advertising & Monetization', description: 'Host-read ads, branded content, and advertising sales handled in-house — turning listeners into revenue.' },
+  { name: 'Show Development', description: 'Concept, format, launch strategy, and audience growth to build a show that stands out and lasts.' },
+  { name: 'Hollywood Studio', description: 'Record in our fully-equipped studio — pro audio and multi-camera 4K video, booked by the hour.' },
 ];
 
 export function showsIndexPage({ shows }) {

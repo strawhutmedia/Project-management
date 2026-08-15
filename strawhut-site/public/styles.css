@@ -381,7 +381,31 @@ table.admin-table { width: 100%; border-collapse: collapse; }
 .login-wrap { display: flex; align-items: center; justify-content: center; min-height: 100vh; padding: 20px; }
 .login-card { width: 380px; max-width: 100%; }
 
+/* FAQ (GEO asset) */
+.faq-list { max-width: 820px; margin: 0 auto; display: flex; flex-direction: column; gap: 12px; }
+.faq-item {
+  background: var(--card); border: 1px solid var(--border);
+  border-radius: 14px; padding: 4px 20px; transition: border-color 0.2s ease;
+}
+.faq-item[open] { border-color: var(--accent); }
+.faq-item summary {
+  list-style: none; cursor: pointer; padding: 16px 0;
+  font-weight: 600; font-size: 1.04rem; color: var(--text);
+  display: flex; align-items: center; justify-content: space-between; gap: 16px;
+}
+.faq-item summary::-webkit-details-marker { display: none; }
+.faq-item summary::after {
+  content: "+"; color: var(--accent); font-weight: 700; font-size: 1.4rem;
+  line-height: 1; flex: 0 0 auto; transition: transform 0.2s ease;
+}
+.faq-item[open] summary::after { transform: rotate(45deg); }
+.faq-item p {
+  margin: 0 0 18px; color: var(--muted); line-height: 1.65; font-size: 0.98rem;
+}
+
 @media (max-width: 820px) {
+  .faq-item { padding: 2px 16px; }
+  .faq-item summary { font-size: 0.98rem; }
   .nav-toggle { display: inline-flex; }
   .nav {
     position: absolute; top: 100%; left: 0; right: 0;
