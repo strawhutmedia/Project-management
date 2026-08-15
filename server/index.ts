@@ -106,6 +106,11 @@ app.use('/api/social-strategy', socialStrategyRouter)
 app.use('/api/show-brief', showBriefRouter)
 app.use('/api/podcasts', podcastsRouter)
 app.use('/api/scheduler', socialSchedulerRouter)
+// Phone-as-remote channel. MUST be mounted before the broad `app.use('/api',
+// …)` routers below — those apply requireUser to every /api/* request that
+// reaches them, which would 401 the phone's login-less button presses before
+// they got here. Its own /remote/stream route enforces login itself.
+app.use('/api/teleprompter/remote', teleprompterRemoteRouter)
 // show_chat mounts on /api directly because its routes are
 // /api/projects/:id/chat — colocated with project-scoped endpoints.
 app.use('/api', showChatRouter)
@@ -113,11 +118,6 @@ app.use('/api', episodeCutsRouter)
 app.use('/api/exports', exportsRouter)
 app.use('/api/admin/outreach/domains', outreachDomainsRouter)
 app.use('/api/outreach', outreachRouter)
-// Remote-control channel (phone-as-remote) — mounted BEFORE the main
-// teleprompter router so its public /remote/:code endpoints don't hit that
-// router's login + podcast-access gate. The host /remote/stream route
-// enforces login itself.
-app.use('/api/teleprompter/remote', teleprompterRemoteRouter)
 app.use('/api/teleprompter', teleprompterRouter)
 app.use('/api/invoicing', invoicingRouter)
 // PUBLIC (token-gated, no login) — vendors submit their W9 via a private link.
