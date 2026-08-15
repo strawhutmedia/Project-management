@@ -313,6 +313,7 @@ export function sitemapXml(shows, episodesByShow, { posts = [], servicePaths = [
         `</url>`
     );
   add('/');
+  add('/about');
   add('/shows');
   add('/studio');
   add('/press');
@@ -383,6 +384,7 @@ ${showList}
 ## Key pages
 
 - [Home](${BASE}/)
+- [About](${BASE}/about)
 - [All shows](${BASE}/shows)
 - [Studio booking](${BASE}/studio)
 - [Guides & resources](${BASE}/resources)

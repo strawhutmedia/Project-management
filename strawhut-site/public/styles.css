@@ -442,6 +442,29 @@ table.admin-table { width: 100%; border-collapse: collapse; }
 .prose.lead { font-size: 1.18rem; color: var(--muted); line-height: 1.6; }
 .prose p { margin: 0 0 16px; }
 
+/* About — logo wall + team */
+.logo-wall {
+  display: flex; flex-wrap: wrap; align-items: center; justify-content: center;
+  gap: 18px 38px; padding: 8px 0;
+}
+.logo-item {
+  display: inline-flex; align-items: center; justify-content: center;
+  min-height: 42px; opacity: 0.72; transition: opacity 0.2s ease;
+}
+.logo-item:hover { opacity: 1; }
+.logo-item img { max-height: 40px; width: auto; filter: grayscale(1) brightness(1.7); }
+.logo-word {
+  font-size: 1.15rem; font-weight: 600; letter-spacing: 0.01em; color: var(--text);
+  white-space: nowrap;
+}
+.team-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 16px; }
+.team-member {
+  display: flex; flex-direction: column; gap: 2px; padding: 16px 18px;
+  background: var(--card); border: 1px solid var(--border); border-radius: 12px;
+}
+.team-name { font-weight: 600; }
+.team-role { font-size: 0.9rem; color: var(--muted); }
+
 /* Call-to-action band */
 .cta-band {
   margin: 40px 0 8px; padding: 34px; text-align: center;

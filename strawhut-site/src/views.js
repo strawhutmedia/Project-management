@@ -220,6 +220,7 @@ ${trackingBody()}
     </div>
     <div class="footer-col">
       <div class="footer-h">Explore</div>
+      <a href="/about">About</a>
       <a href="/shows">All Shows</a>
       <a href="/resources">Guides &amp; Resources</a>
       <a href="/press">Press</a>
@@ -592,6 +593,93 @@ export function servicePage(cfg) {
         { name: 'Home', path: '/' },
         { name: cfg.breadcrumbName || cfg.navLabel, path: cfg.path },
       ]),
+  });
+}
+
+// --- About -----------------------------------------------------------------
+
+// Companies + collaborators we've worked with. Add a `logo` path (a file in
+// /public/logos/) to render a real graphic mark; otherwise a clean, uniform
+// wordmark is shown. Keeping them uniform reads more premium than mismatched
+// raster logos — and swapping in real files later is a one-line change each.
+const CLIENTS = [
+  { name: 'Universal Pictures' },
+  { name: 'Disney' },
+  { name: 'Hulu' },
+  { name: 'Commune' },
+  { name: 'Mekanism' },
+  { name: 'Next City' },
+  { name: 'Plus Company' },
+  { name: 'We Are Social' },
+  { name: 'King Pleasure' },
+  { name: 'Shaping Freedom' },
+  { name: 'Phil Rosenthal' },
+];
+
+// Team — names + roles only (no photos, by design). Fill this in and each
+// person is also emitted as Person schema for search + AI discoverability.
+const TEAM = [];
+
+export function aboutPage() {
+  const logos = CLIENTS.map((c) =>
+    c.logo
+      ? `<span class="logo-item"><img src="${esc(c.logo)}" alt="${esc(c.name)}" loading="lazy"></span>`
+      : `<span class="logo-item logo-word">${esc(c.name)}</span>`
+  ).join('');
+  const team = TEAM.length
+    ? `<section class="section" id="team"><div class="container">
+    <div class="section-head"><h2>The team</h2></div>
+    <div class="team-list">
+      ${TEAM.map(
+        (m) => `<div class="team-member"><span class="team-name">${esc(m.name)}</span><span class="team-role">${esc(m.role)}</span></div>`
+      ).join('')}
+    </div>
+  </div></section>`
+    : '';
+  const body = `
+  <section class="hero" style="padding-bottom:16px"><div class="container">
+    <div class="breadcrumb" style="padding:0 0 14px"><a href="/">Home</a> / About</div>
+    <h1>Think outside the <span class="accent">pod</span>.</h1>
+    <p>Straw Hut Media is an award-winning, full-service podcast production company and network based in Hollywood. Founded in 2017, we've helped creators, brands, and studios make podcasts people love — handling everything from concept and recording to editing, distribution, advertising, and growth. We produce our own original shows and partner with some of the biggest names in entertainment and marketing.</p>
+    <div style="margin-top:22px"><a class="btn btn-primary" href="/contact">Work with us</a> <a class="btn btn-ghost" href="/shows" style="margin-left:8px">Hear our shows</a></div>
+  </div></section>
+
+  <section class="section" id="clients"><div class="container">
+    <div class="section-head"><h2>Trusted by</h2></div>
+    <div class="logo-wall">${logos}</div>
+  </div></section>
+
+  ${team}
+
+  <section class="section"><div class="container"><div class="cta-band">
+    <h2>Let's make something people love</h2>
+    <p>From first idea to chart-topping show — production, distribution, and growth under one roof.</p>
+    <a class="btn btn-primary" href="/contact">Start a podcast with us →</a>
+  </div></div></section>`;
+  const personLd = TEAM.map((m) =>
+    `<script type="application/ld+json">${JSON.stringify({
+      '@context': 'https://schema.org',
+      '@type': 'Person',
+      name: m.name,
+      jobTitle: m.role,
+      worksFor: { '@type': 'Organization', name: 'Straw Hut Media', url: canonical('/') },
+    }).replace(/</g, '\\u003c')}</script>`
+  ).join('\n');
+  return layout({
+    title: 'About Straw Hut Media — Podcast Production Company in Hollywood',
+    description:
+      'Straw Hut Media is an award-winning, full-service podcast production company and network founded in Hollywood in 2017. We work with brands and studios like Universal, Disney, and Hulu.',
+    body,
+    activeNav: '/about',
+    path: '/about',
+    jsonLd:
+      organizationJsonLd() +
+      '\n' +
+      breadcrumbJsonLd([
+        { name: 'Home', path: '/' },
+        { name: 'About', path: '/about' },
+      ]) +
+      (personLd ? '\n' + personLd : ''),
   });
 }
 

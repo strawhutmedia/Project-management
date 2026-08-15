@@ -543,6 +543,8 @@ app.get('/shows', async (req, res) => {
 
 app.get('/studio', (req, res) => res.send(V.studioPage()));
 
+app.get('/about', (req, res) => res.send(V.aboutPage()));
+
 app.get('/contact', (req, res) => res.send(V.contactPage()));
 app.post('/contact', async (req, res) => {
   const { name = '', email = '', company = '', message = '', topic = 'general' } = req.body || {};
