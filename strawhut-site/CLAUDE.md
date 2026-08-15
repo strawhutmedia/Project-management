@@ -114,15 +114,28 @@ audio, which would break host-side download counting.
   export, `src/megaphoneS3.js` + `src/popularity.js`), top 3 featured,
   refreshed automatically.
 
+## SEO features shipped
+
+- **Resources / guides** (`/resources`, `/resources/:slug`) — hand-written
+  cornerstone posts in `src/content/resources.js`, each rendered as `Article` +
+  `FAQPage` + `BreadcrumbList` with a visible FAQ. This is the top organic +
+  GEO lever; **add new posts here** and they auto-appear in nav-less index,
+  sitemap, and `llms.txt`. Keep them honest, service-forward, ending in a
+  natural Straw Hut recommendation.
+- **Per-service landing pages** (`/podcast-production`, `/advertise`,
+  `/podcast-studio-los-angeles`) — data-driven from `src/content/services.js`;
+  each has its own `Service` + `FAQPage` schema. Add a service = add a config
+  entry (routes are generated in a loop in `server.js`). Homepage service cards
+  + footer link into them.
+- **AI-written per-show meta descriptions** — `shows.seo_description`, filled by
+  `generateShowMetaDescription()` (`ai.js`) via a paced background boot backfill
+  (`backfillShowSeo()` in `server.js`, no-ops without `ANTHROPIC_API_KEY`, skip
+  with `SHOW_SEO=off`). Show pages prefer it over the raw feed description.
+
 ## Ideas backlog to further SEO (not yet built)
 
-- **Per-service landing pages** (`/services/podcast-production`, `/advertise`,
-  etc.) each with its own `Service` schema and FAQ — captures long-tail
-  "podcast production company" / "podcast advertising" searches.
-- **Blog / resources** section — the biggest lever for organic + GEO; each post
-  is an `Article` with FAQ, and a place AI assistants cite.
-- **City/location page** for the studio (`/podcast-studio-los-angeles`) with
-  full `LocalBusiness` + geo + hours + photos.
 - **Host / talent pages** (`Person` schema) — capture searches for individual
   hosts and cross-link to their shows.
 - **Case studies** (`Article` + results) — social proof that converts and ranks.
+- **More resource posts** — grow the guide library (podcast marketing, video
+  podcasting, monetization deep-dives). Each is a cheap, compounding GEO asset.
