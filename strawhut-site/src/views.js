@@ -156,19 +156,24 @@ function layout({
 }) {
   const canon = canonical(path);
   const desc = toText(description, 160);
-  const nav = [
-    ['/', 'Home'],
-    ['/shows', 'Shows'],
-    ['/studio', 'Studio'],
-    ['/resources', 'Resources'],
-    ['/press', 'Press'],
-    ['/contact', 'Contact'],
-  ]
-    .map(
-      ([href, label]) =>
-        `<a href="${href}"${activeNav === href ? ' class="active"' : ''}>${label}</a>`
-    )
-    .join('');
+  const nav =
+    [
+      ['/', 'Home'],
+      ['/shows', 'Shows'],
+      ['/studio', 'Studio'],
+      ['/resources', 'Resources'],
+      ['/press', 'Press'],
+      ['/contact', 'Contact'],
+    ]
+      .map(
+        ([href, label]) =>
+          `<a href="${href}"${activeNav === href ? ' class="active"' : ''}>${label}</a>`
+      )
+      .join('') +
+    // "Promote" — cross-sell to The Podbooster (our promotion product). External,
+    // opens in a new tab, carries UTMs so Podbooster attributes the traffic, and
+    // fires a tracked event for cross-property retargeting.
+    `<a class="nav-cta" href="https://thepodbooster.com/?utm_source=strawhutmedia&utm_medium=nav&utm_campaign=promote" target="_blank" rel="noopener" onclick="window.shmTrack&&shmTrack('promote_click',{destination:'thepodbooster.com'})">Promote</a>`;
   return `<!doctype html>
 <html lang="en">
 <head>
