@@ -7,6 +7,9 @@ import {
   canonical,
   organizationJsonLd,
   faqJsonLd,
+  faqJsonLdFrom,
+  articleJsonLd,
+  serviceJsonLd,
   podcastSeriesJsonLd,
   podcastEpisodeJsonLd,
   breadcrumbJsonLd,
@@ -157,6 +160,7 @@ function layout({
     ['/', 'Home'],
     ['/shows', 'Shows'],
     ['/studio', 'Studio'],
+    ['/resources', 'Resources'],
     ['/press', 'Press'],
     ['/contact', 'Contact'],
   ]
@@ -201,8 +205,32 @@ ${trackingBody()}
 <script>(function(){var t=document.getElementById('navToggle'),n=document.getElementById('siteNav');if(!t||!n)return;t.addEventListener('click',function(){var open=n.classList.toggle('open');t.classList.toggle('open',open);t.setAttribute('aria-expanded',open?'true':'false');});n.addEventListener('click',function(e){if(e.target.tagName==='A'){n.classList.remove('open');t.classList.remove('open');t.setAttribute('aria-expanded','false');}});})();</script>
 <main>${body}</main>
 <footer class="site-footer"><div class="container">
-  <div>© ${new Date().getFullYear()} Straw Hut Media — ${esc('Full-service podcast production & network')}</div>
-  <div class="footer-links"><a href="/contact">Contact</a> · <a href="/admin">Admin</a></div>
+  <div class="footer-cols">
+    <div class="footer-col">
+      <div class="footer-h">Services</div>
+      <a href="/podcast-production">Podcast Production</a>
+      <a href="/advertise">Advertise With Us</a>
+      <a href="/studio">Book the Studio</a>
+      <a href="/podcast-studio-los-angeles">LA Podcast Studio</a>
+    </div>
+    <div class="footer-col">
+      <div class="footer-h">Explore</div>
+      <a href="/shows">All Shows</a>
+      <a href="/resources">Guides &amp; Resources</a>
+      <a href="/press">Press</a>
+      <a href="/contact">Contact</a>
+    </div>
+    <div class="footer-col">
+      <div class="footer-h">Get started</div>
+      <a href="/resources/how-to-start-a-podcast">How to start a podcast</a>
+      <a href="/resources/how-to-choose-a-podcast-production-company">Choosing a production company</a>
+      <a href="/contact">Start a podcast with us</a>
+    </div>
+  </div>
+  <div class="footer-base">
+    <div>© ${new Date().getFullYear()} Straw Hut Media — ${esc('Full-service podcast production & network')}</div>
+    <div class="footer-links"><a href="/contact">Contact</a> · <a href="/admin">Admin</a></div>
+  </div>
 </div></footer>
 </body></html>`;
 }
@@ -315,7 +343,12 @@ export function homePage({ shows }) {
     <p style="color:var(--muted);max-width:760px;margin:-8px 0 26px">Straw Hut Media is a full-service podcast production company. Whether you're launching a brand-new show or scaling an existing one, we handle the entire journey — concept, recording, editing, sound design, distribution to every major platform, advertising, and audience growth. We produce our own award-winning originals and partner with brands and creators to build shows people love.</p>
     <div class="grid" style="grid-template-columns:repeat(auto-fill,minmax(260px,1fr))">
       ${SERVICES.map(
-        (s) => `<article class="show-card" style="padding:22px 22px 24px"><h3 style="margin-top:0">${esc(s.name)}</h3><p class="meta" style="font-size:0.92rem;line-height:1.5">${esc(s.description)}</p></article>`
+        (s) => {
+          const inner = `<h3 style="margin-top:0">${esc(s.name)}${s.href ? ' <span class="accent" style="font-weight:600">→</span>' : ''}</h3><p class="meta" style="font-size:0.92rem;line-height:1.5">${esc(s.description)}</p>`;
+          return s.href
+            ? `<a class="show-card svc-card" href="${esc(s.href)}" style="padding:22px 22px 24px;display:block">${inner}</a>`
+            : `<article class="show-card" style="padding:22px 22px 24px">${inner}</article>`;
+        }
       ).join('')}
     </div>
     <p style="margin-top:24px"><a class="btn btn-primary" href="/contact">Work with Straw Hut Media →</a></p>
@@ -353,11 +386,11 @@ export function homePage({ shows }) {
 }
 
 const SERVICES = [
-  { name: 'Podcast Production', description: 'End-to-end production for new and existing shows — recording, editing, sound design, and post-production that sounds professional.' },
+  { name: 'Podcast Production', href: '/podcast-production', description: 'End-to-end production for new and existing shows — recording, editing, sound design, and post-production that sounds professional.' },
   { name: 'Network & Distribution', description: 'We publish and distribute your show to Apple Podcasts, Spotify, YouTube, and every major platform, and grow it across our network.' },
-  { name: 'Advertising & Monetization', description: 'Host-read ads, branded content, and advertising sales handled in-house — turning listeners into revenue.' },
+  { name: 'Advertising & Monetization', href: '/advertise', description: 'Host-read ads, branded content, and advertising sales handled in-house — turning listeners into revenue.' },
   { name: 'Show Development', description: 'Concept, format, launch strategy, and audience growth to build a show that stands out and lasts.' },
-  { name: 'Hollywood Studio', description: 'Record in our fully-equipped studio — pro audio and multi-camera 4K video, booked by the hour.' },
+  { name: 'Hollywood Studio', href: '/studio', description: 'Record in our fully-equipped studio — pro audio and multi-camera 4K video, booked by the hour.' },
 ];
 
 export function showsIndexPage({ shows }) {
@@ -391,6 +424,169 @@ export function showsIndexPage({ shows }) {
       { name: 'Home', path: '/' },
       { name: 'Shows', path: '/shows' },
     ]),
+  });
+}
+
+// --- Resources / blog -------------------------------------------------------
+
+// Shared visible-FAQ block (used by resource posts + service pages). Renders the
+// same <details> pattern as the homepage FAQ so styling is consistent.
+function faqSection(pairs, heading = 'Frequently asked questions') {
+  if (!pairs || !pairs.length) return '';
+  return `<section class="section" id="faq"><div class="container">
+    <div class="section-head"><h2>${esc(heading)}</h2></div>
+    <div class="faq-list">
+      ${pairs
+        .map(([q, a]) => `<details class="faq-item"><summary>${esc(q)}</summary><p>${esc(a)}</p></details>`)
+        .join('')}
+    </div>
+  </div></section>`;
+}
+
+export function resourcesIndexPage({ posts }) {
+  const cards = posts
+    .map(
+      (p) => `<a class="resource-card" href="/resources/${esc(p.slug)}">
+      <span class="resource-cat">${esc(p.category || 'Podcasting')}</span>
+      <h3>${esc(p.title)}</h3>
+      <p>${esc(p.description)}</p>
+      <span class="resource-more">Read the guide <span class="accent">→</span></span>
+    </a>`
+    )
+    .join('');
+  const body = `
+  <section class="hero" style="padding-bottom:14px"><div class="container">
+    <div class="breadcrumb" style="padding:0 0 14px"><a href="/">Home</a> / Resources</div>
+    <h1>Podcasting <span class="accent">guides &amp; resources</span></h1>
+    <p>Straight-talking guides to starting, producing, growing, and monetizing a podcast — written by the team at Straw Hut Media. No fluff, no filler.</p>
+  </div></section>
+  <section class="section" style="padding-top:8px"><div class="container">
+    <div class="resource-grid">${cards}</div>
+    <div class="cta-band">
+      <h2>Ready to make your podcast?</h2>
+      <p>We take shows from first idea to chart-topping — production, distribution, and growth under one roof.</p>
+      <a class="btn btn-primary" href="/contact">Work with Straw Hut Media →</a>
+    </div>
+  </div></section>`;
+  return layout({
+    title: 'Podcasting Guides & Resources — Straw Hut Media',
+    description:
+      'Practical guides to starting, producing, growing, and monetizing a podcast — written by Straw Hut Media, a full-service podcast production company and network.',
+    body,
+    activeNav: '/resources',
+    path: '/resources',
+    jsonLd: breadcrumbJsonLd([
+      { name: 'Home', path: '/' },
+      { name: 'Resources', path: '/resources' },
+    ]),
+  });
+}
+
+export function resourcePostPage({ post, related = [] }) {
+  const relatedCards = related.length
+    ? `<div class="resource-related"><h2>Keep reading</h2><div class="resource-grid">${related
+        .map(
+          (p) => `<a class="resource-card" href="/resources/${esc(p.slug)}">
+        <span class="resource-cat">${esc(p.category || 'Podcasting')}</span>
+        <h3>${esc(p.title)}</h3>
+        <p>${esc(p.description)}</p>
+        <span class="resource-more">Read the guide <span class="accent">→</span></span>
+      </a>`
+        )
+        .join('')}</div></div>`
+    : '';
+  const body = `
+  <article class="article">
+    <div class="container article-narrow">
+      <div class="breadcrumb" style="padding:26px 0 14px"><a href="/">Home</a> / <a href="/resources">Resources</a> / ${esc(post.category || 'Guide')}</div>
+      <span class="resource-cat">${esc(post.category || 'Podcasting')}</span>
+      <h1 class="article-title">${esc(post.title)}</h1>
+      ${post.dek ? `<p class="article-dek">${esc(post.dek)}</p>` : ''}
+      <div class="article-byline">By Straw Hut Media${post.readingTime ? ` · ${esc(post.readingTime)}` : ''}${post.updated ? ` · Updated ${esc(formatDate(post.updated))}` : ''}</div>
+      <div class="article-body">${post.body_html}</div>
+      <div class="cta-band">
+        <h2>Want this done for you?</h2>
+        <p>Straw Hut Media is a full-service podcast production company and network. Tell us about your show and we'll map out exactly what it takes.</p>
+        <a class="btn btn-primary" href="/contact">Start a podcast with us →</a>
+      </div>
+    </div>
+  </article>
+  ${faqSection(post.faq)}
+  ${relatedCards ? `<section class="section"><div class="container article-narrow">${relatedCards}</div></section>` : ''}`;
+  return layout({
+    title: `${post.title} | Straw Hut Media`,
+    description: post.description,
+    body,
+    activeNav: '/resources',
+    path: '/resources/' + post.slug,
+    ogType: 'article',
+    image: post.image,
+    jsonLd:
+      articleJsonLd(post) +
+      '\n' +
+      faqJsonLdFrom(post.faq) +
+      '\n' +
+      breadcrumbJsonLd([
+        { name: 'Home', path: '/' },
+        { name: 'Resources', path: '/resources' },
+        { name: post.title, path: '/resources/' + post.slug },
+      ]),
+  });
+}
+
+// --- Per-service landing pages ---------------------------------------------
+
+export function servicePage(cfg) {
+  const highlights = (cfg.highlights || [])
+    .map(
+      (h) => `<article class="show-card" style="padding:22px 22px 24px"><h3 style="margin-top:0">${esc(h.name)}</h3><p class="meta" style="font-size:0.92rem;line-height:1.55">${esc(h.text)}</p></article>`
+    )
+    .join('');
+  const sections = (cfg.sections || [])
+    .map(
+      (s) => `<section class="section"><div class="container article-narrow">
+      <h2>${esc(s.h2)}</h2>
+      <div class="prose">${s.html}</div>
+    </div></section>`
+    )
+    .join('');
+  const body = `
+  <section class="hero"><div class="container">
+    <div class="breadcrumb" style="padding:0 0 14px"><a href="/">Home</a> / ${esc(cfg.breadcrumbName || cfg.navLabel)}</div>
+    <h1>${cfg.hero.h1}</h1>
+    <p>${esc(cfg.hero.dek)}</p>
+    <div style="margin-top:22px"><a class="btn btn-primary" href="${esc(cfg.hero.cta.href)}">${esc(cfg.hero.cta.label)}</a> <a class="btn btn-ghost" href="/resources" style="margin-left:8px">Read our guides</a></div>
+  </div></section>
+  ${cfg.intro ? `<section class="section" style="padding-bottom:0"><div class="container article-narrow"><p class="prose lead">${esc(cfg.intro)}</p></div></section>` : ''}
+  ${
+    highlights
+      ? `<section class="section"><div class="container">
+    <div class="grid" style="grid-template-columns:repeat(auto-fill,minmax(240px,1fr))">${highlights}</div>
+  </div></section>`
+      : ''
+  }
+  ${sections}
+  ${faqSection(cfg.faq)}
+  <section class="section"><div class="container"><div class="cta-band">
+    <h2>Let's build it together</h2>
+    <p>One award-winning team, the whole journey — from first idea to chart-topping show.</p>
+    <a class="btn btn-primary" href="${esc(cfg.hero.cta.href)}">${esc(cfg.hero.cta.label)} →</a>
+  </div></div></section>`;
+  return layout({
+    title: cfg.title,
+    description: cfg.description,
+    body,
+    activeNav: '',
+    path: cfg.path,
+    jsonLd:
+      serviceJsonLd({ path: cfg.path, ...cfg.schema }) +
+      '\n' +
+      faqJsonLdFrom(cfg.faq) +
+      '\n' +
+      breadcrumbJsonLd([
+        { name: 'Home', path: '/' },
+        { name: cfg.breadcrumbName || cfg.navLabel, path: cfg.path },
+      ]),
   });
 }
 
@@ -721,7 +917,10 @@ export function showPage({ show, episodes, total = episodes.length, pageNum = 1,
   </div></section>`;
   return layout({
     title: `${show.title} — Podcast on Straw Hut Media`,
-    description: show.description || `${show.title} — a podcast on the Straw Hut Media network.`,
+    description:
+      show.seo_description ||
+      toText(show.description, 160) ||
+      `${show.title} — a podcast produced and distributed by Straw Hut Media.`,
     image: show.image_url,
     body,
     activeNav: '/shows',

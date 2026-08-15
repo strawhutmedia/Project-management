@@ -102,6 +102,59 @@ export async function generateLandingCopy({ show, episode, log = () => {} } = {}
   }
 }
 
+// ---------------------------------------------------------------------------
+// Per-show SEO meta descriptions. There are dozens of shows; a unique,
+// keyword-aware ~155-char description per show meaningfully lifts search CTR
+// and gives AI assistants a clean summary of each show. Generated once and
+// stored (shows.seo_description); regenerated only when missing.
+// ---------------------------------------------------------------------------
+const META_SYSTEM = `You write SEO meta descriptions for podcast show pages on Straw Hut Media, a full-service podcast production company and network.
+Write ONE meta description, 140-160 characters, plain text (no quotes, no emojis, no hashtags).
+It must: describe what THIS show is about, name the host if given, read naturally to a human, and include the words "podcast" and, where it fits, "Straw Hut Media".
+Never use "listen free", "tune in", clickbait, or exclamation points.`;
+
+export async function generateShowMetaDescription({ show, log = () => {} } = {}) {
+  if (!KEY || !show) return null;
+  const title = show.title || '';
+  const host = show.author || '';
+  const desc = toText(show.description, 700);
+  const cats = Array.isArray(show.categories) ? show.categories.slice(0, 4).join(', ') : '';
+  try {
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), 30000);
+    const res = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: { 'x-api-key': KEY, 'anthropic-version': '2023-06-01', 'content-type': 'application/json' },
+      body: JSON.stringify({
+        model: MODEL,
+        max_tokens: 200,
+        temperature: 0.5,
+        system: META_SYSTEM,
+        messages: [
+          {
+            role: 'user',
+            content: `Write the meta description. Return ONLY the description text, nothing else.\n\nSHOW: ${title}\nHOST: ${host}\nCATEGORIES: ${cats}\nDESCRIPTION: ${desc}`,
+          },
+        ],
+      }),
+      signal: ctrl.signal,
+    });
+    clearTimeout(timer);
+    if (!res.ok) {
+      log(`ai: meta gen HTTP ${res.status}`);
+      return null;
+    }
+    const data = await res.json().catch(() => null);
+    let text = data?.content?.map?.((b) => b.text || '').join('').trim() || '';
+    text = text.replace(/^["'\s]+|["'\s]+$/g, '').replace(/\s+/g, ' ');
+    if (!text) return null;
+    return text.slice(0, 200);
+  } catch (e) {
+    log(`ai: meta gen failed — ${e.message}`);
+    return null;
+  }
+}
+
 /** Non-AI fallback: decent, non-cheesy copy pulled straight from the materials. */
 export function fallbackLandingCopy({ show, episode } = {}) {
   const epTitle = episode?.title || show?.title || 'Listen now';

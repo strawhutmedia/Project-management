@@ -15,7 +15,9 @@ import * as A from './admin_views.js';
 import { robotsTxt, sitemapXml, llmsTxt } from './seo.js';
 import { sendAnnouncement, mailConfigured, sendContactEmail } from './mail.js';
 import { importFromSite } from './importer.js';
-import { writeLandingCopy, generateLandingCopy, fallbackLandingCopy, aiConfigured } from './ai.js';
+import { writeLandingCopy, generateLandingCopy, fallbackLandingCopy, aiConfigured, generateShowMetaDescription } from './ai.js';
+import { POSTS, getPost } from './content/resources.js';
+import { SERVICE_PAGES, getServicePage } from './content/services.js';
 import * as reco from './recommend.js';
 import { matchAllShows, matchShowVideos } from './youtube.js';
 import { refreshPress } from './press.js';
@@ -510,12 +512,22 @@ app.get('/sitemap.xml', async (req, res) => {
   const shows = await store.listShows();
   const episodesByShow = {};
   for (const s of shows) episodesByShow[s.id] = await store.listEpisodes(s.id, { limit: 2000 });
-  res.type('application/xml').send(sitemapXml(shows, episodesByShow));
+  res.type('application/xml').send(
+    sitemapXml(shows, episodesByShow, {
+      posts: POSTS,
+      servicePaths: SERVICE_PAGES.map((s) => s.path),
+    })
+  );
 });
 
 app.get('/llms.txt', async (req, res) => {
   const shows = await store.listShows();
-  res.type('text/plain').send(llmsTxt(shows));
+  res.type('text/plain').send(
+    llmsTxt(shows, {
+      posts: POSTS,
+      services: SERVICE_PAGES.map((s) => ({ title: s.navLabel, path: s.path, summary: s.summary })),
+    })
+  );
 });
 
 // ---- Public routes --------------------------------------------------------
@@ -555,6 +567,20 @@ app.get('/press', async (req, res) => {
   const items = await store.listPressItems({ limit: 200 });
   res.send(V.pressPage({ items }));
 });
+
+// ---- Resources (guides / blog) --------------------------------------------
+app.get('/resources', (req, res) => res.send(V.resourcesIndexPage({ posts: POSTS })));
+app.get('/resources/:slug', (req, res, next) => {
+  const post = getPost(req.params.slug);
+  if (!post) return next();
+  const related = POSTS.filter((p) => p.slug !== post.slug).slice(0, 2);
+  res.send(V.resourcePostPage({ post, related }));
+});
+
+// ---- Per-service landing pages --------------------------------------------
+for (const svc of SERVICE_PAGES) {
+  app.get(svc.path, (req, res) => res.send(V.servicePage(svc)));
+}
 
 app.get('/lp/:slug', async (req, res, next) => {
   const landing = await store.getLandingBySlug(req.params.slug);
@@ -775,6 +801,30 @@ app.use(async (req, res) => {
   }
 });
 
+// Fill in AI-written SEO meta descriptions for any shows still missing one.
+// Paced and best-effort: silently no-ops without an API key.
+async function backfillShowSeo() {
+  if (process.env.SHOW_SEO === 'off' || !aiConfigured()) return;
+  const shows = await store.listShows();
+  const missing = shows.filter((s) => !s.seo_description);
+  if (!missing.length) return;
+  console.log(`[seo] writing meta descriptions for ${missing.length} show(s)…`);
+  let done = 0;
+  for (const show of missing) {
+    try {
+      const text = await generateShowMetaDescription({ show, log: (m) => console.log('[seo]', m) });
+      if (text) {
+        await store.updateShow(show.id, { seo_description: text });
+        done++;
+      }
+    } catch (e) {
+      console.error('[seo] show', show.slug, 'failed:', e.message);
+    }
+    await new Promise((r) => setTimeout(r, 900)); // gentle pacing
+  }
+  console.log(`[seo] meta descriptions written for ${done}/${missing.length} shows`);
+}
+
 app.listen(PORT, async () => {
   console.log(`[strawhut-site] listening on :${PORT}`);
   console.log(`[strawhut-site] admin at /admin (password via ADMIN_PASSWORD env)`);
@@ -849,6 +899,11 @@ app.listen(PORT, async () => {
   // Homepage spotlight: prefer the most-downloaded shows (Megaphone); fall
   // back to the curated monthly rotation only if Megaphone isn't reachable.
   refreshSpotlight();
+
+  // Backfill unique, AI-written SEO meta descriptions for shows that don't have
+  // one yet. Runs once per boot in the background, paced to be gentle on the
+  // API; no-ops entirely if ANTHROPIC_API_KEY isn't set. Set SHOW_SEO=off to skip.
+  backfillShowSeo().catch((e) => console.error('[seo] show backfill failed:', e.message));
 
   // Pull press mentions in the background so the Press page is populated.
   refreshPress(store, { log: (m) => console.log('[press]', m) })

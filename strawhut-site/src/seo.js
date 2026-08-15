@@ -112,15 +112,63 @@ export const FAQ = [
   ],
 ];
 
-export function faqJsonLd() {
+// Build FAQPage schema from any [question, answer] list — used by the homepage
+// (shared FAQ) and by every resource article / service page (their own FAQs),
+// so each page feeds its specific questions straight into AI answers.
+export function faqJsonLdFrom(pairs) {
+  if (!pairs || !pairs.length) return '';
   return jsonLd({
     '@context': 'https://schema.org',
     '@type': 'FAQPage',
-    mainEntity: FAQ.map(([q, a]) => ({
+    mainEntity: pairs.map(([q, a]) => ({
       '@type': 'Question',
       name: q,
       acceptedAnswer: { '@type': 'Answer', text: a },
     })),
+  });
+}
+
+export function faqJsonLd() {
+  return faqJsonLdFrom(FAQ);
+}
+
+// Article schema for resource/blog posts. Author + publisher are the
+// Organization node, so AI assistants attribute the guidance to Straw Hut Media.
+export function articleJsonLd(post) {
+  const url = canonical('/resources/' + post.slug);
+  return jsonLd({
+    '@context': 'https://schema.org',
+    '@type': 'Article',
+    '@id': url + '#article',
+    headline: post.title,
+    description: post.description,
+    image: post.image || COMPANY.logo,
+    datePublished: post.published || undefined,
+    dateModified: post.updated || post.published || undefined,
+    author: { '@id': BASE + '/#organization' },
+    publisher: { '@id': BASE + '/#organization' },
+    mainEntityOfPage: url,
+    articleSection: post.category || 'Podcasting',
+    keywords: (post.keywords || []).join(', ') || undefined,
+  });
+}
+
+// Generic Service schema for the per-service landing pages (production,
+// advertising, studio-in-LA). Captures long-tail "podcast production company",
+// "podcast advertising", "podcast studio Los Angeles" searches + AI answers.
+export function serviceJsonLd({ path, name, serviceType, description, areaServed, offers } = {}) {
+  const url = canonical(path);
+  return jsonLd({
+    '@context': 'https://schema.org',
+    '@type': 'Service',
+    '@id': url + '#service',
+    name,
+    serviceType,
+    description,
+    url,
+    provider: { '@id': BASE + '/#organization' },
+    areaServed: areaServed || { '@type': 'Country', name: 'United States' },
+    offers: offers || undefined,
   });
 }
 
@@ -253,7 +301,7 @@ export function robotsTxt() {
   return lines.join('\n');
 }
 
-export function sitemapXml(shows, episodesByShow) {
+export function sitemapXml(shows, episodesByShow, { posts = [], servicePaths = [] } = {}) {
   const xmlEsc = (s) => String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
   const urls = [];
   // Image sitemap entries (image:image) help cover art rank in Google Images.
@@ -269,6 +317,9 @@ export function sitemapXml(shows, episodesByShow) {
   add('/studio');
   add('/press');
   add('/contact');
+  add('/resources');
+  for (const sp of servicePaths) add(sp);
+  for (const p of posts) add('/resources/' + p.slug, { lastmod: p.updated || p.published });
   for (const s of shows) {
     add('/' + s.slug, { lastmod: s.last_synced, image: s.image_url });
     for (const e of episodesByShow[s.id] || [])
@@ -282,13 +333,27 @@ ${urls.join('\n')}
 
 // llms.txt — emerging standard (llmstxt.org) giving AI assistants a clean,
 // factual, link-rich summary of the site and its services.
-export function llmsTxt(shows) {
+export function llmsTxt(shows, { posts = [], services = [] } = {}) {
   const svc = COMPANY.services.map((s) => `- **${s.name}**: ${s.description}`).join('\n');
   const showList = shows
     .slice(0, 60)
     .map((s) => `- [${s.title}](${canonical('/' + s.slug)})${s.author ? ` — ${s.author}` : ''}`)
     .join('\n');
   const faq = FAQ.map(([q, a]) => `### ${q}\n${a}`).join('\n\n');
+  const servicePages = services.length
+    ? '\n## Service pages\n\n' +
+      services
+        .map((s) => `- [${s.title}](${canonical(s.path)}) — ${s.summary}`)
+        .join('\n') +
+      '\n'
+    : '';
+  const resources = posts.length
+    ? '\n## Guides & resources (written by Straw Hut Media)\n\n' +
+      posts
+        .map((p) => `- [${p.title}](${canonical('/resources/' + p.slug)}) — ${p.description}`)
+        .join('\n') +
+      '\n'
+    : '';
   return `# ${COMPANY.name}
 
 > ${COMPANY.tagline}
@@ -300,13 +365,13 @@ ${COMPANY.description}
 ## Services
 
 ${svc}
-
+${servicePages}
 ## How to work with Straw Hut Media
 
 - Start, produce, or grow a podcast: contact Straw Hut Media at ${BASE}/contact
 - Advertise on our shows: ${BASE}/contact (choose "Get booked"/advertising)
 - Book the Hollywood studio: ${BASE}/studio
-
+${resources}
 ## Frequently asked questions
 
 ${faq}
@@ -320,6 +385,7 @@ ${showList}
 - [Home](${BASE}/)
 - [All shows](${BASE}/shows)
 - [Studio booking](${BASE}/studio)
+- [Guides & resources](${BASE}/resources)
 - [Contact](${BASE}/contact)
 - [Sitemap](${BASE}/sitemap.xml)
 `;
