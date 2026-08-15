@@ -603,9 +603,9 @@ export function servicePage(cfg) {
 // wordmark is shown. Keeping them uniform reads more premium than mismatched
 // raster logos — and swapping in real files later is a one-line change each.
 const CLIENTS = [
-  { name: 'Universal Pictures' },
-  { name: 'Disney' },
-  { name: 'Hulu' },
+  { name: 'Universal Pictures', logo: '/public/logos/universal-pictures.svg' },
+  { name: 'Disney', logo: '/public/logos/disney.svg' },
+  { name: 'Hulu', logo: '/public/logos/hulu.svg' },
   { name: 'Commune' },
   { name: 'Mekanism' },
   { name: 'Next City' },
@@ -640,7 +640,8 @@ export function aboutPage() {
   <section class="hero" style="padding-bottom:16px"><div class="container">
     <div class="breadcrumb" style="padding:0 0 14px"><a href="/">Home</a> / About</div>
     <h1>Think outside the <span class="accent">pod</span>.</h1>
-    <p>Straw Hut Media is an award-winning, full-service podcast production company and network based in Hollywood. Founded in 2017, we've helped creators, brands, and studios make podcasts people love — handling everything from concept and recording to editing, distribution, advertising, and growth. We produce our own original shows and partner with some of the biggest names in entertainment and marketing.</p>
+    <p>We're Straw Hut Media — an award-winning, full-service podcast production company and network, making shows out of Hollywood since 2017.</p>
+    <p>Here's the deal: we don't take ourselves too seriously, but we take your show dead seriously. We're the crew that'll crack jokes through a ten-hour edit and still sweat every cut, every breath, and every beat of sound design until it's exactly right. From first idea to chart-topping show, we do the whole thing — development, recording in our own studio, editing, distribution to every platform, advertising, and growth. We make our own award-winning originals and produce shows with some of the biggest names in entertainment and marketing. Big names, small egos.</p>
     <div style="margin-top:22px"><a class="btn btn-primary" href="/contact">Work with us</a> <a class="btn btn-ghost" href="/shows" style="margin-left:8px">Hear our shows</a></div>
   </div></section>
 
