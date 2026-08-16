@@ -608,9 +608,9 @@ const CLIENTS = [
   { name: 'Hulu', logo: '/public/logos/hulu.svg' },
   { name: 'Commune', logo: '/public/logos/commune.png' },
   { name: 'Mekanism' },
-  { name: 'Next City' },
-  { name: 'Plus Company' },
-  { name: 'We Are Social' },
+  { name: 'Next City', logo: '/public/logos/next-city.png' },
+  { name: 'Plus Company', logo: '/public/logos/plus-company.png', color: true },
+  { name: 'We Are Social', logo: '/public/logos/we-are-social.svg', color: true },
   { name: 'King Pleasure' },
   { name: 'Shaping Freedom' },
   { name: 'Phil Rosenthal' },
@@ -623,7 +623,7 @@ const TEAM = [];
 export function aboutPage() {
   const logos = CLIENTS.map((c) =>
     c.logo
-      ? `<span class="logo-item"><img src="${esc(c.logo)}" alt="${esc(c.name)}" loading="lazy"></span>`
+      ? `<span class="logo-item"><img class="${c.color ? 'logo-color' : ''}" src="${esc(c.logo)}" alt="${esc(c.name)}" loading="lazy"></span>`
       : `<span class="logo-item logo-word">${esc(c.name)}</span>`
   ).join('');
   const team = TEAM.length
