@@ -313,7 +313,7 @@ export function homePage({ shows }) {
   <section class="hero"><div class="container">
     <h1>Think outside the <span class="accent">pod</span>.</h1>
     <p>Straw Hut Media is an award-winning, full-service podcast production company and network. We take your show from first idea to chart-topping — production, distribution, monetization, and growth, all under one roof.</p>
-    <div style="margin-top:22px"><a class="btn btn-primary" href="/contact">Start a podcast with us</a> <a class="btn btn-ghost" href="/shows" style="margin-left:8px">Hear our shows</a></div>
+    <div style="margin-top:22px"><a class="btn btn-primary" href="/book">Book a 15-min fit call</a> <a class="btn btn-ghost" href="/shows" style="margin-left:8px">Hear our shows</a></div>
   </div></section>
   ${marquee}
 
@@ -357,7 +357,7 @@ export function homePage({ shows }) {
         }
       ).join('')}
     </div>
-    <p style="margin-top:24px"><a class="btn btn-primary" href="/contact">Work with Straw Hut Media →</a></p>
+    <p style="margin-top:24px"><a class="btn btn-primary" href="/book">Book a 15-min fit call →</a></p>
   </div></section>
 
   <section class="section" id="faq"><div class="container">
@@ -471,7 +471,7 @@ export function resourcesIndexPage({ posts }) {
     <div class="cta-band">
       <h2>Ready to make your podcast?</h2>
       <p>We take shows from first idea to chart-topping — production, distribution, and growth under one roof.</p>
-      <a class="btn btn-primary" href="/contact">Work with Straw Hut Media →</a>
+      <a class="btn btn-primary" href="/book">Book a 15-min fit call →</a>
     </div>
   </div></section>`;
   return layout({
@@ -512,8 +512,8 @@ export function resourcePostPage({ post, related = [] }) {
       <div class="article-body">${post.body_html}</div>
       <div class="cta-band">
         <h2>Want this done for you?</h2>
-        <p>Straw Hut Media is a full-service podcast production company and network. Tell us about your show and we'll map out exactly what it takes.</p>
-        <a class="btn btn-primary" href="/contact">Start a podcast with us →</a>
+        <p>Straw Hut Media is a full-service podcast production company and network. Book a quick call and we'll map out exactly what your show takes.</p>
+        <a class="btn btn-primary" href="/book">Book a 15-min fit call →</a>
       </div>
     </div>
   </article>
@@ -644,7 +644,7 @@ export function aboutPage() {
     <h1>Think outside the <span class="accent">pod</span>.</h1>
     <p>We're Straw Hut Media — an award-winning podcast production company and network, founded in Hollywood in 2017 and making podcasts since 2018.</p>
     <p>Anyone can hit record. Turning that into a show people won't stop listening to is the part we've spent years getting very good at.</p>
-    <div style="margin-top:22px"><a class="btn btn-primary" href="/contact">Work with us</a> <a class="btn btn-ghost" href="/shows" style="margin-left:8px">Hear our shows</a></div>
+    <div style="margin-top:22px"><a class="btn btn-primary" href="/book">Book a 15-min fit call</a> <a class="btn btn-ghost" href="/shows" style="margin-left:8px">Hear our shows</a></div>
   </div></section>
 
   <section class="section clients-band" id="clients"><div class="container">
@@ -657,7 +657,7 @@ export function aboutPage() {
   <section class="section"><div class="container"><div class="cta-band">
     <h2>Let's make something people love</h2>
     <p>From first idea to chart-topping show — production, distribution, and growth under one roof.</p>
-    <a class="btn btn-primary" href="/contact">Start a podcast with us →</a>
+    <a class="btn btn-primary" href="/book">Book a 15-min fit call →</a>
   </div></div></section>`;
   const personLd = TEAM.map((m) =>
     `<script type="application/ld+json">${JSON.stringify({
@@ -683,6 +683,42 @@ export function aboutPage() {
         { name: 'About', path: '/about' },
       ]) +
       (personLd ? '\n' + personLd : ''),
+  });
+}
+
+// --- Book a call (GoHighLevel-backed 15-min fit call) -----------------------
+
+export function bookPage({ widgetUrl = '' } = {}) {
+  const embed = widgetUrl
+    ? `<iframe src="${esc(widgetUrl)}" title="Book a 15-minute call with Straw Hut Media" scrolling="no" id="shmBookingWidget" style="width:100%;min-height:740px;border:1px solid var(--border);border-radius:14px;background:#fff"></iframe>
+       <script src="https://link.msgsndr.com/js/form_embed.js"></script>`
+    : `<div class="booking-note"><h3>Our scheduler is being connected</h3><p>Give us one sec to wire up the calendar. In the meantime, <a href="/contact">send us a quick note</a> and we'll get your 15-minute call on the books.</p></div>`;
+  const body = `
+  <section class="hero" style="padding-bottom:16px"><div class="container">
+    <div class="breadcrumb" style="padding:0 0 14px"><a href="/">Home</a> / Book a call</div>
+    <h1>Let's see if we're a <span class="accent">good fit</span></h1>
+    <p>Book a free 15-minute call. Tell us about your show or your idea, and we'll tell you honestly whether — and how — we can help. No slides, no hard sell, no obligation.</p>
+  </div></section>
+  <section class="section" style="padding-top:8px"><div class="container">
+    <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(220px,1fr));margin-bottom:28px">
+      <article class="show-card" style="padding:20px 22px"><h3 style="margin-top:0">What we'll cover</h3><p class="meta" style="line-height:1.55">Your idea or existing show, what you're trying to build, and wherever you're stuck.</p></article>
+      <article class="show-card" style="padding:20px 22px"><h3 style="margin-top:0">What you'll leave with</h3><p class="meta" style="line-height:1.55">A straight answer on whether we're the right partner — and the smartest next step either way.</p></article>
+      <article class="show-card" style="padding:20px 22px"><h3 style="margin-top:0">How long</h3><p class="meta" style="line-height:1.55">Fifteen minutes. That's genuinely it.</p></article>
+    </div>
+    ${embed}
+  </div></section>
+  <script>window.shmTrack&&shmTrack('book_call_view',{});</script>`;
+  return layout({
+    title: 'Book a 15-Minute Fit Call — Straw Hut Media',
+    description:
+      "Book a free 15-minute call with Straw Hut Media to see if we're the right podcast production partner for your show. No pressure, no hard sell.",
+    body,
+    activeNav: '',
+    path: '/book',
+    jsonLd: breadcrumbJsonLd([
+      { name: 'Home', path: '/' },
+      { name: 'Book a call', path: '/book' },
+    ]),
   });
 }
 

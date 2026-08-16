@@ -545,6 +545,11 @@ app.get('/studio', (req, res) => res.send(V.studioPage()));
 
 app.get('/about', (req, res) => res.send(V.aboutPage()));
 
+// 15-minute "are we a fit" discovery call, booked through GoHighLevel so leads
+// land in the CRM. Set BOOKING_WIDGET_URL to the GHL calendar embed URL.
+const BOOKING_WIDGET_URL = process.env.BOOKING_WIDGET_URL || '';
+app.get('/book', (req, res) => res.send(V.bookPage({ widgetUrl: BOOKING_WIDGET_URL })));
+
 app.get('/contact', (req, res) => res.send(V.contactPage()));
 app.post('/contact', async (req, res) => {
   const { name = '', email = '', company = '', message = '', topic = 'general' } = req.body || {};

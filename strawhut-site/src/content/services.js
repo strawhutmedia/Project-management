@@ -17,7 +17,7 @@ export const SERVICE_PAGES = [
     hero: {
       h1: 'Full-service <span class="accent">podcast production</span>',
       dek: 'From first idea to chart-topping show — one award-winning team handles production, distribution, and growth, so you can just be the host.',
-      cta: { label: 'Start your podcast', href: '/contact' },
+      cta: { label: 'Book a 15-min fit call', href: '/book' },
     },
     intro:
       'Straw Hut Media is a full-service podcast production company and network based in Hollywood. Whether you are launching a brand-new show or leveling up an existing one, we own the entire process — concept, recording, editing, sound design, publishing, distribution, and audience growth — so you get a professional, chart-competitive podcast without hiring and managing a team of specialists.',
