@@ -608,12 +608,12 @@ const CLIENTS = [
   { name: 'Hulu', logo: '/public/logos/hulu.svg' },
   { name: 'Commune', logo: '/public/logos/commune.png' },
   { name: 'Mekanism' },
-  { name: 'Next City', logo: '/public/logos/next-city.png' },
+  { name: 'Next City', logo: '/public/logos/next-city.png', dark: true },
   { name: 'Plus Company', logo: '/public/logos/plus-company.svg' },
-  { name: 'We Are Social', logo: '/public/logos/we-are-social.png' },
+  { name: 'We Are Social', logo: '/public/logos/we-are-social.svg' },
   { name: 'King Pleasure' },
   { name: 'Shaping Freedom', logo: '/public/logos/shaping-freedom.webp' },
-  { name: 'Phil Rosenthal', logo: '/public/logos/phil-rosenthal.webp' },
+  { name: 'Phil Rosenthal', logo: '/public/logos/phil-rosenthal.webp', dark: true },
   { name: 'Gayety', logo: '/public/logos/gayety.png' },
   { name: 'Kiss the Ground' },
 ];
@@ -625,7 +625,7 @@ const TEAM = [];
 export function aboutPage() {
   const logos = CLIENTS.map((c) =>
     c.logo
-      ? `<span class="logo-item"><img class="${c.color ? 'logo-color' : ''}" src="${esc(c.logo)}" alt="${esc(c.name)}" loading="lazy"></span>`
+      ? `<span class="logo-item"><img class="${c.dark ? 'logo-dark' : ''}" src="${esc(c.logo)}" alt="${esc(c.name)}" loading="lazy"></span>`
       : `<span class="logo-item logo-word">${esc(c.name)}</span>`
   ).join('');
   const team = TEAM.length
@@ -647,7 +647,7 @@ export function aboutPage() {
     <div style="margin-top:22px"><a class="btn btn-primary" href="/contact">Work with us</a> <a class="btn btn-ghost" href="/shows" style="margin-left:8px">Hear our shows</a></div>
   </div></section>
 
-  <section class="section" id="clients"><div class="container">
+  <section class="section clients-band" id="clients"><div class="container">
     <div class="section-head"><h2>Trusted by</h2></div>
     <div class="logo-wall">${logos}</div>
   </div></section>

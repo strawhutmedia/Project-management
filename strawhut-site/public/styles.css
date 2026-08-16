@@ -456,12 +456,20 @@ table.admin-table { width: 100%; border-collapse: collapse; }
 .logo-item:hover { opacity: 1; }
 .logo-item img {
   max-width: 100%; max-height: 100%; width: auto; object-fit: contain;
-  filter: brightness(0) invert(1);
 }
+/* White-only logos (shipped as knockouts) recolored dark so they read on the
+   white band — a color-only change, leaving the artwork itself untouched. */
+.logo-item img.logo-dark { filter: brightness(0); }
 .logo-word {
-  font-size: 1.05rem; font-weight: 600; letter-spacing: 0.01em; color: var(--text);
+  font-size: 1.05rem; font-weight: 600; letter-spacing: 0.01em; color: #12182f;
   white-space: nowrap; text-align: center;
 }
+
+/* The "Trusted by" block is a white band so every logo shows in its true
+   colors (per brand-logo convention of a light background). */
+.clients-band { background: #ffffff; }
+.clients-band .section-head h2 { color: #12182f; }
+.clients-band .logo-item { opacity: 1; }
 .team-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 16px; }
 .team-member {
   display: flex; flex-direction: column; gap: 2px; padding: 16px 18px;
