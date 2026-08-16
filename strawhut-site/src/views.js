@@ -614,6 +614,8 @@ const CLIENTS = [
   { name: 'King Pleasure' },
   { name: 'Shaping Freedom', logo: '/public/logos/shaping-freedom.webp' },
   { name: 'Phil Rosenthal', logo: '/public/logos/phil-rosenthal.webp' },
+  { name: 'Gayety', logo: '/public/logos/gayety.png' },
+  { name: 'Kiss the Ground' },
 ];
 
 // Team — names + roles only (no photos, by design). Fill this in and each
