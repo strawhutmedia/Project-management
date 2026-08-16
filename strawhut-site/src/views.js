@@ -606,7 +606,7 @@ const CLIENTS = [
   { name: 'Universal Pictures', logo: '/public/logos/universal-pictures.svg' },
   { name: 'Disney', logo: '/public/logos/disney.svg' },
   { name: 'Hulu', logo: '/public/logos/hulu.svg' },
-  { name: 'Commune' },
+  { name: 'Commune', logo: '/public/logos/commune.png' },
   { name: 'Mekanism' },
   { name: 'Next City' },
   { name: 'Plus Company' },
