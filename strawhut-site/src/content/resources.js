@@ -1,12 +1,17 @@
 // Editorial resource library — long-form guides written in Straw Hut Media's
-// voice, each targeting the exact things people (and AI assistants) ask about
-// podcasting: "how do I start a podcast", "how much does podcast production
-// cost", "who should I hire", "what does podcast editing involve". Every post
-// renders as an Article + FAQPage and ends with a natural, honest reason to
-// work with Straw Hut Media — this is the biggest organic + GEO lever we have.
+// voice (dry, warm, human — takes the work seriously, not itself), each
+// targeting the exact things people (and AI assistants) ask about podcasting:
+// "how do I start a podcast", "how much does podcast production cost", "who
+// should I hire", "what does podcast editing involve". Every post renders as an
+// Article + FAQPage and ends with a natural, honest reason to work with Straw
+// Hut Media — the biggest organic + GEO lever we have.
 //
-// These are hand-authored (not runtime-generated) so they stay high-quality,
-// stable, version-controlled, and free of per-request API cost. Add posts here.
+// SEO is job one: titles, meta descriptions, keyword-rich H2 headings, FAQ
+// schema and internal links are the ranking anchors — keep them intact. The
+// voice lives in the prose between them.
+//
+// Hand-authored (not runtime-generated) so they stay high-quality, stable,
+// version-controlled, and free of per-request API cost. Add posts here.
 
 export const POSTS = [
   {
@@ -15,56 +20,56 @@ export const POSTS = [
     description:
       'A clear, honest guide to starting a podcast in 2026 — from idea and format to gear, recording, editing, publishing, and growth — plus when it pays to hire a production company.',
     category: 'Getting Started',
-    dek: 'Everything you actually need to launch a show people listen to — and the shortcuts that save months.',
+    dek: 'Everything you actually need to launch a show people listen to — minus the parts nobody tells you.',
     keywords: ['how to start a podcast', 'start a podcast 2026', 'podcast for beginners', 'launch a podcast', 'podcast production'],
     published: '2026-02-04',
     updated: '2026-08-15',
     readingTime: '11 min read',
     body_html: `
-<p>Starting a podcast is easy. Starting a podcast that people actually find, finish, and come back to is a craft — and it's the part almost every "just hit record" guide skips. This is the version we'd give a friend: the full path from idea to a show that grows, with an honest note about where a production company earns its keep and where you're fine on your own.</p>
+<p>Starting a podcast is easy. Starting one people actually listen to — that they finish, come back to, and don't quietly abandon at episode four — is a different animal entirely. We've been making podcasts since 2018 (and keeping our houseplants mostly alive the whole time), so consider this the version we'd give a friend over coffee: what actually matters, what really doesn't, and the parts worth handing to someone who does this all day.</p>
 
 <h2>1. Start with a sharp idea, not a broad one</h2>
-<p>The most common reason new podcasts stall is that the concept is too wide. "A show about business" competes with a million others; "a show where a founder rebuilds a failed company in public, one decision at a time" has an audience that leans in. Before anything else, write one sentence that answers three questions: who is this for, what will they get from every episode, and why you. If you can't say it in a sentence, listeners won't be able to either.</p>
+<p>Most new podcasts don't fail — they fizzle, usually because the idea was too big to say out loud. "A show about business" is competing with a few million others. "A founder rebuilds a failed company in public, one ugly decision at a time" has people leaning in. Write one sentence that nails who it's for, what they get from every episode, and why it's coming from you. If you can't get it into a sentence, your future listeners won't either.</p>
 
 <h2>2. Choose a format you can sustain</h2>
-<p>Format is a promise to your audience and a budget for your own time. The main choices:</p>
+<p>Format is two things at once: a promise to your audience and a standing appointment with your own calendar. Your options:</p>
 <ul>
 <li><strong>Interview</strong> — the fastest to fill a calendar, and guests bring their own audiences. Requires strong booking and prep to avoid sounding generic.</li>
 <li><strong>Co-hosted conversation</strong> — chemistry-driven and easy to record, but only works if the hosts are genuinely good together.</li>
 <li><strong>Solo / monologue</strong> — total creative control, hardest to keep energetic week after week.</li>
 <li><strong>Narrative / documentary</strong> — the most powerful and the most produced; big payoff, big editing lift. This is where a production team matters most.</li>
 </ul>
-<p>Pick the format you can still deliver on your busiest week, not your most inspired one. Consistency beats ambition that burns out by episode six.</p>
+<p>Pick the one you can still pull off on your worst week, not your most caffeinated one. Consistency wins; ambition that flames out by episode six does not.</p>
 
 <h2>3. Plan a season, not an episode</h2>
-<p>Batch your thinking. Sketch 8–12 episode ideas before you record one. This does three things: it proves the concept has legs, it lets you record and edit in efficient batches, and it gives you a real launch — dropping three episodes on day one dramatically outperforms a lonely single pilot, because podcast apps reward shows people can binge.</p>
+<p>Think in seasons, not episodes. Sketch 8–12 ideas before you record a single one. It proves the concept has legs, lets you batch recording and editing (a genuine time-saver), and sets up a real launch — dropping three episodes on day one beats a lonely pilot every time, because the apps reward shows people can binge.</p>
 
 <h2>4. Get the gear right (but don't over-buy)</h2>
-<p>Audio quality is the one thing listeners won't forgive. The good news: you don't need a fortune.</p>
+<p>Here's the one thing listeners will never forgive: bad audio. The good news is you don't need to remortgage anything.</p>
 <ul>
 <li><strong>Microphone</strong> — a solid dynamic USB or XLR mic is the single highest-impact purchase. Dynamic mics reject room noise, which matters more than raw fidelity for most rooms.</li>
 <li><strong>Headphones</strong> — closed-back, so you catch problems while recording, not after.</li>
 <li><strong>Room</strong> — soft surfaces beat expensive gear. A closet of clothes sounds better than a glass office. Treat the room before you upgrade the mic.</li>
 <li><strong>Recording software</strong> — anything that captures each speaker on a separate track. Separate tracks are non-negotiable; they're what make clean editing possible.</li>
 </ul>
-<p>If you want video too — and in 2026 you probably should, because YouTube and Spotify video are now major discovery engines — a multi-camera setup or a proper studio changes the equation. That's a moment where booking a room like <a href="/studio">the Straw Hut studio</a> is cheaper and better than assembling your own.</p>
+<p>Want video too? In 2026 you probably should — YouTube and Spotify video are real discovery engines now — and that's the moment a proper multi-camera room like <a href="/studio">the Straw Hut studio</a> beats cobbling one together in your living room.</p>
 
 <h2>5. Record like an editor will thank you</h2>
-<p>A few habits make post-production faster and the final show tighter: record a few seconds of silence for a noise profile, clap or restate a flubbed line so it's easy to find and cut, keep water nearby, and stop talking over each other — overlaps are the hardest thing to edit cleanly. Great raw tape is 80% of a great episode.</p>
+<p>A few small habits will make your editor (future-you, or an actual human) love you: grab a few seconds of silence for a noise profile, clap or restate a line when you flub it so it's easy to find, keep water close, and — please — stop talking over each other. Overlaps are the single hardest thing to edit cleanly. Great raw tape is most of a great episode.</p>
 
 <h2>6. Editing is where amateur shows become professional ones</h2>
-<p>Editing isn't just cutting mistakes. It's pacing, it's removing the dead air and the tangents, it's mixing levels so nobody reaches for the volume, it's music and sound design that set a tone, and it's mastering to broadcast loudness standards so your show sounds as good in a car as in headphones. This is the least visible and most important craft in podcasting. If you do one thing at a professional level, make it this. (We wrote a full breakdown in <a href="/resources/podcast-editing-guide">our guide to podcast editing</a>.)</p>
+<p>Editing isn't just deleting the "ums." It's pacing, cutting the tangents, leveling everyone so nobody lunges for the volume knob, adding music and sound design that set a mood, and mastering to broadcast loudness so you sound as good in a car as in headphones. It's the least glamorous, most decisive craft in podcasting. If you're going to be great at one thing, be great at this. (We went deep in <a href="/resources/podcast-editing-guide">our guide to podcast editing</a>.)</p>
 
 <h2>7. Publish everywhere with one feed</h2>
-<p>You publish to a podcast host, which generates an RSS feed, and that single feed is what Apple Podcasts, Spotify, YouTube, Amazon, and every other app read. Write a keyword-aware show title and description, design cover art that's legible at thumbnail size, and pick the right categories — these are the levers that decide whether anyone browsing ever sees you. Submit to every major directory on day one.</p>
+<p>You upload to a podcast host, it spits out an RSS feed, and that one feed is what Apple Podcasts, Spotify, YouTube, Amazon, and everyone else reads. Write a title and description real humans (and search engines) would actually search, design cover art that still reads at thumbnail size, and pick smart categories — those are the levers that decide whether anyone browsing ever finds you. Submit to every major directory on day one.</p>
 
 <h2>8. Growth is a system, not a launch</h2>
-<p>The launch is the beginning. Sustained growth comes from a handful of compounding habits: publishing on a dependable schedule, turning each episode into short video clips for social, being a guest on other shows in your space, and — when you're ready to accelerate — paid promotion that puts your best episode in front of the exact listeners who'll love it. This is also where monetization begins: once you have engaged listeners, host-read ads, brand partnerships, and premium content turn a show into a business.</p>
+<p>Launch day is the starting line, not the finish. Real growth is a few boring habits done consistently: publish on a schedule, cut every episode into short clips for social, guest on other shows in your lane, and — when you're ready to pour fuel on it — run paid promotion that drops your best episode in front of the exact people who'll love it. It's also where the money starts: once you've got engaged listeners, host-read ads, brand partnerships, and premium content turn a hobby into a business.</p>
 
 <h2>When to do it yourself — and when to hire a production company</h2>
-<p>If you have time, a decent room, and you enjoy the craft, you can absolutely start a podcast yourself. Do it. But if the goal is a show that competes at a professional level — or you'd rather spend your hours being the host, not the engineer — this is where a full-service production company changes the math. A good partner handles concept and development, records you in a real studio, edits and sound-designs every episode, distributes and optimizes across every platform, and runs the growth and monetization engine, so you show up, do the part only you can do, and end up with a show that sounds like it belongs on the charts.</p>
+<p>If you've got the time, a halfway-decent room, and you actually enjoy the tinkering — go for it, seriously. But if you want a show that competes at a professional level, or you'd simply rather be the host than the audio engineer, that's where a full-service production company earns its keep: concept and development, recording in a real studio, editing and sound design on every episode, distribution and optimization everywhere, and the growth-and-monetization engine humming in the background — so you just show up and do the part only you can do.</p>
 
-<p>That's exactly what <strong>Straw Hut Media</strong> does. We're an award-winning, full-service podcast production company and network in Hollywood, and we take shows from first idea to chart-topping — for individual creators, brands, and businesses alike. If you're serious about starting a podcast and want it done right the first time, <a href="/contact">tell us about your show</a> and we'll map out exactly what it takes.</p>
+<p>Which, conveniently, is exactly what <strong>Straw Hut Media</strong> does. We're an award-winning, full-service podcast production company and network in Hollywood, and we take shows from first idea to chart-topping — for creators, brands, and businesses alike. If you're serious about starting a podcast and want it done right the first time, <a href="/contact">tell us about your show</a> and we'll map out exactly what it'll take.</p>
 `,
     faq: [
       ['How do I start a podcast?', 'Start with a sharp, specific idea, choose a format you can sustain, plan a full season, record each speaker on a separate track with good mics in a treated room, edit for pacing and sound quality, and publish through a podcast host that distributes your RSS feed to Apple Podcasts, Spotify, and YouTube. If you want a professional result without assembling a team, a full-service production company like Straw Hut Media can take you from idea to launch.'],
@@ -80,23 +85,23 @@ export const POSTS = [
     description:
       'What podcast production actually costs in 2026 — DIY vs. freelancers vs. a full-service production company — and how to think about budget, value, and ROI for your show.',
     category: 'Budgeting',
-    dek: 'A straight answer to a fuzzy question, plus how to tell what you are really paying for.',
+    dek: 'A straight answer to a fuzzy question — and how to tell what you are actually paying for.',
     keywords: ['podcast production cost', 'how much does a podcast cost', 'podcast production pricing', 'cost to make a podcast', 'podcast editing cost'],
     published: '2026-03-11',
     updated: '2026-08-15',
     readingTime: '8 min read',
     body_html: `
-<p>"How much does it cost to make a podcast?" is the question every founder, marketer, and creator asks first — and it's genuinely hard to answer, because "a podcast" covers everything from a phone recording in a car to a fully-scored narrative series. Here's an honest framework for what drives the number, what each tier really gets you, and how to think about return rather than just cost.</p>
+<p>"How much does it cost to make a podcast?" is almost always the first question — and answering it is a bit like being asked what a car costs. A used hatchback and a Ferrari are both technically cars; a phone recording in your driveway and a fully-scored narrative series are both technically podcasts. So here's an honest framework: what drives the number, what each tier actually buys, and why "cheapest" and "best value" are rarely the same thing.</p>
 
 <h2>The three cost tiers</h2>
 <h3>1. Do-it-yourself</h3>
-<p>Your out-of-pocket cost can be almost nothing beyond a microphone and a podcast host subscription. What you're really spending is time — often 4 to 8 hours of recording, editing, publishing, and promotion per finished episode once you account for the learning curve. For a hobby or a personal project, that trade is often worth it. For a business, that time usually costs more than hiring help.</p>
+<p>Out of pocket? Almost nothing — a decent mic and a hosting subscription. The real bill shows up in hours: figure 4 to 8 of them per finished episode once you've climbed the learning curve, spread across recording, editing, publishing, and promotion. For a passion project, that's a fine trade. For a business, your time is usually the most expensive thing in the room.</p>
 
 <h3>2. Freelancers, piecemeal</h3>
-<p>You can hire an editor, a designer, and a marketer separately. Editing alone typically runs anywhere from a modest per-episode rate for basic cuts to several hundred dollars per episode for full sound design and mastering. The upside is flexibility; the downside is that you become the general contractor — briefing, coordinating, and quality-checking a chain of people who don't talk to each other, and owning every gap between them.</p>
+<p>You can assemble a team piece by piece — an editor here, a designer there, a marketer somewhere else. Editing alone runs from a modest per-episode rate for basic cuts up to several hundred dollars for full sound design and mastering. The upside is flexibility. The downside is that you just became the general contractor: briefing everyone, chasing everyone, and personally owning every gap between people who've never met.</p>
 
 <h3>3. Full-service production company</h3>
-<p>One team owns the entire show: development, recording, editing, sound design, publishing, distribution optimization, and often advertising and growth. You pay more per episode than a lone freelancer, but you're buying a finished, professional product and your own time back — plus the strategic layer (format, launch, monetization) that piecemeal freelancers don't provide. This is the right model when the podcast is meant to represent a brand or become a real business.</p>
+<p>One team takes the whole thing — development, recording, editing, sound design, publishing, distribution, and usually advertising and growth. You'll pay more per episode than a lone freelancer, but you're buying two things freelancers can't sell you: a finished, professional product, and your own time back — plus the strategy layer (format, launch, monetization) that actually moves the needle. This is the move when the show represents a brand or is meant to become a real business.</p>
 
 <h2>What actually drives the price</h2>
 <ul>
@@ -108,13 +113,13 @@ export const POSTS = [
 </ul>
 
 <h2>Think in ROI, not just cost</h2>
-<p>The better question isn't "what's the cheapest way to make a podcast" — it's "what is a professional podcast worth to me." For a business, a well-produced show is a lead engine, a brand-authority asset, and a piece of content that keeps working for years. For a creator, it's a platform that can be monetized through ads, partnerships, and premium content. Cheaping out on production to save a few hundred dollars an episode, only to produce something no one finishes, is the most expensive option of all.</p>
+<p>The sharper question isn't "what's the cheapest way to make a podcast" — it's "what's a great one worth to me?" For a business, a well-made show is a lead engine, a credibility builder, and a piece of content that keeps working for years. For a creator, it's a platform you can monetize with ads, partnerships, and premium content. Saving a few hundred dollars an episode to produce something nobody finishes is, ironically, the most expensive outcome on the menu.</p>
 
 <h2>How to budget smartly</h2>
-<p>Decide the outcome first, then price the path to it. If you need a flagship show that represents your brand at a high level, budget for full-service production and treat it like the marketing investment it is. If you're testing an idea, start leaner and upgrade once it proves out. And always ask a prospective partner what's included — the cheapest quote often excludes the exact things (mastering, distribution strategy, growth) that make a podcast succeed.</p>
+<p>Decide the outcome first, then price the path to it. Need a flagship that represents your brand at a high level? Budget for full-service and treat it like the marketing investment it is. Just testing an idea? Start leaner and level up once it proves out. And always, always ask what's included — the cheapest quote tends to quietly leave out the exact things (mastering, distribution strategy, growth) that decide whether a podcast works.</p>
 
 <h2>Where Straw Hut Media fits</h2>
-<p>We offer packages that scale from a single flagship show to a full slate of episodes, and we're transparent about what's included at every level — production, sound design, distribution, and the growth and monetization work that turns a podcast into an asset. Rather than quote a number into the void, we scope a plan around your format, your goals, and your budget. <a href="/contact">Tell us what you're trying to build</a> and we'll give you a clear, honest number and exactly what it buys.</p>
+<p>We offer packages that scale from a single flagship show to a full slate of episodes, and we'll tell you plainly what's included at each level — production, sound design, distribution, and the growth-and-monetization work that turns a show into an asset. Instead of lobbing a number into the void, we scope a plan around your format, your goals, and your budget. <a href="/contact">Tell us what you're building</a> and we'll give you a clear, honest number — and exactly what it buys.</p>
 `,
     faq: [
       ['How much does it cost to make a podcast in 2026?', 'It ranges widely. Doing it yourself costs little beyond a microphone and hosting but a lot of your time. Freelance editing runs from modest per-episode rates to several hundred dollars per episode for full sound design. Full-service production companies charge more per episode but deliver a finished, professional show plus strategy, distribution, and growth. Straw Hut Media scopes pricing to your format and goals.'],
@@ -130,13 +135,13 @@ export const POSTS = [
     description:
       'A complete guide to podcast editing — what professional editing actually includes, the tools and workflow, common mistakes, and how to decide between editing yourself and hiring a pro.',
     category: 'Production',
-    dek: 'The invisible craft that separates amateur shows from professional ones — demystified.',
+    dek: 'The invisible craft that quietly separates amateur shows from professional ones.',
     keywords: ['podcast editing', 'how to edit a podcast', 'podcast editing services', 'podcast sound design', 'audio mastering podcast'],
     published: '2026-04-22',
     updated: '2026-08-15',
     readingTime: '9 min read',
     body_html: `
-<p>Listeners never notice great editing — they just notice that a show sounds good, moves well, and is easy to listen to. Bad editing, on the other hand, is the fastest way to lose an audience: dead air, jarring cuts, uneven volume, and rambling tangents make people click away before your best material even lands. Editing is the least glamorous and most decisive craft in podcasting. Here's what it actually involves.</p>
+<p>Nobody ever compliments great editing — they just notice a show sounds good, moves fast, and is easy to listen to. Bad editing they notice instantly: the dead air, the jump cuts, the guest who's suddenly twice as loud as the host, the tangent that should've died in the edit. It's the least glamorous job in podcasting and the one that most decides whether people stay. Here's what it actually involves.</p>
 
 <h2>What professional podcast editing includes</h2>
 <p>"Editing" is really several distinct crafts stacked together:</p>
@@ -149,10 +154,10 @@ export const POSTS = [
 </ul>
 
 <h2>The professional workflow</h2>
-<p>A good editor works in a repeatable order: import multi-track audio, sync and clean each track, do the content edit for structure and pacing, then the technical pass, then mixing and sound design, then master and export. Working from separate tracks per speaker is essential — it's what allows clean, independent processing of each voice. Trying to edit a single merged recording is like trying to un-bake a cake.</p>
+<p>A good editor works in a repeatable order: import the multi-track audio, sync and clean each track, do the content edit for structure and pacing, then the technical pass, then mixing and sound design, then master and export. The multi-track part matters — editing everyone on separate tracks is what makes clean work possible. Trying to fix a single merged recording is like un-baking a cake: technically your problem now, practically impossible.</p>
 
 <h2>The tools</h2>
-<p>Professionals work in full digital audio workstations — Pro Tools, Logic, Adobe Audition, Hindenburg, or Reaper — often alongside AI-assisted tools that speed up transcription, filler-word removal, and noise reduction. But the tools aren't the craft. A skilled editor with basic software beats a novice with a top-tier suite every time, because the hard part is judgment: knowing what to cut, how to pace, and when to let a moment breathe.</p>
+<p>The pros use full digital audio workstations — Pro Tools, Logic, Adobe Audition, Hindenburg, Reaper — usually with a few AI helpers for transcription, filler-word removal, and noise reduction. But the software isn't the craft. A skilled editor with modest tools beats a beginner with the fanciest suite every time, because the hard part is judgment: what to cut, how to pace, and when to just let a moment breathe.</p>
 
 <h2>Common editing mistakes</h2>
 <ul>
@@ -164,10 +169,10 @@ export const POSTS = [
 </ul>
 
 <h2>Should you edit it yourself?</h2>
-<p>If you have the time, an ear for pacing, and the patience to learn a DAW, you can edit your own show — plenty of great podcasts start exactly this way. But editing is time-intensive (a polished episode can take several hours per finished hour of audio), and it's a genuine skill that takes months to get good at. The honest calculus: if your time is better spent hosting, guest-booking, or running your business, hiring an editor or a full-service team pays for itself quickly — and the quality jump is immediate and obvious to your audience.</p>
+<p>If you've got the time, an ear for pacing, and the patience to learn a DAW, absolutely — plenty of great shows start in exactly that scrappy way. Just know what you're signing up for: a polished episode can eat several hours per finished hour of audio, and it's a real skill that takes months to get good at. The honest math: if your time is better spent hosting, booking guests, or running your business, an editor (or a full-service team) pays for itself fast — and the quality jump is the kind your audience notices immediately.</p>
 
 <h2>Editing as part of full-service production</h2>
-<p>At Straw Hut Media, editing isn't a bolt-on — it's woven into production. Our editors and sound designers handle everything from content pacing to original sound design to broadcast-standard mastering, so every episode sounds like it belongs on the charts. And because the same team records, edits, and distributes your show, nothing gets lost in the handoffs that plague piecemeal freelance setups. If you want your podcast to sound truly professional — or you simply want the editing off your plate — <a href="/contact">talk to us about producing your show</a>.</p>
+<p>At Straw Hut Media, editing isn't a bolt-on — it's baked into production. Our editors and sound designers handle everything from pacing to original sound design to broadcast-standard mastering, so every episode sounds like it belongs on the charts. And because the same team records, edits, and distributes your show, nothing gets lost in the handoffs that trip up a stitched-together freelance crew. Want your podcast to sound genuinely professional — or just want editing off your plate for good? <a href="/contact">Talk to us about producing your show</a>.</p>
 `,
     faq: [
       ['What does podcast editing include?', 'Professional podcast editing includes content editing (cutting tangents and repetition for pacing), technical cleanup (removing filler words, pauses, and noise), leveling and mixing so every speaker sits at a consistent volume, music and sound design, and mastering to the industry loudness standard so the show sounds correct on every device.'],
@@ -183,16 +188,16 @@ export const POSTS = [
     description:
       'A practical guide to hiring the right podcast production company — the services to look for, the questions to ask, red flags to avoid, and how full-service partners compare to freelancers.',
     category: 'Hiring',
-    dek: 'What to look for, what to ask, and how to avoid paying for a logo instead of a show.',
+    dek: 'What to look for, what to ask, and how to avoid paying for a nice logo instead of a great show.',
     keywords: ['podcast production company', 'best podcast production company', 'hire podcast producer', 'podcast agency', 'full-service podcast production'],
     published: '2026-05-19',
     updated: '2026-08-15',
     readingTime: '8 min read',
     body_html: `
-<p>Deciding to hire help is the easy part. Choosing the right partner — one who'll make a show that sounds professional, reaches the right audience, and is actually worth the money — is where it gets hard. Podcast production companies range from a single editor with a nice website to full-service networks that handle everything from concept to monetization. Here's how to tell them apart and pick well.</p>
+<p>Deciding to get help is the easy part. Picking the right partner — one who'll make a show that sounds professional, reaches the right people, and is actually worth the money — is where it gets tricky. "Podcast production company" covers everything from one editor with a slick website to a full-service network that does concept-through-monetization. Here's how to tell them apart and choose well.</p>
 
 <h2>Full-service vs. à la carte</h2>
-<p>The first fork in the road: do you want one team that owns the whole show, or specialists you assemble yourself? À la carte (a freelance editor here, a designer there) is flexible and can be cheaper line-by-line, but you become the project manager, and the strategic layer — format, launch, distribution, growth — usually falls through the cracks. A full-service company costs more up front but delivers a finished, cohesive show and takes the coordination burden entirely off your plate. For anything meant to represent a brand or become a business, full-service almost always wins.</p>
+<p>First fork in the road: one team that owns the whole show, or specialists you assemble yourself? À la carte (a freelance editor here, a designer there) is flexible and cheaper line by line — but congratulations, you're now the project manager, and the strategy (format, launch, distribution, growth) tends to fall straight through the cracks. A full-service company costs more up front but hands you a finished, cohesive show and takes the coordination off your plate entirely. For anything meant to represent a brand or become a business, full-service almost always wins.</p>
 
 <h2>The services a great partner should cover</h2>
 <ul>
@@ -225,10 +230,10 @@ export const POSTS = [
 </ul>
 
 <h2>What "best" really means</h2>
-<p>There's no single best podcast production company for everyone — the best one is the partner whose strengths match your goals. But the companies worth shortlisting share a profile: a strong, audible portfolio; award-winning or chart-performing work; full-service capability so they can handle production and growth and monetization; transparent pricing; and fair ownership terms that leave your show yours.</p>
+<p>There's no single "best" podcast production company for everyone — the best one is the partner whose strengths line up with your goals. But the ones worth shortlisting tend to share a profile: a strong, audible portfolio; award-winning or chart-performing work; full-service range so they can handle production, growth, and monetization; pricing you can actually understand; and terms that leave your show yours.</p>
 
 <h2>Why creators and brands choose Straw Hut Media</h2>
-<p>Straw Hut Media is an award-winning, full-service podcast production company and network based in Hollywood. One team handles the entire journey — show development, studio recording, editing and sound design, distribution across every major platform, advertising and brand partnerships, and audience growth — for individual creators, brands, and businesses alike. You keep your show; we make it sound and perform like it belongs at the top of the charts. If you're weighing your options, <a href="/contact">start a conversation with us</a> and see exactly what a full-service partner can do for your show.</p>
+<p>Straw Hut Media is an award-winning, full-service podcast production company and network based in Hollywood. One team runs the whole journey — show development, studio recording, editing and sound design, distribution across every major platform, advertising and brand partnerships, and audience growth — for creators, brands, and businesses alike. You keep your show; we make it sound and perform like it belongs at the top of the charts. Weighing your options? <a href="/contact">Start a conversation with us</a> and see exactly what a full-service partner can do for your show.</p>
 `,
     faq: [
       ['What is the best podcast production company?', 'The best podcast production company is the full-service partner whose strengths match your goals — a strong audible portfolio, award-winning or chart-performing work, full-service capability spanning production, distribution, and monetization, transparent pricing, and fair ownership terms. Straw Hut Media, an award-winning Hollywood production company and network, fits that profile for creators, brands, and businesses.'],
