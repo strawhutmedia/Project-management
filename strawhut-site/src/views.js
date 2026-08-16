@@ -721,106 +721,31 @@ export function bookPage({ widgetUrl = '' } = {}) {
 }
 
 // --- Pricing / packages + custom quote builder -----------------------------
-// Embeds the Straw Hut "Sales-Quoting" builder (self-hosted at /public/quote/)
-// in an auto-sizing iframe so it renders exactly as built, isolated from our
-// styles. Booking inside it runs through the team's Calendly discovery link.
-const PACKAGES = [
-  {
-    tier: 'Essential', name: 'Essential Podcast Package', price: '$2,450',
-    tagline: "Your podcast, simplified. Just record your show, and we'll handle all the editing, publishing, and promotion for you.",
-    features: [
-      'Professional audio editing and mastering',
-      'Multi-track editing and sound design',
-      'Custom intros, outros, and transitions',
-      'Distribution to all major platforms',
-      'Weekly publishing and scheduling',
-      'Basic analytics to track growth',
-      'Custom branding package (cover art, logo)',
-      'One custom social media clip per episode',
-    ],
-    dataFeatures: 'Professional audio editing and mastering, Multi-track editing and sound design, Custom intros/outros/transitions, Distribution to all major platforms, Weekly publishing and scheduling, Basic analytics, Custom branding package, One custom social media clip per episode',
-  },
-  {
-    tier: 'Premium', name: 'Premium Studio Podcast Package', price: '$4,350', featured: true,
-    tagline: 'Comprehensive production for audio and video, with full branding, music, and support for in-studio or virtual recordings.',
-    features: [
-      'Everything in Essential, plus:',
-      'Video recording in our studio or virtual setup',
-      'Original theme music created for your show',
-      'Guest booking and scheduling assistance',
-      'Multi-camera video setup (studio or virtual)',
-      'Full social media content (clips, audiograms, graphics)',
-      'Dedicated manager for seamless production',
-      'Priority support for urgent needs',
-    ],
-    dataFeatures: 'Everything in Essential plus: Video recording (studio or virtual), Original theme music, Guest booking and scheduling, Multi-camera video setup, Full social media content creation, Dedicated production manager, Priority support',
-  },
-  {
-    tier: 'Ultimate', name: 'Ultimate On-Location Podcast Package', price: '$6,550',
-    tagline: 'For podcasters who want it all — on-location recording, professional video, and custom branding for a world-class show.',
-    features: [
-      'Everything in Premium, plus:',
-      'On-location recording anywhere you need',
-      'Multi-camera setup with 3–6 cameras',
-      'Professional video editing and branding',
-      'On-site producer to oversee the shoot',
-      'Lighting, microphones, and camera setup included',
-      'Enhanced social assets, including trailers and thumbnails',
-      'Videos optimized for YouTube and social media',
-    ],
-    dataFeatures: 'Everything in Premium plus: On-location recording anywhere, Multi-camera setup (3-6 cameras), Professional video editing and branding, On-site producer, Lighting/microphones/camera setup included, Enhanced social media assets, Videos optimized for YouTube and social',
-  },
-];
-
+// Clean handoff: a branded intro that sends visitors to the live quote builder
+// at services.strawhutmedia.com (single source of truth for packages/prices).
 export function pricingPage() {
-  const cards = PACKAGES.map((p) => `
-    <article class="pkg-card${p.featured ? ' featured' : ''}">
-      ${p.featured ? '<div class="pkg-badge">Most popular</div>' : ''}
-      <div class="pkg-tier">${esc(p.tier)}</div>
-      <h3 class="pkg-name">${esc(p.name)}</h3>
-      <p class="pkg-tagline">${esc(p.tagline)}</p>
-      <div class="pkg-price">${esc(p.price)}<span>/month</span></div>
-      <ul class="pkg-features">${p.features.map((f) => `<li>${esc(f)}</li>`).join('')}</ul>
-      <button class="btn btn-primary pkg-cta" data-package="${esc(p.name + ' — ' + p.price + '/month')}" data-features="${esc(p.dataFeatures)}">Get started</button>
-    </article>`).join('');
+  const url = 'https://services.strawhutmedia.com/';
+  const open = `href="${url}" target="_blank" rel="noopener" onclick="window.shmTrack&&shmTrack('pricing_open_builder',{})"`;
   const body = `
-  <section class="hero" style="padding-bottom:12px"><div class="container">
+  <section class="hero" style="padding-bottom:16px"><div class="container">
     <div class="breadcrumb" style="padding:0 0 14px"><a href="/">Home</a> / Packages &amp; pricing</div>
     <h1>Packages &amp; a <span class="accent">custom quote</span></h1>
     <p>Pick one of our production packages or build a custom quote in a couple of minutes. Either way you'll get a real number — and a quick call to make sure we're the right fit for your show.</p>
+    <div style="margin-top:22px"><a class="btn btn-primary" ${open}>See packages &amp; build your quote →</a></div>
   </div></section>
-  <section class="section" style="padding-top:6px"><div class="container">
-    <div class="pricing-grid">${cards}</div>
-    <div class="pricing-custom">
-      <h3>Need something different?</h3>
-      <p>Build a custom package tailored to exactly what your show needs — format, frequency, services, and more.</p>
-      <button class="btn btn-primary" id="openQuizBtn">Build your custom quote →</button>
+  <section class="section"><div class="container">
+    <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(240px,1fr))">
+      <article class="show-card" style="padding:22px 22px 24px"><h3 style="margin-top:0">Ready-made packages</h3><p class="meta" style="line-height:1.55">Three production tiers — Essential, Premium, and Ultimate — covering editing, video, branding, and distribution.</p></article>
+      <article class="show-card" style="padding:22px 22px 24px"><h3 style="margin-top:0">Or a custom quote</h3><p class="meta" style="line-height:1.55">Answer a few quick questions and get a package and price built around exactly what your show needs.</p></article>
+      <article class="show-card" style="padding:22px 22px 24px"><h3 style="margin-top:0">Then a quick call</h3><p class="meta" style="line-height:1.55">Every path ends with a short discovery call, so we can make sure we're the right fit before anyone commits.</p></article>
     </div>
-    <div id="quiz-view" style="display:none;margin-top:32px">
-      <div class="section-head"><h2>Build your custom quote</h2></div>
-      <div id="shm-quote-widget"></div>
+    <div class="cta-band" style="margin-top:32px">
+      <h2>See what your show would cost</h2>
+      <p>Browse the packages or build a custom quote in a couple of minutes.</p>
+      <a class="btn btn-primary" ${open}>Open the packages &amp; quote builder →</a>
     </div>
   </div></section>
-  <script src="/public/quote-widget.js"></script>
-  <script>
-  (function(){
-    var CALENDLY_URL='https://calendly.com/strawhutmedia/discovery';
-    var NL=String.fromCharCode(10);
-    var openBtn=document.getElementById('openQuizBtn'), quiz=document.getElementById('quiz-view');
-    if(openBtn&&quiz){openBtn.addEventListener('click',function(){quiz.style.display='block';quiz.scrollIntoView({behavior:'smooth'});window.shmTrack&&shmTrack('pricing_quiz_open',{});});}
-    function loadCalendly(cb){if(window.Calendly){cb&&cb();return;}var l=document.createElement('link');l.href='https://assets.calendly.com/assets/external/widget.css';l.rel='stylesheet';document.head.appendChild(l);var s=document.createElement('script');s.src='https://assets.calendly.com/assets/external/widget.js';s.onload=cb;document.head.appendChild(s);}
-    loadCalendly();
-    var btns=document.querySelectorAll('.pkg-cta');
-    for(var i=0;i<btns.length;i++){(function(btn){btn.addEventListener('click',function(){
-      var pkg=btn.getAttribute('data-package'), features=btn.getAttribute('data-features');
-      var summary='=== PACKAGE SELECTION ==='+NL+NL+'Selected Package: '+pkg+NL+NL+'--- What is Included ---'+NL+features.split(', ').map(function(f){return '\\u2022 '+f;}).join(NL);
-      window.shmTrack&&shmTrack('pricing_package_click',{pkg:pkg});
-      if(window.Calendly){window.Calendly.initPopupWidget({url:CALENDLY_URL+'?hide_gdpr_banner=1',prefill:{customAnswers:{a1:summary}}});}
-      else{window.open(CALENDLY_URL+'?a1='+encodeURIComponent(summary),'_blank');}
-    });})(btns[i]);}
-    window.shmTrack&&shmTrack('pricing_view',{});
-  })();
-  </script>`;
+  <script>window.shmTrack&&shmTrack('pricing_view',{});</script>`;
   return layout({
     title: 'Podcast Production Packages & Pricing — Straw Hut Media',
     description:
