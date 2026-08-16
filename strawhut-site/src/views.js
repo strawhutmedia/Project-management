@@ -607,15 +607,15 @@ const CLIENTS = [
   { name: 'Disney', logo: '/public/logos/disney.svg' },
   { name: 'Hulu', logo: '/public/logos/hulu.svg' },
   { name: 'Commune', logo: '/public/logos/commune.png' },
-  { name: 'Mekanism' },
+  { name: 'Mekanism', logo: '/public/logos/mekanism.png' },
   { name: 'Next City', logo: '/public/logos/next-city.png' },
   { name: 'Plus Company', logo: '/public/logos/plus-company.svg' },
   { name: 'We Are Social', logo: '/public/logos/we-are-social.png' },
-  { name: 'King Pleasure' },
+  { name: 'King Pleasure', logo: '/public/logos/king-pleasure.png', tall: true },
   { name: 'Shaping Freedom', logo: '/public/logos/shaping-freedom.webp' },
   { name: 'Phil Rosenthal', logo: '/public/logos/phil-rosenthal.webp' },
   { name: 'Gayety', logo: '/public/logos/gayety.png' },
-  { name: 'Kiss the Ground' },
+  { name: 'Kiss the Ground', logo: '/public/logos/kiss-the-ground.png' },
 ];
 
 // Team — names + roles only (no photos, by design). Fill this in and each
@@ -625,7 +625,7 @@ const TEAM = [];
 export function aboutPage() {
   const logos = CLIENTS.map((c) =>
     c.logo
-      ? `<span class="logo-item"><img src="${esc(c.logo)}" alt="${esc(c.name)}" loading="lazy"></span>`
+      ? `<span class="logo-item${c.tall ? ' tall' : ''}"><img src="${esc(c.logo)}" alt="${esc(c.name)}" loading="lazy"></span>`
       : `<span class="logo-item logo-word">${esc(c.name)}</span>`
   ).join('');
   const team = TEAM.length

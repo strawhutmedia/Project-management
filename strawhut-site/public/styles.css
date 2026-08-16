@@ -470,6 +470,9 @@ table.admin-table { width: 100%; border-collapse: collapse; }
 .clients-band .logo-item { opacity: 0.82; }
 .clients-band .logo-item:hover { opacity: 1; }
 .clients-band .logo-item img { filter: brightness(0); }
+/* Tall/stacked lockups (e.g. the Basquiat King Pleasure logo) get extra height
+   so they stay legible in the strip. */
+.logo-item.tall { width: 110px; height: 78px; }
 .team-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 16px; }
 .team-member {
   display: flex; flex-direction: column; gap: 2px; padding: 16px 18px;
