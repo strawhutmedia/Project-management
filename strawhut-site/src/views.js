@@ -642,7 +642,7 @@ export function aboutPage() {
   <section class="hero" style="padding-bottom:16px"><div class="container">
     <div class="breadcrumb" style="padding:0 0 14px"><a href="/">Home</a> / About</div>
     <h1>Think outside the <span class="accent">pod</span>.</h1>
-    <p>We're Straw Hut Media — an award-winning podcast production company and network, making shows out of Hollywood since 2017.</p>
+    <p>We're Straw Hut Media — an award-winning podcast production company and network, founded in Hollywood in 2017 and making podcasts since 2018.</p>
     <p>Anyone can hit record. Turning that into a show people won't stop listening to is the part we've spent years getting very good at.</p>
     <div style="margin-top:22px"><a class="btn btn-primary" href="/contact">Work with us</a> <a class="btn btn-ghost" href="/shows" style="margin-left:8px">Hear our shows</a></div>
   </div></section>
