@@ -216,7 +216,6 @@ ${trackingBody()}
       <a href="/podcast-production">Podcast Production</a>
       <a href="/advertise">Advertise With Us</a>
       <a href="/studio">Book the Studio</a>
-      <a href="/podcast-studio-los-angeles">LA Podcast Studio</a>
     </div>
     <div class="footer-col">
       <div class="footer-h">Explore</div>
@@ -903,8 +902,8 @@ export function studioPage() {
     load();
   })();</script>`;
   return layout({
-    title: 'Book the Studio — Straw Hut Media',
-    description: 'Book the Straw Hut Media podcast studio in Hollywood. 1080p at $125/hr or 4K at $150/hr, audio + video included. Choose the podcast table or cozy couch setup.',
+    title: 'Podcast Studio in Los Angeles (Hollywood) — Book It | Straw Hut Media',
+    description: 'Book the Straw Hut Media podcast studio in Hollywood, Los Angeles. 1080p at $125/hr or 4K at $150/hr, audio + multi-camera video included. Choose the podcast table or cozy couch setup.',
     body,
     activeNav: '/studio',
     path: '/studio',

@@ -103,58 +103,6 @@ export const SERVICE_PAGES = [
     },
   },
 
-  {
-    slug: 'podcast-studio-los-angeles',
-    path: '/podcast-studio-los-angeles',
-    navLabel: 'LA Studio',
-    title: 'Podcast Studio in Los Angeles (Hollywood) | Straw Hut Media',
-    description:
-      'Book a professional podcast studio in Los Angeles. Straw Hut Media’s Hollywood studio offers pro audio and multi-camera 4K video by the hour — 1080p at $125/hr, 4K at $150/hr.',
-    summary: 'Professional podcast studio in Los Angeles (Hollywood) — audio + multi-camera 4K video, booked by the hour.',
-    breadcrumbName: 'LA Podcast Studio',
-    hero: {
-      h1: 'A podcast studio in <span class="accent">the heart of Hollywood</span>',
-      dek: 'Professional audio and multi-camera 4K video, booked by the hour — the Los Angeles studio where great shows get made.',
-      cta: { label: 'Book the studio', href: '/studio#book' },
-    },
-    intro:
-      'Straw Hut Media’s podcast studio sits in the heart of Hollywood, Los Angeles — a fully-equipped, professional space built specifically for podcasting. Record broadcast-quality audio and stunning multi-camera video in a room designed to make you sound and look your best, then walk out with content ready to publish. Book by the hour, choose your setup, and reserve your time online.',
-    highlights: [
-      { name: 'Hollywood location', text: 'Centrally located in Los Angeles — easy for hosts, guests, and crews across the city.' },
-      { name: 'Pro audio', text: 'Broadcast-quality microphones and acoustically-treated space for a clean, warm sound.' },
-      { name: '4K multi-camera video', text: 'Up to four 4K cameras capture polished video for YouTube, Spotify, and social.' },
-      { name: 'Two setups', text: 'The Podcast Table for interviews and panels, or the Cozy Couch for a relaxed vibe.' },
-    ],
-    sections: [
-      {
-        h2: 'Rates',
-        html:
-          '<p><strong>1080p HD — $125/hour.</strong> Full audio and video in 1080p, recorded and ready to publish.<br><strong>4K Ultra HD — $150/hour.</strong> Full audio and video captured on four 4K cameras for a cinematic look. Book enough time to cover setup and wrap — see the <a href="/studio">studio page</a> for booking details and tips.</p>',
-      },
-      {
-        h2: 'Who books our LA studio',
-        html:
-          '<p>Independent creators, brands filming branded shows, agencies producing client content, and hosts who want a professional room without the overhead of building one. Whether you need a one-off session or a recurring weekly booking, the Straw Hut studio is built to make Los Angeles podcasters sound and look their best. New to this? Read <a href="/resources/how-to-start-a-podcast">how to start a podcast</a> first.</p>',
-      },
-    ],
-    faq: [
-      ['Where is the Straw Hut Media podcast studio located?', 'The Straw Hut Media podcast studio is in the heart of Hollywood, Los Angeles — a professional, fully-equipped space for recording podcast audio and multi-camera 4K video, available to book by the hour.'],
-      ['How much does it cost to book a podcast studio in Los Angeles?', 'At Straw Hut Media’s Hollywood studio, a 1080p HD session is $125/hour and a 4K Ultra HD session is $150/hour, with full audio and video included. Book enough time to cover setup and wrap-up.'],
-      ['Does the studio record video as well as audio?', 'Yes. The studio captures broadcast-quality audio and multi-camera video up to 4K on four cameras — ideal for YouTube, Spotify video, and social clips.'],
-      ['Can I book the LA studio for a single session?', 'Yes. You can book by the hour for a one-off session or set up recurring bookings. Choose your setup and reserve your time online on the studio page.'],
-    ],
-    schema: {
-      name: 'Podcast Studio Los Angeles',
-      serviceType: 'Podcast recording studio rental',
-      description:
-        'Professional podcast recording studio in Hollywood, Los Angeles — pro audio and multi-camera 4K video by the hour. 1080p at $125/hour, 4K at $150/hour.',
-      areaServed: { '@type': 'City', name: 'Los Angeles' },
-      offers: [
-        { '@type': 'Offer', name: '1080p HD studio session', priceCurrency: 'USD', price: '125', priceSpecification: { '@type': 'UnitPriceSpecification', price: '125', priceCurrency: 'USD', unitCode: 'HUR', unitText: 'per hour' } },
-        { '@type': 'Offer', name: '4K Ultra HD studio session', priceCurrency: 'USD', price: '150', priceSpecification: { '@type': 'UnitPriceSpecification', price: '150', priceCurrency: 'USD', unitCode: 'HUR', unitText: 'per hour' } },
-      ],
-    },
-  },
 ];
 
 export function getServicePage(slug) {
