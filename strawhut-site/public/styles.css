@@ -481,6 +481,35 @@ table.admin-table { width: 100%; border-collapse: collapse; }
 .team-name { font-weight: 600; }
 .team-role { font-size: 0.9rem; color: var(--muted); }
 
+/* Pricing / packages */
+.pricing-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 22px; align-items: stretch; }
+.pkg-card {
+  position: relative; background: var(--card); border: 1px solid var(--border);
+  border-radius: 18px; padding: 28px 24px; display: flex; flex-direction: column;
+}
+.pkg-card.featured { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+.pkg-badge {
+  position: absolute; top: -11px; left: 24px; background: var(--accent); color: var(--accent-ink);
+  font-size: 0.68rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase;
+  padding: 4px 12px; border-radius: 999px;
+}
+.pkg-tier { font-size: 0.74rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--accent); }
+.pkg-name { font-size: 1.18rem; margin: 8px 0 6px; line-height: 1.25; }
+.pkg-tagline { color: var(--muted); font-size: 0.9rem; line-height: 1.5; margin: 0 0 16px; }
+.pkg-price { font-size: 2rem; font-weight: 700; margin-bottom: 18px; }
+.pkg-price span { font-size: 0.95rem; color: var(--muted); font-weight: 500; }
+.pkg-features { list-style: none; padding: 0; margin: 0 0 22px; display: flex; flex-direction: column; gap: 9px; flex: 1; }
+.pkg-features li { position: relative; padding-left: 26px; font-size: 0.9rem; line-height: 1.45; color: var(--text); }
+.pkg-features li::before { content: "✓"; position: absolute; left: 0; top: 0; color: var(--accent); font-weight: 700; }
+.pkg-cta { width: 100%; justify-content: center; }
+.pricing-custom {
+  text-align: center; margin: 34px auto 0; max-width: 580px; padding: 30px 28px;
+  background: linear-gradient(135deg, rgba(0,204,142,0.12), rgba(213,155,30,0.10));
+  border: 1px solid var(--border); border-radius: 18px;
+}
+.pricing-custom h3 { margin: 0 0 8px; font-size: 1.35rem; }
+.pricing-custom p { color: var(--muted); margin: 0 auto 18px; max-width: 460px; line-height: 1.55; }
+
 /* Call-to-action band */
 .cta-band {
   margin: 40px 0 8px; padding: 34px; text-align: center;
