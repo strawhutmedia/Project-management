@@ -732,16 +732,10 @@ export function pricingPage() {
     <p>Pick one of our production packages or build a custom quote in a couple of minutes. Either way you'll get a real number — and a quick call to make sure we're the right fit for your show.</p>
   </div></section>
   <section class="section" style="padding-top:6px"><div class="container">
-    <iframe id="shmQuoteFrame" src="/public/quote/index.html" title="Straw Hut Media podcast packages and custom quote builder" loading="lazy" scrolling="no" style="width:100%;min-height:1400px;border:0;overflow:hidden;background:#fff;border-radius:16px"></iframe>
+    <iframe id="shmQuoteFrame" src="https://services.strawhutmedia.com/" title="Straw Hut Media podcast packages and custom quote builder" loading="lazy" style="width:100%;min-height:1600px;border:1px solid var(--border);background:#fff;border-radius:16px"></iframe>
+    <p style="text-align:center;color:var(--muted);margin-top:14px;font-size:0.92rem">Trouble viewing the builder? <a href="https://services.strawhutmedia.com/" target="_blank" rel="noopener" style="color:var(--accent)">Open it in a new tab →</a></p>
   </div></section>
-  <script>
-  window.addEventListener('message',function(e){
-    var h=e && e.data && e.data.shmQuoteHeight;
-    var f=document.getElementById('shmQuoteFrame');
-    if(h && f){ f.style.height=(h+24)+'px'; }
-  });
-  window.shmTrack&&shmTrack('pricing_view',{});
-  </script>`;
+  <script>window.shmTrack&&shmTrack('pricing_view',{});</script>`;
   return layout({
     title: 'Podcast Production Packages & Pricing — Straw Hut Media',
     description:
