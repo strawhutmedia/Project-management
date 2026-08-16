@@ -516,11 +516,14 @@ table.admin-table { width: 100%; border-collapse: collapse; }
   .nav.open { max-height: 60vh; }
   .nav a { padding: 15px 6vw; border-top: 1px solid var(--border); font-size: 1.02rem; }
   .nav a:first-child { border-top: none; }
-  /* Keep the Promote CTA looking like a button inside the mobile dropdown */
+  /* On mobile the Promote CTA reads as a normal nav row like the rest, not a
+     standout green button (which was easy to miss). */
   .nav a.nav-cta {
-    margin: 12px 6vw; padding: 13px 16px; border-radius: 12px; border-top: none;
-    text-align: center; font-size: 1.02rem;
+    background: transparent; color: var(--muted); font-weight: 500;
+    margin: 0; padding: 15px 6vw; border-radius: 0; border-top: 1px solid var(--border);
+    text-align: left; font-size: 1.02rem;
   }
+  .nav a.nav-cta:hover, .nav a.nav-cta:active { background: transparent; color: var(--text); transform: none; }
   /* 2-up cover art on mobile instead of one giant image per row */
   .grid { grid-template-columns: repeat(2, 1fr); gap: 12px; }
   .show-card h3 { font-size: 0.92rem; }
