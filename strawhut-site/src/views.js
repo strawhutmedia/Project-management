@@ -724,28 +724,22 @@ export function bookPage({ widgetUrl = '' } = {}) {
 // Clean handoff: a branded intro that sends visitors to the live quote builder
 // at services.strawhutmedia.com (single source of truth for packages/prices).
 export function pricingPage() {
-  const url = 'https://services.strawhutmedia.com/';
-  const open = `href="${url}" target="_blank" rel="noopener" onclick="window.shmTrack&&shmTrack('pricing_open_builder',{})"`;
   const body = `
-  <section class="hero" style="padding-bottom:16px"><div class="container">
+  <section class="hero" style="padding-bottom:8px"><div class="container">
     <div class="breadcrumb" style="padding:0 0 14px"><a href="/">Home</a> / Packages &amp; pricing</div>
     <h1>Packages &amp; a <span class="accent">custom quote</span></h1>
     <p>Pick one of our production packages or build a custom quote in a couple of minutes. Either way you'll get a real number — and a quick call to make sure we're the right fit for your show.</p>
-    <div style="margin-top:22px"><a class="btn btn-primary" ${open}>See packages &amp; build your quote →</a></div>
   </div></section>
-  <section class="section"><div class="container">
-    <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(240px,1fr))">
-      <article class="show-card" style="padding:22px 22px 24px"><h3 style="margin-top:0">Ready-made packages</h3><p class="meta" style="line-height:1.55">Three production tiers — Essential, Premium, and Ultimate — covering editing, video, branding, and distribution.</p></article>
-      <article class="show-card" style="padding:22px 22px 24px"><h3 style="margin-top:0">Or a custom quote</h3><p class="meta" style="line-height:1.55">Answer a few quick questions and get a package and price built around exactly what your show needs.</p></article>
-      <article class="show-card" style="padding:22px 22px 24px"><h3 style="margin-top:0">Then a quick call</h3><p class="meta" style="line-height:1.55">Every path ends with a short discovery call, so we can make sure we're the right fit before anyone commits.</p></article>
-    </div>
-    <div class="cta-band" style="margin-top:32px">
-      <h2>See what your show would cost</h2>
-      <p>Browse the packages or build a custom quote in a couple of minutes.</p>
-      <a class="btn btn-primary" ${open}>Open the packages &amp; quote builder →</a>
-    </div>
+  <section class="section" style="padding-top:6px"><div class="container">
+    <iframe id="shmQuoteFrame" src="/public/quote/index.html" title="Straw Hut Media podcast packages and custom quote builder" loading="lazy" scrolling="no" style="width:100%;min-height:1200px;border:0;overflow:hidden;background:transparent"></iframe>
   </div></section>
-  <script>window.shmTrack&&shmTrack('pricing_view',{});</script>`;
+  <script>
+  window.addEventListener('message',function(e){
+    var h=e && e.data && e.data.shmQuoteHeight, f=document.getElementById('shmQuoteFrame');
+    if(h && f){ f.style.height=(h+24)+'px'; }
+  });
+  window.shmTrack&&shmTrack('pricing_view',{});
+  </script>`;
   return layout({
     title: 'Podcast Production Packages & Pricing — Straw Hut Media',
     description:
