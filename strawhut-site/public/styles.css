@@ -445,19 +445,22 @@ table.admin-table { width: 100%; border-collapse: collapse; }
 /* About — logo wall + team */
 .logo-wall {
   display: flex; flex-wrap: wrap; align-items: center; justify-content: center;
-  gap: 18px 38px; padding: 8px 0;
+  gap: 30px 40px; padding: 8px 0;
 }
+/* Every logo lives in the same fixed slot so nothing dominates (wide marks
+   scale down, tall marks fit by height) — a uniform, monochrome-white wall. */
 .logo-item {
   display: inline-flex; align-items: center; justify-content: center;
-  min-height: 42px; opacity: 0.72; transition: opacity 0.2s ease;
+  width: 150px; height: 46px; opacity: 0.8; transition: opacity 0.2s ease;
 }
 .logo-item:hover { opacity: 1; }
-.logo-item img { max-height: 38px; width: auto; filter: brightness(0) invert(1); }
-/* Full-color marks (colorful or self-contained tiles) keep their brand color */
-.logo-item img.logo-color { filter: none; max-height: 44px; }
+.logo-item img {
+  max-width: 100%; max-height: 100%; width: auto; object-fit: contain;
+  filter: brightness(0) invert(1);
+}
 .logo-word {
-  font-size: 1.15rem; font-weight: 600; letter-spacing: 0.01em; color: var(--text);
-  white-space: nowrap;
+  font-size: 1.05rem; font-weight: 600; letter-spacing: 0.01em; color: var(--text);
+  white-space: nowrap; text-align: center;
 }
 .team-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 16px; }
 .team-member {
