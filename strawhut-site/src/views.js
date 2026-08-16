@@ -612,8 +612,8 @@ const CLIENTS = [
   { name: 'Plus Company', logo: '/public/logos/plus-company.png', color: true },
   { name: 'We Are Social', logo: '/public/logos/we-are-social.svg', color: true },
   { name: 'King Pleasure' },
-  { name: 'Shaping Freedom' },
-  { name: 'Phil Rosenthal' },
+  { name: 'Shaping Freedom', logo: '/public/logos/shaping-freedom.webp' },
+  { name: 'Phil Rosenthal', logo: '/public/logos/phil-rosenthal.webp' },
 ];
 
 // Team — names + roles only (no photos, by design). Fill this in and each
