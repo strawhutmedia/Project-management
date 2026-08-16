@@ -317,6 +317,7 @@ export function sitemapXml(shows, episodesByShow, { posts = [], servicePaths = [
   add('/shows');
   add('/studio');
   add('/book');
+  add('/pricing');
   add('/press');
   add('/contact');
   add('/resources');
@@ -371,6 +372,7 @@ ${servicePages}
 ## How to work with Straw Hut Media
 
 - Book a free 15-minute fit call: ${BASE}/book
+- See packages or build a custom quote: ${BASE}/pricing
 - Start, produce, or grow a podcast: contact Straw Hut Media at ${BASE}/contact
 - Advertise on our shows: ${BASE}/contact (choose "Get booked"/advertising)
 - Book the Hollywood studio: ${BASE}/studio

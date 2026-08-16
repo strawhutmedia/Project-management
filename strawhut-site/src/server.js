@@ -552,6 +552,9 @@ app.get('/about', (req, res) => res.send(V.aboutPage()));
 const BOOKING_WIDGET_URL = process.env.BOOKING_WIDGET_URL || '';
 app.get('/book', (req, res) => res.send(V.bookPage({ widgetUrl: BOOKING_WIDGET_URL })));
 
+// Packages + custom quote builder (embeds the self-hosted Sales-Quoting tool).
+app.get('/pricing', (req, res) => res.send(V.pricingPage()));
+
 app.get('/contact', (req, res) => res.send(V.contactPage()));
 app.post('/contact', async (req, res) => {
   const { name = '', email = '', company = '', message = '', topic = 'general' } = req.body || {};

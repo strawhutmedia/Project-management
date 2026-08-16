@@ -227,9 +227,8 @@ ${trackingBody()}
     </div>
     <div class="footer-col">
       <div class="footer-h">Get started</div>
-      <a href="/resources/how-to-start-a-podcast">How to start a podcast</a>
-      <a href="/resources/how-to-choose-a-podcast-production-company">Choosing a production company</a>
-      <a href="/contact">Start a podcast with us</a>
+      <a href="/book">Book a 15-min fit call</a>
+      <a href="/pricing">Packages &amp; pricing</a>
     </div>
   </div>
   <div class="footer-base">
@@ -717,6 +716,42 @@ export function bookPage({ widgetUrl = '' } = {}) {
     jsonLd: breadcrumbJsonLd([
       { name: 'Home', path: '/' },
       { name: 'Book a call', path: '/book' },
+    ]),
+  });
+}
+
+// --- Pricing / packages + custom quote builder -----------------------------
+// Embeds the Straw Hut "Sales-Quoting" builder (self-hosted at /public/quote/)
+// in an auto-sizing iframe so it renders exactly as built, isolated from our
+// styles. Booking inside it runs through the team's Calendly discovery link.
+export function pricingPage() {
+  const body = `
+  <section class="hero" style="padding-bottom:12px"><div class="container">
+    <div class="breadcrumb" style="padding:0 0 14px"><a href="/">Home</a> / Packages &amp; pricing</div>
+    <h1>Packages &amp; a <span class="accent">custom quote</span></h1>
+    <p>Pick one of our production packages or build a custom quote in a couple of minutes. Either way you'll get a real number — and a quick call to make sure we're the right fit for your show.</p>
+  </div></section>
+  <section class="section" style="padding-top:6px"><div class="container">
+    <iframe id="shmQuoteFrame" src="/public/quote/index.html" title="Straw Hut Media podcast packages and custom quote builder" loading="lazy" scrolling="no" style="width:100%;min-height:1400px;border:0;overflow:hidden;background:#fff;border-radius:16px"></iframe>
+  </div></section>
+  <script>
+  window.addEventListener('message',function(e){
+    var h=e && e.data && e.data.shmQuoteHeight;
+    var f=document.getElementById('shmQuoteFrame');
+    if(h && f){ f.style.height=(h+24)+'px'; }
+  });
+  window.shmTrack&&shmTrack('pricing_view',{});
+  </script>`;
+  return layout({
+    title: 'Podcast Production Packages & Pricing — Straw Hut Media',
+    description:
+      'See Straw Hut Media podcast production packages or build a custom quote in minutes. Transparent options for creators, brands, and businesses.',
+    body,
+    activeNav: '',
+    path: '/pricing',
+    jsonLd: breadcrumbJsonLd([
+      { name: 'Home', path: '/' },
+      { name: 'Packages & pricing', path: '/pricing' },
     ]),
   });
 }
