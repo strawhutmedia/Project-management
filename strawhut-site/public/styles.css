@@ -467,9 +467,9 @@ table.admin-table { width: 100%; border-collapse: collapse; }
    native colors. */
 .clients-band { background: #ffffff; }
 .clients-band .section-head h2 { color: #12182f; }
-.clients-band .logo-item { opacity: 0.82; }
-.clients-band .logo-item:hover { opacity: 1; }
-.clients-band .logo-item img { filter: brightness(0); }
+.clients-band .logo-item { opacity: 1; }
+/* Logos display in their real brand colors on the white band. */
+.clients-band .logo-item img { filter: none; }
 /* Tall/stacked lockups (e.g. the Basquiat King Pleasure logo) get extra height
    so they stay legible in the strip. */
 .logo-item.tall { width: 110px; height: 78px; }
