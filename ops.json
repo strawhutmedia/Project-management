@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-08-18T17:20:35.336Z",
+  "generatedAt": "2026-08-18T17:25:35.340Z",
   "note": "Read-only operational snapshot. Emails are masked; no full contact list is stored here.",
   "summary": {
     "showsWithOutreach": 1,
@@ -32,7 +32,7 @@
           {
             "name": "Jeremiah Brown",
             "emailMasked": "n***@latalent.com",
-            "daysSinceFirstEmail": 33,
+            "daysSinceFirstEmail": 34,
             "opened": false,
             "openCount": 0
           },
