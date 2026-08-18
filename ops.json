@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-08-18T18:50:35.610Z",
+  "generatedAt": "2026-08-18T18:55:35.624Z",
   "note": "Read-only operational snapshot. Emails are masked; no full contact list is stored here.",
   "summary": {
     "showsWithOutreach": 1,
@@ -67,7 +67,7 @@
           {
             "name": "Jennifer Hyde",
             "emailMasked": "j***@gersh.com",
-            "daysSinceFirstEmail": 33,
+            "daysSinceFirstEmail": 34,
             "opened": false,
             "openCount": 0
           },
