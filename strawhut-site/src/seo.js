@@ -227,7 +227,7 @@ export function podcastEpisodeJsonLd(show, episode) {
     associatedMedia: episode.audio_url
       ? { '@type': 'AudioObject', contentUrl: episode.audio_url, encodingFormat: 'audio/mpeg', duration: secondsToISO(episode.duration) }
       : undefined,
-    speakable: { '@type': 'SpeakableSpecification', cssSelector: ['h1', '.ep-hook'] },
+    speakable: { '@type': 'SpeakableSpecification', cssSelector: ['h1', '.notes'] },
     publisher: { '@id': BASE + '/#organization' },
   });
 }

@@ -161,7 +161,6 @@ function layout({
       ['/', 'Home'],
       ['/shows', 'Shows'],
       ['/studio', 'Studio'],
-      ['/press', 'Press'],
       ['/contact', 'Contact'],
     ]
       .map(
@@ -1109,20 +1108,7 @@ function epRecCard(showSlug, showTitle, ep, showImage) {
   </a>`;
 }
 
-// Clean teaser for the episode hero: whole sentences up to ~max chars, and if
-// it must be cut, cut at a word boundary — never mid-word with an ugly "…".
-function cleanExcerpt(html, max = 240) {
-  const t = toText(html, 100000);
-  if (!t || t.length <= max) return t;
-  const slice = t.slice(0, max);
-  const sentEnd = Math.max(slice.lastIndexOf('. '), slice.lastIndexOf('! '), slice.lastIndexOf('? '));
-  if (sentEnd >= max * 0.5) return slice.slice(0, sentEnd + 1).trim();
-  const sp = slice.lastIndexOf(' ');
-  return (sp > 0 ? slice.slice(0, sp) : slice).replace(/[\s,;:—-]+$/, '') + '…';
-}
-
 export function episodePage({ show, episode, moreFromShow = [], related = [] }) {
-  const hook = cleanExcerpt(episode.description, 240);
   const body = `
   <article>
   <section class="episode-hero"><div class="container">
@@ -1133,7 +1119,6 @@ export function episodePage({ show, episode, moreFromShow = [], related = [] }) 
         <a class="show-link" href="/${esc(show.slug)}">${esc(show.title)}</a>
         <h1>${esc(episode.title)}</h1>
         <div class="sub">${episode.published_at ? `<time datetime="${esc(new Date(episode.published_at).toISOString())}">${esc(formatDate(episode.published_at))}</time>` : ''}${episode.duration ? ' · ' + esc(formatDuration(episode.duration)) : ''}${episode.youtube_id ? ' · <span class="pill on">▶ Watch on video</span>' : ''}</div>
-        ${hook ? `<p class="ep-hook">${esc(hook)}</p>` : ''}
         ${episode.youtube_id ? `<div class="video-embed"><iframe src="https://www.youtube-nocookie.com/embed/${esc(episode.youtube_id)}" title="${esc(episode.title)}" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen loading="lazy"></iframe></div>` : ''}
         ${
           episode.audio_url
