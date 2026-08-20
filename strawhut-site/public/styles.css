@@ -41,8 +41,16 @@ img { max-width: 100%; display: block; }
   display: flex; align-items: center; justify-content: space-between;
   height: 68px;
 }
-.brand { display: flex; align-items: center; gap: 10px; font-weight: 700; font-size: 1.25rem; letter-spacing: 0.02em; }
+.brand { display: flex; align-items: center; gap: 10px; }
 .brand .dot { color: var(--accent); }
+/* Boxed wordmark logo — echoes the stamped "STRAW HUT" mark on the current site */
+.brand-box {
+  display: inline-block; font-weight: 700; font-size: 0.95rem; letter-spacing: 0.14em;
+  text-transform: uppercase; line-height: 1; color: var(--text);
+  padding: 9px 13px; border: 2px solid var(--text); border-radius: 7px;
+  transition: color 0.15s, border-color 0.15s, background 0.15s;
+}
+.brand:hover .brand-box { color: var(--accent); border-color: var(--accent); }
 .nav { display: flex; gap: 26px; align-items: center; }
 .nav a { color: var(--muted); font-weight: 500; font-size: 0.95rem; transition: color 0.15s; }
 .nav a:hover, .nav a.active { color: var(--text); }
@@ -76,20 +84,52 @@ img { max-width: 100%; display: block; }
 .btn-danger { color: #ff8080; border-color: #4a2530; background: #241419; }
 
 /* Hero */
-.hero { padding: 76px 0 40px; }
-.hero h1 { font-size: clamp(2.2rem, 5vw, 3.6rem); line-height: 1.05; margin: 0 0 16px; font-weight: 700; }
-.hero p { color: var(--muted); font-size: 1.15rem; max-width: 620px; margin: 0; }
+.hero { padding: 72px 0 30px; overflow: hidden; }
+.hero-inner { display: grid; grid-template-columns: 1.05fr 0.95fr; gap: 40px; align-items: center; }
+.hero-copy { position: relative; z-index: 2; }
+.hero-eyebrow {
+  display: inline-block; font-size: 0.78rem; font-weight: 600; letter-spacing: 0.08em;
+  text-transform: uppercase; color: var(--accent); margin-bottom: 14px;
+}
+.hero h1 { font-size: clamp(2.2rem, 5vw, 3.7rem); line-height: 1.03; margin: 0 0 16px; font-weight: 700; }
+.hero p { color: var(--muted); font-size: 1.14rem; max-width: 560px; margin: 0; }
 .hero .accent { color: var(--accent); }
+.hero-cta { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 26px; }
+
+/* Bouncing waveform — the animated charm from the current site */
+.hero-wave {
+  display: flex; align-items: center; justify-content: center; gap: 5px;
+  height: 260px; padding: 0 6px;
+  -webkit-mask-image: radial-gradient(120% 100% at 50% 50%, #000 55%, transparent 100%);
+  mask-image: radial-gradient(120% 100% at 50% 50%, #000 55%, transparent 100%);
+}
+.hero-wave span {
+  flex: 1 1 0; min-width: 3px; max-width: 9px; border-radius: 999px;
+  background: linear-gradient(180deg, var(--accent), #0a8f66);
+  height: 22%; transform-origin: center;
+  animation: wave-bounce 1.25s ease-in-out infinite alternate;
+  opacity: 0.92;
+}
+.hero-wave span:nth-child(3n) { background: linear-gradient(180deg, var(--accent-2), #a4750f); }
+@keyframes wave-bounce { 0% { height: 14%; } 100% { height: 92%; } }
+@media (prefers-reduced-motion: reduce) { .hero-wave span { animation: none; height: 55%; } }
+@media (max-width: 860px) {
+  .hero-inner { grid-template-columns: 1fr; gap: 8px; }
+  .hero-wave { height: 130px; order: 2; }
+}
 
 /* Moving cover-art marquee */
 .marquee { overflow: hidden; padding: 14px 0 6px; -webkit-mask-image: linear-gradient(90deg, transparent, #000 6%, #000 94%, transparent); mask-image: linear-gradient(90deg, transparent, #000 6%, #000 94%, transparent); }
 .marquee-track { display: flex; gap: 18px; width: max-content; animation: marquee-scroll 150s linear infinite; }
-.marquee-track.reverse { animation-direction: reverse; }
+/* Second row scrolls the opposite way — its own keyframe so nothing in the
+   `animation` shorthand can reset the direction. */
+.marquee-track.reverse { animation-name: marquee-scroll-rev; }
 .marquee:hover .marquee-track { animation-play-state: paused; }
 .marquee-item { flex: 0 0 auto; width: 132px; height: 132px; border-radius: 14px; overflow: hidden; box-shadow: var(--shadow); transition: transform 0.2s; }
 .marquee-item:hover { transform: scale(1.06); }
 .marquee-item img { width: 100%; height: 100%; object-fit: cover; }
 @keyframes marquee-scroll { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+@keyframes marquee-scroll-rev { from { transform: translateX(-50%); } to { transform: translateX(0); } }
 @media (prefers-reduced-motion: reduce) { .marquee-track { animation: none; } }
 /* Slower, calmer scroll on phones (narrow viewport makes 80s feel frantic) */
 @media (max-width: 700px) {
@@ -105,13 +145,60 @@ img { max-width: 100%; display: block; }
 
 /* Show grid */
 .grid { display: grid; gap: 22px; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); }
-/* Featured: exactly fills the row (no leftover empty space from a scroll strip) */
-.featured-grid { display: grid; gap: 22px; grid-template-columns: repeat(3, minmax(0, 1fr)); }
-/* Services: flex row that fits all 5 on desktop and centers any orphan — no lonely 2nd row */
-.services-grid { display: flex; flex-wrap: wrap; gap: 22px; justify-content: center; }
-.services-grid > * { flex: 1 1 210px; max-width: 340px; }
-@media (max-width: 860px) { .featured-grid { grid-template-columns: repeat(2, 1fr); gap: 14px; } }
-@media (max-width: 520px) { .featured-grid { grid-template-columns: 1fr; } }
+.section-lede { color: var(--muted); max-width: 760px; margin: -8px 0 30px; font-size: 1.02rem; }
+
+/* Big Featured Podcast banner — one show at a time, built from cover art */
+.fbanner { position: relative; border-radius: 22px; overflow: hidden; min-height: 380px; box-shadow: var(--shadow); border: 1px solid var(--border); }
+.fbanner-slide {
+  position: absolute; inset: 0; display: grid; grid-template-columns: 380px 1fr; gap: 0;
+  opacity: 0; visibility: hidden; transition: opacity 0.6s ease; background: var(--card);
+}
+.fbanner-slide.active { opacity: 1; visibility: visible; position: relative; }
+.fb-art { position: relative; overflow: hidden; }
+.fb-art img { width: 100%; height: 100%; object-fit: cover; }
+.fb-art::after { content: ""; position: absolute; inset: 0; background: linear-gradient(90deg, transparent 55%, var(--card) 100%); }
+.fb-info { padding: 40px 44px; display: flex; flex-direction: column; justify-content: center; }
+.fb-info h3 { font-size: clamp(1.6rem, 3vw, 2.4rem); margin: 0 0 6px; line-height: 1.1; }
+.fb-host { color: var(--accent); font-weight: 600; margin-bottom: 14px; }
+.fb-info p { color: var(--muted); margin: 0 0 22px; max-width: 520px; display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden; }
+.fb-info .btn { align-self: flex-start; }
+.fbanner-dots { display: flex; gap: 9px; justify-content: center; margin-top: 18px; }
+.fdot { width: 9px; height: 9px; border-radius: 999px; border: 0; padding: 0; background: var(--border); cursor: pointer; transition: background 0.2s, transform 0.2s; }
+.fdot.active { background: var(--accent); transform: scale(1.25); }
+@media (max-width: 760px) {
+  .fbanner { min-height: 0; }
+  .fbanner-slide.active { grid-template-columns: 1fr; }
+  .fb-art { aspect-ratio: 16 / 9; }
+  .fb-art::after { background: linear-gradient(180deg, transparent 55%, var(--card) 100%); }
+  .fb-info { padding: 26px 24px 30px; }
+}
+
+/* Impact band — angled, full-bleed break between show sections (not a box) */
+.impact-band {
+  position: relative; margin: 46px 0; padding: 62px 0;
+  background: linear-gradient(115deg, #0d2a22 0%, #103a2c 45%, #0f2038 100%);
+  clip-path: polygon(0 3.2vw, 100% 0, 100% calc(100% - 3.2vw), 0 100%);
+}
+.impact-band::before {
+  content: ""; position: absolute; inset: 0;
+  background: radial-gradient(60% 120% at 85% 20%, rgba(0,204,142,0.22), transparent 60%);
+  pointer-events: none;
+}
+.impact-inner { position: relative; display: flex; align-items: center; justify-content: space-between; gap: 34px; flex-wrap: wrap; }
+.impact-copy { max-width: 640px; }
+.impact-copy h2 { font-size: clamp(1.6rem, 3.4vw, 2.5rem); margin: 0 0 12px; line-height: 1.08; }
+.impact-copy p { color: #c6d6cf; margin: 0; font-size: 1.05rem; }
+.impact-cta { display: flex; flex-direction: column; gap: 12px; min-width: 220px; }
+
+/* Service pillars — numbered, connected, not identical boxes */
+.pillars { display: grid; grid-template-columns: repeat(2, 1fr); gap: 2px; border-radius: var(--radius); overflow: hidden; border: 1px solid var(--border); background: var(--border); }
+.pillar { display: flex; gap: 18px; align-items: flex-start; padding: 26px 26px; background: var(--card); transition: background 0.15s; }
+.pillar-link:hover { background: var(--card-2); }
+.pillar-num { font-size: 1.5rem; font-weight: 700; color: var(--accent); line-height: 1; min-width: 40px; opacity: 0.85; }
+.pillar-body h3 { margin: 2px 0 6px; font-size: 1.12rem; }
+.pillar-body p { margin: 0; color: var(--muted); font-size: 0.94rem; line-height: 1.5; }
+.pillar-arrow { color: var(--accent); font-weight: 600; }
+@media (max-width: 720px) { .pillars { grid-template-columns: 1fr; } }
 
 /* Featured spotlight — horizontal, swipeable row (a few shows, not a wall) */
 .spotlight-row { display: flex; gap: 20px; overflow-x: auto; padding: 4px 2px 14px; scroll-snap-type: x mandatory; -webkit-overflow-scrolling: touch; }

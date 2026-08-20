@@ -168,10 +168,10 @@ function layout({
           `<a href="${href}"${activeNav === href ? ' class="active"' : ''}>${label}</a>`
       )
       .join('') +
-    // "Promote" — cross-sell to The Podbooster (our promotion product). External,
-    // opens in a new tab, carries UTMs so Podbooster attributes the traffic, and
-    // fires a tracked event for cross-property retargeting.
-    `<a class="nav-cta" href="https://thepodbooster.com/?utm_source=strawhutmedia&utm_medium=nav&utm_campaign=promote" target="_blank" rel="noopener" onclick="window.shmTrack&&shmTrack('promote_click',{destination:'thepodbooster.com'})">Promote</a>`;
+    // "Promote" — cross-sell to The Podbooster (our promotion product), external.
+    `<a href="https://thepodbooster.com/?utm_source=strawhutmedia&utm_medium=nav&utm_campaign=promote" target="_blank" rel="noopener" onclick="window.shmTrack&&shmTrack('promote_click',{destination:'thepodbooster.com'})">Promote</a>` +
+    // Primary CTA: Start Your Podcast → our production page.
+    `<a class="nav-cta" href="/podcast-production"${activeNav === '/podcast-production' ? ' aria-current="page"' : ''}>Start Your Podcast</a>`;
   return `<!doctype html>
 <html lang="en">
 <head>
@@ -201,7 +201,7 @@ ${jsonLd}
 <body class="${bodyClass}">
 ${trackingBody()}
 <header class="site-header"><div class="container">
-  <a class="brand" href="/">Straw Hut Media<span class="dot">.</span></a>
+  <a class="brand" href="/" aria-label="Straw Hut Media home"><span class="brand-box">Straw Hut</span></a>
   <button class="nav-toggle" id="navToggle" type="button" aria-label="Menu" aria-expanded="false" aria-controls="siteNav"><span class="nav-toggle-bars"></span></button>
   <nav class="nav" id="siteNav">${nav}</nav>
 </div></header>
@@ -285,15 +285,50 @@ export function homePage({ shows }) {
   const partners = shows.filter((s) => s.show_type === 'partnered');
   const cards = (list) =>
     list
-      .map(
-        (s) => `<a class="show-card" href="/${esc(s.slug)}">
+      .map((s) => {
+        const cats = (s.categories || []).filter(Boolean).slice(0, 4).join(', ');
+        const meta = cats || (s.episode_count != null ? s.episode_count + ' episodes' : s.author || '');
+        return `<a class="show-card" href="/${esc(s.slug)}">
       ${s.featured ? '<span class="badge">Featured</span>' : ''}
       <div class="art">${artOrPlaceholder(s.image_url, s.title)}</div>
       <div class="body"><h3>${esc(s.title)}</h3>
-      <div class="meta">${s.episode_count != null ? esc(s.episode_count) + ' episodes' : esc(s.author || '')}</div></div>
-    </a>`
-      )
+      <div class="meta">${esc(meta)}</div></div>
+    </a>`;
+      })
       .join('');
+
+  // Big Featured Podcast banner/carousel — built from each show's cover art.
+  const featuredBanner = featured.length
+    ? `<section class="section" id="featured"><div class="container">
+    <div class="section-head"><h2>Featured Podcast</h2></div>
+    <div class="fbanner" id="fbanner">
+      ${featured
+        .map(
+          (s, i) => `<a class="fbanner-slide${i === 0 ? ' active' : ''}" href="/${esc(s.slug)}">
+        <div class="fb-art">${artOrPlaceholder(s.image_url, s.title)}</div>
+        <div class="fb-info">
+          <h3>${esc(s.title)}</h3>
+          ${s.author ? `<div class="fb-host">${esc(s.author)}</div>` : ''}
+          <p>${esc(toText(s.description, 300))}</p>
+          <span class="btn btn-primary">Start Listening →</span>
+        </div>
+      </a>`
+        )
+        .join('')}
+    </div>
+    ${
+      featured.length > 1
+        ? `<div class="fbanner-dots">${featured
+            .map((_, i) => `<button class="fdot${i === 0 ? ' active' : ''}" data-i="${i}" type="button" aria-label="Featured ${i + 1}"></button>`)
+            .join('')}</div>`
+        : ''
+    }
+  </div></section>
+  <script>(function(){var s=document.querySelectorAll('#fbanner .fbanner-slide'),d=document.querySelectorAll('.fdot'),c=0;if(s.length<2)return;function go(n){s[c].classList.remove('active');d[c]&&d[c].classList.remove('active');c=(n+s.length)%s.length;s[c].classList.add('active');d[c]&&d[c].classList.add('active');}d.forEach(function(x){x.addEventListener('click',function(e){e.preventDefault();go(+x.getAttribute('data-i'));});});var t=setInterval(function(){go(c+1);},6000);})();</script>`
+    : '';
+
+  // Bouncing waveform behind the hero (SSR-stable heights/delays).
+  const heroWave = `<div class="hero-wave" aria-hidden="true">${Array.from({ length: 60 }, (_, i) => `<span style="animation-delay:${((i % 15) * 0.08).toFixed(2)}s"></span>`).join('')}</div>`;
 
   // Moving cover-art strip (the "charm" from the current site) — pure CSS,
   // duplicated once so the scroll loops seamlessly.
@@ -307,54 +342,63 @@ export function homePage({ shows }) {
     : '';
 
   const body = `
-  <section class="hero"><div class="container">
-    <h1>Think outside the <span class="accent">pod</span>.</h1>
-    <p>Straw Hut Media is an award-winning, full-service podcast production company and network. We take your show from first idea to chart-topping — production, distribution, monetization, and growth, all under one roof.</p>
-    <div style="margin-top:22px"><a class="btn btn-primary" href="/book">Book a 15-min fit call</a> <a class="btn btn-ghost" href="/shows" style="margin-left:8px">Hear our shows</a></div>
+  <section class="hero"><div class="container hero-inner">
+    <div class="hero-copy">
+      <span class="hero-eyebrow">Podcast production &amp; network · since 2018</span>
+      <h1>Think outside the <span class="accent">pod</span>.</h1>
+      <p>Straw Hut Media is an award-winning, full-service podcast production company and network. We take your show from first idea to chart-topping — production, distribution, monetization, and growth, all under one roof.</p>
+      <div class="hero-cta"><a class="btn btn-primary" href="/podcast-production">Start your podcast</a> <a class="btn btn-ghost" href="/shows">Hear our shows</a></div>
+    </div>
+    ${heroWave}
   </div></section>
   ${marquee}
 
-  ${
-    featured.length
-      ? `<section class="section"><div class="container">
-    <div class="section-head"><h2>Featured Shows</h2><a class="count" href="/shows">View all →</a></div>
-    <div class="featured-grid">${cards(featured)}</div>
-  </div></section>`
-      : ''
-  }
+  ${featuredBanner}
 
   ${
     originals.length
       ? `<section class="section" id="original"><div class="container">
     <div class="section-head"><h2>Original Shows</h2><a class="count" href="/shows#original">View all ${originals.length} →</a></div>
-    <div class="grid">${cards(originals.slice(0, 10))}</div>
+    <div class="grid">${cards(originals.slice(0, 8))}</div>
   </div></section>`
       : ''
   }
+
+  <section class="impact-band"><div class="container">
+    <div class="impact-inner">
+      <div class="impact-copy">
+        <h2>Your idea deserves a real production team.</h2>
+        <p>Anyone can hit record. Turning that into a show people won't stop listening to — the writing, the sound, the release strategy, the growth — is the part we've spent years getting very good at.</p>
+      </div>
+      <div class="impact-cta">
+        <a class="btn btn-primary" href="/podcast-production">Start your podcast →</a>
+        <a class="btn btn-ghost" href="/book">Book a 15-min fit call</a>
+      </div>
+    </div>
+  </div></section>
 
   ${
     partners.length
       ? `<section class="section" id="partnered"><div class="container">
     <div class="section-head"><h2>Partner Shows</h2><a class="count" href="/shows#partner">View all ${partners.length} →</a></div>
-    <div class="grid">${cards(partners.slice(0, 10))}</div>
+    <div class="grid">${cards(partners.slice(0, 8))}</div>
   </div></section>`
       : ''
   }
 
   <section class="section" id="advertise"><div class="container">
     <div class="section-head"><h2>Everything you need to make a podcast</h2></div>
-    <p style="color:var(--muted);max-width:760px;margin:-8px 0 26px">Straw Hut Media is a full-service podcast production company. Whether you're launching a brand-new show or scaling an existing one, we handle the entire journey — concept, recording, editing, sound design, distribution to every major platform, advertising, and audience growth. We produce our own award-winning originals and partner with brands and creators to build shows people love.</p>
-    <div class="services-grid">
-      ${SERVICES.map(
-        (s) => {
-          const inner = `<h3 style="margin-top:0">${esc(s.name)}${s.href ? ' <span class="accent" style="font-weight:600">→</span>' : ''}</h3><p class="meta" style="font-size:0.92rem;line-height:1.5">${esc(s.description)}</p>`;
-          return s.href
-            ? `<a class="show-card svc-card" href="${esc(s.href)}" style="padding:22px 22px 24px;display:block">${inner}</a>`
-            : `<article class="show-card" style="padding:22px 22px 24px">${inner}</article>`;
-        }
-      ).join('')}
+    <p class="section-lede">Straw Hut Media is a full-service podcast production company. Whether you're launching a brand-new show or scaling an existing one, we handle the entire journey — concept, recording, editing, sound design, distribution to every major platform, advertising, and audience growth. We produce our own award-winning originals and partner with brands and creators to build shows people love.</p>
+    <div class="pillars">
+      ${SERVICES.map((s, i) => {
+        const n = String(i + 1).padStart(2, '0');
+        const inner = `<span class="pillar-num">${n}</span><div class="pillar-body"><h3>${esc(s.name)}${s.href ? ' <span class="pillar-arrow">→</span>' : ''}</h3><p>${esc(s.description)}</p></div>`;
+        return s.href
+          ? `<a class="pillar pillar-link" href="${esc(s.href)}">${inner}</a>`
+          : `<article class="pillar">${inner}</article>`;
+      }).join('')}
     </div>
-    <p style="margin-top:24px"><a class="btn btn-primary" href="/book">Book a 15-min fit call →</a></p>
+    <p style="margin-top:28px"><a class="btn btn-primary" href="/book">Book a 15-min fit call →</a></p>
   </div></section>
 
   <section class="section" id="faq"><div class="container">
