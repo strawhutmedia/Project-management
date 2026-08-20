@@ -1110,8 +1110,20 @@ function epRecCard(showSlug, showTitle, ep, showImage) {
   </a>`;
 }
 
+// Clean teaser for the episode hero: whole sentences up to ~max chars, and if
+// it must be cut, cut at a word boundary — never mid-word with an ugly "…".
+function cleanExcerpt(html, max = 240) {
+  const t = toText(html, 100000);
+  if (!t || t.length <= max) return t;
+  const slice = t.slice(0, max);
+  const sentEnd = Math.max(slice.lastIndexOf('. '), slice.lastIndexOf('! '), slice.lastIndexOf('? '));
+  if (sentEnd >= max * 0.5) return slice.slice(0, sentEnd + 1).trim();
+  const sp = slice.lastIndexOf(' ');
+  return (sp > 0 ? slice.slice(0, sp) : slice).replace(/[\s,;:—-]+$/, '') + '…';
+}
+
 export function episodePage({ show, episode, moreFromShow = [], related = [] }) {
-  const hook = toText(episode.description, 150);
+  const hook = cleanExcerpt(episode.description, 240);
   const body = `
   <article>
   <section class="episode-hero"><div class="container">
