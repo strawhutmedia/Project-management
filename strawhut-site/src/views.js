@@ -344,9 +344,9 @@ export function homePage({ shows }) {
   const body = `
   <section class="hero"><div class="container hero-inner">
     <div class="hero-copy">
-      <span class="hero-eyebrow">Podcast production &amp; network · since 2018</span>
+      <span class="hero-eyebrow">Full-service podcast agency &amp; network · since 2018</span>
       <h1>Think outside the <span class="accent">pod</span>.</h1>
-      <p>Straw Hut Media is an award-winning, full-service podcast production company and network. We take your show from first idea to chart-topping — production, distribution, monetization, and growth, all under one roof.</p>
+      <p><strong>Straw Hut Media is an award-winning podcast agency and network.</strong> We take your show from first idea to chart-topping — production, distribution, monetization, and growth, all under one roof.</p>
       <div class="hero-cta"><a class="btn btn-primary" href="/podcast-production">Start your podcast</a> <a class="btn btn-ghost" href="/shows">Hear our shows</a></div>
     </div>
     ${heroWave}
@@ -388,7 +388,7 @@ export function homePage({ shows }) {
 
   <section class="section" id="advertise"><div class="container">
     <div class="section-head"><h2>Everything you need to make a podcast</h2></div>
-    <p class="section-lede">Straw Hut Media is a full-service podcast production company. Whether you're launching a brand-new show or scaling an existing one, we handle the entire journey — concept, recording, editing, sound design, distribution to every major platform, advertising, and audience growth. We produce our own award-winning originals and partner with brands and creators to build shows people love.</p>
+    <p class="section-lede">Straw Hut Media is a full-service podcast agency. Whether you're launching a brand-new show or scaling an existing one, we handle the entire journey — concept, recording, editing, sound design, distribution to every major platform, advertising, and audience growth. We produce our own award-winning originals and partner with brands and creators to build shows people love.</p>
     <div class="pillars">
       ${SERVICES.map((s, i) => {
         const n = String(i + 1).padStart(2, '0');
@@ -421,9 +421,9 @@ export function homePage({ shows }) {
     </div>
   </div></section>`;
   return layout({
-    title: 'Straw Hut Media — Podcast Production Company & Network',
+    title: 'Straw Hut Media — Podcast Agency & Network',
     description:
-      'Straw Hut Media is a full-service podcast production company and network. We produce, host, distribute, and monetize original and partner podcasts.',
+      'Straw Hut Media is a full-service podcast agency and network. We produce, host, distribute, and monetize original and partner podcasts.',
     body,
     activeNav: '/',
     path: '/',

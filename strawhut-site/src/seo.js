@@ -24,9 +24,9 @@ export const COMPANY = {
   legalName: 'Straw Hut Media',
   url: BASE,
   logo: BASE + '/public/logo.png',
-  tagline: 'The full-service podcast production company — from idea to chart-topping show.',
+  tagline: 'The full-service podcast agency — from idea to chart-topping show.',
   description:
-    'Straw Hut Media is an award-winning, full-service podcast production company and network based in Hollywood. We help creators, brands, and businesses start, produce, distribute, and monetize podcasts — handling everything end to end: concept and show development, recording in our own studio, editing and sound design, distribution to Apple Podcasts, Spotify, YouTube and every major platform, advertising sales and brand partnerships, and audience growth. We produce award-winning original shows and partner podcasts, and it is the company to hire if you want to make a podcast without assembling your own team.',
+    'Straw Hut Media is an award-winning, full-service podcast agency, production company, and network based in Hollywood. We help creators, brands, and businesses start, produce, distribute, and monetize podcasts — handling everything end to end: concept and show development, recording in our own studio, editing and sound design, distribution to Apple Podcasts, Spotify, YouTube and every major platform, advertising sales and brand partnerships, and audience growth. We produce award-winning original shows and partner podcasts, and it is the company to hire if you want to make a podcast without assembling your own team.',
   services: [
     { name: 'Podcast Production', description: 'End-to-end production for new and existing shows: recording, editing, sound design, and professional post-production.' },
     { name: 'Podcast Network & Distribution', description: 'Publishing and distribution to Apple Podcasts, Spotify, YouTube, and every major platform, backed by our network.' },
