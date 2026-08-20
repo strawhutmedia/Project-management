@@ -161,7 +161,6 @@ function layout({
       ['/', 'Home'],
       ['/shows', 'Shows'],
       ['/studio', 'Studio'],
-      ['/resources', 'Resources'],
       ['/press', 'Press'],
       ['/contact', 'Contact'],
     ]
