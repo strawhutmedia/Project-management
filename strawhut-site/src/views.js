@@ -688,7 +688,9 @@ export function bookPage({ widgetUrl = '' } = {}) {
   const embed = widgetUrl
     ? `<iframe src="${esc(widgetUrl)}" title="Book a 15-minute call with Straw Hut Media" scrolling="no" id="shmBookingWidget" style="width:100%;min-height:740px;border:1px solid var(--border);border-radius:14px;background:#fff"></iframe>
        <script src="https://link.msgsndr.com/js/form_embed.js"></script>`
-    : `<div class="booking-note"><h3>Our scheduler is being connected</h3><p>Give us one sec to wire up the calendar. In the meantime, <a href="/contact">send us a quick note</a> and we'll get your 15-minute call on the books.</p></div>`;
+    : `<div class="calendly-inline-widget" data-url="https://calendly.com/strawhutmedia/discovery?hide_gdpr_banner=1&background_color=12182f&text_color=f2f3f8&primary_color=00cc8e" style="min-width:320px;height:740px"></div>
+       <script src="https://assets.calendly.com/assets/external/widget.js" async></script>
+       <noscript><p class="booking-note"><a href="https://calendly.com/strawhutmedia/discovery" target="_blank" rel="noopener">Open the scheduler to book your 15-minute call →</a></p></noscript>`;
   const body = `
   <section class="hero" style="padding-bottom:16px"><div class="container">
     <div class="breadcrumb" style="padding:0 0 14px"><a href="/">Home</a> / Book a call</div>
