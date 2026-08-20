@@ -359,7 +359,7 @@ export function homePage({ shows }) {
     originals.length
       ? `<section class="section" id="original"><div class="container">
     <div class="section-head"><h2>Original Shows</h2><a class="count" href="/shows#original">View all ${originals.length} →</a></div>
-    <div class="grid">${cards(originals.slice(0, 8))}</div>
+    <div class="grid grid-4">${cards(originals.slice(0, 4))}</div>
   </div></section>`
       : ''
   }
@@ -381,7 +381,7 @@ export function homePage({ shows }) {
     partners.length
       ? `<section class="section" id="partnered"><div class="container">
     <div class="section-head"><h2>Partner Shows</h2><a class="count" href="/shows#partner">View all ${partners.length} →</a></div>
-    <div class="grid">${cards(partners.slice(0, 8))}</div>
+    <div class="grid grid-4">${cards(partners.slice(0, 4))}</div>
   </div></section>`
       : ''
   }

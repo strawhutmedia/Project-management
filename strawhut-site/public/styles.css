@@ -145,6 +145,12 @@ img { max-width: 100%; display: block; }
 
 /* Show grid */
 .grid { display: grid; gap: 22px; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); }
+/* Homepage rows: a clean single row of 4 larger, highlighted cards */
+.grid-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.grid-4 .show-card h3 { font-size: 1.12rem; }
+.grid-4 .show-card .body { padding: 16px 17px 19px; }
+@media (max-width: 900px) { .grid-4 { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 460px) { .grid-4 { grid-template-columns: 1fr; } }
 .section-lede { color: var(--muted); max-width: 760px; margin: -8px 0 30px; font-size: 1.02rem; }
 
 /* Big Featured Podcast banner — one show at a time, built from cover art */
