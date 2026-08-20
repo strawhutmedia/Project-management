@@ -386,21 +386,6 @@ export function homePage({ shows }) {
       : ''
   }
 
-  <section class="section" id="advertise"><div class="container">
-    <div class="section-head"><h2>Everything you need to make a podcast</h2></div>
-    <p class="section-lede">Straw Hut Media is a full-service podcast agency. Whether you're launching a brand-new show or scaling an existing one, we handle the entire journey — concept, recording, editing, sound design, distribution to every major platform, advertising, and audience growth. We produce our own award-winning originals and partner with brands and creators to build shows people love.</p>
-    <div class="pillars">
-      ${SERVICES.map((s, i) => {
-        const n = String(i + 1).padStart(2, '0');
-        const inner = `<span class="pillar-num">${n}</span><div class="pillar-body"><h3>${esc(s.name)}${s.href ? ' <span class="pillar-arrow">→</span>' : ''}</h3><p>${esc(s.description)}</p></div>`;
-        return s.href
-          ? `<a class="pillar pillar-link" href="${esc(s.href)}">${inner}</a>`
-          : `<article class="pillar">${inner}</article>`;
-      }).join('')}
-    </div>
-    <p style="margin-top:28px"><a class="btn btn-primary" href="/book">Book a 15-min fit call →</a></p>
-  </div></section>
-
   <section class="section" id="faq"><div class="container">
     <div class="section-head"><h2>Podcasting questions, answered</h2></div>
     <div class="faq-list">
