@@ -231,7 +231,6 @@ ${trackingBody()}
   </div>
   <div class="footer-base">
     <div>© ${new Date().getFullYear()} Straw Hut Media — ${esc('Full-service podcast production & network')}</div>
-    <div class="footer-links"><a href="/contact">Contact</a> · <a href="/admin">Admin</a></div>
   </div>
 </div></footer>
 </body></html>`;
@@ -301,8 +300,10 @@ export function homePage({ shows }) {
   const marqueeShows = shows.filter((s) => s.image_url);
   const marqueeItem = (s) =>
     `<a class="marquee-item" href="/${esc(s.slug)}" title="${esc(s.title)}"><img src="${esc(s.image_url)}" alt="${esc(s.title)}" loading="lazy"></a>`;
+  const marqueeRow = (list, extra) =>
+    `<div class="marquee"><div class="marquee-track${extra}">${[...list, ...list].map(marqueeItem).join('')}</div></div>`;
   const marquee = marqueeShows.length
-    ? `<div class="marquee"><div class="marquee-track">${[...marqueeShows, ...marqueeShows].map(marqueeItem).join('')}</div></div>`
+    ? marqueeRow(marqueeShows, '') + marqueeRow([...marqueeShows].reverse(), ' reverse')
     : '';
 
   const body = `
@@ -317,7 +318,7 @@ export function homePage({ shows }) {
     featured.length
       ? `<section class="section"><div class="container">
     <div class="section-head"><h2>Featured Shows</h2><a class="count" href="/shows">View all →</a></div>
-    <div class="spotlight-row">${cards(featured)}</div>
+    <div class="featured-grid">${cards(featured)}</div>
   </div></section>`
       : ''
   }
@@ -326,7 +327,7 @@ export function homePage({ shows }) {
     originals.length
       ? `<section class="section" id="original"><div class="container">
     <div class="section-head"><h2>Original Shows</h2><a class="count" href="/shows#original">View all ${originals.length} →</a></div>
-    <div class="spotlight-row">${cards(originals.slice(0, 12))}</div>
+    <div class="grid">${cards(originals.slice(0, 10))}</div>
   </div></section>`
       : ''
   }
@@ -335,7 +336,7 @@ export function homePage({ shows }) {
     partners.length
       ? `<section class="section" id="partnered"><div class="container">
     <div class="section-head"><h2>Partner Shows</h2><a class="count" href="/shows#partner">View all ${partners.length} →</a></div>
-    <div class="spotlight-row">${cards(partners.slice(0, 12))}</div>
+    <div class="grid">${cards(partners.slice(0, 10))}</div>
   </div></section>`
       : ''
   }
@@ -343,7 +344,7 @@ export function homePage({ shows }) {
   <section class="section" id="advertise"><div class="container">
     <div class="section-head"><h2>Everything you need to make a podcast</h2></div>
     <p style="color:var(--muted);max-width:760px;margin:-8px 0 26px">Straw Hut Media is a full-service podcast production company. Whether you're launching a brand-new show or scaling an existing one, we handle the entire journey — concept, recording, editing, sound design, distribution to every major platform, advertising, and audience growth. We produce our own award-winning originals and partner with brands and creators to build shows people love.</p>
-    <div class="grid" style="grid-template-columns:repeat(auto-fill,minmax(260px,1fr))">
+    <div class="services-grid">
       ${SERVICES.map(
         (s) => {
           const inner = `<h3 style="margin-top:0">${esc(s.name)}${s.href ? ' <span class="accent" style="font-weight:600">→</span>' : ''}</h3><p class="meta" style="font-size:0.92rem;line-height:1.5">${esc(s.description)}</p>`;
