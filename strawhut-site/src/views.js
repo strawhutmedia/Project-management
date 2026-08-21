@@ -210,6 +210,10 @@ ${image ? `<meta property="og:image" content="${esc(image)}">` : ''}
 ${image ? `<meta name="twitter:image" content="${esc(image)}">` : ''}
 ${feedUrl ? `<link rel="alternate" type="application/rss+xml" title="${esc(title)}" href="${esc(feedUrl)}">` : ''}
 ${RESOURCE_HINTS}
+<link rel="icon" href="/public/favicon.ico" sizes="any">
+<link rel="icon" type="image/png" sizes="32x32" href="/public/favicon-32.png">
+<link rel="icon" type="image/png" sizes="16x16" href="/public/favicon-16.png">
+<link rel="apple-touch-icon" href="/public/favicon-180.png">
 ${trackingHead()}
 ${FONT}
 <link rel="stylesheet" href="/styles.css">
@@ -218,7 +222,7 @@ ${jsonLd}
 <body class="${bodyClass}">
 ${trackingBody()}
 <header class="site-header"><div class="container">
-  <a class="brand" href="/" aria-label="Straw Hut Media home"><img class="brand-logo" src="/public/straw-hut-logo.png" alt="Straw Hut Media" width="973" height="322"></a>
+  <a class="brand" href="/" aria-label="Straw Hut Media home"><img class="brand-logo" src="/public/shm-logo.gif" alt="Straw Hut Media" width="349" height="160"></a>
   <button class="nav-toggle" id="navToggle" type="button" aria-label="Menu" aria-expanded="false" aria-controls="siteNav"><span class="nav-toggle-bars"></span></button>
   <nav class="nav" id="siteNav">${nav}</nav>
 </div></header>
@@ -262,7 +266,7 @@ function footerBlock() {
   return `<footer class="site-footer"><div class="container">
   <div class="footer-top">
     <div class="footer-brand">
-      <img class="brand-logo" src="/public/straw-hut-logo.png" alt="Straw Hut Media" width="973" height="322">
+      <img class="brand-logo" src="/public/shm-logo.gif" alt="Straw Hut Media" width="349" height="160">
       <p>Award-winning podcast agency &amp; network — from first idea to chart-topping show.</p>
       ${socials}
     </div>
