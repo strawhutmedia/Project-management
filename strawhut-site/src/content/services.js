@@ -23,6 +23,7 @@ export const SERVICE_PAGES = [
       'Straw Hut Media is a full-service podcast production company and network based in Hollywood. Whether you are launching a brand-new show or leveling up an existing one, we own the entire process — concept, recording, editing, sound design, publishing, distribution, and audience growth — so you get a professional, chart-competitive podcast without hiring and managing a team of specialists.',
     highlights: [
       { name: 'Show development', text: 'Concept, format, positioning, and a real launch plan built to stand out and last.' },
+      { name: 'Creative direction', text: 'A creative director prepping every brief, script, and rundown and guiding hosts and guests through recording and post — so the talent can focus purely on the content while we shape the show.' },
       { name: 'Studio recording', text: 'Record in our fully-equipped Hollywood studio — pro audio and multi-camera 4K video.' },
       { name: 'Editing & sound design', text: 'Content editing, mixing, original sound design, and broadcast-standard mastering on every episode.' },
       { name: 'Distribution', text: 'Published and optimized across Apple Podcasts, Spotify, YouTube, and every major platform.' },
@@ -51,7 +52,7 @@ export const SERVICE_PAGES = [
       name: 'Podcast Production',
       serviceType: 'Podcast production',
       description:
-        'Full-service podcast production: show development, studio recording, editing, sound design, distribution, growth, and monetization for creators, brands, and businesses.',
+        'Full-service podcast production: show development, creative direction, studio recording, editing, sound design, distribution, growth, and monetization for creators, brands, and businesses.',
     },
   },
 
