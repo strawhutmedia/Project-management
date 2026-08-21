@@ -732,7 +732,7 @@ export function servicePage(cfg, { shows = [] } = {}) {
       <p class="trusted-eyebrow" style="color:#5a6270">Trusted by the teams behind</p>
       <div class="logo-wall">${trusted
         .map(
-          (c) => `<span class="logo-item${c.tall ? ' tall' : ''}"><img src="${esc(c.logo)}" alt="${esc(c.name)}" loading="lazy"></span>`
+          (c) => `<span class="logo-item${c.tall ? ' tall' : ''}${c.mid ? ' mid' : ''}"><img src="${esc(c.logo)}" alt="${esc(c.name)}" loading="lazy"></span>`
         )
         .join('')}</div>
     </div></section>`
@@ -836,7 +836,7 @@ const CLIENTS = [
   { name: 'Plus Company', logo: '/public/logos/plus-company.png' },
   { name: 'We Are Social', logo: '/public/logos/we-are-social.png' },
   { name: 'King Pleasure', logo: '/public/logos/king-pleasure.png', tall: true },
-  { name: 'Shaping Freedom', logo: '/public/logos/shaping-freedom.png' },
+  { name: 'Shaping Freedom', logo: '/public/logos/shaping-freedom.png', mid: true },
   { name: 'Phil Rosenthal', logo: '/public/logos/phil-rosenthal.png' },
   { name: 'Gayety', logo: '/public/logos/gayety.png' },
   { name: 'Kiss the Ground', logo: '/public/logos/kiss-the-ground.png' },
@@ -849,7 +849,7 @@ const TEAM = [];
 export function aboutPage() {
   const logos = CLIENTS.map((c) =>
     c.logo
-      ? `<span class="logo-item${c.tall ? ' tall' : ''}"><img src="${esc(c.logo)}" alt="${esc(c.name)}" loading="lazy"></span>`
+      ? `<span class="logo-item${c.tall ? ' tall' : ''}${c.mid ? ' mid' : ''}"><img src="${esc(c.logo)}" alt="${esc(c.name)}" loading="lazy"></span>`
       : `<span class="logo-item logo-word">${esc(c.name)}</span>`
   ).join('');
   const team = TEAM.length

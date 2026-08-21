@@ -649,14 +649,16 @@ table.admin-table { width: 100%; border-collapse: collapse; }
    scale down, tall marks fit by height) — a uniform, monochrome-white wall. */
 .logo-item {
   display: inline-flex; align-items: center; justify-content: center;
-  height: 42px; opacity: 0.9; transition: opacity 0.2s ease;
+  height: 44px; opacity: 0.92; transition: opacity 0.2s ease;
 }
 .logo-item:hover { opacity: 1; }
 /* Normalize by HEIGHT so every mark reads at the same visual weight, with
-   natural widths (wide marks stay wide, no squished boxes). */
+   natural widths (wide marks stay wide, no squished boxes). Detailed and
+   portrait lockups get extra height so they stay legible. */
 .logo-item img {
-  height: 100%; width: auto; max-width: 210px; object-fit: contain;
+  height: 100%; width: auto; max-width: 230px; object-fit: contain;
 }
+.logo-item.mid { height: 58px; }      /* fine-detail landscape marks (Shaping Freedom) */
 .logo-word {
   font-size: 1.05rem; font-weight: 700; letter-spacing: 0.01em; color: #12182f;
   white-space: nowrap; text-align: center;
@@ -672,7 +674,7 @@ table.admin-table { width: 100%; border-collapse: collapse; }
 .clients-band .logo-item img { filter: none; }
 /* Tall/stacked lockups (e.g. the Basquiat King Pleasure logo) get extra height
    so they stay legible in the strip. */
-.logo-item.tall { height: 66px; }
+.logo-item.tall { height: 78px; }     /* portrait/stacked lockups (King Pleasure) */
 .team-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 16px; }
 .team-member {
   display: flex; flex-direction: column; gap: 2px; padding: 16px 18px;
