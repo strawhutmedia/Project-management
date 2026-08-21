@@ -56,7 +56,7 @@ app.use('/public', express.static(path.join(__dirname, '..', 'public'), staticOp
 // feed sync so every page's footer stays current.
 async function refreshFooter() {
   try {
-    V.setFooterData({ recentEpisodes: await store.recentEpisodes(6) });
+    V.setFooterData({ recentEpisodes: await store.recentEpisodes(12) });
   } catch (e) {
     console.error('[footer] refresh failed:', e.message);
   }

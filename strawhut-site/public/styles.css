@@ -402,6 +402,21 @@ img { max-width: 100%; display: block; }
 }
 .footer-socials a:hover { color: var(--accent-ink); background: var(--accent); border-color: transparent; transform: translateY(-2px); }
 .footer-socials svg { width: 18px; height: 18px; }
+/* Instagram module */
+.footer-ig { padding-bottom: 34px; margin-bottom: 34px; border-bottom: 1px solid var(--border); }
+.footer-ig-head { display: flex; align-items: baseline; justify-content: space-between; gap: 14px; margin-bottom: 14px; flex-wrap: wrap; }
+.footer-ig-head .footer-h { margin: 0; }
+.ig-follow { color: var(--accent); font-weight: 600; font-size: 0.92rem; }
+.ig-follow:hover { color: #00e6a0; }
+.ig-grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 12px; }
+.ig-tile { position: relative; aspect-ratio: 1/1; border-radius: 12px; overflow: hidden; background: var(--card-2); box-shadow: var(--shadow); }
+.ig-tile img { width: 100%; height: 100%; object-fit: cover; transition: transform 0.25s, filter 0.2s; }
+.ig-tile:hover img { transform: scale(1.06); filter: brightness(0.8); }
+.ig-badge { position: absolute; top: 8px; right: 8px; width: 22px; height: 22px; color: #fff; opacity: 0.9; filter: drop-shadow(0 1px 2px rgba(0,0,0,0.5)); }
+.ig-badge svg { width: 100%; height: 100%; }
+@media (max-width: 760px) { .ig-grid { grid-template-columns: repeat(3, 1fr); } }
+@media (max-width: 760px) { .ig-tile:nth-child(n+7) { display: none; } }
+
 /* Recent episodes rail */
 .footer-recent .footer-h { margin-bottom: 12px; }
 .recent-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }

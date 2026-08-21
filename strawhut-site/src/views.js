@@ -262,7 +262,30 @@ function footerBlock() {
     { length: 90 },
     (_, i) => `<span style="animation-delay:${((i % 18) * 0.07).toFixed(2)}s"></span>`
   ).join('')}</div>`;
+  // Instagram module — recent video content as tiles that link out to the real
+  // profile, with a Follow button. (Live IG post pull needs their API/approval.)
+  const igUrl = (SOCIALS.find(([n]) => n === 'Instagram') || [])[1] || '#';
+  const igTiles = (_footerData.recentEpisodes || [])
+    .map((e) => (e.youtube_id ? `https://i.ytimg.com/vi/${e.youtube_id}/hqdefault.jpg` : e.image_url || e.show_image))
+    .filter(Boolean)
+    .slice(0, 6);
+  const igBadge =
+    '<span class="ig-badge"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2.2c3.2 0 3.6 0 4.9.07 1.17.05 1.8.25 2.23.41.56.22.96.48 1.38.9.42.42.68.82.9 1.38.16.42.36 1.06.41 2.23.06 1.27.07 1.65.07 4.85s0 3.58-.07 4.85c-.05 1.17-.25 1.8-.41 2.23-.22.56-.48.96-.9 1.38-.42.42-.82.68-1.38.9-.42.16-1.06.36-2.23.41-1.27.06-1.65.07-4.85.07s-3.58 0-4.85-.07c-1.17-.05-1.8-.25-2.23-.41a3.7 3.7 0 0 1-1.38-.9 3.7 3.7 0 0 1-.9-1.38c-.16-.42-.36-1.06-.41-2.23C2.21 15.58 2.2 15.2 2.2 12s0-3.58.07-4.85c.05-1.17.25-1.8.41-2.23.22-.56.48-.96.9-1.38.42-.42.82-.68 1.38-.9.42-.16 1.06-.36 2.23-.41C8.42 2.21 8.8 2.2 12 2.2Zm0 4.86A4.94 4.94 0 1 0 12 17a4.94 4.94 0 0 0 0-9.94Zm0 8.14A3.2 3.2 0 1 1 12 8.8a3.2 3.2 0 0 1 0 6.4Zm6.3-8.34a1.15 1.15 0 1 1-2.3 0 1.15 1.15 0 0 1 2.3 0Z"/></svg></span>';
+  const igWidget = igTiles.length
+    ? `<div class="footer-ig">
+      <div class="footer-ig-head">
+        <div class="footer-h">Follow along on Instagram</div>
+        <a class="ig-follow" href="${esc(igUrl)}" target="_blank" rel="noopener">@strawhut.media →</a>
+      </div>
+      <div class="ig-grid">${igTiles
+        .map(
+          (src) => `<a class="ig-tile" href="${esc(igUrl)}" target="_blank" rel="noopener"><img src="${esc(src)}" alt="Straw Hut Media on Instagram" loading="lazy">${igBadge}</a>`
+        )
+        .join('')}</div>
+    </div>`
+    : '';
   return `<footer class="site-footer"><div class="container">
+  ${igWidget}
   <div class="footer-top">
     <div class="footer-brand">
       <img class="brand-logo" src="/public/shm-logo.gif" alt="Straw Hut Media" width="349" height="160">
