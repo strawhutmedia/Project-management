@@ -135,6 +135,17 @@ class JsonStore {
   async allEpisodesRaw() {
     return Object.values(this.db.episodes);
   }
+  async recentEpisodes(limit = 6) {
+    const shows = this.db.shows || {};
+    return Object.values(this.db.episodes)
+      .filter((e) => e.published_at)
+      .sort((a, b) => new Date(b.published_at) - new Date(a.published_at))
+      .slice(0, limit)
+      .map((e) => {
+        const s = shows[e.show_id];
+        return { ...e, show_slug: s ? s.slug : null, show_title: s ? s.title : '', show_image: s ? s.image_url : '' };
+      });
+  }
   async setEpisodeEmbedding(id, vec) {
     if (this.db.episodes[id]) this.db.episodes[id].embedding = vec; // flush batched via save()
   }
@@ -476,6 +487,18 @@ class PgStore {
   async allEpisodesRaw() {
     const { rows } = await this.pool.query(
       `SELECT id, show_id, slug, title, image_url, duration, embedding, youtube_id FROM episodes`
+    );
+    return rows;
+  }
+  async recentEpisodes(limit = 6) {
+    const { rows } = await this.pool.query(
+      `SELECT e.id, e.show_id, e.slug, e.title, e.image_url, e.duration, e.published_at, e.youtube_id,
+              s.slug AS show_slug, s.title AS show_title, s.image_url AS show_image
+         FROM episodes e JOIN shows s ON s.id = e.show_id
+        WHERE e.published_at IS NOT NULL
+        ORDER BY e.published_at DESC NULLS LAST
+        LIMIT $1`,
+      [limit]
     );
     return rows;
   }

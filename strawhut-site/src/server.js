@@ -52,6 +52,16 @@ app.use('/public', express.static(path.join(__dirname, '..', 'public'), staticOp
 
 // Spotlight = most-downloaded shows (Megaphone). Falls back to the curated
 // monthly rotation only when Megaphone isn't configured or returns no numbers.
+// Sitewide footer "Recent episodes" rail — refreshed on boot and after each
+// feed sync so every page's footer stays current.
+async function refreshFooter() {
+  try {
+    V.setFooterData({ recentEpisodes: await store.recentEpisodes(6) });
+  } catch (e) {
+    console.error('[footer] refresh failed:', e.message);
+  }
+}
+
 let spotlightStatus = { source: 'pending', megaphoneConfigured: megaphoneConfigured() };
 async function refreshSpotlight() {
   try {
@@ -850,6 +860,7 @@ app.listen(PORT, async () => {
       }
       await refreshPress(store, { log: (m) => console.log('[press]', m) }).catch(() => {});
       await refreshSpotlight();
+      await refreshFooter();
     },
   });
 
@@ -911,6 +922,9 @@ app.listen(PORT, async () => {
   // Homepage spotlight: prefer the most-downloaded shows (Megaphone); fall
   // back to the curated monthly rotation only if Megaphone isn't reachable.
   refreshSpotlight();
+
+  // Populate the footer "Recent episodes" rail.
+  refreshFooter();
 
   // Backfill unique, AI-written SEO meta descriptions for shows that don't have
   // one yet. Runs once per boot in the background, paced to be gentle on the

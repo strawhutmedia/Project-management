@@ -142,6 +142,23 @@ export function platformRow(show) {
   </div>`;
 }
 
+// Straw Hut Media social profiles (from the live strawhutmedia.com footer).
+const SOCIALS = [
+  ['Instagram', 'https://www.instagram.com/strawhut.media/', '<path d="M12 2.2c3.2 0 3.6 0 4.9.07 1.17.05 1.8.25 2.23.41.56.22.96.48 1.38.9.42.42.68.82.9 1.38.16.42.36 1.06.41 2.23.06 1.27.07 1.65.07 4.85s0 3.58-.07 4.85c-.05 1.17-.25 1.8-.41 2.23-.22.56-.48.96-.9 1.38-.42.42-.82.68-1.38.9-.42.16-1.06.36-2.23.41-1.27.06-1.65.07-4.85.07s-3.58 0-4.85-.07c-1.17-.05-1.8-.25-2.23-.41a3.7 3.7 0 0 1-1.38-.9 3.7 3.7 0 0 1-.9-1.38c-.16-.42-.36-1.06-.41-2.23C2.21 15.58 2.2 15.2 2.2 12s0-3.58.07-4.85c.05-1.17.25-1.8.41-2.23.22-.56.48-.96.9-1.38.42-.42.82-.68 1.38-.9.42-.16 1.06-.36 2.23-.41C8.42 2.21 8.8 2.2 12 2.2Zm0 1.8c-3.15 0-3.5 0-4.75.07-.9.04-1.38.19-1.7.31-.43.17-.74.37-1.06.69-.32.32-.52.63-.69 1.06-.12.32-.27.8-.31 1.7C3.4 8.5 3.4 8.85 3.4 12s0 3.5.09 4.75c.04.9.19 1.38.31 1.7.17.43.37.74.69 1.06.32.32.63.52 1.06.69.32.12.8.27 1.7.31 1.25.06 1.6.07 4.75.07s3.5 0 4.75-.07c.9-.04 1.38-.19 1.7-.31.43-.17.74-.37 1.06-.69.32-.32.52-.63.69-1.06.12-.32.27-.8.31-1.7.06-1.25.07-1.6.07-4.75s0-3.5-.07-4.75c-.04-.9-.19-1.38-.31-1.7a2.86 2.86 0 0 0-.69-1.06 2.86 2.86 0 0 0-1.06-.69c-.32-.12-.8-.27-1.7-.31C15.5 4 15.15 4 12 4Zm0 3.06A4.94 4.94 0 1 1 12 17a4.94 4.94 0 0 1 0-9.88Zm0 8.14A3.2 3.2 0 1 0 12 8.8a3.2 3.2 0 0 0 0 6.4Zm6.3-8.34a1.15 1.15 0 1 1-2.3 0 1.15 1.15 0 0 1 2.3 0Z"/>'],
+  ['Facebook', 'https://m.facebook.com/strawhutmedia/', '<path d="M22 12a10 10 0 1 0-11.56 9.88v-6.99H7.9V12h2.54V9.8c0-2.5 1.49-3.89 3.77-3.89 1.09 0 2.24.2 2.24.2v2.46h-1.26c-1.24 0-1.63.77-1.63 1.56V12h2.78l-.44 2.89h-2.34v6.99A10 10 0 0 0 22 12Z"/>'],
+  ['Twitter', 'https://twitter.com/strawhutmedia', '<path d="M18.9 2.5h3.3l-7.2 8.24L23.7 21.5h-6.63l-5.2-6.8-5.94 6.8H2.63l7.7-8.8L2 2.5h6.8l4.7 6.2 5.4-6.2Zm-1.16 17h1.83L7.34 4.4H5.38l12.36 15.1Z"/>'],
+  ['YouTube', 'https://www.youtube.com/@strawhutmedia', '<path d="M23.5 6.5a3 3 0 0 0-2.12-2.12C19.5 3.87 12 3.87 12 3.87s-7.5 0-9.38.51A3 3 0 0 0 .5 6.5 31.3 31.3 0 0 0 0 12a31.3 31.3 0 0 0 .5 5.5 3 3 0 0 0 2.12 2.12c1.88.51 9.38.51 9.38.51s7.5 0 9.38-.51A3 3 0 0 0 23.5 17.5 31.3 31.3 0 0 0 24 12a31.3 31.3 0 0 0-.5-5.5ZM9.6 15.6V8.4l6.24 3.6-6.24 3.6Z"/>'],
+  ['Email', 'mailto:hello@strawhutmedia.com', '<path d="M3 4h18a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2Zm0 2v.4l9 5.6 9-5.6V6H3Zm18 12V8.75l-8.47 5.27a1 1 0 0 1-1.06 0L3 8.75V18h18Z"/>'],
+];
+
+// Sitewide footer data (recent episodes) — server.js refreshes this via
+// setFooterData() on boot and after each feed sync; layout() reads from it so
+// every page's footer stays current without threading data through each route.
+let _footerData = { recentEpisodes: [] };
+export function setFooterData(d = {}) {
+  _footerData = { ..._footerData, ...d };
+}
+
 function layout({
   title,
   description,
@@ -201,39 +218,81 @@ ${jsonLd}
 <body class="${bodyClass}">
 ${trackingBody()}
 <header class="site-header"><div class="container">
-  <a class="brand" href="/" aria-label="Straw Hut Media home"><span class="brand-box">Straw Hut</span></a>
+  <a class="brand" href="/" aria-label="Straw Hut Media home"><img class="brand-logo" src="/straw-hut-logo.png" alt="Straw Hut Media" width="973" height="322"></a>
   <button class="nav-toggle" id="navToggle" type="button" aria-label="Menu" aria-expanded="false" aria-controls="siteNav"><span class="nav-toggle-bars"></span></button>
   <nav class="nav" id="siteNav">${nav}</nav>
 </div></header>
 <script>(function(){var t=document.getElementById('navToggle'),n=document.getElementById('siteNav');if(!t||!n)return;t.addEventListener('click',function(){var open=n.classList.toggle('open');t.classList.toggle('open',open);t.setAttribute('aria-expanded',open?'true':'false');});n.addEventListener('click',function(e){if(e.target.tagName==='A'){n.classList.remove('open');t.classList.remove('open');t.setAttribute('aria-expanded','false');}});})();</script>
 <main>${body}</main>
-<footer class="site-footer"><div class="container">
-  <div class="footer-cols">
-    <div class="footer-col">
-      <div class="footer-h">Services</div>
-      <a href="/podcast-production">Podcast Production</a>
-      <a href="/advertise">Advertise With Us</a>
-      <a href="/studio">Book the Studio</a>
+${footerBlock()}
+</body></html>`;
+}
+
+// Sitewide footer: link columns, social icons, and a live "Recent episodes"
+// rail fed from _footerData, capped with an animated waveform strip.
+function footerBlock() {
+  const recent = (_footerData.recentEpisodes || []).slice(0, 4);
+  const recentList = recent.length
+    ? `<div class="footer-recent">
+      <div class="footer-h">Recent episodes</div>
+      <ul class="recent-list">
+        ${recent
+          .map((e) => {
+            const d = e.published_at ? new Date(e.published_at) : null;
+            const day = d ? String(d.getDate()) : '';
+            const mon = d ? d.toLocaleString('en-US', { month: 'short' }) : '';
+            const url = e.show_slug ? `/${esc(e.show_slug)}/${esc(e.slug)}` : '#';
+            return `<li><a href="${url}">
+              <span class="recent-date">${day}<small>${mon}</small></span>
+              <span class="recent-title">${esc(e.title)}</span>
+            </a></li>`;
+          })
+          .join('')}
+      </ul>
+    </div>`
+    : '';
+  const socials = `<div class="footer-socials">${SOCIALS.map(
+    ([name, url, path]) =>
+      `<a href="${esc(url)}"${url.startsWith('mailto:') ? '' : ' target="_blank" rel="noopener"'} aria-label="${esc(name)}" title="${esc(name)}"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">${path}</svg></a>`
+  ).join('')}</div>`;
+  const wave = `<div class="footer-wave" aria-hidden="true">${Array.from(
+    { length: 90 },
+    (_, i) => `<span style="animation-delay:${((i % 18) * 0.07).toFixed(2)}s"></span>`
+  ).join('')}</div>`;
+  return `<footer class="site-footer"><div class="container">
+  <div class="footer-top">
+    <div class="footer-brand">
+      <img class="brand-logo" src="/straw-hut-logo.png" alt="Straw Hut Media" width="973" height="322">
+      <p>Award-winning podcast agency &amp; network — from first idea to chart-topping show.</p>
+      ${socials}
     </div>
-    <div class="footer-col">
-      <div class="footer-h">Explore</div>
-      <a href="/about">About</a>
-      <a href="/shows">All Shows</a>
-      <a href="/resources">Guides &amp; Resources</a>
-      <a href="/press">Press</a>
-      <a href="/contact">Contact</a>
+    <div class="footer-cols">
+      <div class="footer-col">
+        <div class="footer-h">Services</div>
+        <a href="/podcast-production">Podcast Production</a>
+        <a href="/advertise">Advertise With Us</a>
+        <a href="/studio">Book the Studio</a>
+      </div>
+      <div class="footer-col">
+        <div class="footer-h">Explore</div>
+        <a href="/about">About</a>
+        <a href="/shows">All Shows</a>
+        <a href="/resources">Guides &amp; Resources</a>
+        <a href="/resources#faq">Podcasting FAQ</a>
+        <a href="/contact">Contact</a>
+      </div>
+      <div class="footer-col">
+        <div class="footer-h">Get started</div>
+        <a href="/book">Book a 15-min fit call</a>
+        <a href="/pricing">Packages &amp; pricing</a>
+      </div>
     </div>
-    <div class="footer-col">
-      <div class="footer-h">Get started</div>
-      <a href="/book">Book a 15-min fit call</a>
-      <a href="/pricing">Packages &amp; pricing</a>
-    </div>
+    ${recentList}
   </div>
   <div class="footer-base">
-    <div>© ${new Date().getFullYear()} Straw Hut Media — ${esc('Full-service podcast production & network')}</div>
+    <div>© ${new Date().getFullYear()} Straw Hut Media — Full-service podcast agency &amp; network</div>
   </div>
-</div></footer>
-</body></html>`;
+</div>${wave}</footer>`;
 }
 
 export function notFoundPage({ suggestions = [] }) {
@@ -386,14 +445,14 @@ export function homePage({ shows }) {
       : ''
   }
 
-  <section class="section" id="faq"><div class="container">
-    <div class="section-head"><h2>Podcasting questions, answered</h2></div>
-    <div class="faq-list">
-      ${FAQ.map(
-        ([q, a]) => `<details class="faq-item"><summary>${esc(q)}</summary><p>${esc(a)}</p></details>`
-      ).join('')}
+  <section class="stats-band" id="stats"><div class="container">
+    <div class="stats-grid">
+      <div class="stat"><div class="stat-num" data-target="104" data-suffix="M">0</div><div class="stat-label">Americans listen to podcasts every month</div></div>
+      <div class="stat"><div class="stat-num" data-target="61" data-suffix="%">0</div><div class="stat-label">more likely to engage with brands they hear on podcasts</div></div>
+      <div class="stat"><div class="stat-num" data-target="78" data-suffix="%">0</div><div class="stat-label">say they support the ads they hear on podcasts</div></div>
     </div>
   </div></section>
+  <script>(function(){var band=document.getElementById('stats');if(!band)return;var nums=band.querySelectorAll('.stat-num');function run(){nums.forEach(function(n){var t=+n.getAttribute('data-target'),sfx=n.getAttribute('data-suffix')||'',start=null,dur=1600;function step(ts){if(!start)start=ts;var p=Math.min((ts-start)/dur,1);var val=Math.round((p<1?(1-Math.pow(1-p,3)):1)*t);n.textContent=val+sfx;if(p<1)requestAnimationFrame(step);}requestAnimationFrame(step);});}if('IntersectionObserver'in window){var io=new IntersectionObserver(function(e){e.forEach(function(x){if(x.isIntersecting){run();io.disconnect();}});},{threshold:0.4});io.observe(band);}else{run();}})();</script>
 
   <section class="section" id="subscribe"><div class="container">
     <div class="panel" style="max-width:640px;margin:0 auto;text-align:center;background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:34px">
@@ -413,7 +472,7 @@ export function homePage({ shows }) {
     activeNav: '/',
     path: '/',
     image: shows.find((s) => s.image_url)?.image_url,
-    jsonLd: organizationJsonLd() + '\n' + faqJsonLd(),
+    jsonLd: organizationJsonLd(),
   });
 }
 
@@ -494,23 +553,34 @@ export function resourcesIndexPage({ posts }) {
   </div></section>
   <section class="section" style="padding-top:8px"><div class="container">
     <div class="resource-grid">${cards}</div>
-    <div class="cta-band">
+  </div></section>
+  <section class="section" id="faq"><div class="container">
+    <div class="section-head"><h2>Podcasting questions, answered</h2></div>
+    <div class="faq-list">
+      ${FAQ.map(
+        ([q, a]) => `<details class="faq-item"><summary>${esc(q)}</summary><p>${esc(a)}</p></details>`
+      ).join('')}
+    </div>
+    <div class="cta-band" style="margin-top:34px">
       <h2>Ready to make your podcast?</h2>
       <p>We take shows from first idea to chart-topping — production, distribution, and growth under one roof.</p>
       <a class="btn btn-primary" href="/book">Book a 15-min fit call →</a>
     </div>
   </div></section>`;
   return layout({
-    title: 'Podcasting Guides & Resources — Straw Hut Media',
+    title: 'Podcasting Guides, Resources & FAQ — Straw Hut Media',
     description:
-      'Practical guides to starting, producing, growing, and monetizing a podcast — written by Straw Hut Media, a full-service podcast production company and network.',
+      'Practical guides and answers to the most common podcasting questions — starting, producing, growing, and monetizing a podcast — from Straw Hut Media, a full-service podcast agency and network.',
     body,
     activeNav: '/resources',
     path: '/resources',
-    jsonLd: breadcrumbJsonLd([
-      { name: 'Home', path: '/' },
-      { name: 'Resources', path: '/resources' },
-    ]),
+    jsonLd:
+      breadcrumbJsonLd([
+        { name: 'Home', path: '/' },
+        { name: 'Resources', path: '/resources' },
+      ]) +
+      '\n' +
+      faqJsonLd(),
   });
 }
 
