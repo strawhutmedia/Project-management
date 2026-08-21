@@ -692,10 +692,29 @@ const STUDIO_SHOTS = ['CA6A0788', 'CA6A0790', 'CA6A0794', 'CA6A0798', 'CA6A0800'
   (n) => `/public/studio/${n}.jpg`
 );
 
+// Straw Hut's flagship shows — surfaced first on the service pages.
+const FLAGSHIP_SLUGS = [
+  'only-murders-in-the-building',
+  'the-up-here-down-low-companion-podcast',
+  'wicked-the-official-podcast',
+  'seen-on-the-screen-with-jacqueline-coley',
+  'naked-lunch',
+  'commune-with-jeff-krasno',
+  'kiss-the-ground-w-ryland-engelhart',
+  'shaping-freedom-with-lisane-basquiat',
+];
+
 export function servicePage(cfg, { shows = [] } = {}) {
   const withArt = shows.filter((s) => s.image_url);
-  // Hero collage of real produced-show cover art (falls back to a waveform).
-  const heroArt = withArt.slice(0, 6);
+  // Order shows flagship-first, then everything else.
+  const flagshipOrder = new Map(FLAGSHIP_SLUGS.map((s, i) => [s, i]));
+  const orderedShows = [...withArt].sort((a, b) => {
+    const ai = flagshipOrder.has(a.slug) ? flagshipOrder.get(a.slug) : 999;
+    const bi = flagshipOrder.has(b.slug) ? flagshipOrder.get(b.slug) : 999;
+    return ai - bi;
+  });
+  // Hero collage — our biggest shows first (falls back to a waveform).
+  const heroArt = orderedShows.slice(0, 6);
   const heroVisual =
     heroArt.length >= 4
       ? `<div class="svc-hero-art">${heroArt
@@ -705,13 +724,15 @@ export function servicePage(cfg, { shows = [] } = {}) {
           .join('')}</div>`
       : `<div class="hero-wave" aria-hidden="true">${Array.from({ length: 44 }, (_, i) => `<span style="animation-delay:${((i % 12) * 0.08).toFixed(2)}s"></span>`).join('')}</div>`;
 
-  // Trusted-by logo strip (real client marks).
-  const trusted = CLIENTS.filter((c) => c.logo).slice(0, 8);
+  // Trusted-by logo strip — real brand colors on a white band (matches /about).
+  const trusted = CLIENTS.filter((c) => c.logo).slice(0, 9);
   const trustedStrip = trusted.length
-    ? `<section class="section" style="padding:18px 0 6px"><div class="container">
-      <p class="trusted-eyebrow">Trusted by the teams behind</p>
-      <div class="trusted-logos">${trusted
-        .map((c) => `<img src="${esc(c.logo)}" alt="${esc(c.name)}" loading="lazy">`)
+    ? `<section class="section clients-band"><div class="container">
+      <p class="trusted-eyebrow" style="color:#5a6270">Trusted by the teams behind</p>
+      <div class="logo-wall">${trusted
+        .map(
+          (c) => `<span class="logo-item${c.tall ? ' tall' : ''}"><img src="${esc(c.logo)}" alt="${esc(c.name)}" loading="lazy"></span>`
+        )
         .join('')}</div>
     </div></section>`
     : '';
@@ -723,12 +744,12 @@ export function servicePage(cfg, { shows = [] } = {}) {
     )
     .join('');
 
-  // Cover-art marquee of shows we've produced.
-  const marquee = withArt.length
+  // Cover-art marquee of shows we've produced (flagship first).
+  const marquee = orderedShows.length
     ? `<section class="section"><div class="container">
       <div class="section-head"><h2>Shows we've produced</h2><a class="count" href="/shows">View all →</a></div>
     </div>
-    <div class="marquee"><div class="marquee-track">${[...withArt, ...withArt]
+    <div class="marquee"><div class="marquee-track">${[...orderedShows, ...orderedShows]
       .map(
         (s) => `<a class="marquee-item" href="/${esc(s.slug)}" title="${esc(s.title)}"><img src="${esc(s.image_url)}" alt="${esc(s.title)}" loading="lazy"></a>`
       )
