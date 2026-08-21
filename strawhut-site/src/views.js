@@ -228,6 +228,7 @@ ${trackingBody()}
 <script>(function(){var t=document.getElementById('navToggle'),n=document.getElementById('siteNav');if(!t||!n)return;t.addEventListener('click',function(){var open=n.classList.toggle('open');t.classList.toggle('open',open);t.setAttribute('aria-expanded',open?'true':'false');});n.addEventListener('click',function(e){if(e.target.tagName==='A'){n.classList.remove('open');t.classList.remove('open');t.setAttribute('aria-expanded','false');}});})();</script>
 <main>${body}</main>
 ${footerBlock()}
+<script>(function(){var sel='.section-head,.fbanner,.impact-inner,.stats-grid,.cta-band,.faq-list,.svc-hero-art,.footer-ig,.footer-top,.grid-4>*,.featured-grid>*,.pillars>*,.inc-item,.resource-card,.svc-shot,.ig-tile,.svc-tile';var els=[].slice.call(document.querySelectorAll(sel));if(!('IntersectionObserver'in window)||!els.length)return;var groups=new Map();var vh=window.innerHeight||document.documentElement.clientHeight;els.forEach(function(el){el.classList.add('reveal');var p=el.parentNode,i=groups.get(p)||0;groups.set(p,i+1);if(i)el.style.transitionDelay=Math.min(i,6)*0.06+'s';if(el.getBoundingClientRect().top<vh*0.92)el.classList.add('is-visible');});var io=new IntersectionObserver(function(en){en.forEach(function(e){if(e.isIntersecting){e.target.classList.add('is-visible');io.unobserve(e.target);}});},{threshold:0.1,rootMargin:'0px 0px -6% 0px'});els.forEach(function(el){if(!el.classList.contains('is-visible'))io.observe(el);});})();</script>
 </body></html>`;
 }
 
@@ -496,9 +497,9 @@ export function homePage({ shows }) {
 
   <section class="stats-band" id="stats"><div class="container">
     <div class="stats-grid">
-      <div class="stat"><div class="stat-num" data-target="158" data-suffix="M">0</div><div class="stat-label">Americans listen to podcasts every month</div></div>
-      <div class="stat"><div class="stat-num" data-target="44" data-suffix="%">0</div><div class="stat-label">of weekly listeners have bought something after hearing it on a podcast</div></div>
-      <div class="stat"><div class="stat-num" data-target="80" data-suffix="%">0</div><div class="stat-label">of active listeners trust the ads they hear on podcasts</div></div>
+      <div class="stat"><div class="stat-num" data-target="158" data-suffix="M">0</div><div class="stat-label">Americans listen to podcasts every month</div><div class="stat-source">Edison Research, Infinite Dial 2025</div></div>
+      <div class="stat"><div class="stat-num" data-target="44" data-suffix="%">0</div><div class="stat-label">of weekly listeners have bought something after hearing it on a podcast</div><div class="stat-source">Edison Research / Sounds Profitable, 2025</div></div>
+      <div class="stat"><div class="stat-num" data-target="80" data-suffix="%">0</div><div class="stat-label">of active listeners trust the ads they hear on podcasts</div><div class="stat-source">Sounds Profitable, 2025</div></div>
     </div>
   </div></section>
   <script>(function(){var band=document.getElementById('stats');if(!band)return;var nums=band.querySelectorAll('.stat-num');function run(){nums.forEach(function(n){var t=+n.getAttribute('data-target'),sfx=n.getAttribute('data-suffix')||'',start=null,dur=1600;function step(ts){if(!start)start=ts;var p=Math.min((ts-start)/dur,1);var val=Math.round((p<1?(1-Math.pow(1-p,3)):1)*t);n.textContent=val+sfx;if(p<1)requestAnimationFrame(step);}requestAnimationFrame(step);});}if('IntersectionObserver'in window){var io=new IntersectionObserver(function(e){e.forEach(function(x){if(x.isIntersecting){run();io.disconnect();}});},{threshold:0.4});io.observe(band);}else{run();}})();</script>
