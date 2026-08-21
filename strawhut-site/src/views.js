@@ -364,10 +364,33 @@ const artOrPlaceholder = (url, alt) =>
     ? `<img src="${esc(url)}" alt="${esc(alt)}" loading="lazy">`
     : `<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;color:var(--muted)">🎙️</div>`;
 
+// Owner-curated homepage line-ups. Pinned by slug, in this exact order; any
+// slug not found in the catalog is skipped, and the row is topped up from the
+// rest of that category so it always shows four.
+const HOME_ORIGINAL_SLUGS = ['naked-lunch', 'dont-be-alone-with-jay-kogen', 'behind-the-shadows-w-harvey-guillen', 'pride'];
+const HOME_PARTNER_SLUGS = ['wicked-the-official-podcast', 'only-murders-in-the-building', 'seen-on-the-screen-with-jacqueline-coley', 'commune-with-jeff-krasno'];
+
+function curateRow(pool, pinnedSlugs, count = 4) {
+  const bySlug = new Map(pool.map((s) => [s.slug, s]));
+  const picked = [];
+  const seen = new Set();
+  for (const slug of pinnedSlugs) {
+    const s = bySlug.get(slug);
+    if (s && !seen.has(slug)) { picked.push(s); seen.add(slug); }
+  }
+  for (const s of pool) {
+    if (picked.length >= count) break;
+    if (!seen.has(s.slug)) { picked.push(s); seen.add(s.slug); }
+  }
+  return picked.slice(0, count);
+}
+
 export function homePage({ shows }) {
   const featured = shows.filter((s) => s.featured);
   const originals = shows.filter((s) => (s.show_type || 'original') !== 'partnered');
   const partners = shows.filter((s) => s.show_type === 'partnered');
+  const originalPicks = curateRow(originals, HOME_ORIGINAL_SLUGS);
+  const partnerPicks = curateRow(partners, HOME_PARTNER_SLUGS);
   const cards = (list) =>
     list
       .map((s) => {
@@ -444,7 +467,7 @@ export function homePage({ shows }) {
     originals.length
       ? `<section class="section" id="original"><div class="container">
     <div class="section-head"><h2>Original Shows</h2><a class="count" href="/shows#original">View all ${originals.length} →</a></div>
-    <div class="grid grid-4">${cards(originals.slice(0, 4))}</div>
+    <div class="grid grid-4">${cards(originalPicks)}</div>
   </div></section>`
       : ''
   }
@@ -466,7 +489,7 @@ export function homePage({ shows }) {
     partners.length
       ? `<section class="section" id="partnered"><div class="container">
     <div class="section-head"><h2>Partner Shows</h2><a class="count" href="/shows#partner">View all ${partners.length} →</a></div>
-    <div class="grid grid-4">${cards(partners.slice(0, 4))}</div>
+    <div class="grid grid-4">${cards(partnerPicks)}</div>
   </div></section>`
       : ''
   }
