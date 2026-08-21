@@ -496,9 +496,9 @@ export function homePage({ shows }) {
 
   <section class="stats-band" id="stats"><div class="container">
     <div class="stats-grid">
-      <div class="stat"><div class="stat-num" data-target="104" data-suffix="M">0</div><div class="stat-label">Americans listen to podcasts every month</div></div>
-      <div class="stat"><div class="stat-num" data-target="61" data-suffix="%">0</div><div class="stat-label">more likely to engage with brands they hear on podcasts</div></div>
-      <div class="stat"><div class="stat-num" data-target="78" data-suffix="%">0</div><div class="stat-label">say they support the ads they hear on podcasts</div></div>
+      <div class="stat"><div class="stat-num" data-target="158" data-suffix="M">0</div><div class="stat-label">Americans listen to podcasts every month</div></div>
+      <div class="stat"><div class="stat-num" data-target="44" data-suffix="%">0</div><div class="stat-label">of weekly listeners have bought something after hearing it on a podcast</div></div>
+      <div class="stat"><div class="stat-num" data-target="80" data-suffix="%">0</div><div class="stat-label">of active listeners trust the ads they hear on podcasts</div></div>
     </div>
   </div></section>
   <script>(function(){var band=document.getElementById('stats');if(!band)return;var nums=band.querySelectorAll('.stat-num');function run(){nums.forEach(function(n){var t=+n.getAttribute('data-target'),sfx=n.getAttribute('data-suffix')||'',start=null,dur=1600;function step(ts){if(!start)start=ts;var p=Math.min((ts-start)/dur,1);var val=Math.round((p<1?(1-Math.pow(1-p,3)):1)*t);n.textContent=val+sfx;if(p<1)requestAnimationFrame(step);}requestAnimationFrame(step);});}if('IntersectionObserver'in window){var io=new IntersectionObserver(function(e){e.forEach(function(x){if(x.isIntersecting){run();io.disconnect();}});},{threshold:0.4});io.observe(band);}else{run();}})();</script>
