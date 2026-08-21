@@ -43,8 +43,8 @@ img { max-width: 100%; display: block; }
 }
 .brand { display: flex; align-items: center; gap: 10px; }
 .brand .dot { color: var(--accent); }
-/* Real Straw Hut hand-drawn wordmark logo (white PNG, transparent) */
-.brand-logo { height: 34px; width: auto; display: block; transition: opacity 0.15s; }
+/* Real Straw Hut hand-drawn wordmark logo (animated boxed GIF) */
+.brand-logo { height: 48px; width: auto; display: block; transition: opacity 0.15s; }
 .brand:hover .brand-logo { opacity: 0.85; }
 .nav { display: flex; gap: 26px; align-items: center; }
 .nav a { color: var(--muted); font-weight: 500; font-size: 0.95rem; transition: color 0.15s; }
@@ -392,7 +392,7 @@ img { max-width: 100%; display: block; }
 /* Footer */
 .site-footer { border-top: 1px solid var(--border); margin-top: 60px; padding: 46px 0 0; color: var(--muted); position: relative; }
 .footer-top { display: grid; grid-template-columns: 1.4fr 2fr 1.3fr; gap: 40px; align-items: start; }
-.footer-brand .brand-logo { height: 38px; margin-bottom: 14px; }
+.footer-brand .brand-logo { height: 54px; margin-bottom: 14px; }
 .footer-brand p { margin: 0 0 18px; max-width: 300px; font-size: 0.92rem; line-height: 1.5; }
 .footer-socials { display: flex; gap: 12px; }
 .footer-socials a {
