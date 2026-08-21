@@ -178,7 +178,6 @@ function layout({
       ['/', 'Home'],
       ['/shows', 'Shows'],
       ['/studio', 'Studio'],
-      ['/contact', 'Contact'],
     ]
       .map(
         ([href, label]) =>
