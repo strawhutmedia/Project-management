@@ -724,8 +724,9 @@ export function servicePage(cfg, { shows = [] } = {}) {
           .join('')}</div>`
       : `<div class="hero-wave" aria-hidden="true">${Array.from({ length: 44 }, (_, i) => `<span style="animation-delay:${((i % 12) * 0.08).toFixed(2)}s"></span>`).join('')}</div>`;
 
-  // Trusted-by logo strip — real brand colors on a white band (matches /about).
-  const trusted = CLIENTS.filter((c) => c.logo).slice(0, 9);
+  // Trusted-by logo strip — every client mark, real brand colors on a white
+  // band, normalized by height (matches /about exactly).
+  const trusted = CLIENTS.filter((c) => c.logo);
   const trustedStrip = trusted.length
     ? `<section class="section clients-band"><div class="container">
       <p class="trusted-eyebrow" style="color:#5a6270">Trusted by the teams behind</p>
