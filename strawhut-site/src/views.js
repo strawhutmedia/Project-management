@@ -218,7 +218,7 @@ ${jsonLd}
 <body class="${bodyClass}">
 ${trackingBody()}
 <header class="site-header"><div class="container">
-  <a class="brand" href="/" aria-label="Straw Hut Media home"><img class="brand-logo" src="/straw-hut-logo.png" alt="Straw Hut Media" width="973" height="322"></a>
+  <a class="brand" href="/" aria-label="Straw Hut Media home"><img class="brand-logo" src="/public/straw-hut-logo.png" alt="Straw Hut Media" width="973" height="322"></a>
   <button class="nav-toggle" id="navToggle" type="button" aria-label="Menu" aria-expanded="false" aria-controls="siteNav"><span class="nav-toggle-bars"></span></button>
   <nav class="nav" id="siteNav">${nav}</nav>
 </div></header>
@@ -262,7 +262,7 @@ function footerBlock() {
   return `<footer class="site-footer"><div class="container">
   <div class="footer-top">
     <div class="footer-brand">
-      <img class="brand-logo" src="/straw-hut-logo.png" alt="Straw Hut Media" width="973" height="322">
+      <img class="brand-logo" src="/public/straw-hut-logo.png" alt="Straw Hut Media" width="973" height="322">
       <p>Award-winning podcast agency &amp; network — from first idea to chart-topping show.</p>
       ${socials}
     </div>
@@ -638,12 +638,61 @@ export function resourcePostPage({ post, related = [] }) {
 
 // --- Per-service landing pages ---------------------------------------------
 
-export function servicePage(cfg) {
+const STUDIO_SHOTS = ['CA6A0788', 'CA6A0790', 'CA6A0794', 'CA6A0798', 'CA6A0800', 'CA6A0803'].map(
+  (n) => `/public/studio/${n}.jpg`
+);
+
+export function servicePage(cfg, { shows = [] } = {}) {
+  const withArt = shows.filter((s) => s.image_url);
+  // Hero collage of real produced-show cover art (falls back to a waveform).
+  const heroArt = withArt.slice(0, 6);
+  const heroVisual =
+    heroArt.length >= 4
+      ? `<div class="svc-hero-art">${heroArt
+          .map(
+            (s) => `<a class="svc-tile" href="/${esc(s.slug)}" title="${esc(s.title)}"><img src="${esc(s.image_url)}" alt="${esc(s.title)}" loading="lazy"></a>`
+          )
+          .join('')}</div>`
+      : `<div class="hero-wave" aria-hidden="true">${Array.from({ length: 44 }, (_, i) => `<span style="animation-delay:${((i % 12) * 0.08).toFixed(2)}s"></span>`).join('')}</div>`;
+
+  // Trusted-by logo strip (real client marks).
+  const trusted = CLIENTS.filter((c) => c.logo).slice(0, 8);
+  const trustedStrip = trusted.length
+    ? `<section class="section" style="padding:18px 0 6px"><div class="container">
+      <p class="trusted-eyebrow">Trusted by the teams behind</p>
+      <div class="trusted-logos">${trusted
+        .map((c) => `<img src="${esc(c.logo)}" alt="${esc(c.name)}" loading="lazy">`)
+        .join('')}</div>
+    </div></section>`
+    : '';
+
+  // "What's included" — highlights as an accent-checked grid, not plain boxes.
   const highlights = (cfg.highlights || [])
     .map(
-      (h) => `<article class="show-card" style="padding:22px 22px 24px"><h3 style="margin-top:0">${esc(h.name)}</h3><p class="meta" style="font-size:0.92rem;line-height:1.55">${esc(h.text)}</p></article>`
+      (h) => `<div class="inc-item"><span class="inc-check">✓</span><div><h3>${esc(h.name)}</h3><p>${esc(h.text)}</p></div></div>`
     )
     .join('');
+
+  // Cover-art marquee of shows we've produced.
+  const marquee = withArt.length
+    ? `<section class="section"><div class="container">
+      <div class="section-head"><h2>Shows we've produced</h2><a class="count" href="/shows">View all →</a></div>
+    </div>
+    <div class="marquee"><div class="marquee-track">${[...withArt, ...withArt]
+      .map(
+        (s) => `<a class="marquee-item" href="/${esc(s.slug)}" title="${esc(s.title)}"><img src="${esc(s.image_url)}" alt="${esc(s.title)}" loading="lazy"></a>`
+      )
+      .join('')}</div></div></section>`
+    : '';
+
+  // Real studio photos.
+  const studioStrip = `<section class="section"><div class="container">
+    <div class="section-head"><h2>Record in our Hollywood studio</h2><a class="count" href="/studio">Book the studio →</a></div>
+    <div class="svc-studio">${STUDIO_SHOTS.map(
+      (src) => `<a class="svc-shot" href="/studio"><img src="${src}" alt="Straw Hut Media podcast studio" loading="lazy"></a>`
+    ).join('')}</div>
+  </div></section>`;
+
   const sections = (cfg.sections || [])
     .map(
       (s) => `<section class="section"><div class="container article-narrow">
@@ -653,21 +702,28 @@ export function servicePage(cfg) {
     )
     .join('');
   const body = `
-  <section class="hero"><div class="container">
-    <div class="breadcrumb" style="padding:0 0 14px"><a href="/">Home</a> / ${esc(cfg.breadcrumbName || cfg.navLabel)}</div>
-    <h1>${cfg.hero.h1}</h1>
-    <p>${esc(cfg.hero.dek)}</p>
-    <div style="margin-top:22px"><a class="btn btn-primary" href="${esc(cfg.hero.cta.href)}">${esc(cfg.hero.cta.label)}</a> <a class="btn btn-ghost" href="/resources" style="margin-left:8px">Read our guides</a></div>
+  <section class="hero"><div class="container hero-inner">
+    <div class="hero-copy">
+      <div class="breadcrumb" style="padding:0 0 14px"><a href="/">Home</a> / ${esc(cfg.breadcrumbName || cfg.navLabel)}</div>
+      <h1>${cfg.hero.h1}</h1>
+      <p>${esc(cfg.hero.dek)}</p>
+      <div class="hero-cta"><a class="btn btn-primary" href="${esc(cfg.hero.cta.href)}">${esc(cfg.hero.cta.label)}</a> <a class="btn btn-ghost" href="/shows">Hear our shows</a></div>
+    </div>
+    ${heroVisual}
   </div></section>
+  ${trustedStrip}
   ${cfg.intro ? `<section class="section" style="padding-bottom:0"><div class="container article-narrow"><p class="prose lead">${esc(cfg.intro)}</p></div></section>` : ''}
   ${
     highlights
       ? `<section class="section"><div class="container">
-    <div class="grid" style="grid-template-columns:repeat(auto-fill,minmax(240px,1fr))">${highlights}</div>
+    <div class="section-head"><h2>What's included</h2></div>
+    <div class="inc-grid">${highlights}</div>
   </div></section>`
       : ''
   }
+  ${marquee}
   ${sections}
+  ${studioStrip}
   ${faqSection(cfg.faq)}
   <section class="section"><div class="container"><div class="cta-band">
     <h2>Let's build it together</h2>

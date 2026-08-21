@@ -191,6 +191,36 @@ img { max-width: 100%; display: block; }
 .impact-copy p { color: #c6d6cf; margin: 0; font-size: 1.05rem; }
 .impact-cta { display: flex; flex-direction: column; gap: 12px; min-width: 220px; }
 
+/* Service page — hero cover-art collage */
+.svc-hero-art { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+.svc-tile { border-radius: 14px; overflow: hidden; aspect-ratio: 1/1; box-shadow: var(--shadow); transition: transform 0.2s; }
+.svc-tile:nth-child(1) { transform: translateY(-14px); }
+.svc-tile:nth-child(4) { transform: translateY(-14px); }
+.svc-tile img { width: 100%; height: 100%; object-fit: cover; }
+.svc-tile:hover { transform: translateY(-18px) scale(1.02); }
+@media (max-width: 860px) { .svc-hero-art { grid-template-columns: repeat(3, 1fr); gap: 8px; } .svc-tile:nth-child(1), .svc-tile:nth-child(4) { transform: none; } }
+
+/* Trusted-by logo strip */
+.trusted-eyebrow { text-align: center; color: var(--muted); font-size: 0.8rem; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; margin: 0 0 16px; }
+.trusted-logos { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 30px 44px; }
+.trusted-logos img { height: 30px; width: auto; opacity: 0.72; filter: brightness(0) invert(1); transition: opacity 0.2s; }
+.trusted-logos img:hover { opacity: 1; }
+
+/* "What's included" checklist grid */
+.inc-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 22px 30px; }
+.inc-item { display: flex; gap: 14px; align-items: flex-start; }
+.inc-check { flex: 0 0 auto; width: 26px; height: 26px; border-radius: 999px; background: rgba(0,204,142,0.15); color: var(--accent); display: inline-flex; align-items: center; justify-content: center; font-weight: 700; font-size: 0.85rem; margin-top: 2px; }
+.inc-item h3 { margin: 0 0 4px; font-size: 1.05rem; }
+.inc-item p { margin: 0; color: var(--muted); font-size: 0.92rem; line-height: 1.5; }
+@media (max-width: 860px) { .inc-grid { grid-template-columns: 1fr; } }
+
+/* Service page — studio photo strip */
+.svc-studio { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+.svc-shot { border-radius: 14px; overflow: hidden; aspect-ratio: 4/3; box-shadow: var(--shadow); background: var(--card-2); }
+.svc-shot img { width: 100%; height: 100%; object-fit: cover; transition: transform 0.3s; }
+.svc-shot:hover img { transform: scale(1.05); }
+@media (max-width: 700px) { .svc-studio { grid-template-columns: repeat(2, 1fr); } }
+
 /* Animated "state of podcasting" stat band — numbers count up on scroll */
 .stats-band { padding: 30px 0 10px; }
 .stats-grid {

@@ -601,7 +601,10 @@ app.get('/resources/:slug', (req, res, next) => {
 
 // ---- Per-service landing pages --------------------------------------------
 for (const svc of SERVICE_PAGES) {
-  app.get(svc.path, (req, res) => res.send(V.servicePage(svc)));
+  app.get(svc.path, async (req, res) => {
+    const shows = await store.listShows().catch(() => []);
+    res.send(V.servicePage(svc, { shows }));
+  });
 }
 
 app.get('/lp/:slug', async (req, res, next) => {
