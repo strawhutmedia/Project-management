@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-08-21T21:15:04.863Z",
+  "generatedAt": "2026-08-21T21:20:04.869Z",
   "note": "Read-only operational snapshot. Emails are masked; no full contact list is stored here.",
   "summary": {
     "showsWithOutreach": 1,
@@ -123,7 +123,7 @@
           {
             "name": "Casey Johnson",
             "emailMasked": "t***@wilhelmina.com",
-            "daysSinceFirstEmail": 35,
+            "daysSinceFirstEmail": 36,
             "opened": false,
             "openCount": 0
           }
