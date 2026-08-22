@@ -114,3 +114,25 @@ dependency entirely.
 - **Cover wall widened 16 → 24 shows** (12 + phone + 12). Twelve divides evenly
   by both the 3-up and 4-up stacked layouts, so every row is full at every width
   and the nth-child trimming hack added earlier could be deleted outright.
+
+## Mobile-first pass (2026-08-22)
+
+Audited every public page in headless Chromium at 390px. Findings 26 → 13,
+and the 13 remaining are intentional (marquee strips, the miniature phone-player
+UI, inline links inside body copy).
+
+- **The homepage headline was being cut off on every phone.** `.hero-wave` is a
+  flex row of 60 bars with a 3px minimum each — a 475px minimum width. As a grid
+  item (default `min-width: auto`) it dragged the hero track past the screen
+  edge, and `.hero { overflow: hidden }` clipped the h1, the intro copy and the
+  second CTA rather than showing a scrollbar. That's also why the earlier
+  "no horizontal scroll" check passed. Fixed with `min-width: 0` on hero
+  children plus halving the bars below 560px.
+- **Footer waveform** had the same fault at 90 bars / 715px — the right third
+  was cut off. Halved on phones.
+- **Touch targets**: footer links were 23px tall with a 9px gap; moved the gap
+  inside the link so the target is 43px with the same visual rhythm. Same for
+  the Instagram follow link, section counts, and breadcrumbs.
+- **Nothing under 12px** on phones any more (was 9.9px in places).
+- Added `tools/mobile-audit.mjs` so this is a repeatable check, not a one-off,
+  and wrote the mobile-first rule into CLAUDE.md.

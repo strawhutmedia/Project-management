@@ -82,6 +82,10 @@ img { max-width: 100%; display: block; }
 .hero { padding: 72px 0 30px; overflow: hidden; }
 .hero-inner { display: grid; grid-template-columns: 1.05fr 0.95fr; gap: 40px; align-items: center; }
 .hero-copy { position: relative; z-index: 2; }
+/* Grid items default to min-width:auto, so a wide child (the waveform) can force
+   the whole track past the viewport — on a phone that silently clipped the
+   headline, because .hero hides overflow. Never let a hero child set the width. */
+.hero-inner > * { min-width: 0; }
 .hero-eyebrow {
   display: inline-block; font-size: 0.78rem; font-weight: 600; letter-spacing: 0.08em;
   text-transform: uppercase; color: var(--accent); margin-bottom: 14px;
@@ -111,6 +115,12 @@ img { max-width: 100%; display: block; }
 @media (max-width: 860px) {
   .hero-inner { grid-template-columns: 1fr; gap: 8px; }
   .hero-wave { height: 130px; order: 2; }
+}
+/* 60 bars need 475px just to reach their 3px minimum. On a phone that's wider
+   than the screen, so half the bars are dropped and the rest get real width. */
+@media (max-width: 560px) {
+  .hero-wave { gap: 4px; height: 108px; }
+  .hero-wave span:nth-child(even) { display: none; }
 }
 
 /* Moving cover-art marquee */
@@ -521,6 +531,9 @@ img { max-width: 100%; display: block; }
 .footer-wave span:nth-child(2n) { background: linear-gradient(180deg, #6b7bd6, var(--accent)); }
 @keyframes footwave { 0% { height: 12%; } 100% { height: 85%; } }
 @media (prefers-reduced-motion: reduce) { .footer-wave span { animation: none; height: 40%; } }
+/* 90 bars need 715px to reach their minimum; on a phone the right third was
+   simply cut off. Halve them so the strip spans the full width evenly. */
+@media (max-width: 560px) { .footer-wave span:nth-child(even) { display: none; } }
 @media (max-width: 860px) {
   .footer-top { grid-template-columns: 1fr 1fr; gap: 30px; }
   .footer-recent { grid-column: 1 / -1; }
@@ -922,3 +935,24 @@ table.admin-table { width: 100%; border-collapse: collapse; }
 .contact-form .cf-turnstile-slot { max-width: 340px; }
 /* Inside the subscribe row (a flex line), drop onto its own centred line. */
 #subscribe form .cf-turnstile-slot { flex-basis: 100%; display: flex; justify-content: center; margin: 8px 0 0; }
+
+/* ---------------------------------------------------------------------------
+   Phone polish. Most visitors are on a phone, so these are corrections for
+   things that are merely tight on a desktop but genuinely awkward on a handset:
+   touch targets below Apple's 44px guidance, and text under ~12px.
+   --------------------------------------------------------------------------- */
+@media (max-width: 640px) {
+  /* Links were 23px tall with a 9px gap between them — a 23px target. Move the
+     spacing inside the link so the tappable area grows without changing the
+     visual rhythm of the column. */
+  .footer-col { gap: 0; }
+  .footer-col a { display: block; padding: 10px 0; }
+  .ig-follow,
+  .section-head .count { display: inline-block; padding: 10px 0; }
+  /* Nothing below ~12px: 10px type is legible on a 27" monitor, not in a hand. */
+  .breadcrumb a { display: inline-block; padding: 8px 0; }
+  .recent-date small { font-size: 0.72rem; }
+  .footer-h { font-size: 0.8rem; }
+  .stat-source { font-size: 0.78rem; }
+  .badge, .pkg-badge, .aplayer-eyebrow, .aplayer-status { font-size: 0.75rem; }
+}

@@ -7,6 +7,46 @@ generates show + episode pages automatically.
 
 ---
 
+## 📱 MOBILE FIRST — check the phone BEFORE you call anything done
+
+**Roughly 90% of visitors reach this site on a phone.** Desktop and tablet must
+look good; the phone must look *incredible*. If you designed or verified on
+desktop and checked the phone afterwards — or not at all — you did it wrong.
+
+**Every change that touches markup or CSS must be rendered and looked at on a
+phone viewport before it is committed.** Not reasoned about. Rendered.
+
+```
+node tools/mobile-audit.mjs                        # audit live at 390px
+node tools/mobile-audit.mjs --base http://localhost:8080
+node tools/mobile-audit.mjs --shot home            # + screenshots to look at
+```
+
+The harness renders real pages in headless Chromium (downloading and
+re-pointing remote images so cover art actually appears) and reports
+horizontal overflow, elements wider than the viewport, text under 11.5px, and
+touch targets under 32px. Read the screenshots — the numbers catch structural
+breakage, but only your eyes catch ugly.
+
+Rules that came out of real bugs on this site:
+
+- **A hidden overflow is not a passing grade.** `.hero { overflow: hidden }`
+  meant a 475px-wide waveform silently *clipped the homepage headline* on every
+  phone while the "no horizontal scroll" check passed. Check element widths
+  against the viewport, not just `scrollWidth`.
+- **Give grid/flex children `min-width: 0`.** They default to `min-width: auto`,
+  so one wide child (a waveform, a long word, a table) drags the whole track
+  past the screen edge.
+- **A grid whose item count doesn't divide by the column count leaves a hole**
+  that reads as missing content. Pick counts that divide by 3 and 4, or wrap
+  and centre.
+- **Touch targets ≥44px, text ≥12px.** 10px type and a 23px link are fine on a
+  27" monitor and miserable in a hand.
+- Decorative strips built from many fixed-width bars need a reduced count on
+  phones — squeezing 90 bars into 390px just clips them.
+
+---
+
 ## ⭐ NUMBER ONE GOAL — non-negotiable, applies to EVERY page
 
 **Strong SEO + AI-discoverability (GEO) on every single public page, so that
