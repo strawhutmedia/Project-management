@@ -79,3 +79,10 @@ dependency entirely.
   "Education, Education, Education".
 - **Audit baseline:** all pages 200, one `<h1>` each, JSON-LD present
   everywhere, **zero images missing alt text**, sitemap 5,449 URLs.
+- **Anti-spam on the public forms.** A bot submission got through the contact
+  form (random name, gibberish message) — neither `/contact` nor `/subscribe`
+  had any protection. Added `src/antispam.js`: honeypot field, HMAC-signed
+  render timestamp (proves we served the form and that ≥3s passed), and a
+  per-IP rate limit. Deliberately no CAPTCHA and no new vendor — the checks are
+  invisible, so conversion is untouched. Content heuristics only *flag* (subject
+  line prefix), never block, so a real lead is never lost to a false positive.
