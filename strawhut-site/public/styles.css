@@ -276,38 +276,45 @@ img { max-width: 100%; display: block; }
 .fbanner-dots { display: flex; gap: 9px; justify-content: center; margin-top: 18px; }
 .fdot { width: 9px; height: 9px; border-radius: 999px; border: 0; padding: 0; background: var(--border); cursor: pointer; transition: background 0.2s, transform 0.2s; }
 .fdot.active { background: var(--accent); transform: scale(1.25); }
-/* On a phone the two-column banner used to collapse to one column with a
-   full-width SQUARE cover — 358x358, more than half the screen, with the copy
-   shoved below the fold. It stopped reading as a banner at all.
+/* On a phone the featured show is rendered in the same language as the impact
+   band below it: a full-bleed, angled colour field rather than a boxed card.
+   The colour field is a heavily blurred copy of the show's own cover, so each
+   featured show brings its own palette — blue for Naked Lunch, green and pink
+   for Wicked — with no colour extraction and no new dependency.
 
-   Instead: a landscape art strip (the cover still shown whole, never cropped)
-   over a card whose background is a heavily blurred copy of that same cover.
-   The banner therefore takes its colour from the artwork itself — green and
-   pink for Wicked, blue sky for Naked Lunch — with no colour extraction and no
-   new dependency. */
+   (Before this, the two-column banner simply collapsed to one column and the
+   square cover became 358x358 — over half the screen, copy below the fold.) */
 @media (max-width: 760px) {
-  .fbanner { min-height: 0; }
-  .fbanner-slide.active { grid-template-columns: 1fr; }
-
+  .fbanner {
+    min-height: 0; border: 0; border-radius: 0; box-shadow: none;
+    width: 100vw; margin-left: calc(50% - 50vw);
+    clip-path: polygon(0 3.2vw, 100% 0, 100% calc(100% - 3.2vw), 0 100%);
+  }
+  .fbanner-slide.active {
+    grid-template-columns: 1fr; background: #101832;
+    padding: calc(3.2vw + 32px) 22px calc(3.2vw + 36px);
+  }
   /* position:static hands the blurred layer's containing block up to the slide,
-     so it fills the whole card instead of just the art box. */
-  .fb-art { position: static; aspect-ratio: 16 / 9; width: 100%; margin: 0; }
+     so it fills the whole band instead of sitting inside the art box. */
+  .fb-art { position: static; aspect-ratio: auto; width: auto; margin: 0 0 22px; display: block; }
   .fb-art .fb-bg {
-    position: absolute; inset: 0; width: 100%; height: 100%;
-    filter: blur(38px) saturate(1.75) brightness(0.5); transform: scale(1.35);
+    position: absolute; inset: 0; width: 100%; height: 100%; z-index: 0;
+    filter: blur(40px) saturate(1.8) brightness(0.55); transform: scale(1.4);
   }
-  .fb-art .fb-main { position: relative; z-index: 1; padding: 14px 0 4px; }
-
-  /* Scrim under the copy so the title stays readable over any artwork. */
-  .fb-info {
-    position: relative; z-index: 1; padding: 14px 20px 22px;
-    background: linear-gradient(180deg, rgba(18, 24, 47, 0) 0%, rgba(18, 24, 47, 0.52) 18%, rgba(18, 24, 47, 0.72) 100%);
+  .fb-art .fb-main {
+    position: relative; z-index: 2; width: 168px; height: 168px;
+    border-radius: 14px; box-shadow: 0 18px 44px rgba(0, 0, 0, 0.55);
   }
-  .fb-info h3 { font-size: 1.3rem; }
-  .fb-host { margin-bottom: 10px; }
-  /* --muted is tuned for the navy card; over a warm-tinted banner it loses
-     contrast, so use white at reduced alpha, which holds up on any artwork. */
-  .fb-info p { -webkit-line-clamp: 3; font-size: 0.95rem; margin-bottom: 18px; color: rgba(255, 255, 255, 0.84); }
+  /* Directional depth, the same trick the impact band uses, but neutral so it
+     darkens for legibility without imposing a hue on the artwork. */
+  .fbanner-slide.active::before {
+    content: ""; position: absolute; inset: 0; z-index: 1; pointer-events: none;
+    background: linear-gradient(115deg, rgba(0, 0, 0, 0.44) 0%, rgba(0, 0, 0, 0.10) 45%, rgba(10, 16, 34, 0.74) 100%);
+  }
+  .fb-info { position: relative; z-index: 2; padding: 0; background: none; }
+  .fb-info h3 { font-size: 1.6rem; line-height: 1.08; }
+  .fb-host { margin-bottom: 12px; }
+  .fb-info p { color: rgba(255, 255, 255, 0.86); font-size: 1rem; -webkit-line-clamp: 3; margin-bottom: 20px; }
 }
 
 /* Impact band — angled, full-bleed break between show sections (not a box) */
