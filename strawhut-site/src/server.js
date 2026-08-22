@@ -62,6 +62,14 @@ const CANONICAL_HOST = (() => {
   try { return new URL(process.env.APP_BASE_URL || 'https://www.strawhutmedia.com').host; }
   catch { return 'www.strawhutmedia.com'; }
 })();
+// Retired subdomains. Their content now lives as a PATH on the main site, which
+// consolidates ranking authority instead of splitting it across subdomains.
+// 301 (not deletion) so existing links and indexed pages pass their equity on.
+const LEGACY_SUBDOMAINS = {
+  start: '/podcast-production',   // old GoHighLevel "Start Your Podcast" funnel
+  services: '/pricing',           // old IIS quote tool — now native on /pricing
+};
+
 // Renamed shows + old section pages that don't map by a simple id-strip.
 const LEGACY_EXPLICIT = {
   '/untitled-689': '/only-murders-in-the-building',
@@ -72,8 +80,17 @@ const LEGACY_EXPLICIT = {
 // 1. Canonical host — only touches strawhutmedia.com hosts (never the Railway
 //    preview domain or localhost), so it's inert until the domain is live.
 app.use((req, res, next) => {
-  const host = (req.headers.host || '').toLowerCase();
-  if (/(^|\.)strawhutmedia\.com$/.test(host) && host !== CANONICAL_HOST) {
+  const host = (req.headers.host || '').toLowerCase().split(':')[0];
+  if (host === CANONICAL_HOST) return next();
+  // A retired subdomain lands on its replacement page, not the bare homepage.
+  const dest = LEGACY_SUBDOMAINS[host.split('.')[0]];
+  if (dest && host.endsWith('.strawhutmedia.com')) {
+    return res.redirect(301, `https://${CANONICAL_HOST}${dest}`);
+  }
+  // Only the apex is folded into the canonical host. Any OTHER subdomain passes
+  // through untouched — never assume a strawhutmedia.com subdomain that reaches
+  // this service belongs to it (e.g. slate.* is a separate app).
+  if (host === 'strawhutmedia.com') {
     return res.redirect(301, `https://${CANONICAL_HOST}${req.originalUrl}`);
   }
   next();
