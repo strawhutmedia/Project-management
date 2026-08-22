@@ -376,6 +376,40 @@ function audienceEvent(name, params) {
 if(document.readyState!=='loading')setTimeout(f,0);else document.addEventListener('DOMContentLoaded',f);})();</script>`;
 }
 
+
+// A phone playing one of our shows, sitting in the middle of the network wall.
+// Built in CSS rather than a flat mockup image so the artwork is real, rotates
+// through the roster, and stays crisp at any density.
+function phoneMockup(shows) {
+  const picks = shows.filter((s) => s.image_url).slice(0, 6);
+  if (!picks.length) return '';
+  const slides = picks
+    .map(
+      (s, i) => `<a class="ph-slide${i === 0 ? ' active' : ''}" href="/${esc(s.slug)}">
+        <img src="${esc(s.image_url)}" alt="${esc(s.title)}" loading="lazy">
+        <span class="ph-title">${esc(s.title)}</span>
+        <span class="ph-sub">${esc(s.author || 'Straw Hut Media')}</span>
+      </a>`
+    )
+    .join('');
+  return `<div class="ph-wrap" aria-hidden="true"><div class="ph">
+    <div class="ph-notch"></div>
+    <div class="ph-screen">
+      <div class="ph-now">Playing from podcast</div>
+      <div class="ph-slides" id="phSlides">${slides}</div>
+      <div class="ph-bar"><span></span></div>
+      <div class="ph-times"><em>0:00</em><em>26:33</em></div>
+      <div class="ph-ctrls">
+        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M11 18V6l-8.5 6 8.5 6Zm.5-6 8.5 6V6l-8.5 6Z"/></svg>
+        <div class="ph-play"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7L8 5Z"/></svg></div>
+        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M13 6v12l8.5-6L13 6ZM12.5 12 4 6v12l8.5-6Z"/></svg>
+      </div>
+    </div>
+  </div></div>
+  <script>(function(){var s=document.querySelectorAll('#phSlides .ph-slide');if(s.length<2)return;var c=0;
+setInterval(function(){s[c].classList.remove('active');c=(c+1)%s.length;s[c].classList.add('active');},3500);})();</script>`;
+}
+
 const artOrPlaceholder = (url, alt) =>
   url
     ? `<img src="${esc(url)}" alt="${esc(alt)}" loading="lazy">`
@@ -575,12 +609,22 @@ export function showsIndexPage({ shows }) {
   ${
     selections.length
       ? `<section class="section" style="padding-top:6px"><div class="container">
-    <div class="section-head"><h2>Straw Hut Producer Selections</h2></div>
-    <div class="selections">${selections
-      .map(
-        (s) => `<a class="sel-item" href="/${esc(s.slug)}" title="${esc(s.title)}"><img src="${esc(s.image_url)}" alt="${esc(s.title)}" loading="lazy"></a>`
-      )
-      .join('')}</div>
+    <div class="section-head"><h2>The Network</h2><a class="count" href="#original">Browse all →</a></div>
+    <div class="selections">
+      ${selections
+        .slice(0, 8)
+        .map(
+          (s) => `<a class="sel-item" href="/${esc(s.slug)}" title="${esc(s.title)}"><img src="${esc(s.image_url)}" alt="${esc(s.title)}" loading="lazy"></a>`
+        )
+        .join('')}
+      ${phoneMockup(selections)}
+      ${selections
+        .slice(8, 16)
+        .map(
+          (s) => `<a class="sel-item" href="/${esc(s.slug)}" title="${esc(s.title)}"><img src="${esc(s.image_url)}" alt="${esc(s.title)}" loading="lazy"></a>`
+        )
+        .join('')}
+    </div>
   </div></section>`
       : ''
   }
