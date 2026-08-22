@@ -50,6 +50,61 @@ app.use('/onboarding', express.static(path.join(__dirname, '..', 'public', 'onbo
 app.use('/services', express.static(path.join(__dirname, '..', 'public', 'services'), staticOpts));
 app.use('/public', express.static(path.join(__dirname, '..', 'public'), staticOpts));
 
+// ---- Domain-migration safety net ----------------------------------------
+// When strawhutmedia.com moves onto this app, we must not lose the old site's
+// Google ranking. Two pieces:
+//   1. Canonical host: force one host (www vs apex) per APP_BASE_URL so search
+//      engines see a single URL for every page.
+//   2. Legacy redirects: the old IIS site appended a numeric CMS id to every
+//      show/episode slug (e.g. /naked-lunch-843, /show-12/episode-34). Strip
+//      the id and 301 to the clean slug so every old link keeps its equity.
+const CANONICAL_HOST = (() => {
+  try { return new URL(process.env.APP_BASE_URL || 'https://www.strawhutmedia.com').host; }
+  catch { return 'www.strawhutmedia.com'; }
+})();
+// Renamed shows + old section pages that don't map by a simple id-strip.
+const LEGACY_EXPLICIT = {
+  '/untitled-689': '/only-murders-in-the-building',
+  '/ourpodcasthosts': '/shows',
+  '/trendingepisode': '/shows',
+};
+
+// 1. Canonical host — only touches strawhutmedia.com hosts (never the Railway
+//    preview domain or localhost), so it's inert until the domain is live.
+app.use((req, res, next) => {
+  const host = (req.headers.host || '').toLowerCase();
+  if (/(^|\.)strawhutmedia\.com$/.test(host) && host !== CANONICAL_HOST) {
+    return res.redirect(301, `https://${CANONICAL_HOST}${req.originalUrl}`);
+  }
+  next();
+});
+
+// 2. Legacy slug redirects.
+app.use(async (req, res, next) => {
+  if (req.method !== 'GET') return next();
+  const p = decodeURIComponent(req.path).replace(/\/+$/, '') || '/';
+  const low = p.toLowerCase();
+  if (LEGACY_EXPLICIT[low]) return res.redirect(301, LEGACY_EXPLICIT[low]);
+  const parts = p.slice(1).split('/');
+  if (parts.length < 1 || parts.length > 2 || !parts[0]) return next();
+  const m0 = parts[0].match(/^(.+?)-\d+$/);
+  if (!m0) return next();
+  try {
+    // If the full first segment is already a real show, it's a valid new URL.
+    if (await store.getShowBySlug(parts[0])) return next();
+    const show = await store.getShowBySlug(m0[1]);
+    if (!show) return res.redirect(301, '/shows'); // unknown old id → catalog, never a 404
+    if (parts[1]) {
+      const em = parts[1].match(/^(.+?)-\d+$/);
+      const ep = await store.getEpisodeBySlug(show.id, em ? em[1] : parts[1]);
+      return res.redirect(301, ep ? `/${show.slug}/${ep.slug}` : `/${show.slug}`);
+    }
+    return res.redirect(301, `/${show.slug}`);
+  } catch {
+    return next();
+  }
+});
+
 // Spotlight = most-downloaded shows (Megaphone). Falls back to the curated
 // monthly rotation only when Megaphone isn't configured or returns no numbers.
 // Sitewide footer "Recent episodes" rail — refreshed on boot and after each
