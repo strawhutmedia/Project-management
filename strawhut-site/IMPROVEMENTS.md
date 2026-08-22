@@ -144,3 +144,13 @@ UI, inline links inside body copy).
   Counted with `nth-of-type` so only cover links are numbered: the wall also
   contains the phone mockup div and its script, and counting all children
   shifted every rule by one (caught by rendering, not by reading the CSS).
+- **Featured banner rebuilt for phones.** It was collapsing to one column with a
+  full-width 358x358 square cover — over half the screen, copy pushed below the
+  fold, and it stopped reading as a banner at all. Now a landscape art strip
+  (cover still shown whole, never cropped) on a card whose background is a
+  heavily blurred copy of that same artwork, so **the banner colour comes from
+  the show**: blue for Naked Lunch, green/pink/gold for Wicked. No colour
+  extraction, no dependency — the blurred cover already carries the palette.
+  Banner height 681px → 461px. Description switched to white-at-alpha because
+  `--muted` loses contrast over warm artwork. Desktop measured identical
+  before/after (382px tall, 380x380 art) — untouched.

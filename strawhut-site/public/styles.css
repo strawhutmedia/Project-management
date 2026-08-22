@@ -276,11 +276,38 @@ img { max-width: 100%; display: block; }
 .fbanner-dots { display: flex; gap: 9px; justify-content: center; margin-top: 18px; }
 .fdot { width: 9px; height: 9px; border-radius: 999px; border: 0; padding: 0; background: var(--border); cursor: pointer; transition: background 0.2s, transform 0.2s; }
 .fdot.active { background: var(--accent); transform: scale(1.25); }
+/* On a phone the two-column banner used to collapse to one column with a
+   full-width SQUARE cover — 358x358, more than half the screen, with the copy
+   shoved below the fold. It stopped reading as a banner at all.
+
+   Instead: a landscape art strip (the cover still shown whole, never cropped)
+   over a card whose background is a heavily blurred copy of that same cover.
+   The banner therefore takes its colour from the artwork itself — green and
+   pink for Wicked, blue sky for Naked Lunch — with no colour extraction and no
+   new dependency. */
 @media (max-width: 760px) {
   .fbanner { min-height: 0; }
   .fbanner-slide.active { grid-template-columns: 1fr; }
-  .fb-art { aspect-ratio: 1 / 1; width: 100%; max-height: none; margin: 0 auto; }
-  .fb-info { padding: 26px 24px 30px; }
+
+  /* position:static hands the blurred layer's containing block up to the slide,
+     so it fills the whole card instead of just the art box. */
+  .fb-art { position: static; aspect-ratio: 16 / 9; width: 100%; margin: 0; }
+  .fb-art .fb-bg {
+    position: absolute; inset: 0; width: 100%; height: 100%;
+    filter: blur(38px) saturate(1.75) brightness(0.5); transform: scale(1.35);
+  }
+  .fb-art .fb-main { position: relative; z-index: 1; padding: 14px 0 4px; }
+
+  /* Scrim under the copy so the title stays readable over any artwork. */
+  .fb-info {
+    position: relative; z-index: 1; padding: 14px 20px 22px;
+    background: linear-gradient(180deg, rgba(18, 24, 47, 0) 0%, rgba(18, 24, 47, 0.52) 18%, rgba(18, 24, 47, 0.72) 100%);
+  }
+  .fb-info h3 { font-size: 1.3rem; }
+  .fb-host { margin-bottom: 10px; }
+  /* --muted is tuned for the navy card; over a warm-tinted banner it loses
+     contrast, so use white at reduced alpha, which holds up on any artwork. */
+  .fb-info p { -webkit-line-clamp: 3; font-size: 0.95rem; margin-bottom: 18px; color: rgba(255, 255, 255, 0.84); }
 }
 
 /* Impact band — angled, full-bleed break between show sections (not a box) */
