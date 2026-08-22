@@ -213,9 +213,16 @@ img { max-width: 100%; display: block; }
 .fbanner-slide.active { opacity: 1; visibility: visible; position: relative; }
 /* Podcast cover art is square — keep the frame square so nothing is ever
    cropped off the artwork (titles sit right at the top edge of most covers). */
-.fb-art { position: relative; overflow: hidden; aspect-ratio: 1 / 1; align-self: center; }
-.fb-art img { width: 100%; height: 100%; object-fit: cover; object-position: center; }
-.fb-art::after { content: ""; position: absolute; inset: 0; background: linear-gradient(90deg, transparent 55%, var(--card) 100%); }
+/* Cover art must NEVER be cropped — show titles sit hard against the top edge.
+   `contain` guarantees the whole image is visible whatever shape the box ends
+   up; a blurred copy of the same art fills any leftover space so it reads as
+   deliberate rather than letterboxed. */
+.fb-art { position: relative; overflow: hidden; aspect-ratio: 1 / 1; align-self: center; display: flex; }
+.fb-art .fb-bg {
+  position: absolute; inset: 0; width: 100%; height: 100%;
+  object-fit: cover; filter: blur(26px) saturate(1.3) brightness(0.55); transform: scale(1.2);
+}
+.fb-art .fb-main { position: relative; width: 100%; height: 100%; object-fit: contain; object-position: center; }
 .fb-info { padding: 40px 44px; display: flex; flex-direction: column; justify-content: center; }
 .fb-info h3 { font-size: clamp(1.6rem, 3vw, 2.4rem); margin: 0 0 6px; line-height: 1.1; }
 .fb-host { color: var(--accent); font-weight: 600; margin-bottom: 14px; }
@@ -227,8 +234,7 @@ img { max-width: 100%; display: block; }
 @media (max-width: 760px) {
   .fbanner { min-height: 0; }
   .fbanner-slide.active { grid-template-columns: 1fr; }
-  .fb-art { aspect-ratio: 1 / 1; max-height: 62vh; margin: 0 auto; }
-  .fb-art::after { background: linear-gradient(180deg, transparent 55%, var(--card) 100%); }
+  .fb-art { aspect-ratio: 1 / 1; width: 100%; max-height: none; margin: 0 auto; }
   .fb-info { padding: 26px 24px 30px; }
 }
 

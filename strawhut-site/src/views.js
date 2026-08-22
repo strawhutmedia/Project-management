@@ -22,6 +22,20 @@ import {
 import { resolvePlatformLinks } from './platforms.js';
 import { CONTACT_ROUTES } from './mail.js';
 import { trackingHead, trackingBody, consentBanner } from './tracking.js';
+import fs from 'node:fs';
+import path from 'node:path';
+import crypto from 'node:crypto';
+import { fileURLToPath } from 'node:url';
+
+// Stylesheet cache-buster. styles.css is served with a 1h cache, so without a
+// versioned URL a CSS fix can take an hour to reach anyone who already loaded
+// the site. Hash the file once at boot and append it to the link.
+const CSS_V = (() => {
+  try {
+    const f = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'public', 'styles.css');
+    return crypto.createHash('sha1').update(fs.readFileSync(f)).digest('hex').slice(0, 10);
+  } catch { return String(Date.now()); }
+})();
 
 const FONT =
   '<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>' +
@@ -220,7 +234,7 @@ ${RESOURCE_HINTS}
 <link rel="apple-touch-icon" href="/public/favicon-180.png">
 ${trackingHead()}
 ${FONT}
-<link rel="stylesheet" href="/styles.css">
+<link rel="stylesheet" href="/styles.css?v=${CSS_V}">
 ${jsonLd}
 </head>
 <body class="${bodyClass}">
@@ -464,7 +478,11 @@ export function homePage({ shows }) {
       ${featured
         .map(
           (s, i) => `<a class="fbanner-slide${i === 0 ? ' active' : ''}" href="/${esc(s.slug)}">
-        <div class="fb-art">${artOrPlaceholder(s.image_url, s.title)}</div>
+        <div class="fb-art">${
+          s.image_url
+            ? `<img class="fb-bg" src="${esc(s.image_url)}" alt="" aria-hidden="true" loading="lazy"><img class="fb-main" src="${esc(s.image_url)}" alt="${esc(s.title)}" loading="lazy">`
+            : artOrPlaceholder(s.image_url, s.title)
+        }</div>
         <div class="fb-info">
           <h3>${esc(s.title)}</h3>
           ${s.author ? `<div class="fb-host">${esc(s.author)}</div>` : ''}
@@ -1177,7 +1195,7 @@ ${landing.indexable ? `<link rel="canonical" href="${esc(canon)}"><meta name="ro
 <meta property="og:title" content="${esc(headline)}">
 <meta property="og:description" content="${esc(toText(landing.subhead || body, 160))}">
 ${heroImg ? `<meta property="og:image" content="${esc(heroImg)}">` : ''}
-${trackingHead()}${FONT}<link rel="stylesheet" href="/styles.css">${gtag}
+${trackingHead()}${FONT}<link rel="stylesheet" href="/styles.css?v=${CSS_V}">${gtag}
 </head>
 <body class="lp-body">
 ${trackingBody()}
