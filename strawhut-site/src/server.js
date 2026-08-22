@@ -623,6 +623,7 @@ app.get('/shows', async (req, res) => {
   res.send(V.showsIndexPage({ shows }));
 });
 
+app.get('/privacy', (req, res) => res.send(V.privacyPage()));
 app.get('/studio', (req, res) => res.send(V.studioPage()));
 // We have one studio — the old LA landing page is consolidated into /studio.
 app.get('/podcast-studio-los-angeles', (req, res) => res.redirect(301, '/studio'));

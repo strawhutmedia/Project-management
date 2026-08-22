@@ -21,7 +21,7 @@ import {
 } from './seo.js';
 import { resolvePlatformLinks } from './platforms.js';
 import { CONTACT_ROUTES } from './mail.js';
-import { trackingHead, trackingBody } from './tracking.js';
+import { trackingHead, trackingBody, consentBanner } from './tracking.js';
 
 const FONT =
   '<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>' +
@@ -229,6 +229,7 @@ ${trackingBody()}
 </div></header>
 <script>(function(){var t=document.getElementById('navToggle'),n=document.getElementById('siteNav');if(!t||!n)return;t.addEventListener('click',function(){var open=n.classList.toggle('open');t.classList.toggle('open',open);t.setAttribute('aria-expanded',open?'true':'false');});n.addEventListener('click',function(e){if(e.target.tagName==='A'){n.classList.remove('open');t.classList.remove('open');t.setAttribute('aria-expanded','false');}});})();</script>
 <main>${body}</main>
+${consentBanner()}
 ${footerBlock()}
 <script>(function(){var sel='.section-head,.fbanner,.impact-inner,.stats-grid,.cta-band,.faq-list,.svc-hero-art,.footer-ig,.footer-top,.grid-4>*,.featured-grid>*,.pillars>*,.inc-item,.resource-card,.svc-shot,.ig-tile,.svc-tile';var els=[].slice.call(document.querySelectorAll(sel));if(!('IntersectionObserver'in window)||!els.length)return;var groups=new Map();var vh=window.innerHeight||document.documentElement.clientHeight;els.forEach(function(el){el.classList.add('reveal');var p=el.parentNode,i=groups.get(p)||0;groups.set(p,i+1);if(i)el.style.transitionDelay=Math.min(i,6)*0.06+'s';if(el.getBoundingClientRect().top<vh*0.92)el.classList.add('is-visible');});var io=new IntersectionObserver(function(en){en.forEach(function(e){if(e.isIntersecting){e.target.classList.add('is-visible');io.unobserve(e.target);}});},{threshold:0.1,rootMargin:'0px 0px -6% 0px'});els.forEach(function(el){if(!el.classList.contains('is-visible'))io.observe(el);});})();</script>
 </body></html>`;
@@ -309,6 +310,7 @@ function footerBlock() {
         <a href="/resources">Guides &amp; Resources</a>
         <a href="/resources#faq">Podcasting FAQ</a>
         <a href="/contact">Contact</a>
+        <a href="/privacy">Privacy &amp; Cookies</a>
       </div>
       <div class="footer-col">
         <div class="footer-h">Get started</div>
@@ -1513,5 +1515,95 @@ export function episodePage({ show, episode, moreFromShow = [], related = [] }) 
         { name: show.title, path: '/' + show.slug },
         { name: episode.title, path: `/${show.slug}/${episode.slug}` },
       ]),
+  });
+}
+
+export function privacyPage() {
+  const updated = 'August 2026';
+  const body = `
+  <section class="hero" style="padding-bottom:10px"><div class="container article-narrow">
+    <div class="breadcrumb" style="padding:0 0 14px"><a href="/">Home</a> / Privacy &amp; Cookies</div>
+    <h1>Privacy &amp; <span class="accent">cookies</span></h1>
+    <p>How Straw Hut Media handles your information. Last updated ${updated}.</p>
+  </div></section>
+  <section class="section" style="padding-top:8px"><div class="container article-narrow"><div class="prose">
+    <h2>Who we are</h2>
+    <p>Straw Hut Media is a podcast agency and network based in Hollywood, California.
+       If you have any question about this policy or your data, email
+       <a href="mailto:hello@strawhutmedia.com">hello@strawhutmedia.com</a>.</p>
+
+    <h2>What we collect</h2>
+    <ul>
+      <li><strong>Information you give us.</strong> If you submit the contact form, book a
+          call, or subscribe to the newsletter, we receive what you type — typically your
+          name, email address, and your message.</li>
+      <li><strong>Usage information.</strong> With your consent, analytics and advertising
+          tools record pages viewed, episodes played, approximate location, device and
+          browser type, and how you arrived at the site.</li>
+      <li><strong>Essential technical data.</strong> Server logs and a session cookie for
+          the admin area. These are required for the site to work and are not used to
+          track or profile you.</li>
+    </ul>
+
+    <h2>Cookies and how consent works</h2>
+    <p>We set only strictly necessary cookies until you choose to accept more. Analytics
+       and advertising tags start in a denied state via Google Consent Mode, and the
+       Meta and TikTok pixels are not loaded at all unless you accept. Choosing
+       “Essential only” means no analytics or advertising cookies are written.</p>
+    <ul>
+      <li><strong>Essential</strong> — session and security cookies. Always on.</li>
+      <li><strong>Analytics</strong> — Google Analytics / Google Tag Manager, to understand
+          which shows and pages people actually use.</li>
+      <li><strong>Advertising</strong> — Google Ads, Meta, and TikTok, so we can show
+          Straw Hut Media ads to people who have visited us and measure whether they work.</li>
+    </ul>
+    <p>You can change your mind at any time:
+       <a href="#" onclick="window.shmOpenConsent&amp;&amp;window.shmOpenConsent();return false;">reopen cookie settings</a>.
+       You can also clear cookies in your browser.</p>
+
+    <h2>Why we are allowed to use it</h2>
+    <p>For analytics and advertising cookies we rely on your consent. For replying to an
+       enquiry or delivering a service you asked for, we rely on performing a contract or
+       our legitimate interest in running the business. You can withdraw consent at any time.</p>
+
+    <h2>Who we share it with</h2>
+    <p>We do not sell your personal information. We share it only with providers that help
+       us operate: our hosting provider (Railway), email delivery (Resend), and — where you
+       have consented — Google, Meta, and TikTok for analytics and advertising. Podcast
+       audio streams from the show’s host (for example Megaphone), which may log the request.</p>
+
+    <h2>How long we keep it</h2>
+    <p>Enquiries and subscriptions are kept until you ask us to delete them or they are no
+       longer needed. Analytics data is retained according to the provider’s settings,
+       typically no more than 14 months.</p>
+
+    <h2>Your rights</h2>
+    <p>Depending on where you live — including the UK and EEA under UK/EU GDPR, and
+       California under the CCPA/CPRA — you may have the right to access, correct, delete,
+       or port your information, to object to or restrict processing, to withdraw consent,
+       and to opt out of targeted advertising or any “sale” or “sharing” of personal
+       information. We do not sell personal information. To exercise any right, email
+       <a href="mailto:hello@strawhutmedia.com">hello@strawhutmedia.com</a> and we will
+       respond within the time the law allows. UK/EEA residents may also complain to their
+       local data protection authority.</p>
+
+    <h2>Children</h2>
+    <p>This site is not directed at children under 13, and we do not knowingly collect
+       their personal information.</p>
+
+    <h2>Changes</h2>
+    <p>If we change this policy we will update the date at the top of this page.</p>
+  </div></div></section>`;
+  return layout({
+    title: 'Privacy & Cookies — Straw Hut Media',
+    description:
+      'How Straw Hut Media collects, uses, and protects your information, the cookies we set, and how to control your choices.',
+    body,
+    activeNav: '',
+    path: '/privacy',
+    jsonLd: breadcrumbJsonLd([
+      { name: 'Home', path: '/' },
+      { name: 'Privacy & Cookies', path: '/privacy' },
+    ]),
   });
 }
