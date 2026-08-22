@@ -55,6 +55,14 @@ function snapshot(route) {
     if (!fs.existsSync(abs) || !fs.statSync(abs).size) { const d = curl(url); if (d.length < 200) continue; fs.writeFileSync(abs, d); }
     html = html.split(`"${url}"`).join(`"../assets/${file}"`);
   }
+  // Same-origin assets (the logo, favicons) need localising too, or screenshots
+  // show alt text where the brand mark should be and you can't trust your eyes.
+  for (const rel of [...new Set([...html.matchAll(/(?:src|href)="(\/[\w./-]+\.(?:png|jpe?g|gif|webp|svg|ico))"/g)].map(m => m[1]))]) {
+    const file = rel.replace(/[^\w.-]/g, '_');
+    const abs = `${OUT}/assets/${file}`;
+    if (!fs.existsSync(abs) || !fs.statSync(abs).size) { const d = curl(BASE + rel); if (d.length < 100) continue; fs.writeFileSync(abs, d); }
+    html = html.split(`"${rel}"`).join(`"../assets/${file}"`);
+  }
   html = html.replace(/<link rel="stylesheet" href="\/styles\.css[^"]*">/, `<style>${css}</style>`);
   const file = `${OUT}/pages/${name}.html`;
   fs.writeFileSync(file, html);
