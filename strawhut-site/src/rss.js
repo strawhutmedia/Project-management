@@ -12,6 +12,18 @@ const parser = new XMLParser({
   attributeNamePrefix: '@_',
   cdataPropName: '__cdata',
   trimValues: true,
+  // Real podcast feeds are big and full of legitimate entities (&amp;, &#39;)
+  // across hundreds of episodes, and the library's default cap of 1000 total
+  // expansions rejects them outright (e.g. Simplecast-hosted shows). Raise the
+  // count/length ceilings while KEEPING the depth cap, which is what actually
+  // protects against billion-laughs style entity-expansion attacks.
+  processEntities: {
+    enabled: true,
+    maxEntitySize: 10000,
+    maxExpansionDepth: 10,
+    maxTotalExpansions: 500000,
+    maxExpandedLength: 20000000,
+  },
 });
 
 // Some feeds nest text in CDATA, some inline it; normalize either shape.
@@ -83,9 +95,18 @@ export function parseFeed(xml, feedUrl) {
     throw new Error('Could not find an RSS <channel> — is this a valid podcast feed?');
   }
 
-  const categories = arr(channel['itunes:category'])
-    .map((c) => (c && c['@_text']) || text(c))
-    .filter(Boolean);
+  // Feeds routinely repeat the same itunes:category (once per nested subcategory),
+  // which would render as "Education, Education, Education" on show cards.
+  const categories = [
+    ...new Map(
+      arr(channel['itunes:category'])
+        .map((c) => (c && c['@_text']) || text(c))
+        .filter(Boolean)
+        .map((c) => String(c).trim())
+        .filter(Boolean)
+        .map((c) => [c.toLowerCase(), c])
+    ).values(),
+  ];
 
   const show = {
     feed_url: feedUrl,

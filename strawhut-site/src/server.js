@@ -13,7 +13,7 @@ import { addShowFromFeed, syncShow, syncAll, startScheduler } from './sync.js';
 import * as V from './views.js';
 import * as A from './admin_views.js';
 import { robotsTxt, sitemapXml, llmsTxt } from './seo.js';
-import { sendAnnouncement, mailConfigured, sendContactEmail } from './mail.js';
+import { sendAnnouncement, mailConfigured, sendContactEmail, sendTrafficDigest } from './mail.js';
 import { importFromSite } from './importer.js';
 import { writeLandingCopy, generateLandingCopy, fallbackLandingCopy, aiConfigured, generateShowMetaDescription } from './ai.js';
 import { POSTS, getPost } from './content/resources.js';
@@ -62,6 +62,14 @@ const CANONICAL_HOST = (() => {
   try { return new URL(process.env.APP_BASE_URL || 'https://www.strawhutmedia.com').host; }
   catch { return 'www.strawhutmedia.com'; }
 })();
+// Retired subdomains. Their content now lives as a PATH on the main site, which
+// consolidates ranking authority instead of splitting it across subdomains.
+// 301 (not deletion) so existing links and indexed pages pass their equity on.
+const LEGACY_SUBDOMAINS = {
+  start: '/podcast-production',   // old GoHighLevel "Start Your Podcast" funnel
+  services: '/pricing',           // old IIS quote tool — now native on /pricing
+};
+
 // Renamed shows + old section pages that don't map by a simple id-strip.
 const LEGACY_EXPLICIT = {
   '/untitled-689': '/only-murders-in-the-building',
@@ -72,8 +80,17 @@ const LEGACY_EXPLICIT = {
 // 1. Canonical host — only touches strawhutmedia.com hosts (never the Railway
 //    preview domain or localhost), so it's inert until the domain is live.
 app.use((req, res, next) => {
-  const host = (req.headers.host || '').toLowerCase();
-  if (/(^|\.)strawhutmedia\.com$/.test(host) && host !== CANONICAL_HOST) {
+  const host = (req.headers.host || '').toLowerCase().split(':')[0];
+  if (host === CANONICAL_HOST) return next();
+  // A retired subdomain lands on its replacement page, not the bare homepage.
+  const dest = LEGACY_SUBDOMAINS[host.split('.')[0]];
+  if (dest && host.endsWith('.strawhutmedia.com')) {
+    return res.redirect(301, `https://${CANONICAL_HOST}${dest}`);
+  }
+  // Only the apex is folded into the canonical host. Any OTHER subdomain passes
+  // through untouched — never assume a strawhutmedia.com subdomain that reaches
+  // this service belongs to it (e.g. slate.* is a separate app).
+  if (host === 'strawhutmedia.com') {
     return res.redirect(301, `https://${CANONICAL_HOST}${req.originalUrl}`);
   }
   next();
@@ -103,6 +120,28 @@ app.use(async (req, res, next) => {
   } catch {
     return next();
   }
+});
+
+// ---- First-party traffic counting -----------------------------------------
+// Counts real page requests per path, per day, straight into our own Postgres.
+// Aggregate only — no IP, no user agent stored, no cookie — so it needs no
+// consent banner and can't be blocked by tracker blockers. Bots are filtered
+// best-effort so the numbers reflect people.
+const BOT_RE = /bot|crawl|spider|slurp|bingpreview|facebookexternalhit|headless|lighthouse|pingdom|uptime|curl|wget|python-requests|node-fetch|axios|monitor/i;
+app.use((req, res, next) => {
+  next(); // never delay the response
+  try {
+    if (req.method !== 'GET') return;
+    const p = req.path;
+    if (p.includes('.') || p.startsWith('/admin') || p.startsWith('/public') ||
+        p.startsWith('/api') || p === '/healthz' || p === '/robots.txt' ||
+        p === '/sitemap.xml' || p === '/llms.txt') return;
+    if (BOT_RE.test(req.headers['user-agent'] || '')) return;
+    res.on('finish', () => {
+      if (res.statusCode !== 200) return; // only count pages actually served
+      store.recordView(p.length > 200 ? p.slice(0, 200) : p).catch(() => {});
+    });
+  } catch {}
 });
 
 // Spotlight = most-downloaded shows (Megaphone). Falls back to the curated
@@ -137,6 +176,28 @@ async function refreshSpotlight() {
   } catch (e) {
     spotlightStatus = { source: 'error', megaphoneConfigured: megaphoneConfigured(), error: e.message };
     console.error('[spotlight] failed:', e.message);
+  }
+}
+
+// Weekly traffic digest. Checked hourly; sends at most once every 7 days, with
+// the last-sent timestamp persisted so restarts and redeploys don't re-send or
+// reset the clock. Set TRAFFIC_DIGEST=off to disable.
+async function maybeSendTrafficDigest(force = false) {
+  if (process.env.TRAFFIC_DIGEST === 'off' || !mailConfigured()) return { sent: false };
+  try {
+    const last = await store.getState('traffic_digest_at');
+    const due = force || !last || Date.now() - new Date(last).getTime() >= 7 * 864e5;
+    if (!due) return { sent: false };
+    const stats = await store.viewStats(7);
+    const to = process.env.ADMIN_EMAIL || 'ryan@strawhutmedia.com';
+    const siteUrl = (process.env.APP_BASE_URL || 'https://www.strawhutmedia.com').replace(/\/+$/, '');
+    await sendTrafficDigest(to, { stats, days: 7, siteUrl });
+    await store.setState('traffic_digest_at', new Date().toISOString());
+    console.log(`[digest] weekly traffic email sent to ${to} (${stats.total} views)`);
+    return { sent: true, total: stats.total };
+  } catch (e) {
+    console.error('[digest] failed:', e.message);
+    return { sent: false, error: e.message };
   }
 }
 
@@ -187,6 +248,20 @@ app.get('/admin', requireAdmin, async (req, res) => {
   const stats = await store.stats();
   const shows = await withCounts(await store.listShows());
   res.send(A.dashboardPage({ stats, shows, flash: readFlash(req, res) }));
+});
+
+app.post('/admin/analytics/send-digest', requireAdmin, async (req, res) => {
+  const r = await maybeSendTrafficDigest(true);
+  setFlash(res, r.sent
+    ? { type: 'ok', msg: `Traffic digest sent (${r.total} page views).` }
+    : { type: 'err', msg: `Not sent: ${r.error || 'email not configured'}` });
+  res.redirect('/admin/analytics');
+});
+
+app.get('/admin/analytics', requireAdmin, async (req, res) => {
+  const days = Math.min(90, Math.max(1, parseInt(req.query.days || '7', 10)));
+  const stats = await store.viewStats(days);
+  res.send(A.analyticsPage({ stats, days }));
 });
 
 app.get('/admin/shows', requireAdmin, async (req, res) => {
@@ -606,6 +681,7 @@ app.get('/shows', async (req, res) => {
   res.send(V.showsIndexPage({ shows }));
 });
 
+app.get('/privacy', (req, res) => res.send(V.privacyPage()));
 app.get('/studio', (req, res) => res.send(V.studioPage()));
 // We have one studio — the old LA landing page is consolidated into /studio.
 app.get('/podcast-studio-los-angeles', (req, res) => res.redirect(301, '/studio'));
@@ -857,6 +933,21 @@ app.use(async (req, res) => {
       return res.redirect(301, ep ? `/${show.slug}/${ep.slug}` : `/${show.slug}`);
     }
 
+    // Hyphen-less vanity URLs from the old site (/onlymurders, /nakedlunch,
+    // /wicked …). Google still has these indexed, and the token-based matcher
+    // below can't see them because it splits on hyphens. Compare the
+    // alphanumeric-only form so they 301 instead of 404ing away their ranking.
+    const compact = (x) => String(x || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+    const cq = compact(showBase);
+    if (parts.length === 1 && cq.length >= 5) {
+      const hit =
+        shows.find((s) => compact(s.slug) === cq) ||
+        shows.find((s) => compact(s.title) === cq) ||
+        shows.find((s) => compact(s.slug).startsWith(cq)) ||
+        shows.find((s) => compact(s.title).startsWith(cq));
+      if (hit) return res.redirect(301, `/${hit.slug}`);
+    }
+
     // No direct match → fuzzy "did you mean" against show slugs.
     const qt = slugTokens(showBase);
     const suggestions = shows
@@ -983,6 +1074,10 @@ app.listen(PORT, async () => {
 
   // Populate the footer "Recent episodes" rail.
   refreshFooter();
+
+  // Weekly traffic digest — checked hourly, sends once every 7 days.
+  setInterval(() => maybeSendTrafficDigest().catch(() => {}), 60 * 60 * 1000);
+  maybeSendTrafficDigest().catch(() => {});
 
   // Backfill unique, AI-written SEO meta descriptions for shows that don't have
   // one yet. Runs once per boot in the background, paced to be gentle on the

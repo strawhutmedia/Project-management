@@ -9,6 +9,7 @@ const FONT =
 function adminLayout({ title, active, body, stats }) {
   const nav = [
     ['/admin', '📊 Dashboard'],
+    ['/admin/analytics', '📈 Traffic'],
     ['/admin/shows', '🎙️ Shows'],
     ['/admin/shows/new', '➕ Add Show'],
     ['/admin/announcements', '📣 Announcements'],
@@ -358,4 +359,53 @@ export function membersPage({ subscribers, flash }) {
       <tbody>${rows || '<tr><td colspan="4" style="color:var(--muted)">No members yet. The signup form on the homepage will collect them.</td></tr>'}</tbody></table>
     </div>`;
   return adminLayout({ title: 'Members', active: '/admin/members', body });
+}
+
+/** Traffic dashboard: totals, week-over-week change, and the most-visited pages. */
+export function analyticsPage({ stats, days }) {
+  const { total, previous, top, daily } = stats;
+  const delta = previous > 0 ? Math.round(((total - previous) / previous) * 100) : null;
+  const max = Math.max(1, ...daily.map((d) => d.hits));
+  const bars = daily
+    .map((d) => {
+      const label = new Date(d.day).toLocaleDateString('en-US', { weekday: 'short', month: 'numeric', day: 'numeric' });
+      return `<div class="tv-bar" title="${esc(label)}: ${d.hits}">
+        <div class="tv-fill" style="height:${Math.round((d.hits / max) * 100)}%"></div>
+        <span class="tv-x">${esc(label.split(' ')[0])}</span></div>`;
+    })
+    .join('');
+  const rows = top.length
+    ? top
+        .map(
+          (r) => `<tr><td><a href="${esc(r.path)}" target="_blank" rel="noopener">${esc(r.path)}</a></td>
+        <td style="text-align:right;font-variant-numeric:tabular-nums">${r.hits.toLocaleString()}</td>
+        <td style="width:38%"><div class="tv-track"><div class="tv-meter" style="width:${Math.round((r.hits / top[0].hits) * 100)}%"></div></div></td></tr>`
+        )
+        .join('')
+    : '<tr><td colspan="3" style="color:var(--muted)">No visits recorded yet — counting starts from the moment this deployed.</td></tr>';
+  const opts = [7, 14, 30, 90]
+    .map((d) => `<a class="btn btn-sm${d === days ? ' btn-primary' : ''}" href="/admin/analytics?days=${d}">${d}d</a>`)
+    .join(' ');
+  const body = `
+  <div class="admin-head"><h1>Traffic</h1><div>${opts}
+    <form method="post" action="/admin/analytics/send-digest" style="display:inline;margin-left:10px">
+      <button class="btn btn-sm" type="submit">Email me this now</button></form></div></div>
+  <div class="tv-cards">
+    <div class="tv-card"><div class="tv-num">${total.toLocaleString()}</div><div class="tv-lab">page views · last ${days} days</div></div>
+    <div class="tv-card"><div class="tv-num">${previous.toLocaleString()}</div><div class="tv-lab">previous ${days} days</div></div>
+    <div class="tv-card"><div class="tv-num" style="color:${delta === null ? 'var(--muted)' : delta >= 0 ? 'var(--accent)' : '#ff8080'}">${
+      delta === null ? '—' : (delta >= 0 ? '+' : '') + delta + '%'
+    }</div><div class="tv-lab">change</div></div>
+    <div class="tv-card"><div class="tv-num">${top.length}</div><div class="tv-lab">pages visited</div></div>
+  </div>
+  ${daily.length ? `<div class="panel" style="margin-bottom:20px"><div class="tv-chart">${bars}</div></div>` : ''}
+  <div class="panel">
+    <h2 style="margin-top:0;font-size:1.05rem">Most visited pages</h2>
+    <table class="admin-table"><thead><tr><th>Page</th><th style="text-align:right">Views</th><th></th></tr></thead>
+    <tbody>${rows}</tbody></table>
+  </div>
+  <p style="color:var(--muted);font-size:0.85rem;margin-top:14px">
+    Counted first-party in our own database — no cookies, no personal data, and unaffected by ad blockers.
+    Known bots are excluded. A weekly summary is emailed every Monday.</p>`;
+  return adminLayout({ title: 'Traffic', active: '/admin/analytics', body });
 }

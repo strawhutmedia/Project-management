@@ -135,6 +135,37 @@ class JsonStore {
   async allEpisodesRaw() {
     return Object.values(this.db.episodes);
   }
+  async recordView(path) {
+    const day = new Date().toISOString().slice(0, 10);
+    this.db.page_views = this.db.page_views || {};
+    const k = day + '|' + path;
+    this.db.page_views[k] = (this.db.page_views[k] || 0) + 1;
+  }
+  async viewStats(days = 7) {
+    const pv = this.db.page_views || {};
+    const cut = (n) => new Date(Date.now() - n * 864e5).toISOString().slice(0, 10);
+    const inRange = (d, a, b) => d > a && (b === null || d <= b);
+    const agg = {};
+    let total = 0, previous = 0;
+    const daily = {};
+    for (const [k, hits] of Object.entries(pv)) {
+      const [day, path] = k.split('|');
+      if (inRange(day, cut(days), null)) {
+        agg[path] = (agg[path] || 0) + hits; total += hits;
+        daily[day] = (daily[day] || 0) + hits;
+      } else if (inRange(day, cut(days * 2), cut(days))) previous += hits;
+    }
+    return {
+      total, previous,
+      top: Object.entries(agg).map(([path, hits]) => ({ path, hits })).sort((a, b) => b.hits - a.hits).slice(0, 25),
+      daily: Object.entries(daily).sort().map(([day, hits]) => ({ day, hits })),
+    };
+  }
+  async getState(key) { return (this.db.app_state || {})[key] || null; }
+  async setState(key, value) {
+    this.db.app_state = this.db.app_state || {};
+    this.db.app_state[key] = String(value); this._flush();
+  }
   async recentEpisodes(limit = 6) {
     const shows = this.db.shows || {};
     return Object.values(this.db.episodes)
@@ -313,6 +344,21 @@ class PgStore {
         UNIQUE (show_id, guid)
       );
       CREATE INDEX IF NOT EXISTS idx_episodes_show ON episodes(show_id, published_at DESC);
+      -- First-party, privacy-preserving traffic counts. Aggregate only: a row
+      -- per (day, path) with a hit counter. No IPs, no user agents, no cookies,
+      -- nothing that identifies a person — so it needs no consent and is immune
+      -- to ad blockers that strip third-party analytics.
+      CREATE TABLE IF NOT EXISTS page_views (
+        day   DATE NOT NULL,
+        path  TEXT NOT NULL,
+        hits  BIGINT NOT NULL DEFAULT 0,
+        PRIMARY KEY (day, path)
+      );
+      CREATE INDEX IF NOT EXISTS idx_page_views_day ON page_views(day DESC);
+      CREATE TABLE IF NOT EXISTS app_state (
+        key TEXT PRIMARY KEY,
+        value TEXT
+      );
       CREATE TABLE IF NOT EXISTS subscribers (
         id         TEXT PRIMARY KEY,
         email      TEXT UNIQUE NOT NULL,
@@ -489,6 +535,47 @@ class PgStore {
       `SELECT id, show_id, slug, title, image_url, duration, embedding, youtube_id FROM episodes`
     );
     return rows;
+  }
+  async recordView(path) {
+    await this.pool.query(
+      `INSERT INTO page_views (day, path, hits) VALUES (CURRENT_DATE, $1, 1)
+       ON CONFLICT (day, path) DO UPDATE SET hits = page_views.hits + 1`,
+      [path]
+    );
+  }
+  async viewStats(days = 7) {
+    const { rows: top } = await this.pool.query(
+      `SELECT path, SUM(hits)::bigint AS hits FROM page_views
+        WHERE day > CURRENT_DATE - $1::int
+        GROUP BY path ORDER BY hits DESC LIMIT 25`, [days]
+    );
+    const { rows: tot } = await this.pool.query(
+      `SELECT COALESCE(SUM(hits),0)::bigint AS hits FROM page_views WHERE day > CURRENT_DATE - $1::int`, [days]
+    );
+    const { rows: prev } = await this.pool.query(
+      `SELECT COALESCE(SUM(hits),0)::bigint AS hits FROM page_views
+        WHERE day > CURRENT_DATE - ($1::int * 2) AND day <= CURRENT_DATE - $1::int`, [days]
+    );
+    const { rows: daily } = await this.pool.query(
+      `SELECT day, SUM(hits)::bigint AS hits FROM page_views
+        WHERE day > CURRENT_DATE - $1::int GROUP BY day ORDER BY day`, [days]
+    );
+    return {
+      total: Number(tot[0]?.hits || 0),
+      previous: Number(prev[0]?.hits || 0),
+      top: top.map((r) => ({ path: r.path, hits: Number(r.hits) })),
+      daily: daily.map((r) => ({ day: r.day, hits: Number(r.hits) })),
+    };
+  }
+  async getState(key) {
+    const { rows } = await this.pool.query(`SELECT value FROM app_state WHERE key=$1`, [key]);
+    return rows[0]?.value || null;
+  }
+  async setState(key, value) {
+    await this.pool.query(
+      `INSERT INTO app_state (key,value) VALUES ($1,$2)
+       ON CONFLICT (key) DO UPDATE SET value=EXCLUDED.value`, [key, String(value)]
+    );
   }
   async recentEpisodes(limit = 6) {
     const { rows } = await this.pool.query(
