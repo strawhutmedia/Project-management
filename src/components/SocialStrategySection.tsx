@@ -1,6 +1,6 @@
 // Per-show social media strategy dashboard.
 //
-// Nine Claude-driven strategy tools shown as cards. Each card:
+// Ten Claude-driven strategy tools shown as cards. Each card:
 //   - shows the doc's status ("Not yet generated" / "Generated 3d ago")
 //   - Run button → prompts for input if the tool has a [paste] field,
 //                  otherwise fires straight into a Claude call
@@ -77,12 +77,12 @@ const TOOLS: Tool[] = [
     accent: 'stage-done',
   },
   {
-    kind: 'post',
-    label: '8. Post That Stops the Scroll',
-    purpose: 'One high-engagement post on a specific topic. Hook + body + CTA + why-it-works.',
+    kind: 'winners',
+    label: '8. Copy Your Own Winners',
+    purpose: 'Paste past posts (with numbers if you have them) — get the patterns behind the strongest and weakest ones, plus a repeatable formula. Your best posts already hold it.',
     needsPaste: true,
-    pasteHint: 'The topic. Be specific — "why our last episode\'s guest changed her mind about AI music" beats "AI music".',
-    accent: 'stage-mixing',
+    pasteHint: 'Paste 5-15 past posts, each with whatever performance you know (likes, saves, shares, comments). Label them however is easiest — "Post 1: … (2.1k likes)".',
+    accent: 'stage-overdubs',
   },
   {
     kind: 'monetization',
@@ -90,6 +90,14 @@ const TOOLS: Tool[] = [
     purpose: 'Offer ideas, pricing, content angles that convert followers to buyers, funnel stages.',
     needsPaste: false,
     accent: 'urgent',
+  },
+  {
+    kind: 'post',
+    label: '10. Write the Caption Last',
+    purpose: 'One natural, brand-voice caption on a specific topic: first-sentence hook, clear value, strong CTA. Caption last, never first — it works because the tools above already told it who you are.',
+    needsPaste: true,
+    pasteHint: 'The topic. Be specific — "why our last episode\'s guest changed her mind about AI music" beats "AI music".',
+    accent: 'stage-mixing',
   },
 ]
 
@@ -122,7 +130,7 @@ export default function SocialStrategySection({
       <div>
         <h2 className="text-[11px] uppercase tracking-[0.2em] text-muted font-bold">🧠 Social Media Strategy</h2>
         <p className="text-[11px] text-muted/80 mt-1">
-          Nine strategist tools per show. Build these once and every text post,
+          Ten strategist tools per show, in run order. Build these once and every text post,
           carousel, and daily plan generation references them for context.
         </p>
       </div>
@@ -432,6 +440,7 @@ function DocumentRenderer({ kind, content }: { kind: StrategyKind; content: Reco
     case 'pillars':       return <PillarsDoc content={content} />
     case 'calendar':      return <CalendarDoc content={content} />
     case 'ideas':         return <IdeasDoc content={content} />
+    case 'winners':       return <WinnersDoc content={content} />
     case 'post':          return <PostDoc content={content} />
     case 'monetization':  return <MonetizationDoc content={content} />
   }
@@ -711,6 +720,35 @@ function IdeasDoc({ content }: { content: Record<string, unknown> }) {
           </Section>
         )
       })}
+    </div>
+  )
+}
+
+function WinnersDoc({ content }: { content: Record<string, unknown> }) {
+  const breakdown = Array.isArray(content.post_breakdown) ? content.post_breakdown as Array<Record<string, unknown>> : []
+  return (
+    <div className="space-y-4">
+      <Section title="Repeatable formula">
+        <p className="font-bold">{String(content.repeatable_formula ?? '')}</p>
+      </Section>
+      <Section title="Winning patterns"><BulletList items={Array.isArray(content.winning_patterns) ? content.winning_patterns : []} /></Section>
+      <Section title="Losing patterns"><BulletList items={Array.isArray(content.losing_patterns) ? content.losing_patterns : []} /></Section>
+      <Section title="Specific improvements"><BulletList items={Array.isArray(content.specific_improvements) ? content.specific_improvements : []} /></Section>
+      <Section title="Post-by-post breakdown">
+        <div className="space-y-2">
+          {breakdown.map((p, i) => (
+            <div key={i} className="rounded-lg bg-ink/30 border border-line p-2">
+              <div className="flex items-start justify-between gap-2">
+                <p className="text-xs text-text flex-1">{String(p.post ?? '')}</p>
+                <span className={`text-[9px] uppercase tracking-wider font-bold shrink-0 ${String(p.verdict) === 'strong' ? 'text-stage-done' : 'text-urgent'}`}>
+                  {String(p.verdict ?? '')}
+                </span>
+              </div>
+              <p className="text-xs text-muted mt-1">{String(p.why ?? '')}</p>
+            </div>
+          ))}
+        </div>
+      </Section>
     </div>
   )
 }

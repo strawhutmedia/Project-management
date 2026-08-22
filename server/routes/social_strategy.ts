@@ -1,4 +1,4 @@
-// Per-show social strategy documents (the 9 tools).
+// Per-show social strategy documents (the 10 tools).
 //
 //   GET    /api/social-strategy/projects/:projectId              → list all 7 documents (some may be null)
 //   POST   /api/social-strategy/projects/:projectId/:kind        → generate/regenerate a document
@@ -29,7 +29,7 @@ socialStrategyRouter.use(requireUser)
 
 const KINDS: StrategyKind[] = [
   'strategy', 'profile_audit', 'audience', 'authority', 'pillars',
-  'calendar', 'ideas', 'post', 'monetization',
+  'calendar', 'ideas', 'winners', 'post', 'monetization',
 ]
 
 function isKind(x: unknown): x is StrategyKind {

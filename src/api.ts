@@ -175,7 +175,7 @@ export type ApiShowBrief = {
 
 export type StrategyKind =
   | 'strategy' | 'profile_audit' | 'audience' | 'authority' | 'pillars'
-  | 'calendar' | 'ideas' | 'post' | 'monetization'
+  | 'calendar' | 'ideas' | 'winners' | 'post' | 'monetization'
 
 export type ApiStrategyDocument = {
   id: string

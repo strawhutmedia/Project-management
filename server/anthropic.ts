@@ -219,7 +219,7 @@ export type RawSocialPlan = {
 // Each doc is condensed to the fields the generator actually needs —
 // full JSON blowout would blow past the cache-friendly prefix budget.
 export type StrategyDocsInput = Partial<Record<
-  'strategy' | 'audience' | 'authority' | 'pillars' | 'monetization',
+  'strategy' | 'audience' | 'authority' | 'pillars' | 'monetization' | 'winners',
   Record<string, unknown> | null
 >>
 
@@ -274,6 +274,13 @@ export function strategyDocsBlock(docs?: StrategyDocsInput): string {
         parts.push(`  · ${truncate(pl.name, 60)} — ${truncate(pl.purpose ?? '', 160)}`)
       }
     }
+  }
+  const w = docs.winners as Record<string, unknown> | undefined
+  if (w) {
+    parts.push('PROVEN PATTERNS (mined from this show\'s actual past posts — follow them):')
+    if (w.repeatable_formula) parts.push(`  Formula: ${truncate(w.repeatable_formula, 300)}`)
+    if (Array.isArray(w.winning_patterns)) parts.push(`  What works: ${w.winning_patterns.slice(0, 4).map((x) => truncate(x, 120)).join(' · ')}`)
+    if (Array.isArray(w.losing_patterns)) parts.push(`  Avoid: ${w.losing_patterns.slice(0, 4).map((x) => truncate(x, 120)).join(' · ')}`)
   }
   const m = docs.monetization as Record<string, unknown> | undefined
   if (m) {
@@ -1482,7 +1489,7 @@ export async function generateCarouselDeck(input: CarouselGenerateInput): Promis
 }
 
 // ============================================================
-// SOCIAL STRATEGY TOOLS (9 per-show strategy documents)
+// SOCIAL STRATEGY TOOLS (10 per-show strategy documents)
 // ============================================================
 // One entry point — generateSocialStrategyDocument({projectContext,
 // kind, inputContext}) — that dispatches to the right prompt +
@@ -1500,7 +1507,8 @@ export type StrategyKind =
   | 'pillars'       // Content Pillars That Convert
   | 'calendar'      // 30-Day Content Plan (hook + key message + CTA + format per day)
   | 'ideas'         // Never Run Out of Ideas — idea bank by audience level
-  | 'post'          // Posts That Stop the Scroll (one-off)
+  | 'winners'       // Copy Your Own Winners — pattern-mine past posts
+  | 'post'          // Write the Caption Last (one-off; run after the rest)
   | 'monetization'  // Audience Monetization Strategy
 
 export type StrategyProjectContext = {
@@ -1790,6 +1798,30 @@ const STRATEGY_SCHEMAS: Record<StrategyKind, Record<string, unknown>> = {
       },
     },
   },
+  winners: {
+    type: 'object',
+    additionalProperties: false,
+    required: ['post_breakdown', 'winning_patterns', 'losing_patterns',
+               'specific_improvements', 'repeatable_formula'],
+    properties: {
+      post_breakdown: {
+        type: 'array',
+        items: {
+          type: 'object', additionalProperties: false,
+          required: ['post', 'verdict', 'why'],
+          properties: {
+            post: { type: 'string' },
+            verdict: { type: 'string', enum: ['strong', 'weak'] },
+            why: { type: 'string' },
+          },
+        },
+      },
+      winning_patterns: { type: 'array', items: { type: 'string' } },
+      losing_patterns: { type: 'array', items: { type: 'string' } },
+      specific_improvements: { type: 'array', items: { type: 'string' } },
+      repeatable_formula: { type: 'string' },
+    },
+  },
   post: {
     type: 'object',
     additionalProperties: false,
@@ -1889,11 +1921,26 @@ problems, and stay relevant over time — for each idea, name the specific probl
 for the viewer and the best format for it. Ground the ideas in what the show actually covers
 (recent episodes, pillars, and audience docs when present), not generic niche filler.
 Return the JSON matching the schema.`,
-  post: `You are a copywriter for high-engagement social posts.
-Write ONE high-engagement social post on the topic the operator provided (input_context).
-Open with a hook that makes someone stop scrolling, deliver a clear and useful insight in the
-body, and close with a call to action that drives comments, saves, or clicks. Also explain
-briefly why the hook stops the scroll. Return the JSON matching the schema.`,
+  winners: `You are a social media analyst who reverse-engineers what works.
+The operator pasted their past posts into input_context — ideally with performance notes
+(likes, saves, shares, comments), but work with what you're given. Find the patterns behind
+the strongest and weakest posts: for each pasted post, give a verdict (strong / weak) and
+explain why it worked or didn't — hook structure, topic, format, emotional trigger, CTA,
+timing, specificity. Then extract the winning patterns and losing patterns as reusable rules,
+give specific improvements to apply going forward, and distill it all into ONE repeatable
+formula the show can run on purpose. The best posts already hold the formula — your job is
+to pull it out. Judge only the posts you were given; don't invent performance data.
+Return the JSON matching the schema.`,
+  post: `You are a copywriter for high-engagement social captions. Write the caption LAST —
+this show's strategy docs (positioning, audience psychology, pillars, brand voice, winning
+patterns) are in the show block, and the caption only works because they already told you
+who this show is. Use them.
+Write ONE caption on the topic the operator provided (input_context). It must sound natural
+and match the show's brand voice — like a person, not a brand. Grab attention in the FIRST
+sentence (that's the hook), deliver clear value in the body, and end with a strong call to
+action that drives comments, saves, or clicks. Where a "Copy Your Own Winners" doc exists in
+sibling docs, follow its repeatable formula. Also explain briefly why the hook stops the
+scroll. Return the JSON matching the schema.`,
   monetization: `You are a business strategist focused on turning social followers into paying customers.
 Review the show's current business model (inferred from projectContext.brand_voice and recent
 episodes) and build a monetization plan that includes concrete offer ideas, pricing structure,

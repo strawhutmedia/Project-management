@@ -31,7 +31,7 @@ export async function loadShowStrategyDocs(projectId: string): Promise<StrategyD
   const { rows } = await pool.query<{ kind: string; content: Record<string, unknown> }>(
     `SELECT kind, content FROM social_strategy_documents
        WHERE project_id = $1 AND status = 'generated'
-         AND kind IN ('strategy', 'audience', 'authority', 'pillars', 'monetization')`,
+         AND kind IN ('strategy', 'audience', 'authority', 'pillars', 'monetization', 'winners')`,
     [projectId],
   )
   const out: StrategyDocsInput = {}
