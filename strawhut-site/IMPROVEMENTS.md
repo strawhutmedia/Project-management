@@ -19,6 +19,35 @@ entries at the top. Keep each entry to what changed and why it mattered.
 6. **Out of scope:** DNS records, email records (MX/SPF/DKIM/DMARC), env vars,
    and anything requiring credentials.
 
+## Parked — Rainbow Media app rebuild
+
+`rainbowmedia.strawhutmedia.com` is a business-critical app used regularly, and
+it is the only remaining reason the GoDaddy Windows VPS exists. Paused pending
+information; **do not let that VPS lapse before this is resolved** (paid through
+April 2029, so there is time).
+
+What was established from the outside (login page + headers only):
+- ASP.NET MVC 5.2 / .NET Framework 4 on IIS 10 — hence the *Windows* VPS.
+- Bootstrap 5, jQuery, DataTables + Responsive, moment.js, blockUI.
+- Login form posts to `/` with UserName / Password / RememberMe / ReturnUrl.
+- The shared layout contains a "Are you sure you want to delete this record?"
+  modal, so it is a CRUD records app.
+- Purpose per the owner: Rainbow Media Co uploads/submits content to one of
+  their clients; possibly produces an RSS feed.
+- No public endpoints — /rss, /feed, /sitemap.xml, /robots.txt and friends all
+  404. Everything is behind auth, so it cannot be reverse-engineered remotely.
+
+Still needed before any rebuild:
+1. Screenshots of every screen after login (dashboard, list, add/edit forms).
+2. Whether it *generates* a feed or *pushes* files somewhere (FTP/host/email).
+3. Who logs in, and how many accounts.
+4. Volume of stored content, and whether the client has a saved feed URL that
+   must keep resolving after a move (would need a redirect).
+
+Rebuilding here is well-supported: admin auth, Postgres, RSS handling and AWS
+S3 credentials all already exist in this app, and it would drop the Windows
+dependency entirely.
+
 ## Backlog / ideas not yet built
 
 - **Host & talent pages** (`Person` schema) — capture searches for individual
