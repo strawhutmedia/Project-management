@@ -219,7 +219,7 @@ export type RawSocialPlan = {
 // Each doc is condensed to the fields the generator actually needs —
 // full JSON blowout would blow past the cache-friendly prefix budget.
 export type StrategyDocsInput = Partial<Record<
-  'strategy' | 'audience' | 'authority' | 'pillars' | 'monetization',
+  'strategy' | 'audience' | 'authority' | 'pillars' | 'monetization' | 'winners',
   Record<string, unknown> | null
 >>
 
@@ -274,6 +274,13 @@ export function strategyDocsBlock(docs?: StrategyDocsInput): string {
         parts.push(`  · ${truncate(pl.name, 60)} — ${truncate(pl.purpose ?? '', 160)}`)
       }
     }
+  }
+  const w = docs.winners as Record<string, unknown> | undefined
+  if (w) {
+    parts.push('PROVEN PATTERNS (mined from this show\'s actual past posts — follow them):')
+    if (w.repeatable_formula) parts.push(`  Formula: ${truncate(w.repeatable_formula, 300)}`)
+    if (Array.isArray(w.winning_patterns)) parts.push(`  What works: ${w.winning_patterns.slice(0, 4).map((x) => truncate(x, 120)).join(' · ')}`)
+    if (Array.isArray(w.losing_patterns)) parts.push(`  Avoid: ${w.losing_patterns.slice(0, 4).map((x) => truncate(x, 120)).join(' · ')}`)
   }
   const m = docs.monetization as Record<string, unknown> | undefined
   if (m) {
@@ -331,6 +338,177 @@ export type GenerateResult = {
     outputTokens: number
     cacheCreationInputTokens: number
     cacheReadInputTokens: number
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────
+// Autopilot daily generator — transcript-less.
+// ─────────────────────────────────────────────────────────────────────
+//
+// The per-episode generator above needs a finished transcript; the
+// autopilot runs every morning whether or not an episode dropped, so it
+// writes from the show's strategy docs (especially the 30-day calendar
+// slot for today), brand voice, example posts, and recent episode
+// titles instead. Output reuses RawSocialPlan/SCHEMA so the items flow
+// through the exact same plan → scheduler → QA pipeline as everything
+// else. It's a smaller batch than the episode plan: this is a daily
+// drumbeat for the QA queue, not an episode launch package.
+
+const AUTOPILOT_SYSTEM_PROMPT = `You are the daily social-media writer for a podcast network.
+Every morning you produce that day's draft content for one show. A human QA
+reviewer edits and approves everything before it goes live — write finished,
+postable content, not outlines.
+
+Produce EXACTLY this batch:
+  - text_posts: 2 (complete, ready-to-paste captions in the show's voice)
+  - photo_concepts: 1
+  - reel_concepts: 1
+  - story_concepts: 1
+
+If the user block includes a "=== SHOW STRATEGY ===" section, it is the
+authoritative brief: serve the listed pillars, land on the audience's actual
+desires and frustrations, match the tone, and follow the PROVEN PATTERNS
+formula when present.
+
+If the user block includes a "TODAY'S CALENDAR SLOT" section, today's content
+executes that slot: use its idea and hook as the starting point (you may
+sharpen the wording), respect its post type and goal, and keep its CTA intent.
+When there is no calendar slot, pick the strongest angle from the strategy and
+recent episodes yourself, and vary it from the previous days' themes listed
+under RECENT AUTOPILOT THEMES so consecutive days never repeat.
+
+You have NO transcript today, so:
+  - NEVER invent timecodes, quotes, or moments that would need a recording.
+    No [HH:MM:SS] prefixes anywhere.
+  - suggested_clip fields name a real recent episode (from RECENT EPISODES)
+    plus what kind of moment the editor should look for in it, e.g.
+    "From 'Episode Title' — find the exchange where the guest explains X".
+  - image_direction describes either a reusable brand asset by exact filename
+    (when AVAILABLE BRAND ASSETS lists one that fits) or a simple shot the
+    team can produce without a recording (cover art treatment, host photo,
+    text-forward layout is allowed ONLY for text-quote graphics).
+
+Voice: the EXAMPLE POSTS are authoritative — copy their tone, vocabulary,
+sentence length, and formatting. Write like a person, not a brand. Respect
+the SPELLING REQUIREMENTS list exactly.
+
+Output: ONLY valid JSON matching the supplied schema. No preamble.`
+
+export type AutopilotGenerateInput = {
+  showName: string
+  showSubtitle?: string | null
+  brandVoice: string
+  examplePosts: string[]
+  vocabulary?: string
+  strategyDocs?: StrategyDocsInput
+  brandAssets?: Array<{ name: string; dropboxPath: string }>
+  recentEpisodes: Array<{ title: string; subtitle?: string | null }>
+  // Today's entry from the 30-day calendar strategy doc, if the show
+  // has one. Passed through verbatim-ish so the day executes the plan.
+  calendarSlot?: {
+    day: number
+    idea?: string
+    hook?: string
+    format?: string
+    core_message?: string
+    cta?: string
+    post_type?: string
+    goal?: string
+    pillar?: string
+  } | null
+  // Ideas from the last few autopilot days, so consecutive days vary.
+  recentThemes: string[]
+  date: string
+}
+
+export async function generateAutopilotPlan(input: AutopilotGenerateInput): Promise<GenerateResult> {
+  logInfo('autopilot: generating daily plan', {
+    showName: input.showName,
+    date: input.date,
+    hasCalendarSlot: Boolean(input.calendarSlot),
+  })
+  const showBlock = showMetadataBlock({
+    showName: input.showName,
+    showSubtitle: input.showSubtitle,
+    brandVoice: input.brandVoice,
+    examplePosts: input.examplePosts,
+    vocabulary: input.vocabulary,
+    strategyDocs: input.strategyDocs,
+    brandAssets: input.brandAssets,
+    // Unused by showMetadataBlock but required by GenerateInput.
+    episodeTitle: '', episodeTranscript: '', date: input.date,
+  })
+  const dayLines: string[] = [`DATE: ${input.date}`]
+  if (input.calendarSlot) {
+    const c = input.calendarSlot
+    dayLines.push('', `TODAY'S CALENDAR SLOT (day ${c.day} of the 30-day plan — execute this):`)
+    if (c.idea) dayLines.push(`  Idea: ${c.idea}`)
+    if (c.hook) dayLines.push(`  Hook: ${c.hook}`)
+    if (c.core_message) dayLines.push(`  Key message: ${c.core_message}`)
+    if (c.cta) dayLines.push(`  CTA: ${c.cta}`)
+    if (c.format) dayLines.push(`  Format: ${c.format}`)
+    if (c.post_type) dayLines.push(`  Post type: ${c.post_type}`)
+    if (c.goal) dayLines.push(`  Goal: ${c.goal}`)
+    if (c.pillar) dayLines.push(`  Pillar: ${c.pillar}`)
+  }
+  if (input.recentEpisodes.length > 0) {
+    dayLines.push('', 'RECENT EPISODES (real — reference these, never invent episodes):')
+    for (const e of input.recentEpisodes.slice(0, 8)) {
+      dayLines.push(`  - ${e.title}${e.subtitle ? ` — ${e.subtitle}` : ''}`)
+    }
+  }
+  if (input.recentThemes.length > 0) {
+    dayLines.push('', 'RECENT AUTOPILOT THEMES (do not repeat these):')
+    for (const t of input.recentThemes.slice(0, 10)) dayLines.push(`  - ${t}`)
+  }
+  dayLines.push('', "Generate today's draft batch now.")
+
+  let response
+  try {
+    response = await client.messages.create({
+      model: MODEL,
+      max_tokens: 8000,
+      system: AUTOPILOT_SYSTEM_PROMPT,
+      messages: [
+        {
+          role: 'user',
+          content: [
+            { type: 'text', text: showBlock, cache_control: { type: 'ephemeral' } },
+            { type: 'text', text: dayLines.join('\n') },
+          ],
+        },
+      ],
+      output_config: {
+        format: { type: 'json_schema', schema: SCHEMA },
+      },
+    })
+  } catch (err) {
+    logError('autopilot: claude call failed', {
+      showName: input.showName,
+      error: err instanceof Error ? err.message : String(err),
+    })
+    throw err
+  }
+
+  const textBlock = response.content.find((b) => b.type === 'text')
+  if (!textBlock || textBlock.type !== 'text') {
+    throw new Error('autopilot: claude returned no text block')
+  }
+  let plan: RawSocialPlan
+  try {
+    plan = JSON.parse(textBlock.text) as RawSocialPlan
+  } catch (err) {
+    logError('autopilot: invalid JSON from claude', { body: textBlock.text.slice(0, 500) })
+    throw new Error(`autopilot: invalid JSON: ${err instanceof Error ? err.message : String(err)}`)
+  }
+  return {
+    plan,
+    usage: {
+      inputTokens: response.usage.input_tokens,
+      outputTokens: response.usage.output_tokens,
+      cacheCreationInputTokens: response.usage.cache_creation_input_tokens ?? 0,
+      cacheReadInputTokens: response.usage.cache_read_input_tokens ?? 0,
+    },
   }
 }
 
@@ -1482,7 +1660,7 @@ export async function generateCarouselDeck(input: CarouselGenerateInput): Promis
 }
 
 // ============================================================
-// SOCIAL STRATEGY TOOLS (7 per-show strategy documents)
+// SOCIAL STRATEGY TOOLS (10 per-show strategy documents)
 // ============================================================
 // One entry point — generateSocialStrategyDocument({projectContext,
 // kind, inputContext}) — that dispatches to the right prompt +
@@ -1493,12 +1671,15 @@ export async function generateCarouselDeck(input: CarouselGenerateInput): Promis
 // [paste] fields).
 
 export type StrategyKind =
-  | 'strategy'      // Full Social Media Strategy
+  | 'strategy'      // Full Social Media Strategy (the complete system — run first)
+  | 'profile_audit' // Fix the Profile — audit before feeding it more content
   | 'audience'      // Audience Psychology Breakdown
   | 'authority'     // Authority Positioning Plan
   | 'pillars'       // Content Pillars That Convert
-  | 'calendar'      // 30-Day Content Plan
-  | 'post'          // Posts That Stop the Scroll (one-off)
+  | 'calendar'      // 30-Day Content Plan (hook + key message + CTA + format per day)
+  | 'ideas'         // Never Run Out of Ideas — idea bank by audience level
+  | 'winners'       // Copy Your Own Winners — pattern-mine past posts
+  | 'post'          // Write the Caption Last (one-off; run after the rest)
   | 'monetization'  // Audience Monetization Strategy
 
 export type StrategyProjectContext = {
@@ -1556,7 +1737,9 @@ const STRATEGY_SCHEMAS: Record<StrategyKind, Record<string, unknown>> = {
   strategy: {
     type: 'object',
     additionalProperties: false,
-    required: ['brand_positioning', 'content_direction', 'audience_targeting', 'monetization_plan', 'growth_north_star'],
+    required: ['brand_positioning', 'content_direction', 'audience_targeting',
+               'posting_system', 'engagement_plan', 'tracking',
+               'monetization_plan', 'growth_north_star'],
     properties: {
       brand_positioning: {
         type: 'object', additionalProperties: false,
@@ -1586,6 +1769,31 @@ const STRATEGY_SCHEMAS: Record<StrategyKind, Record<string, unknown>> = {
           what_gets_them_to_follow: { type: 'array', items: { type: 'string' } },
         },
       },
+      posting_system: {
+        type: 'object', additionalProperties: false,
+        required: ['cadence', 'weekly_rhythm', 'time_budget_fit'],
+        properties: {
+          cadence: { type: 'string' },
+          weekly_rhythm: { type: 'array', items: { type: 'string' } },
+          time_budget_fit: { type: 'string' },
+        },
+      },
+      engagement_plan: {
+        type: 'object', additionalProperties: false,
+        required: ['daily_habits', 'community_moves'],
+        properties: {
+          daily_habits: { type: 'array', items: { type: 'string' } },
+          community_moves: { type: 'array', items: { type: 'string' } },
+        },
+      },
+      tracking: {
+        type: 'object', additionalProperties: false,
+        required: ['metrics_to_watch', 'review_cadence'],
+        properties: {
+          metrics_to_watch: { type: 'array', items: { type: 'string' } },
+          review_cadence: { type: 'string' },
+        },
+      },
       monetization_plan: {
         type: 'object', additionalProperties: false,
         required: ['near_term', 'medium_term', 'long_term'],
@@ -1596,6 +1804,32 @@ const STRATEGY_SCHEMAS: Record<StrategyKind, Record<string, unknown>> = {
         },
       },
       growth_north_star: { type: 'string' },
+    },
+  },
+  profile_audit: {
+    type: 'object',
+    additionalProperties: false,
+    required: ['first_impression', 'whats_helping', 'whats_hurting',
+               'biggest_fixes', 'bio_rewrite_options', 'consistency_notes', 'engagement_notes'],
+    properties: {
+      first_impression: { type: 'string' },
+      whats_helping: { type: 'array', items: { type: 'string' } },
+      whats_hurting: { type: 'array', items: { type: 'string' } },
+      biggest_fixes: {
+        type: 'array',
+        items: {
+          type: 'object', additionalProperties: false,
+          required: ['fix', 'why', 'how'],
+          properties: {
+            fix: { type: 'string' },
+            why: { type: 'string' },
+            how: { type: 'string' },
+          },
+        },
+      },
+      bio_rewrite_options: { type: 'array', items: { type: 'string' } },
+      consistency_notes: { type: 'string' },
+      engagement_notes: { type: 'string' },
     },
   },
   audience: {
@@ -1676,17 +1910,87 @@ const STRATEGY_SCHEMAS: Record<StrategyKind, Record<string, unknown>> = {
         type: 'array',
         items: {
           type: 'object', additionalProperties: false,
-          required: ['day', 'idea', 'format', 'core_message', 'goal', 'pillar'],
+          required: ['day', 'idea', 'hook', 'format', 'core_message', 'cta', 'post_type', 'goal', 'pillar'],
           properties: {
             day: { type: 'integer' },
             idea: { type: 'string' },
+            hook: { type: 'string' },
             format: { type: 'string' },
             core_message: { type: 'string' },
+            cta: { type: 'string' },
+            post_type: { type: 'string', enum: ['educational', 'entertaining', 'personal', 'authority', 'community'] },
             goal: { type: 'string', enum: ['reach', 'trust', 'buy'] },
             pillar: { type: 'string' },
           },
         },
       },
+    },
+  },
+  ideas: {
+    type: 'object',
+    additionalProperties: false,
+    required: ['beginner', 'intermediate', 'advanced'],
+    properties: {
+      beginner: {
+        type: 'array',
+        items: {
+          type: 'object', additionalProperties: false,
+          required: ['idea', 'problem_it_solves', 'format'],
+          properties: {
+            idea: { type: 'string' },
+            problem_it_solves: { type: 'string' },
+            format: { type: 'string' },
+          },
+        },
+      },
+      intermediate: {
+        type: 'array',
+        items: {
+          type: 'object', additionalProperties: false,
+          required: ['idea', 'problem_it_solves', 'format'],
+          properties: {
+            idea: { type: 'string' },
+            problem_it_solves: { type: 'string' },
+            format: { type: 'string' },
+          },
+        },
+      },
+      advanced: {
+        type: 'array',
+        items: {
+          type: 'object', additionalProperties: false,
+          required: ['idea', 'problem_it_solves', 'format'],
+          properties: {
+            idea: { type: 'string' },
+            problem_it_solves: { type: 'string' },
+            format: { type: 'string' },
+          },
+        },
+      },
+    },
+  },
+  winners: {
+    type: 'object',
+    additionalProperties: false,
+    required: ['post_breakdown', 'winning_patterns', 'losing_patterns',
+               'specific_improvements', 'repeatable_formula'],
+    properties: {
+      post_breakdown: {
+        type: 'array',
+        items: {
+          type: 'object', additionalProperties: false,
+          required: ['post', 'verdict', 'why'],
+          properties: {
+            post: { type: 'string' },
+            verdict: { type: 'string', enum: ['strong', 'weak'] },
+            why: { type: 'string' },
+          },
+        },
+      },
+      winning_patterns: { type: 'array', items: { type: 'string' } },
+      losing_patterns: { type: 'array', items: { type: 'string' } },
+      specific_improvements: { type: 'array', items: { type: 'string' } },
+      repeatable_formula: { type: 'string' },
     },
   },
   post: {
@@ -1736,12 +2040,27 @@ const STRATEGY_SCHEMAS: Record<StrategyKind, Record<string, unknown>> = {
 }
 
 const STRATEGY_SYSTEM_PROMPTS: Record<StrategyKind, string> = {
-  strategy: `You are a senior social media strategist who has built brands from zero to millions of followers.
-Review the show's business, niche, target audience, competitors, and growth goals.
-Build a COMPLETE strategy covering brand positioning, content direction, audience targeting,
-and monetization. Be specific to THIS show (not generic advice). Ground every recommendation
-in what the show actually is and what its audience actually cares about.
+  strategy: `Act as this show's $2,000-a-month social media manager.
+Before creating anything, understand the show's niche, audience, goals, brand voice, content
+style, and available time — all of that is in the show block (the Show Brief is authoritative;
+constraints tell you how much time the team actually has). Then build a COMPLETE system, not
+just a positioning doc: planning (brand positioning, content direction, audience targeting),
+posting (a realistic cadence and weekly rhythm that fits the team's available time — say
+explicitly how it fits), engagement (daily habits and community moves that grow the account
+between posts), growth, and tracking (which metrics to watch and how often to review them).
+Be specific to THIS show (not generic advice). Ground every recommendation in what the show
+actually is and what its audience actually cares about. This document is the foundation every
+other tool references — make it complete enough that nothing downstream has to guess.
 Return the JSON matching the schema.`,
+  profile_audit: `You are a social media profile auditor. The operator pasted their profile
+info into input_context — the link, bio text, and/or a description of the profile picture,
+pinned content, recent posts, and engagement. Review the bio, picture, content, positioning,
+messaging, consistency, and engagement. Tell them what is helping growth, what is hurting it,
+and the biggest fixes — ranked, each with why it matters and exactly how to do it. Include
+2-4 rewritten bio options in the show's voice. The principle: fix the account before feeding
+it more content — posting into a broken profile just burns the work faster. Judge only what
+you were actually given; if something important wasn't provided (e.g. no bio text), say so in
+the relevant note instead of inventing it. Return the JSON matching the schema.`,
   audience: `You are an audience psychologist who studies how people consume media online.
 Break down the target audience in detail — frustrations, desires, fears, and daily habits
 around content. Turn that research into specific messaging angles and content topics that
@@ -1758,15 +2077,41 @@ posts about consistently. Each pillar should either attract new followers, estab
 or drive leads / sales — say which. For each pillar, include 3-5 example post topics and
 explain exactly why it connects with the audience. Return the JSON matching the schema.`,
   calendar: `You are a social media planner.
-Build a full 30-day content calendar for this show. Include a daily content idea, post format,
-core message angle, and the goal (reach / trust / buy). Where the show has content pillars in
-sibling_docs, map each day to a pillar. Balance the mix — don't post the same format five days
-in a row. Return the JSON matching the schema.`,
-  post: `You are a copywriter for high-engagement social posts.
-Write ONE high-engagement social post on the topic the operator provided (input_context).
-Open with a hook that makes someone stop scrolling, deliver a clear and useful insight in the
-body, and close with a call to action that drives comments, saves, or clicks. Also explain
-briefly why the hook stops the scroll. Return the JSON matching the schema.`,
+Build a full 30-day content calendar for this show — a month of hooks in one sitting beats
+deciding what to post every morning. Every day gets: the content idea, the HOOK (the actual
+opening line, written out — not a description of one), the key message, the CTA, the best
+format, and the goal (reach / trust / buy). Mix the post types across the month — educational,
+entertaining, personal, authority, and community posts — and tag each day with its type.
+Where the show has content pillars in sibling docs, map each day to a pillar. Balance the
+mix — don't post the same format or type five days in a row. Return the JSON matching the schema.`,
+  ideas: `You are a content ideation engine for this show's niche.
+Generate a deep bank of original content ideas sorted by audience level — beginner,
+intermediate, and advanced (10-15 ideas per level). Sorting by audience level is what stops
+the show writing the same beginner post forever. Prioritise ideas that educate, solve real
+problems, and stay relevant over time — for each idea, name the specific problem it solves
+for the viewer and the best format for it. Ground the ideas in what the show actually covers
+(recent episodes, pillars, and audience docs when present), not generic niche filler.
+Return the JSON matching the schema.`,
+  winners: `You are a social media analyst who reverse-engineers what works.
+The operator pasted their past posts into input_context — ideally with performance notes
+(likes, saves, shares, comments), but work with what you're given. Find the patterns behind
+the strongest and weakest posts: for each pasted post, give a verdict (strong / weak) and
+explain why it worked or didn't — hook structure, topic, format, emotional trigger, CTA,
+timing, specificity. Then extract the winning patterns and losing patterns as reusable rules,
+give specific improvements to apply going forward, and distill it all into ONE repeatable
+formula the show can run on purpose. The best posts already hold the formula — your job is
+to pull it out. Judge only the posts you were given; don't invent performance data.
+Return the JSON matching the schema.`,
+  post: `You are a copywriter for high-engagement social captions. Write the caption LAST —
+this show's strategy docs (positioning, audience psychology, pillars, brand voice, winning
+patterns) are in the show block, and the caption only works because they already told you
+who this show is. Use them.
+Write ONE caption on the topic the operator provided (input_context). It must sound natural
+and match the show's brand voice — like a person, not a brand. Grab attention in the FIRST
+sentence (that's the hook), deliver clear value in the body, and end with a strong call to
+action that drives comments, saves, or clicks. Where a "Copy Your Own Winners" doc exists in
+sibling docs, follow its repeatable formula. Also explain briefly why the hook stops the
+scroll. Return the JSON matching the schema.`,
   monetization: `You are a business strategist focused on turning social followers into paying customers.
 Review the show's current business model (inferred from projectContext.brand_voice and recent
 episodes) and build a monetization plan that includes concrete offer ideas, pricing structure,

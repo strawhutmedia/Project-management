@@ -79,6 +79,23 @@ with the artist (e.g. Maggie) — not mixing.
 
 Per-project pipelines (e.g. for podcasts/films) are planned but not yet built.
 
+## Socials autopilot (daily content engine)
+
+Shows with `socials_autopilot_enabled` get a daily draft batch (2 text posts +
+photo/reel/story concepts) generated each morning at a per-show PT hour
+(`socials_autopilot_hour`, default 6am) by `server/socials_autopilot.ts`:
+strategy docs + 30-day calendar slot + recent episodes → drafts appended to
+the show's freeform social plan → auto-assigned into that day's scheduler
+slots → QA digest emailed to the admin. One run per (project, PT date),
+enforced by a UNIQUE constraint (`socials_autopilot_runs`), so redeploys
+can't double-generate. Admin can fire a run manually from the Social Plan
+Settings card ("Run now", uses force to retry failed runs only).
+
+**Hard rule: Slate never posts to any social platform.** The autopilot stops
+at the Scheduler in `planned` status; a human QAs, publishes manually, and
+flips slots to `posted`. Do not add a posting integration without Ryan's
+explicit approval.
+
 ## Permissions
 
 - **Admin** (currently Ryan only): invite/remove users, delete projects/songs,

@@ -174,8 +174,8 @@ export type ApiShowBrief = {
 }
 
 export type StrategyKind =
-  | 'strategy' | 'audience' | 'authority' | 'pillars'
-  | 'calendar' | 'post' | 'monetization'
+  | 'strategy' | 'profile_audit' | 'audience' | 'authority' | 'pillars'
+  | 'calendar' | 'ideas' | 'winners' | 'post' | 'monetization'
 
 export type ApiStrategyDocument = {
   id: string
@@ -542,6 +542,9 @@ export type ApiProject = {
   socialsVocabulary?: string | null
   socialsExamplePosts?: string[]
   socialsDefaultAssignees?: Partial<Record<'story_video' | 'story_photo' | 'reel_concept' | 'photo_concept', string>>
+  socialsAutopilotEnabled?: boolean
+  socialsAutopilotHour?: number
+  socialsAutopilotStartedOn?: string | null
   rssFeedUrl?: string | null
   coverArtUrl?: string | null
   brandAssetsFolder?: string | null
@@ -1012,8 +1015,18 @@ export const api = {
     }
     return res.json() as Promise<{ ok: true; path: string }>
   },
+  // Socials autopilot
+  runSocialsAutopilot: (projectId: string, force = false) =>
+    request<{ ok: true; skipped: string | null; itemCount: number }>(
+      `/api/socials/autopilot/${projectId}/run`,
+      { method: 'POST', body: JSON.stringify({ force }) },
+    ),
+  socialsAutopilotRuns: (projectId: string) =>
+    request<{ runs: Array<{ id: string; run_date: string; status: 'running' | 'done' | 'failed'; error: string | null; calendar_day: number | null; item_count: number; created_at: string }> }>(
+      `/api/socials/autopilot/${projectId}/runs`,
+    ),
   // Project edit
-  updateProject: (id: string, patch: { name?: string; subtitle?: string; dropboxFolder?: string; channelsSubfolder?: string | null; defaultOwners?: Record<string, string>; filmPhase?: 'pre' | 'production' | 'post' | 'wrapped'; socialsBrandVoice?: string | null; socialsVocabulary?: string | null; socialsExamplePosts?: string[]; socialsDefaultAssignees?: Partial<Record<'story_video' | 'story_photo' | 'reel_concept' | 'photo_concept', string>>; rssFeedUrl?: string | null; coverArtUrl?: string | null; brandAssetsFolder?: string | null }) =>
+  updateProject: (id: string, patch: { name?: string; subtitle?: string; dropboxFolder?: string; channelsSubfolder?: string | null; defaultOwners?: Record<string, string>; filmPhase?: 'pre' | 'production' | 'post' | 'wrapped'; socialsBrandVoice?: string | null; socialsVocabulary?: string | null; socialsExamplePosts?: string[]; socialsDefaultAssignees?: Partial<Record<'story_video' | 'story_photo' | 'reel_concept' | 'photo_concept', string>>; socialsAutopilotEnabled?: boolean; socialsAutopilotHour?: number; rssFeedUrl?: string | null; coverArtUrl?: string | null; brandAssetsFolder?: string | null }) =>
     request<{ ok: true }>(`/api/projects/${id}`, { method: 'PATCH', body: JSON.stringify(patch) }),
   uploadPodcastEpisode: (projectId: string, body: { dropboxPath: string; title?: string; releaseDate?: string | null }) =>
     request<{ episode: { id: string; title: string; processingState: 'processing' | 'ready' | 'posted' } }>(

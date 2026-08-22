@@ -31,7 +31,7 @@ export async function loadShowStrategyDocs(projectId: string): Promise<StrategyD
   const { rows } = await pool.query<{ kind: string; content: Record<string, unknown> }>(
     `SELECT kind, content FROM social_strategy_documents
        WHERE project_id = $1 AND status = 'generated'
-         AND kind IN ('strategy', 'audience', 'authority', 'pillars', 'monetization')`,
+         AND kind IN ('strategy', 'audience', 'authority', 'pillars', 'monetization', 'winners')`,
     [projectId],
   )
   const out: StrategyDocsInput = {}
@@ -733,6 +733,48 @@ socialsRouter.post('/:planId/regenerate-item', async (req, res) => {
     [plan.id, JSON.stringify(items)],
   )
   res.json({ ok: true, item: fresh })
+})
+
+// ─────────────────────────────────────────────────────────────────────
+// Autopilot admin endpoints
+// ─────────────────────────────────────────────────────────────────────
+// The daily loop itself lives in ../socials_autopilot and runs on the
+// server clock. These endpoints let the admin fire a run on demand (to
+// test, or to retry a failed morning) and inspect run history. The
+// toggle + hour live on the project PATCH like the other socials config.
+
+// POST /api/socials/autopilot/:projectId/run — admin-only, on demand.
+// { force?: true } retries over a failed/stuck run; a completed run for
+// today is never overwritten.
+socialsRouter.post('/autopilot/:projectId/run', async (req, res) => {
+  const user = (req as typeof req & { user: SessionUser }).user
+  if (user.role !== 'admin') { res.status(403).json({ error: 'admin_only' }); return }
+  if (!hasAnthropicKey()) { res.status(503).json({ error: 'anthropic_key_missing' }); return }
+  const projectId = req.params.projectId
+  const force = req.body?.force === true
+  const { nowPTDate, runAutopilotForProject } = await import('../socials_autopilot')
+  const result = await runAutopilotForProject(projectId, nowPTDate(), { force })
+  if (!result.ok) { res.status(500).json({ error: 'run_failed', detail: result.skipped }); return }
+  res.json({ ok: true, skipped: result.skipped ?? null, itemCount: result.itemCount ?? 0 })
+})
+
+// GET /api/socials/autopilot/:projectId/runs — recent run history.
+socialsRouter.get('/autopilot/:projectId/runs', async (req, res) => {
+  const user = (req as typeof req & { user: SessionUser }).user
+  const projectId = req.params.projectId
+  if (!(await userCanAccessProject(user.id, user.role, projectId))) {
+    res.status(403).json({ error: 'forbidden' }); return
+  }
+  const { rows } = await pool.query(
+    `SELECT id, run_date::text, status, error, calendar_day,
+            jsonb_array_length(item_ids) AS item_count,
+            input_tokens, output_tokens, created_at
+       FROM socials_autopilot_runs
+      WHERE project_id = $1
+      ORDER BY run_date DESC LIMIT 30`,
+    [projectId],
+  )
+  res.json({ runs: rows })
 })
 
 // HH:MM:SS — used to anchor every Claude clip suggestion to a real
