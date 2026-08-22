@@ -33,6 +33,7 @@ import { intakeRouter } from './routes/intake'
 import { quickbooksRouter } from './routes/quickbooks'
 import { handleResendWebhook } from './routes/outreach_webhook'
 import { seedBackInYourArms } from './seeds/back_in_your_arms'
+import { seedMadelineInvite } from './seeds/invite_madeline'
 import { ensureRyanIsPodcastEp } from './routes/projects'
 import { startScheduler } from './scheduler'
 import { scheduleBootTimeCoverSync, syncMissingCoversFromRss } from './rss_cover_sync'
@@ -216,6 +217,7 @@ async function start() {
     logInfo('migrations complete')
     await seedBackInYourArms()
     await ensureRyanIsPodcastEp()
+    await seedMadelineInvite()
   } catch (err) {
     logError('migrations failed', { error: err instanceof Error ? err.message : String(err) })
     markBootError(err)
