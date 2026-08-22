@@ -136,3 +136,11 @@ UI, inline links inside body copy).
 - **Nothing under 12px** on phones any more (was 9.9px in places).
 - Added `tools/mobile-audit.mjs` so this is a repeatable check, not a one-off,
   and wrote the mobile-first rule into CLAUDE.md.
+- **Cover wall trimmed on small screens.** 24 covers is right for the desktop
+  collage but was eight rows of scrolling on a phone before the visitor reached
+  the actual show list. Now two rows per breakpoint — 3+3 on a handset, 4+4 on a
+  tablet, all 24 on desktop. "Original Shows" moved from 1800px down the page to
+  1063px (2.1 phone screens of scrolling → 1.3); wall height 1408px → 670px.
+  Counted with `nth-of-type` so only cover links are numbered: the wall also
+  contains the phone mockup div and its script, and counting all children
+  shifted every rule by one (caught by rendering, not by reading the CSS).

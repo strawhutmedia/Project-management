@@ -215,6 +215,23 @@ img { max-width: 100%; display: block; }
   .selections { --sel-cols: 3; --sel-gap: 10px; }
   .sel-item { border-radius: 12px; }
 }
+/* The wall is a taste of the network, not the catalogue — the full list sits
+   directly below it. 24 covers makes a good collage on a desktop but eight rows
+   of scrolling on a phone before the visitor reaches anything useful. Two rows
+   on a handset, two on a tablet; the desktop keeps all 24.
+
+   Counted with nth-of-type so only the cover links (<a>) are numbered — the
+   wall also contains the phone mockup <div> and its <script>, and counting all
+   children silently shifted every rule by one. The covers are a1-a12, then the
+   phone, then a13-a24. */
+@media (max-width: 900px) {          /* 4 across -> keep 4 + 4 */
+  .selections > a.sel-item:nth-of-type(n+5):nth-of-type(-n+12),
+  .selections > a.sel-item:nth-of-type(n+17) { display: none; }
+}
+@media (max-width: 560px) {          /* 3 across -> keep 3 + 3 */
+  .selections > a.sel-item:nth-of-type(n+4):nth-of-type(-n+12),
+  .selections > a.sel-item:nth-of-type(n+16) { display: none; }
+}
 
 /* Show grid */
 .grid { display: grid; gap: 22px; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); }
