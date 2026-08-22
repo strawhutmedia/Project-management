@@ -2,7 +2,7 @@
 // Everything user-facing is escaped via esc(); episode show-notes are
 // intentionally rendered as feed-provided HTML inside a sandboxed .notes block.
 
-import { esc, toText, formatDuration, formatDate } from './util.js';
+import { esc, toText, formatDuration, formatDate, endsSentence } from './util.js';
 import { formFields } from './antispam.js';
 import { turnstileWidget } from './turnstile.js';
 import {
@@ -461,6 +461,26 @@ const artOrPlaceholder = (url, alt) =>
 // Owner-curated homepage line-ups. Pinned by slug, in this exact order; any
 // slug not found in the catalog is skipped, and the row is topped up from the
 // rest of that category so it always shows four.
+/**
+ * Display copy for a show, guaranteed to end on a complete sentence and to
+ * contain no ellipsis.
+ *
+ * The team's own approved description comes first — it's only set aside when it
+ * has no sentence break inside the space available, which would leave a
+ * dangling fragment. In that case we use the shortened version written for the
+ * show (see backfillShowBlurbs), then the meta description, and only as a last
+ * resort a clean word-boundary cut.
+ */
+function showBlurb(show, max = 165) {
+  const own = toText(show.description, max);
+  if (own && endsSentence(own)) return own;
+  for (const alt of [show.blurb, show.seo_description]) {
+    const t = toText(alt, max);
+    if (t && endsSentence(t)) return t;
+  }
+  return own;
+}
+
 const HOME_ORIGINAL_SLUGS = ['naked-lunch', 'dont-be-alone-with-jay-kogen', 'behind-the-shadows-w-harvey-guillen', 'pride'];
 const HOME_PARTNER_SLUGS = ['wicked-the-official-podcast', 'only-murders-in-the-building', 'seen-on-the-screen-with-jacqueline-coley', 'commune-with-jeff-krasno'];
 
@@ -515,7 +535,7 @@ export function homePage({ shows }) {
         <div class="fb-info">
           <h3>${esc(s.title)}</h3>
           ${s.author ? `<div class="fb-host">${esc(s.author)}</div>` : ''}
-          <p>${esc(toText(s.description, 300))}</p>
+          <p>${esc(showBlurb(s))}</p>
           <span class="btn btn-primary">Start Listening →</span>
         </div>
       </a>`

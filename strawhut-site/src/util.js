@@ -34,7 +34,15 @@ export function toText(html, max = 300) {
     .replace(/&quot;/g, '"')
     .replace(/\s+/g, ' ')
     .trim();
-  return max && t.length > max ? t.slice(0, max).trim() + '…' : t;
+  if (!max || t.length <= max) return t;
+  // Never truncate mid-thought with an ellipsis. Cut at the last sentence that
+  // fits, so what's shown is always a finished sentence someone wrote.
+  const window = t.slice(0, max);
+  const whole = window.match(/^[\s\S]*[.!?]["'\u2019\u201d)\]]?(?=\s|$)/);
+  if (whole) return whole[0].trim();
+  // No sentence ends inside the budget (a run-on description). Fall back to
+  // whole words and drop any trailing punctuation, but still no ellipsis.
+  return window.replace(/\s+\S*$/, '').replace(/[\s,;:\u2014-]+$/, '').trim();
 }
 
 // Escape a string for safe insertion into HTML.
@@ -69,4 +77,9 @@ export function formatDate(d) {
   const date = new Date(d);
   if (isNaN(date)) return '';
   return date.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+}
+
+/** True when a string ends on a finished sentence (so it needs no ellipsis). */
+export function endsSentence(s) {
+  return /[.!?]["'\u2019\u201d)\]]?$/.test(String(s || '').trim());
 }

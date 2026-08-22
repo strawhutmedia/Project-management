@@ -6,7 +6,7 @@
 //   ANTHROPIC_API_KEY   (required for AI copy; falls back to a heuristic if unset)
 //   LANDING_COPY_MODEL  (optional, default claude-sonnet-4-6)
 
-import { toText } from './util.js';
+import { toText, endsSentence} from './util.js';
 
 const KEY = (process.env.ANTHROPIC_API_KEY || '').trim();
 const MODEL = (process.env.LANDING_COPY_MODEL || 'claude-sonnet-4-6').trim();
@@ -112,6 +112,69 @@ const META_SYSTEM = `You write SEO meta descriptions for podcast show pages on S
 Write ONE meta description, 140-160 characters, plain text (no quotes, no emojis, no hashtags).
 It must: describe what THIS show is about, name the host if given, read naturally to a human, and include the words "podcast" and, where it fits, "Straw Hut Media".
 Never use "listen free", "tune in", clickbait, or exclamation points.`;
+
+const BLURB_SYSTEM = `You write short display copy for a podcast network's website.
+
+You are given a show's own description, written and approved by its team. Your job
+is ONLY to shorten it so it fits a small space — never to reinvent it.
+
+Rules:
+- 1 to 2 COMPLETE sentences. It must end on a full stop, question mark or
+  exclamation mark. Never end mid-thought.
+- NEVER use an ellipsis (…  or ...). Not at the end, not anywhere.
+- Stay under the character limit you are given. This is a hard limit.
+- Keep the show's own voice, claims and names. Do not invent hosts, guests,
+  awards, numbers or anything not present in the source.
+- No marketing filler ("dive in", "join us as we"), no hashtags, no URLs,
+  no "on this podcast" throat-clearing. Get to what the show actually is.
+- Plain text only. Return ONLY the copy, nothing else.`;
+
+/**
+ * Shorten a show's own description into display copy that fits, as complete
+ * sentences. Used when the team's copy has no sentence break inside the space
+ * available, so trimming it would otherwise leave a fragment.
+ */
+export async function generateShowBlurb({ show, max = 165, log = () => {} } = {}) {
+  if (!KEY || !show) return null;
+  const desc = toText(show.description, 900);
+  if (!desc) return null;
+  try {
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), 30000);
+    const res = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: { 'x-api-key': KEY, 'anthropic-version': '2023-06-01', 'content-type': 'application/json' },
+      body: JSON.stringify({
+        model: MODEL,
+        max_tokens: 200,
+        temperature: 0.3,
+        system: BLURB_SYSTEM,
+        messages: [
+          {
+            role: 'user',
+            content: `Shorten this to at most ${max} characters, as 1-2 complete sentences.\n\nSHOW: ${show.title || ''}\nHOST: ${show.author || ''}\nDESCRIPTION: ${desc}`,
+          },
+        ],
+      }),
+      signal: ctrl.signal,
+    });
+    clearTimeout(timer);
+    if (!res.ok) { log(`ai: blurb HTTP ${res.status}`); return null; }
+    const data = await res.json().catch(() => null);
+    let text = data?.content?.map?.((b) => b.text || '').join('').trim() || '';
+    text = text.replace(/^["'\s]+|["'\s]+$/g, '').replace(/\s+/g, ' ').replace(/\s*(?:\u2026|\.\.\.)\s*$/, '');
+    // Only accept output that actually satisfies the brief — otherwise the
+    // caller keeps the team's own copy rather than shipping worse text.
+    if (!text || text.length > max || !endsSentence(text)) {
+      log(`ai: blurb rejected for ${show.slug} (len ${text.length}, ends "${text.slice(-12)}")`);
+      return null;
+    }
+    return text;
+  } catch (e) {
+    log(`ai: blurb failed — ${e.message}`);
+    return null;
+  }
+}
 
 export async function generateShowMetaDescription({ show, log = () => {} } = {}) {
   if (!KEY || !show) return null;

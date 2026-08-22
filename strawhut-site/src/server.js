@@ -15,7 +15,7 @@ import * as A from './admin_views.js';
 import { robotsTxt, sitemapXml, llmsTxt } from './seo.js';
 import { sendAnnouncement, mailConfigured, sendContactEmail, sendTrafficDigest } from './mail.js';
 import { importFromSite } from './importer.js';
-import { writeLandingCopy, generateLandingCopy, fallbackLandingCopy, aiConfigured, generateShowMetaDescription } from './ai.js';
+import { writeLandingCopy, generateLandingCopy, fallbackLandingCopy, aiConfigured, generateShowMetaDescription, generateShowBlurb } from './ai.js';
 import { POSTS, getPost } from './content/resources.js';
 import { SERVICE_PAGES, getServicePage } from './content/services.js';
 import * as reco from './recommend.js';
@@ -26,6 +26,7 @@ import { applyPopularSpotlight, megaphoneConfigured } from './popularity.js';
 import { resolveArtwork, imageWidth, MIN_ACCEPTABLE } from './artwork.js';
 import { inspect as inspectSubmission } from './antispam.js';
 import { verifyTurnstile } from './turnstile.js';
+import { toText as plainText, endsSentence } from './util.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PORT = process.env.PORT || 8080;
@@ -1042,6 +1043,32 @@ app.use(async (req, res) => {
 
 // Fill in AI-written SEO meta descriptions for any shows still missing one.
 // Paced and best-effort: silently no-ops without an API key.
+// Display copy for the featured banner and cards. The team's own description is
+// always preferred — we only write a shortened version for shows whose copy has
+// no sentence break inside the space available, where trimming would otherwise
+// leave a dangling fragment. Nothing on the site ever renders an ellipsis.
+const BLURB_MAX = 165;
+async function backfillShowBlurbs() {
+  if (process.env.SHOW_SEO === 'off' || !aiConfigured()) return;
+  const shows = await store.listShows();
+  const needs = shows.filter(
+    (s) => !s.blurb && s.description && !endsSentence(plainText(s.description, BLURB_MAX))
+  );
+  if (!needs.length) return;
+  console.log(`[blurb] shortening ${needs.length} show description(s) that don't trim cleanly…`);
+  let done = 0;
+  for (const show of needs) {
+    try {
+      const text = await generateShowBlurb({ show, max: BLURB_MAX, log: (m) => console.log('[blurb]', m) });
+      if (text) { await store.updateShow(show.id, { blurb: text }); done++; }
+    } catch (e) {
+      console.error('[blurb] show', show.slug, 'failed:', e.message);
+    }
+    await new Promise((r) => setTimeout(r, 900));
+  }
+  console.log(`[blurb] wrote ${done}/${needs.length}`);
+}
+
 async function backfillShowSeo() {
   if (process.env.SHOW_SEO === 'off' || !aiConfigured()) return;
   const shows = await store.listShows();
@@ -1153,7 +1180,9 @@ app.listen(PORT, async () => {
   // Backfill unique, AI-written SEO meta descriptions for shows that don't have
   // one yet. Runs once per boot in the background, paced to be gentle on the
   // API; no-ops entirely if ANTHROPIC_API_KEY isn't set. Set SHOW_SEO=off to skip.
-  backfillShowSeo().catch((e) => console.error('[seo] show backfill failed:', e.message));
+  backfillShowSeo()
+    .then(() => backfillShowBlurbs())
+    .catch((e) => console.error('[seo] show backfill failed:', e.message));
 
   // Pull press mentions in the background so the Press page is populated.
   refreshPress(store, { log: (m) => console.log('[press]', m) })

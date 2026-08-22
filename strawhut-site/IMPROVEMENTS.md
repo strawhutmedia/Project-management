@@ -172,3 +172,24 @@ UI, inline links inside body copy).
     (verified: header stays at top: 0 after scrolling 2500px).
   - Overflow swept at 320/390/430/560/760/761/900/1024/1280/1440/1920px with
     classic scrollbars forced on: zero at every width.
+- **No more truncation ellipses.** Two separate causes: `toText()` hard-sliced
+  mid-word and appended `…`, and six CSS `-webkit-line-clamp` rules added their
+  own. Both fixed:
+  - `toText()` now cuts at the **last complete sentence** that fits, so what's
+    shown is always a finished sentence someone wrote. No ellipsis, ever.
+  - Removed the line-clamps on the featured copy, episode excerpts, press
+    snippets, player titles and footer episode titles — text wraps in full
+    instead of being cut with a `…`.
+  - For the minority of shows whose description has no sentence break inside the
+    space available, `generateShowBlurb()` (the same Anthropic path already
+    writing meta descriptions) shortens **their own copy** into 1–2 complete
+    sentences, stored in `shows.blurb` and backfilled in the background. The
+    team's approved description is always preferred; the blurb is only used when
+    trimming it would leave a fragment. Generated text is rejected unless it is
+    under the limit and ends on a real sentence, so a bad generation can never
+    ship something worse than the source.
+  - Measured on all 30 real show descriptions: 22 fit as complete sentences from
+    the team's own copy, the other 8 get a written blurb → 30/30 complete, 0
+    ellipses added by us, 0 over the length budget.
+  - Author-intended ellipses in source copy (e.g. Folklorica's "Introducing…
+    Folklorica!") are left alone — deliberate style, not truncation.

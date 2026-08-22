@@ -298,7 +298,7 @@ main { overflow-x: clip; }
 .fb-info { position: relative; z-index: 2; padding: 0; display: flex; flex-direction: column; justify-content: center; }
 .fb-info h3 { font-size: clamp(1.6rem, 3vw, 2.4rem); margin: 0 0 6px; line-height: 1.1; }
 .fb-host { color: var(--accent); font-weight: 600; margin-bottom: 14px; }
-.fb-info p { color: rgba(255, 255, 255, 0.86); margin: 0 0 22px; max-width: 520px; display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden; }
+.fb-info p { color: rgba(255, 255, 255, 0.86); margin: 0 0 22px; max-width: 520px; }
 .fb-info .btn { align-self: flex-start; }
 .fbanner-dots { display: flex; gap: 9px; justify-content: center; margin-top: 18px; }
 .fdot { width: 9px; height: 9px; border-radius: 999px; border: 0; padding: 0; background: var(--border); cursor: pointer; transition: background 0.2s, transform 0.2s; }
@@ -341,7 +341,7 @@ main { overflow-x: clip; }
   .fb-info { position: relative; z-index: 2; padding: 0; background: none; }
   .fb-info h3 { font-size: 1.6rem; line-height: 1.08; }
   .fb-host { margin-bottom: 12px; }
-  .fb-info p { color: rgba(255, 255, 255, 0.86); font-size: 1rem; -webkit-line-clamp: 3; margin-bottom: 20px; }
+  .fb-info p { color: rgba(255, 255, 255, 0.86); font-size: 1rem; margin-bottom: 20px; }
 }
 
 /* Impact band — angled, full-bleed break between show sections (not a box) */
@@ -461,7 +461,7 @@ main { overflow-x: clip; }
 .episode-row .thumb { width: 84px; height: 84px; border-radius: 10px; object-fit: cover; background: var(--card-2); }
 .episode-row .title { font-weight: 600; font-size: 1.05rem; margin: 0 0 4px; }
 .episode-row .sub { color: var(--muted); font-size: 0.85rem; }
-.episode-row .excerpt { color: var(--muted); font-size: 0.9rem; margin-top: 6px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.episode-row .excerpt { color: var(--muted); font-size: 0.9rem; margin-top: 6px; }
 
 /* Episode detail */
 .episode-hero { padding: 40px 0 8px; }
@@ -523,7 +523,7 @@ main { overflow-x: clip; }
 .aplayer-meta { min-width: 0; }
 .aplayer-eyebrow { font-size: 0.68rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: var(--accent); margin-bottom: 3px; }
 .aplayer-status { color: var(--muted); }
-.aplayer-title { font-size: 0.98rem; font-weight: 600; color: var(--text); line-height: 1.3; overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+.aplayer-title { font-size: 0.98rem; font-weight: 600; color: var(--text); line-height: 1.3; }
 
 /* Utility row: speed / volume / download */
 .aplayer-util { display: flex; align-items: center; gap: 8px; margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--border); }
@@ -598,7 +598,7 @@ main { overflow-x: clip; }
 .recent-list a:hover .recent-title { color: var(--accent); }
 .recent-date { flex: 0 0 auto; text-align: center; color: var(--accent); font-weight: 700; font-size: 1.15rem; line-height: 1; min-width: 30px; }
 .recent-date small { display: block; font-size: 0.62rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); margin-top: 3px; }
-.recent-title { color: var(--text); font-size: 0.9rem; line-height: 1.35; opacity: 0.9; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.recent-title { color: var(--text); font-size: 0.9rem; line-height: 1.35; opacity: 0.9; }
 /* Animated waveform strip at the very bottom */
 .footer-wave { display: flex; align-items: flex-end; gap: 3px; height: 60px; margin-top: 40px; padding: 0 2px; overflow: hidden; }
 .footer-wave span {
@@ -645,7 +645,7 @@ main { overflow-x: clip; }
 .press-body { padding: 18px 20px 20px; }
 .press-meta { color: var(--accent); font-weight: 600; font-size: 0.82rem; text-transform: uppercase; letter-spacing: 0.03em; }
 .press-title { margin: 8px 0 8px; font-size: 1.12rem; line-height: 1.3; }
-.press-snippet { color: var(--muted); font-size: 0.92rem; margin: 0 0 12px; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+.press-snippet { color: var(--muted); font-size: 0.92rem; margin: 0 0 12px; }
 .press-link { color: var(--text); font-weight: 600; font-size: 0.88rem; }
 
 /* Booking note on the Studio page */
