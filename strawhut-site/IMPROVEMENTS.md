@@ -86,3 +86,11 @@ dependency entirely.
   per-IP rate limit. Deliberately no CAPTCHA and no new vendor — the checks are
   invisible, so conversion is untouched. Content heuristics only *flag* (subject
   line prefix), never block, so a real lead is never lost to a false positive.
+- **Cloudflare Turnstile added** (approved by Ryan) as a fourth layer on the two
+  public forms. Scoped tightly on request: it loads *only* on `/contact` and the
+  homepage, and on the homepage it's lazy — the Cloudflare script isn't fetched
+  until someone focuses the subscribe field, so the homepage pays nothing.
+  Verified every other public page ships zero Turnstile code. A rejected token
+  blocks; a *missing* one (ad blocker, Cloudflare outage) is only flagged, and
+  if the challenge is still solving when someone hits submit the form holds and
+  sends itself — no double click, no lost lead.

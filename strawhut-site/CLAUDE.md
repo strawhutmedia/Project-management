@@ -64,6 +64,33 @@ Set these on Railway (inert until set); no code change needed:
 | `META_PIXEL_ID` | Facebook / Instagram retargeting |
 | `TIKTOK_PIXEL_ID` | TikTok retargeting |
 
+### Form protection (`src/antispam.js` + `src/turnstile.js`)
+
+Public forms (`/contact`, homepage subscribe) are protected by, in order:
+honeypot → HMAC-signed render token (≥3s fill) → per-IP rate limit →
+Cloudflare Turnstile. **Ryan approved Turnstile as a stack addition on
+2026-08-22** — it is the only exception to the "no new external services" rule.
+
+| Env var | Purpose |
+|---|---|
+| `TURNSTILE_SITE_KEY` | Public key, rendered in the widget |
+| `TURNSTILE_SECRET_KEY` | Server-side key for `siteverify` |
+
+Both unset = Turnstile is completely inert (`turnstileWidget()` returns `''`),
+and the first three layers still run.
+
+**Two rules — do not break them:**
+
+1. **Turnstile loads ONLY on pages that contain a form.** There is deliberately
+   no hook in `layout()`; the script tag is emitted next to the widget. On the
+   homepage it is `lazy` — the Cloudflare script isn't requested until someone
+   focuses the subscribe field. If you add a new public form, call
+   `turnstileWidget()` inside it; never move this into `layout()`.
+2. **Only an actively *rejected* token blocks.** A missing or unverifiable
+   token (ad blocker, corporate proxy, Cloudflare outage) is flagged and the
+   message is still delivered. Content heuristics likewise only flag. Losing
+   one real client inquiry costs more than a hundred spam emails.
+
 `shmTrack(event, params)` fans one event out to dataLayer/gtag/fbq/ttq. Wired
 events: `play_episode`, `contact_submit`, `subscribe`, `platform_click`,
 `lp_cta_click` (+ Meta `Lead`/`Subscribe`). Recommended path: set `GTM_CONTAINER_ID`

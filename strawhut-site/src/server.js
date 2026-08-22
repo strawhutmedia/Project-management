@@ -25,6 +25,7 @@ import { applyMonthlyRotation } from './spotlight.js';
 import { applyPopularSpotlight, megaphoneConfigured } from './popularity.js';
 import { resolveArtwork, imageWidth, MIN_ACCEPTABLE } from './artwork.js';
 import { inspect as inspectSubmission } from './antispam.js';
+import { verifyTurnstile } from './turnstile.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PORT = process.env.PORT || 8080;
@@ -747,9 +748,20 @@ app.post('/contact', async (req, res) => {
     console.log('[contact] blocked', check.reason, '-', String(email).slice(0, 60));
     return res.send(V.contactPage({ sent: true }));
   }
+  // Turnstile. Only an actively rejected token is treated as proof of a bot;
+  // a missing or unverifiable one is flagged and still delivered.
+  const cf = await verifyTurnstile(req.body['cf-turnstile-response'], req.ip);
+  if (cf.status === 'failed') {
+    console.log('[contact] blocked turnstile', cf.codes.join(','), '-', String(email).slice(0, 60));
+    return res.send(V.contactPage({ sent: true }));
+  }
+  const flags = [...check.flags];
+  if (cf.status === 'missing') flags.push('no-captcha');
+  if (cf.status === 'unreachable') console.warn('[contact] turnstile unreachable:', cf.codes.join(','));
+  const suspicious = check.suspicious || flags.length >= 2;
   try {
     if (mailConfigured()) {
-      await sendContactEmail({ name, email, company, message, topic, flags: check.suspicious ? check.flags : [] });
+      await sendContactEmail({ name, email, company, message, topic, flags: suspicious ? flags : [] });
     } else {
       console.log('[contact] (email not configured) message from', email, `[${topic}]`, '-', message.slice(0, 120));
     }
@@ -873,8 +885,9 @@ app.get('/go/:showSlug/:episodeSlug', async (req, res, next) => {
 app.post('/subscribe', async (req, res) => {
   const email = (req.body.email || '').trim();
   const check = inspectSubmission(req.body, { ip: req.ip });
-  if (!check.ok) {
-    console.log('[subscribe] blocked', check.reason, '-', email.slice(0, 60));
+  const cf = await verifyTurnstile(req.body['cf-turnstile-response'], req.ip);
+  if (!check.ok || cf.status === 'failed') {
+    console.log('[subscribe] blocked', check.reason || 'turnstile:' + cf.codes.join(','), '-', email.slice(0, 60));
     return res.send(
       V.messagePage({
         title: "You're subscribed — Straw Hut Media",

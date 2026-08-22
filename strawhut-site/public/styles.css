@@ -901,3 +901,10 @@ table.admin-table { width: 100%; border-collapse: collapse; }
   .ph { max-width: 208px; }
 }
 }
+
+/* Cloudflare Turnstile — only rendered on pages that have a form. */
+.cf-turnstile-slot { margin: 4px 0 18px; min-height: 0; }
+.cf-turnstile-slot:empty { margin: 0; }
+.contact-form .cf-turnstile-slot { max-width: 340px; }
+/* Inside the subscribe row (a flex line), drop onto its own centred line. */
+#subscribe form .cf-turnstile-slot { flex-basis: 100%; display: flex; justify-content: center; margin: 8px 0 0; }

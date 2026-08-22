@@ -4,6 +4,7 @@
 
 import { esc, toText, formatDuration, formatDate } from './util.js';
 import { formFields } from './antispam.js';
+import { turnstileWidget } from './turnstile.js';
 import {
   canonical,
   organizationJsonLd,
@@ -583,6 +584,7 @@ export function homePage({ shows }) {
         ${formFields()}
         <input type="email" name="email" required placeholder="you@email.com" style="flex:1;min-width:240px;padding:13px 16px;border-radius:999px;border:1px solid var(--border);background:var(--bg-2);color:var(--text);font-family:inherit">
         <button class="btn btn-primary" type="submit">Subscribe</button>
+        ${turnstileWidget({ lazy: true, action: 'subscribe' })}
       </form>
     </div>
   </div></section>`;
@@ -1398,6 +1400,7 @@ export function contactPage({ sent = false, error = '', values = {} } = {}) {
              </div>
              <div class="field"><label>Company / show <span style="color:var(--muted);font-weight:400">(optional)</span></label><input type="text" name="company" value="${v('company')}"></div>
              <div class="field"><label>What can we help with?</label><textarea name="message" rows="6" required>${v('message')}</textarea></div>
+             ${turnstileWidget({ action: 'contact' })}
              <button class="btn btn-primary" type="submit">Send message</button>
            </form>`
     }
