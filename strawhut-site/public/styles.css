@@ -819,3 +819,6 @@ table.admin-table { width: 100%; border-collapse: collapse; }
   .consent-actions { justify-content: stretch; }
   .consent-actions .btn { flex: 1; justify-content: center; }
 }
+/* Notice variant (opt-out regions): lower-key than the blocking opt-in bar. */
+.consent-bar.consent-notice { padding: 12px 0; }
+.consent-bar.consent-notice p { font-size: 0.84rem; }

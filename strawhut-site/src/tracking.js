@@ -89,7 +89,29 @@ export function consentBanner() {
 </div>
 <script>(function(){var el=document.getElementById('shm-consent');if(!el)return;
 var stored=null;try{stored=localStorage.getItem('shm_consent');}catch(e){}
-if(!stored){el.hidden=false;}
+// Where opt-IN is legally required (UK/EEA + Switzerland), nothing runs until the
+// visitor accepts. Everywhere else (notably the US, where the standard is opt-OUT)
+// tracking is on by default and the bar acts as notice with an opt-out — which is
+// both compliant there and keeps the retargeting audience intact.
+function needsOptIn(){
+  try{
+    var tz=(Intl.DateTimeFormat().resolvedOptions().timeZone||'');
+    if(/^(Europe|Atlantic\/(Azores|Madeira|Canary|Faroe|Reykjavik))/.test(tz)) return true;
+    var l=(navigator.languages||[navigator.language||'']).join(',');
+    return /\b(en-GB|en-IE|de|fr|es|it|nl|pt|pl|sv|da|fi|no|cs|sk|hu|ro|bg|hr|sl|et|lv|lt|el|mt|ga)\b/i.test(l)
+      && !/\ben-US\b/i.test(l);
+  }catch(e){ return true; } // fail closed
+}
+if(!stored){
+  if(needsOptIn()){
+    el.hidden=false;                    // opt-in region: stay denied until accepted
+  } else {
+    try{gtag('consent','update',{ad_storage:'granted',ad_user_data:'granted',ad_personalization:'granted',analytics_storage:'granted',personalization_storage:'granted'});}catch(e){}
+    try{window.shmLoadPixels&&window.shmLoadPixels();}catch(e){}
+    el.classList.add('consent-notice');  // notice + opt-out, not a blocker
+    el.hidden=false;
+  }
+}
 function choose(v){try{localStorage.setItem('shm_consent',v);}catch(e){}
   if(v==='all'){try{gtag('consent','update',{ad_storage:'granted',ad_user_data:'granted',ad_personalization:'granted',analytics_storage:'granted',personalization_storage:'granted'});}catch(e){}
     try{window.shmLoadPixels&&window.shmLoadPixels();}catch(e){}}

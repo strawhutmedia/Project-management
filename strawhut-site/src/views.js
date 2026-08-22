@@ -364,6 +364,15 @@ export function messagePage({ title, heading, message }) {
   return layout({ title, description: message, body, path: '/' });
 }
 
+
+// Structured audience events. Each fans out to dataLayer/GA4/Meta/TikTok via
+// shmTrack, carrying the dimensions needed to build retargeting segments
+// (which show, which category, which service) rather than just a page view.
+function audienceEvent(name, params) {
+  return `<script>(function(){function f(){window.shmTrack&&shmTrack(${JSON.stringify(name)},${JSON.stringify(params)});}
+if(document.readyState!=='loading')setTimeout(f,0);else document.addEventListener('DOMContentLoaded',f);})();</script>`;
+}
+
 const artOrPlaceholder = (url, alt) =>
   url
     ? `<img src="${esc(url)}" alt="${esc(alt)}" loading="lazy">`
@@ -685,7 +694,8 @@ export function resourcePostPage({ post, related = [] }) {
     </div>
   </article>
   ${faqSection(post.faq)}
-  ${relatedCards ? `<section class="section"><div class="container article-narrow">${relatedCards}</div></section>` : ''}`;
+  ${relatedCards ? `<section class="section"><div class="container article-narrow">${relatedCards}</div></section>` : ''}
+  ${audienceEvent('view_guide',{guide:post.title,guide_slug:post.slug,category:post.category||''})}`;
   return layout({
     title: `${post.title} | Straw Hut Media`,
     description: post.description,
@@ -822,7 +832,8 @@ export function servicePage(cfg, { shows = [] } = {}) {
     <h2>Let's build it together</h2>
     <p>One award-winning team, the whole journey — from first idea to chart-topping show.</p>
     <a class="btn btn-primary" href="${esc(cfg.hero.cta.href)}">${esc(cfg.hero.cta.label)} →</a>
-  </div></div></section>`;
+  </div></div></section>
+  ${audienceEvent('view_service',{service:cfg.navLabel,service_path:cfg.path})}`;
   return layout({
     title: cfg.title,
     description: cfg.description,
@@ -1410,7 +1421,8 @@ export function showPage({ show, episodes, total = episodes.length, pageNum = 1,
       </div>`
         : ''
     }
-  </div></section>`;
+  </div></section>
+  ${audienceEvent('view_show',{show:show.title,show_slug:show.slug,show_type:show.show_type||'original',categories:(show.categories||[]).join('|')})}`;
   return layout({
     title: `${show.title} — Podcast on Straw Hut Media`,
     description:
@@ -1496,7 +1508,8 @@ export function episodePage({ show, episode, moreFromShow = [], related = [] }) 
   </div></section>`
       : ''
   }
-  </article>`;
+  </article>
+  ${audienceEvent('view_episode',{show:show.title,show_slug:show.slug,episode:episode.title})}`;
   return layout({
     title: `${episode.title} — ${show.title} | Straw Hut Media`,
     description: episode.description || `${episode.title}, an episode of ${show.title} on Straw Hut Media.`,
