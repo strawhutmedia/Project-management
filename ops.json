@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-08-22T21:10:09.514Z",
+  "generatedAt": "2026-08-22T21:14:39.589Z",
   "note": "Read-only operational snapshot. Emails are masked; no full contact list is stored here.",
   "summary": {
     "showsWithOutreach": 1,
@@ -116,7 +116,7 @@
           {
             "name": "Leonardo Dionicio",
             "emailMasked": "c***@leonardodionicio.com",
-            "daysSinceFirstEmail": 36,
+            "daysSinceFirstEmail": 37,
             "opened": false,
             "openCount": 0
           },
