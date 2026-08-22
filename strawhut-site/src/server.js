@@ -875,6 +875,21 @@ app.use(async (req, res) => {
       return res.redirect(301, ep ? `/${show.slug}/${ep.slug}` : `/${show.slug}`);
     }
 
+    // Hyphen-less vanity URLs from the old site (/onlymurders, /nakedlunch,
+    // /wicked …). Google still has these indexed, and the token-based matcher
+    // below can't see them because it splits on hyphens. Compare the
+    // alphanumeric-only form so they 301 instead of 404ing away their ranking.
+    const compact = (x) => String(x || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+    const cq = compact(showBase);
+    if (parts.length === 1 && cq.length >= 5) {
+      const hit =
+        shows.find((s) => compact(s.slug) === cq) ||
+        shows.find((s) => compact(s.title) === cq) ||
+        shows.find((s) => compact(s.slug).startsWith(cq)) ||
+        shows.find((s) => compact(s.title).startsWith(cq));
+      if (hit) return res.redirect(301, `/${hit.slug}`);
+    }
+
     // No direct match → fuzzy "did you mean" against show slugs.
     const qt = slugTokens(showBase);
     const suggestions = shows
