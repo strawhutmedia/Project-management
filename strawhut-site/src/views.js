@@ -400,6 +400,7 @@ function phoneMockup(shows) {
   const slides = picks
     .map(
       (s, i) => `<a class="ph-slide${i === 0 ? ' active' : ''}" href="/${esc(s.slug)}">
+        <span class="ph-show">${esc(s.title)}</span>
         <img src="${esc(s.image_url)}" alt="${esc(s.title)}" loading="lazy">
         <span class="ph-title">${esc(s.title)}</span>
         <span class="ph-sub">${esc(s.author || 'Straw Hut Media')}</span>
@@ -407,16 +408,17 @@ function phoneMockup(shows) {
     )
     .join('');
   return `<div class="ph-wrap" aria-hidden="true"><div class="ph">
-    <div class="ph-notch"></div>
     <div class="ph-screen">
-      <div class="ph-now">Playing from podcast</div>
+      <div class="ph-chrome"><span class="ph-chev">⌄</span><span class="ph-dots">•••</span></div>
       <div class="ph-slides" id="phSlides">${slides}</div>
       <div class="ph-bar"><span></span></div>
-      <div class="ph-times"><em>0:00</em><em>26:33</em></div>
+      <div class="ph-times"><em>0:00</em><em>-26:33</em></div>
       <div class="ph-ctrls">
-        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M11 18V6l-8.5 6 8.5 6Zm.5-6 8.5 6V6l-8.5 6Z"/></svg>
+        <span class="ph-rate">1×</span>
+        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 5V1L7 6l5 5V7a6 6 0 1 1-6 6H4a8 8 0 1 0 8-8Z"/></svg>
         <div class="ph-play"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7L8 5Z"/></svg></div>
-        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M13 6v12l8.5-6L13 6ZM12.5 12 4 6v12l8.5-6Z"/></svg>
+        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 5V1l5 5-5 5V7a6 6 0 1 0 6 6h2a8 8 0 1 1-8-8Z"/></svg>
+        <span class="ph-rate">15</span>
       </div>
     </div>
   </div></div>
