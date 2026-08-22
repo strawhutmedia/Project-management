@@ -392,7 +392,6 @@ export function sitemapXml(shows, episodesByShow, { posts = [], servicePaths = [
   add('/shows');
   add('/studio');
   add('/book');
-  add('/pricing');
   add('/press');
   add('/contact');
   add('/resources');

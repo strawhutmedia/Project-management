@@ -172,6 +172,7 @@ function layout({
   ogType = 'website',
   jsonLd = '',
   feedUrl = '',
+  noindex = false,
 }) {
   const canon = canonical(path);
   const desc = toText(description, 160);
@@ -198,7 +199,9 @@ function layout({
 <title>${esc(title)}</title>
 <meta name="description" content="${esc(desc)}">
 <link rel="canonical" href="${esc(canon)}">
-<meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1">
+${noindex
+  ? '<meta name="robots" content="noindex, follow">'
+  : '<meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1">'}
 <meta property="og:type" content="${esc(ogType)}">
 <meta property="og:site_name" content="Straw Hut Media">
 <meta property="og:title" content="${esc(title)}">
@@ -1087,6 +1090,10 @@ export function pricingPage() {
     body,
     activeNav: '',
     path: '/pricing',
+    // Kept off search by owner decision — prices stay visible to anyone we send
+    // here, but aren't published to competitors via Google. 'follow' so the
+    // page still passes link equity onward.
+    noindex: true,
     jsonLd:
       breadcrumbJsonLd([
         { name: 'Home', path: '/' },
