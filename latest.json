@@ -1,9 +1,9 @@
 {
   "version": "0.2.2",
-  "now": "2026-08-22T22:25:21.093Z",
+  "now": "2026-08-22T22:29:26.329Z",
   "boot": {
-    "startedAt": "2026-08-22T22:25:20.702Z",
-    "completedAt": "2026-08-22T22:25:21.082Z",
+    "startedAt": "2026-08-22T22:29:25.976Z",
+    "completedAt": "2026-08-22T22:29:26.319Z",
     "error": null
   },
   "env": {
@@ -141,7 +141,7 @@
   "recentLog": [
     {
       "level": "info",
-      "ts": "2026-08-22T22:25:20.699Z",
+      "ts": "2026-08-22T22:29:25.974Z",
       "msg": "serving client from",
       "data": {
         "clientDir": "/app/dist"
@@ -149,7 +149,7 @@
     },
     {
       "level": "info",
-      "ts": "2026-08-22T22:25:20.702Z",
+      "ts": "2026-08-22T22:29:25.976Z",
       "msg": "boot starting",
       "data": {
         "cwd": "/app",
@@ -160,12 +160,12 @@
     },
     {
       "level": "info",
-      "ts": "2026-08-22T22:25:20.944Z",
+      "ts": "2026-08-22T22:29:26.212Z",
       "msg": "migrations complete"
     },
     {
       "level": "info",
-      "ts": "2026-08-22T22:25:21.070Z",
+      "ts": "2026-08-22T22:29:26.309Z",
       "msg": "wardrobe outfits: applied",
       "data": {
         "projectId": "12f53ed1-c6c7-4c11-8d7b-06d91744c9af",
@@ -176,7 +176,7 @@
     },
     {
       "level": "info",
-      "ts": "2026-08-22T22:25:21.071Z",
+      "ts": "2026-08-22T22:29:26.309Z",
       "msg": "BIYA seed: project already exists, ensured shoot days",
       "data": {
         "projectId": "12f53ed1-c6c7-4c11-8d7b-06d91744c9af"
@@ -184,17 +184,17 @@
     },
     {
       "level": "info",
-      "ts": "2026-08-22T22:25:21.082Z",
+      "ts": "2026-08-22T22:29:26.319Z",
       "msg": "listening on :8080"
     },
     {
       "level": "info",
-      "ts": "2026-08-22T22:25:21.083Z",
+      "ts": "2026-08-22T22:29:26.320Z",
       "msg": "scheduler started (every 5 min)"
     },
     {
       "level": "info",
-      "ts": "2026-08-22T22:25:21.086Z",
+      "ts": "2026-08-22T22:29:26.322Z",
       "msg": "autopilot: loop started",
       "data": {
         "tickMinutes": 10
