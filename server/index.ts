@@ -234,6 +234,9 @@ async function start() {
     void import('./ops').then(({ reportOps }) => { void reportOps() })
     startScheduler()
     startOutreachSendLoop()
+    void import('./socials_autopilot').then(({ startSocialsAutopilotLoop }) => {
+      startSocialsAutopilotLoop()
+    })
     void enableDomainOpenTracking()
     // Pick up any breakdown runs that were killed by the previous
     // shutdown (deploy / crash). Producers don't have to click

@@ -450,6 +450,25 @@ projectsRouter.patch('/:id', async (req, res) => {
     updates.push(`rss_feed_url = $${i++}`)
     values.push(typeof v === 'string' && v.trim() ? v.trim().slice(0, 2000) : null)
   }
+  if (typeof req.body?.socialsAutopilotEnabled === 'boolean') {
+    updates.push(`socials_autopilot_enabled = $${i++}`)
+    values.push(req.body.socialsAutopilotEnabled)
+    // Enabling (re)starts the 30-day calendar cycle from today (PT
+    // handled loosely here — the loop does exact PT math; this is just
+    // the cycle anchor).
+    if (req.body.socialsAutopilotEnabled) {
+      updates.push(`socials_autopilot_started_on = COALESCE(socials_autopilot_started_on, CURRENT_DATE)`)
+    } else {
+      updates.push(`socials_autopilot_started_on = NULL`)
+    }
+  }
+  if (typeof req.body?.socialsAutopilotHour === 'number') {
+    const h = Math.round(req.body.socialsAutopilotHour)
+    if (h >= 0 && h <= 23) {
+      updates.push(`socials_autopilot_hour = $${i++}`)
+      values.push(h)
+    }
+  }
   if ('coverArtUrl' in (req.body ?? {})) {
     const v = req.body.coverArtUrl
     updates.push(`cover_art_url = $${i++}`)
@@ -535,6 +554,7 @@ projectsRouter.get('/:id', async (req, res) => {
   const projRes = await pool.query(
     `SELECT id, name, subtitle, kind, dropbox_folder, default_owners, stage_labels, channels_subfolder, film_phase,
             socials_brand_voice, socials_example_posts, socials_default_assignees, socials_vocabulary,
+            socials_autopilot_enabled, socials_autopilot_hour, socials_autopilot_started_on::text,
             rss_feed_url, cover_art_url, brand_assets_folder,
             socials_brand_profile, socials_brand_profile_at,
             slug, hero_tagline, guest_pitch, contact_email, brand_hex,
@@ -643,6 +663,9 @@ projectsRouter.get('/:id', async (req, res) => {
       socialsExamplePosts: Array.isArray(project.socials_example_posts) ? project.socials_example_posts : [],
       socialsDefaultAssignees: (project.socials_default_assignees && typeof project.socials_default_assignees === 'object')
         ? project.socials_default_assignees : {},
+      socialsAutopilotEnabled: project.socials_autopilot_enabled === true,
+      socialsAutopilotHour: typeof project.socials_autopilot_hour === 'number' ? project.socials_autopilot_hour : 6,
+      socialsAutopilotStartedOn: project.socials_autopilot_started_on ?? null,
       rssFeedUrl: project.rss_feed_url ?? null,
       coverArtUrl: project.cover_art_url ?? null,
       brandAssetsFolder: project.brand_assets_folder ?? null,

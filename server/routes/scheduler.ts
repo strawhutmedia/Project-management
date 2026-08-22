@@ -77,8 +77,9 @@ function eachDate(from: string, to: string): string[] {
 }
 
 // Seed missing day rows in one bulk insert. ON CONFLICT skip lets us
-// safely call this on partially-seeded ranges.
-async function seedDays(dates: string[]): Promise<void> {
+// safely call this on partially-seeded ranges. Exported for the socials
+// autopilot, which seeds today's grid before assigning its drafts.
+export async function seedDays(dates: string[]): Promise<void> {
   if (dates.length === 0) return
   const values: string[] = []
   const params: unknown[] = []

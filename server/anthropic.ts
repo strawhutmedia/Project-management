@@ -341,6 +341,177 @@ export type GenerateResult = {
   }
 }
 
+// ─────────────────────────────────────────────────────────────────────
+// Autopilot daily generator — transcript-less.
+// ─────────────────────────────────────────────────────────────────────
+//
+// The per-episode generator above needs a finished transcript; the
+// autopilot runs every morning whether or not an episode dropped, so it
+// writes from the show's strategy docs (especially the 30-day calendar
+// slot for today), brand voice, example posts, and recent episode
+// titles instead. Output reuses RawSocialPlan/SCHEMA so the items flow
+// through the exact same plan → scheduler → QA pipeline as everything
+// else. It's a smaller batch than the episode plan: this is a daily
+// drumbeat for the QA queue, not an episode launch package.
+
+const AUTOPILOT_SYSTEM_PROMPT = `You are the daily social-media writer for a podcast network.
+Every morning you produce that day's draft content for one show. A human QA
+reviewer edits and approves everything before it goes live — write finished,
+postable content, not outlines.
+
+Produce EXACTLY this batch:
+  - text_posts: 2 (complete, ready-to-paste captions in the show's voice)
+  - photo_concepts: 1
+  - reel_concepts: 1
+  - story_concepts: 1
+
+If the user block includes a "=== SHOW STRATEGY ===" section, it is the
+authoritative brief: serve the listed pillars, land on the audience's actual
+desires and frustrations, match the tone, and follow the PROVEN PATTERNS
+formula when present.
+
+If the user block includes a "TODAY'S CALENDAR SLOT" section, today's content
+executes that slot: use its idea and hook as the starting point (you may
+sharpen the wording), respect its post type and goal, and keep its CTA intent.
+When there is no calendar slot, pick the strongest angle from the strategy and
+recent episodes yourself, and vary it from the previous days' themes listed
+under RECENT AUTOPILOT THEMES so consecutive days never repeat.
+
+You have NO transcript today, so:
+  - NEVER invent timecodes, quotes, or moments that would need a recording.
+    No [HH:MM:SS] prefixes anywhere.
+  - suggested_clip fields name a real recent episode (from RECENT EPISODES)
+    plus what kind of moment the editor should look for in it, e.g.
+    "From 'Episode Title' — find the exchange where the guest explains X".
+  - image_direction describes either a reusable brand asset by exact filename
+    (when AVAILABLE BRAND ASSETS lists one that fits) or a simple shot the
+    team can produce without a recording (cover art treatment, host photo,
+    text-forward layout is allowed ONLY for text-quote graphics).
+
+Voice: the EXAMPLE POSTS are authoritative — copy their tone, vocabulary,
+sentence length, and formatting. Write like a person, not a brand. Respect
+the SPELLING REQUIREMENTS list exactly.
+
+Output: ONLY valid JSON matching the supplied schema. No preamble.`
+
+export type AutopilotGenerateInput = {
+  showName: string
+  showSubtitle?: string | null
+  brandVoice: string
+  examplePosts: string[]
+  vocabulary?: string
+  strategyDocs?: StrategyDocsInput
+  brandAssets?: Array<{ name: string; dropboxPath: string }>
+  recentEpisodes: Array<{ title: string; subtitle?: string | null }>
+  // Today's entry from the 30-day calendar strategy doc, if the show
+  // has one. Passed through verbatim-ish so the day executes the plan.
+  calendarSlot?: {
+    day: number
+    idea?: string
+    hook?: string
+    format?: string
+    core_message?: string
+    cta?: string
+    post_type?: string
+    goal?: string
+    pillar?: string
+  } | null
+  // Ideas from the last few autopilot days, so consecutive days vary.
+  recentThemes: string[]
+  date: string
+}
+
+export async function generateAutopilotPlan(input: AutopilotGenerateInput): Promise<GenerateResult> {
+  logInfo('autopilot: generating daily plan', {
+    showName: input.showName,
+    date: input.date,
+    hasCalendarSlot: Boolean(input.calendarSlot),
+  })
+  const showBlock = showMetadataBlock({
+    showName: input.showName,
+    showSubtitle: input.showSubtitle,
+    brandVoice: input.brandVoice,
+    examplePosts: input.examplePosts,
+    vocabulary: input.vocabulary,
+    strategyDocs: input.strategyDocs,
+    brandAssets: input.brandAssets,
+    // Unused by showMetadataBlock but required by GenerateInput.
+    episodeTitle: '', episodeTranscript: '', date: input.date,
+  })
+  const dayLines: string[] = [`DATE: ${input.date}`]
+  if (input.calendarSlot) {
+    const c = input.calendarSlot
+    dayLines.push('', `TODAY'S CALENDAR SLOT (day ${c.day} of the 30-day plan — execute this):`)
+    if (c.idea) dayLines.push(`  Idea: ${c.idea}`)
+    if (c.hook) dayLines.push(`  Hook: ${c.hook}`)
+    if (c.core_message) dayLines.push(`  Key message: ${c.core_message}`)
+    if (c.cta) dayLines.push(`  CTA: ${c.cta}`)
+    if (c.format) dayLines.push(`  Format: ${c.format}`)
+    if (c.post_type) dayLines.push(`  Post type: ${c.post_type}`)
+    if (c.goal) dayLines.push(`  Goal: ${c.goal}`)
+    if (c.pillar) dayLines.push(`  Pillar: ${c.pillar}`)
+  }
+  if (input.recentEpisodes.length > 0) {
+    dayLines.push('', 'RECENT EPISODES (real — reference these, never invent episodes):')
+    for (const e of input.recentEpisodes.slice(0, 8)) {
+      dayLines.push(`  - ${e.title}${e.subtitle ? ` — ${e.subtitle}` : ''}`)
+    }
+  }
+  if (input.recentThemes.length > 0) {
+    dayLines.push('', 'RECENT AUTOPILOT THEMES (do not repeat these):')
+    for (const t of input.recentThemes.slice(0, 10)) dayLines.push(`  - ${t}`)
+  }
+  dayLines.push('', "Generate today's draft batch now.")
+
+  let response
+  try {
+    response = await client.messages.create({
+      model: MODEL,
+      max_tokens: 8000,
+      system: AUTOPILOT_SYSTEM_PROMPT,
+      messages: [
+        {
+          role: 'user',
+          content: [
+            { type: 'text', text: showBlock, cache_control: { type: 'ephemeral' } },
+            { type: 'text', text: dayLines.join('\n') },
+          ],
+        },
+      ],
+      output_config: {
+        format: { type: 'json_schema', schema: SCHEMA },
+      },
+    })
+  } catch (err) {
+    logError('autopilot: claude call failed', {
+      showName: input.showName,
+      error: err instanceof Error ? err.message : String(err),
+    })
+    throw err
+  }
+
+  const textBlock = response.content.find((b) => b.type === 'text')
+  if (!textBlock || textBlock.type !== 'text') {
+    throw new Error('autopilot: claude returned no text block')
+  }
+  let plan: RawSocialPlan
+  try {
+    plan = JSON.parse(textBlock.text) as RawSocialPlan
+  } catch (err) {
+    logError('autopilot: invalid JSON from claude', { body: textBlock.text.slice(0, 500) })
+    throw new Error(`autopilot: invalid JSON: ${err instanceof Error ? err.message : String(err)}`)
+  }
+  return {
+    plan,
+    usage: {
+      inputTokens: response.usage.input_tokens,
+      outputTokens: response.usage.output_tokens,
+      cacheCreationInputTokens: response.usage.cache_creation_input_tokens ?? 0,
+      cacheReadInputTokens: response.usage.cache_read_input_tokens ?? 0,
+    },
+  }
+}
+
 function showMetadataBlock(input: GenerateInput): string {
   const lines: string[] = []
   lines.push(`SHOW: ${input.showName}`)

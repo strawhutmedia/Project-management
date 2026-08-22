@@ -31,6 +31,10 @@ export default function PodcastSocialsConfig({
   const [assignees, setAssignees] = useState<Partial<Record<typeof KIND_OPTIONS[number]['key'], string>>>(
     project.socialsDefaultAssignees ?? {},
   )
+  const [autopilotEnabled, setAutopilotEnabled] = useState(project.socialsAutopilotEnabled ?? false)
+  const [autopilotHour, setAutopilotHour] = useState(project.socialsAutopilotHour ?? 6)
+  const [autopilotBusy, setAutopilotBusy] = useState(false)
+  const [autopilotNote, setAutopilotNote] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const [savedAt, setSavedAt] = useState<Date | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -43,6 +47,8 @@ export default function PodcastSocialsConfig({
         socialsVocabulary: vocabulary.trim() || null,
         socialsExamplePosts: examples.map((e) => e.trim()).filter((e) => e.length > 0),
         socialsDefaultAssignees: assignees,
+        socialsAutopilotEnabled: autopilotEnabled,
+        socialsAutopilotHour: autopilotHour,
       })
       setSavedAt(new Date())
       await onSaved()
@@ -50,6 +56,22 @@ export default function PodcastSocialsConfig({
       setError(err instanceof Error ? err.message : 'failed')
     } finally {
       setBusy(false)
+    }
+  }
+
+  async function runAutopilotNow() {
+    setAutopilotBusy(true); setAutopilotNote(null)
+    try {
+      const r = await api.runSocialsAutopilot(project.id, true)
+      setAutopilotNote(
+        r.skipped === 'already_ran_today'
+          ? 'Already ran today — check the Scheduler.'
+          : `Generated ${r.itemCount} drafts — they're in the Scheduler awaiting QA.`,
+      )
+    } catch (err) {
+      setAutopilotNote(err instanceof Error ? err.message : 'failed')
+    } finally {
+      setAutopilotBusy(false)
     }
   }
 
@@ -61,6 +83,58 @@ export default function PodcastSocialsConfig({
           Configures how Claude writes the daily social plan for this show. Defaults below auto-assign
           new plan items so the right person picks them up.
         </p>
+      </div>
+
+      <div className="rounded-xl border border-stage-done/40 bg-stage-done/5 p-4 space-y-2">
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <p className="text-[10px] uppercase tracking-wider text-stage-done font-bold">🤖 Daily Autopilot</p>
+            <p className="text-[11px] text-muted/80 mt-1 leading-relaxed">
+              Every morning Claude drafts the day's content (2 text posts + photo, reel &amp; story concepts)
+              from the strategy docs and 30-day calendar, drops it into the Scheduler, and emails a QA digest.
+              <strong className="text-text"> Nothing ever auto-posts</strong> — a human reviews, publishes
+              manually, and marks slots posted.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => setAutopilotEnabled(!autopilotEnabled)}
+            className={`shrink-0 w-12 h-7 rounded-full transition relative ${autopilotEnabled ? 'bg-stage-done' : 'bg-line'}`}
+            aria-label="Toggle daily autopilot"
+          >
+            <span className={`absolute top-1 w-5 h-5 rounded-full bg-white transition-all ${autopilotEnabled ? 'left-6' : 'left-1'}`} />
+          </button>
+        </div>
+        {autopilotEnabled && (
+          <div className="flex items-center gap-3 pt-1">
+            <label className="flex items-center gap-2 text-[11px] text-muted">
+              Generate at
+              <select
+                value={autopilotHour}
+                onChange={(e) => setAutopilotHour(Number(e.target.value))}
+                className="bg-ink/40 border border-line text-text rounded px-2 py-1 text-xs"
+              >
+                {Array.from({ length: 24 }, (_, h) => (
+                  <option key={h} value={h}>
+                    {h === 0 ? '12am' : h < 12 ? `${h}am` : h === 12 ? '12pm' : `${h - 12}pm`} PT
+                  </option>
+                ))}
+              </select>
+            </label>
+            <button
+              type="button"
+              onClick={() => void runAutopilotNow()}
+              disabled={autopilotBusy}
+              className="text-[10px] uppercase tracking-wider font-bold text-stage-done border border-stage-done/40 rounded-full px-3 py-1.5 hover:bg-stage-done/10 disabled:opacity-50"
+            >
+              {autopilotBusy ? 'Generating…' : '✨ Run now'}
+            </button>
+          </div>
+        )}
+        {autopilotNote && <p className="text-[11px] text-muted">{autopilotNote}</p>}
+        {autopilotEnabled !== (project.socialsAutopilotEnabled ?? false) && (
+          <p className="text-[10px] text-muted/70 italic">Remember to hit Save below to apply the toggle.</p>
+        )}
       </div>
 
       <div>
