@@ -179,16 +179,33 @@ img { max-width: 100%; display: block; }
 /* Below desktop the staggered wall stops reading as "curated" and just looks
    broken — mismatched sizes on stacked rows. Drop the offsets AND the
    double-width tiles so it becomes a tidy, uniform grid of square covers. */
+/* Stacked layouts use flex-wrap rather than a grid: the cover count rarely
+   divides evenly by the column count, and a grid leaves the shortfall as an
+   empty hole on the right of the last row (it reads as missing shows). Wrapping
+   + centring puts the short row in the middle, where it looks deliberate, and
+   it stays correct whatever the show count is. */
 @media (max-width: 900px) {
-  .selections { grid-template-columns: repeat(4, 1fr); gap: 12px; align-items: start; }
+  .selections {
+    --sel-cols: 4; --sel-gap: 12px;
+    display: flex; flex-wrap: wrap; justify-content: center;
+    gap: var(--sel-gap); align-items: flex-start;
+  }
   .sel-item,
   .sel-item:nth-child(4n+1),
   .sel-item:nth-child(4n+3) { transform: none; }
-  .sel-item:nth-child(6n+2) { grid-column: span 1; }
+  .sel-item { flex: 0 0 calc((100% - (var(--sel-cols) - 1) * var(--sel-gap)) / var(--sel-cols) - 0.02px); }
+  .ph-wrap { flex: 0 0 100%; }
 }
 @media (max-width: 560px) {
-  .selections { grid-template-columns: repeat(3, 1fr); gap: 10px; }
+  .selections { --sel-cols: 3; --sel-gap: 10px; }
   .sel-item { border-radius: 12px; }
+  /* The wall is built as 8 covers, the phone, then 8 more. Eight doesn't divide
+     by three, so each half left a short final row. Trim both halves to six and
+     each becomes exactly two rows. (4-up above still divides evenly at 8.) */
+  .selections > .sel-item:nth-child(7),
+  .selections > .sel-item:nth-child(8),
+  .selections > .sel-item:nth-child(16),
+  .selections > .sel-item:nth-child(17) { display: none; }
 }
 
 /* Show grid */
@@ -899,7 +916,6 @@ table.admin-table { width: 100%; border-collapse: collapse; }
 @media (max-width: 560px) {
   .ph-wrap { grid-column: 1 / -1; grid-row: auto; padding: 16px 0; }
   .ph { max-width: 208px; }
-}
 }
 
 /* Cloudflare Turnstile — only rendered on pages that have a form. */

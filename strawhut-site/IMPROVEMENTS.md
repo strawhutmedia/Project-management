@@ -94,3 +94,11 @@ dependency entirely.
   blocks; a *missing* one (ad blocker, Cloudflare outage) is only flagged, and
   if the challenge is still solving when someone hits submit the form holds and
   sends itself — no double click, no lost lead.
+- **Fixed the ragged last row in the "The Network" cover wall on phones.** The
+  wall is built as 8 covers → phone → 8 covers; at 3 columns each half of 8 left
+  a short final row, which read as missing shows. Stacked breakpoints now wrap
+  and centre instead of using a rigid grid (so any count degrades gracefully),
+  and at ≤560px each half is trimmed to 6 so both are exact rows. Verified by
+  rendering /shows headlessly at 360/390/430/560/600/768/900/1024/1280/1440px:
+  complete rows at every stacked width, no horizontal scroll, desktop collage
+  untouched. Also removed a stray `}` in styles.css.
