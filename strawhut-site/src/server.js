@@ -23,6 +23,7 @@ import { matchAllShows, matchShowVideos } from './youtube.js';
 import { refreshPress } from './press.js';
 import { applyMonthlyRotation } from './spotlight.js';
 import { applyPopularSpotlight, megaphoneConfigured } from './popularity.js';
+import { resolveArtwork, imageWidth, MIN_ACCEPTABLE } from './artwork.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PORT = process.env.PORT || 8080;
@@ -198,6 +199,37 @@ async function maybeSendTrafficDigest(force = false) {
   } catch (e) {
     console.error('[digest] failed:', e.message);
     return { sent: false, error: e.message };
+  }
+}
+
+// Upgrade low-resolution cover art. Several feeds publish show artwork well
+// below Apple's 1400px minimum (some at 256px), which looks soft wherever we
+// render art large. The full-size originals live on Apple, matched EXACTLY by
+// the collection id in each show's Apple URL — never by name — so there is no
+// risk of putting the wrong artwork on a client's page. The result is stored,
+// so each show is resolved once, and calls are paced inside Apple's rate
+// limit. Set ARTWORK_HIRES=off to skip.
+async function backfillArtwork() {
+  if (process.env.ARTWORK_HIRES === 'off') return;
+  try {
+    const shows = await store.listShows();
+    let checked = 0, upgraded = 0;
+    for (const show of shows) {
+      if (show.artwork_url || !show.apple_url) continue;
+      checked++;
+      const w = await imageWidth(show.image_url);
+      if (w >= MIN_ACCEPTABLE) continue;
+      const hi = await resolveArtwork(show);
+      if (hi) {
+        await store.updateShow(show.id, { artwork_url: hi, image_url: hi });
+        upgraded++;
+        console.log(`[artwork] ${show.slug}: ${w || '?'}px -> 3000px`);
+      }
+      await new Promise((r) => setTimeout(r, 4000));
+    }
+    if (checked) console.log(`[artwork] checked ${checked}, upgraded ${upgraded}`);
+  } catch (e) {
+    console.error('[artwork] backfill failed:', e.message);
   }
 }
 
@@ -1074,6 +1106,9 @@ app.listen(PORT, async () => {
 
   // Populate the footer "Recent episodes" rail.
   refreshFooter();
+
+  // Upgrade any low-resolution cover art from Apple (background, paced).
+  backfillArtwork().catch((e) => console.error('[artwork]', e.message));
 
   // Weekly traffic digest — checked hourly, sends once every 7 days.
   setInterval(() => maybeSendTrafficDigest().catch(() => {}), 60 * 60 * 1000);
