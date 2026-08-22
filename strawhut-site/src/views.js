@@ -250,7 +250,32 @@ ${trackingBody()}
 <main>${body}</main>
 ${consentBanner()}
 ${footerBlock()}
-<script>(function(){var sel='.section-head,.fbanner,.impact-inner,.stats-grid,.cta-band,.faq-list,.svc-hero-art,.footer-ig,.footer-top,.grid-4>*,.featured-grid>*,.pillars>*,.inc-item,.resource-card,.svc-shot,.ig-tile,.svc-tile';var els=[].slice.call(document.querySelectorAll(sel));if(!('IntersectionObserver'in window)||!els.length)return;var groups=new Map();var vh=window.innerHeight||document.documentElement.clientHeight;els.forEach(function(el){el.classList.add('reveal');var p=el.parentNode,i=groups.get(p)||0;groups.set(p,i+1);if(i)el.style.transitionDelay=Math.min(i,6)*0.06+'s';if(el.getBoundingClientRect().top<vh*0.92)el.classList.add('is-visible');});var io=new IntersectionObserver(function(en){en.forEach(function(e){if(e.isIntersecting){e.target.classList.add('is-visible');io.unobserve(e.target);}});},{threshold:0.1,rootMargin:'0px 0px -6% 0px'});els.forEach(function(el){if(!el.classList.contains('is-visible'))io.observe(el);});})();</script>
+<script>(function(){
+var sel='.section-head,.fbanner,.impact-inner,.stats-grid,.cta-band,.faq-list,.svc-hero-art,.footer-ig,.footer-top,.grid-4>*,.featured-grid>*,.pillars>*,.inc-item,.resource-card,.svc-shot,.ig-tile,.svc-tile';
+var els=[].slice.call(document.querySelectorAll(sel));
+if(!('IntersectionObserver'in window)||!els.length)return;
+var vh=window.innerHeight||document.documentElement.clientHeight;
+// Measure everything FIRST. Interleaving a read (getBoundingClientRect) with a
+// write (classList.add) forces the browser to recompute layout on every single
+// element, which is what made the first scroll feel like it was catching.
+var tops=els.map(function(el){return el.getBoundingClientRect().top;});
+var groups=new Map();
+var pending=[];
+for(var k=0;k<els.length;k++){
+  var el=els[k],p=el.parentNode,i2=groups.get(p)||0;
+  groups.set(p,i2+1);
+  el.classList.add('reveal');
+  // Anything already on screen at load is shown immediately and never animates
+  // — the page shouldn't play an entrance for content the visitor can see.
+  if(tops[k]<vh*0.95){el.classList.add('is-visible');}
+  else{if(i2)el.style.transitionDelay=Math.min(i2,4)*0.045+'s';pending.push(el);}
+}
+if(!pending.length)return;
+var io=new IntersectionObserver(function(en){
+  en.forEach(function(e){if(e.isIntersecting){e.target.classList.add('is-visible');io.unobserve(e.target);}});
+},{threshold:0,rootMargin:'0px 0px -8% 0px'});
+pending.forEach(function(el){io.observe(el);});
+})();</script>
 </body></html>`;
 }
 
@@ -610,7 +635,7 @@ const SERVICES = [
 
 export function showsIndexPage({ shows }) {
   // A curated wall of cover art — the network at a glance, above the lists.
-  const selections = shows.filter((s) => s.image_url).slice(0, 16);
+  const selections = shows.filter((s) => s.image_url).slice(0, 24);
   const card = (s) => `<a class="show-card" href="/${esc(s.slug)}">
       ${s.featured ? '<span class="badge">Featured</span>' : ''}
       <div class="art">${artOrPlaceholder(s.image_url, s.title)}</div>
@@ -636,14 +661,14 @@ export function showsIndexPage({ shows }) {
     <div class="section-head"><h2>The Network</h2><a class="count" href="#original">Browse all →</a></div>
     <div class="selections">
       ${selections
-        .slice(0, 8)
+        .slice(0, 12)
         .map(
           (s) => `<a class="sel-item" href="/${esc(s.slug)}" title="${esc(s.title)}"><img src="${esc(s.image_url)}" alt="${esc(s.title)}" loading="lazy"></a>`
         )
         .join('')}
       ${phoneMockup(selections)}
       ${selections
-        .slice(8, 16)
+        .slice(12, 24)
         .map(
           (s) => `<a class="sel-item" href="/${esc(s.slug)}" title="${esc(s.title)}"><img src="${esc(s.image_url)}" alt="${esc(s.title)}" loading="lazy"></a>`
         )

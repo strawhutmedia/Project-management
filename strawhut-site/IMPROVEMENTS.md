@@ -102,3 +102,15 @@ dependency entirely.
   rendering /shows headlessly at 360/390/430/560/600/768/900/1024/1280/1440px:
   complete rows at every stacked width, no horizontal scroll, desktop collage
   untouched. Also removed a stray `}` in styles.css.
+- **Smoother scroll reveal.** The init loop interleaved a DOM write
+  (`classList.add`) with a read (`getBoundingClientRect`) per element, forcing a
+  layout recalculation on every one — the cause of the clunky first scroll.
+  Measured all positions before touching any classes, and scoped `will-change`
+  to elements still waiting (it was pinned on ~40 elements forever, one
+  compositor layer each). Softened the motion too: 24px → 14px rise, 0.7s →
+  0.55s, gentler easing, smaller stagger. Measured in headless Chromium over 5
+  runs: forced layouts 46 → 33, layout time 51.8ms → 38.5ms, style recalcs
+  48 → 33.
+- **Cover wall widened 16 → 24 shows** (12 + phone + 12). Twelve divides evenly
+  by both the 3-up and 4-up stacked layouts, so every row is full at every width
+  and the nth-child trimming hack added earlier could be deleted outright.
