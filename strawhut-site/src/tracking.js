@@ -17,7 +17,11 @@
 const GTM = (process.env.GTM_CONTAINER_ID || 'GTM-WM7DVH3Z').trim();
 const GA4 = (process.env.GA4_MEASUREMENT_ID || '').trim();
 const ADS = (process.env.GOOGLE_ADS_ID || '').trim();
-const META = (process.env.META_PIXEL_ID || '').trim();
+// Straw Hut's Meta pixel, recovered from the live start/services properties
+// where it was already installed. Pixel IDs are public (visible in page source),
+// so this is a safe default; override with META_PIXEL_ID if it ever changes.
+// NOTE: loaded only after consent — see shmLoadPixels below.
+const META = (process.env.META_PIXEL_ID || '679724066324304').trim();
 const TT = (process.env.TIKTOK_PIXEL_ID || '').trim();
 const SITE_ID = (process.env.SITE_ID || 'strawhut-media').trim();
 
@@ -64,8 +68,8 @@ window.dataLayer.push({site:'${j(SITE_ID)}'});</script>`;
   // Meta and TikTok have no consent-mode equivalent, so they are not loaded at
   // all until the visitor accepts. shmLoadPixels() is called by the banner.
   const deferred = [];
-  if (META) deferred.push(`!function(f,b,e,v,n,t,s){if(f.fbq)return;n=f.fbq=function(){n.callMethod?n.callMethod.apply(n,arguments):n.queue.push(arguments)};if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';n.queue=[];t=b.createElement(e);t.async=!0;t.src=v;s=b.getElementsByTagName(e)[0];s.parentNode.insertBefore(t,s)}(window,document,'script','https://connect.facebook.net/en_US/fbevents.js');fbq('init','\${j(META)}');fbq('track','PageView');`);
-  if (TT) deferred.push(`!function(w,d,t){w.TiktokAnalyticsObject=t;var ttq=w[t]=w[t]||[];ttq.methods=["page","track","identify","instances","debug","on","off","once","ready","alias","group","enableCookie","disableCookie"];ttq.setAndDefer=function(t,e){t[e]=function(){t.push([e].concat(Array.prototype.slice.call(arguments,0)))}};for(var i=0;i<ttq.methods.length;i++)ttq.setAndDefer(ttq,ttq.methods[i]);ttq.load=function(e){var n="https://analytics.tiktok.com/i18n/pixel/events.js";ttq._i=ttq._i||{};ttq._i[e]=[];ttq._i[e]._u=n;ttq._t=ttq._t||{};ttq._t[e]=+new Date;var o=d.createElement("script");o.type="text/javascript";o.async=!0;o.src=n+"?sdkid="+e+"&lib="+t;var a=d.getElementsByTagName("script")[0];a.parentNode.insertBefore(o,a)};ttq.load('\${j(TT)}');ttq.page();}(window,document,'ttq');`);
+  if (META) deferred.push(`!function(f,b,e,v,n,t,s){if(f.fbq)return;n=f.fbq=function(){n.callMethod?n.callMethod.apply(n,arguments):n.queue.push(arguments)};if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';n.queue=[];t=b.createElement(e);t.async=!0;t.src=v;s=b.getElementsByTagName(e)[0];s.parentNode.insertBefore(t,s)}(window,document,'script','https://connect.facebook.net/en_US/fbevents.js');fbq('init','${j(META)}');fbq('track','PageView');`);
+  if (TT) deferred.push(`!function(w,d,t){w.TiktokAnalyticsObject=t;var ttq=w[t]=w[t]||[];ttq.methods=["page","track","identify","instances","debug","on","off","once","ready","alias","group","enableCookie","disableCookie"];ttq.setAndDefer=function(t,e){t[e]=function(){t.push([e].concat(Array.prototype.slice.call(arguments,0)))}};for(var i=0;i<ttq.methods.length;i++)ttq.setAndDefer(ttq,ttq.methods[i]);ttq.load=function(e){var n="https://analytics.tiktok.com/i18n/pixel/events.js";ttq._i=ttq._i||{};ttq._i[e]=[];ttq._i[e]._u=n;ttq._t=ttq._t||{};ttq._t[e]=+new Date;var o=d.createElement("script");o.type="text/javascript";o.async=!0;o.src=n+"?sdkid="+e+"&lib="+t;var a=d.getElementsByTagName("script")[0];a.parentNode.insertBefore(o,a)};ttq.load('${j(TT)}');ttq.page();}(window,document,'ttq');`);
   out += `<script>window.shmLoadPixels=function(){if(window.__shmPixels)return;window.__shmPixels=1;${deferred.join('')}};
 try{if(localStorage.getItem('shm_consent')==='all')window.shmLoadPixels();}catch(e){}</script>`;
 
