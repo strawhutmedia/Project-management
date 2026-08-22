@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-08-22T19:51:48.219Z",
+  "generatedAt": "2026-08-22T19:52:18.217Z",
   "note": "Read-only operational snapshot. Emails are masked; no full contact list is stored here.",
   "summary": {
     "showsWithOutreach": 1,
@@ -102,7 +102,7 @@
           {
             "name": "Malcolm Roberson",
             "emailMasked": "m***@persona-pr.com",
-            "daysSinceFirstEmail": 37,
+            "daysSinceFirstEmail": 38,
             "opened": false,
             "openCount": 0
           },
