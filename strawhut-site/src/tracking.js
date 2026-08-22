@@ -38,7 +38,17 @@ export function trackingHead() {
   // automatically; Meta/TikTok are withheld entirely until consent (below).
   let out = `<script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}
 gtag('consent','default',{ad_storage:'denied',ad_user_data:'denied',ad_personalization:'denied',analytics_storage:'denied',personalization_storage:'denied',functionality_storage:'granted',security_storage:'granted',wait_for_update:500});
-try{var c=localStorage.getItem('shm_consent');if(c==='all'){gtag('consent','update',{ad_storage:'granted',ad_user_data:'granted',ad_personalization:'granted',analytics_storage:'granted',personalization_storage:'granted'});}}catch(e){}
+(function(){var G={ad_storage:'granted',ad_user_data:'granted',ad_personalization:'granted',analytics_storage:'granted',personalization_storage:'granted'};
+var c=null;try{c=localStorage.getItem('shm_consent');}catch(e){}
+if(c==='all'){gtag('consent','update',G);return;}
+if(c==='essential')return;
+// No stored choice: grant immediately OUTSIDE opt-in jurisdictions so the very
+// first pageview is measured. Done here in <head>, before Google's tags load,
+// rather than in the footer banner — otherwise the initial pageview is sent
+// under 'denied' and lost. UK/EEA/CH stays denied until explicit acceptance.
+try{var tz=(Intl.DateTimeFormat().resolvedOptions().timeZone||'');
+var eu=/^(Europe|Atlantic\/(Azores|Madeira|Canary|Faroe|Reykjavik))/.test(tz);
+if(!eu)gtag('consent','update',G);}catch(e){}})();
 window.dataLayer.push({site:'${j(SITE_ID)}'});</script>`;
 
   if (GTM) {
