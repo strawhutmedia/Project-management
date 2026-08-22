@@ -158,3 +158,17 @@ UI, inline links inside body copy).
   Verified edge-to-edge with no horizontal scroll at 320/360/390/430/560/700/760
   and correctly back to the inset card at 761px+. Desktop measured identical
   before/after (1178x382, 380x380 art, 22px radius, no clip) — untouched.
+- **Featured band extended to desktop** (Ryan approved). Same full-bleed angled
+  colour field at every width, tinted by a blurred copy of the show's own cover;
+  content held to the 1180px `.container` measure with padding so the band
+  bleeds but the copy doesn't stretch on a wide screen.
+  - **Caught a bug the harness would have missed:** headless Chromium runs with
+    `--hide-scrollbars`, so "no horizontal scroll" was passing without ever
+    exercising the case. Re-launched with real scrollbars and the desktop band
+    produced **8px of sideways scroll** at 1280px — `100vw` is wider than the
+    content box whenever a classic (non-overlay) scrollbar is present. Guarded
+    with `main { overflow-x: clip }` — `clip` rather than `hidden` because clip
+    doesn't create a scroll container, so sticky positioning still works
+    (verified: header stays at top: 0 after scrolling 2500px).
+  - Overflow swept at 320/390/430/560/760/761/900/1024/1280/1440/1920px with
+    classic scrollbars forced on: zero at every width.
