@@ -537,6 +537,8 @@ const SERVICES = [
 ];
 
 export function showsIndexPage({ shows }) {
+  // A curated wall of cover art — the network at a glance, above the lists.
+  const selections = shows.filter((s) => s.image_url).slice(0, 16);
   const card = (s) => `<a class="show-card" href="/${esc(s.slug)}">
       ${s.featured ? '<span class="badge">Featured</span>' : ''}
       <div class="art">${artOrPlaceholder(s.image_url, s.title)}</div>
@@ -556,6 +558,18 @@ export function showsIndexPage({ shows }) {
     <div class="breadcrumb"><a href="/">Home</a> / Shows</div>
     <h1 style="margin:14px 0 0">All Shows</h1>
   </div></section>
+  ${
+    selections.length
+      ? `<section class="section" style="padding-top:6px"><div class="container">
+    <div class="section-head"><h2>Straw Hut Producer Selections</h2></div>
+    <div class="selections">${selections
+      .map(
+        (s) => `<a class="sel-item" href="/${esc(s.slug)}" title="${esc(s.title)}"><img src="${esc(s.image_url)}" alt="${esc(s.title)}" loading="lazy"></a>`
+      )
+      .join('')}</div>
+  </div></section>`
+      : ''
+  }
   ${shows.length ? section('original', 'Original Shows', originals) + section('partner', 'Partner Shows', partners) : `<section class="section"><div class="container"><div class="empty">No shows yet.</div></div></section>`}`;
   return layout({
     title: 'All Shows — Straw Hut Media',
