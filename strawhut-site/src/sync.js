@@ -6,7 +6,7 @@
 
 import { fetchFeed } from './rss.js';
 import { slugify, uniqueSlug } from './util.js';
-import { isFrozenShow } from './overrides.js';
+import { isFrozenShow, artFor } from './overrides.js';
 
 /** Add a brand-new show from a feed URL (used by the admin "Add show" form). */
 export async function addShowFromFeed(store, feedUrl, opts = {}) {
@@ -46,7 +46,7 @@ export async function syncShow(store, show) {
     title: feedShow.title || show.title,
     description: feedShow.description || show.description,
     author: feedShow.author || show.author,
-    image_url: feedShow.image_url || show.image_url,
+    image_url: artFor(show.slug, feedShow.image_url || show.image_url),
     link: feedShow.link || show.link,
     categories: feedShow.categories?.length ? feedShow.categories : show.categories,
     show_type: show.show_type || 'original',
