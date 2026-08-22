@@ -33,6 +33,11 @@ export function toText(html, max = 300) {
     .replace(/&#39;|&apos;/g, "'")
     .replace(/&quot;/g, '"')
     .replace(/\s+/g, ' ')
+    // Feeds routinely lose the space after a full stop ("climate.From Straw
+    // Hut"), which hides the sentence boundary from everything downstream.
+    // Only fix it after a lowercase letter or digit so acronyms like U.S. are
+    // left alone.
+    .replace(/([a-z0-9])([.!?])([A-Z])/g, '$1$2 $3')
     .trim();
   if (!max || t.length <= max) return t;
   // Never truncate mid-thought with an ellipsis. Cut at the last sentence that
@@ -82,4 +87,17 @@ export function formatDate(d) {
 /** True when a string ends on a finished sentence (so it needs no ellipsis). */
 export function endsSentence(s) {
   return /[.!?]["'\u2019\u201d)\]]?$/.test(String(s || '').trim());
+}
+
+/**
+ * The first complete sentence of a text, when one exists within `ceiling`.
+ * Used as a guaranteed no-ellipsis fallback: a slightly long but finished
+ * sentence always beats a fragment that stops mid-thought.
+ */
+export function firstSentence(html, ceiling = 380) {
+  const t = toText(html, 0);
+  const m = t.match(/^[\s\S]*?[.!?]["'\u2019\u201d)\]]?(?=\s|$)/);
+  if (!m) return '';
+  const one = m[0].trim();
+  return one.length <= ceiling ? one : '';
 }

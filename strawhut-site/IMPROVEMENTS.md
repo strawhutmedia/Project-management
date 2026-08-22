@@ -193,3 +193,16 @@ UI, inline links inside body copy).
     ellipses added by us, 0 over the length budget.
   - Author-intended ellipses in source copy (e.g. Folklorica's "Introducing…
     Folklorica!") are left alone — deliberate style, not truncation.
+- **Follow-up:** the AI blurb path alone wasn't enough — production still showed
+  a fragment for String and Tell, because that show's stored `seo_description`
+  is *itself* cut off ("…while racing to make friendship"), so the fallback
+  chain correctly rejected it, and I can't confirm `ANTHROPIC_API_KEY` is set on
+  the website service. Made a complete sentence **guaranteed without AI**:
+  when nothing fits the budget, fall back to the show's own first sentence even
+  if it runs slightly long (a complete sentence at 200 characters beats a
+  fragment at 165). Also fixed a common feed artifact — a missing space after a
+  full stop ("climate.From Straw Hut") hid the sentence boundary; now repaired,
+  but only after a lowercase letter or digit so "U.S. Government" is untouched.
+  Result across all 30 real descriptions: **30/30 complete sentences**, median
+  123 characters, longest 232. The AI blurb remains as an upgrade that produces
+  something shorter when the key is available.

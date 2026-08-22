@@ -2,7 +2,7 @@
 // Everything user-facing is escaped via esc(); episode show-notes are
 // intentionally rendered as feed-provided HTML inside a sandboxed .notes block.
 
-import { esc, toText, formatDuration, formatDate, endsSentence } from './util.js';
+import { esc, toText, formatDuration, formatDate, endsSentence, firstSentence } from './util.js';
 import { formFields } from './antispam.js';
 import { turnstileWidget } from './turnstile.js';
 import {
@@ -478,6 +478,11 @@ function showBlurb(show, max = 165) {
     const t = toText(alt, max);
     if (t && endsSentence(t)) return t;
   }
+  // Nothing fits the budget as a finished sentence. Run slightly long with the
+  // show's own opening sentence rather than stop mid-thought — a complete
+  // sentence at 200 characters reads far better than a fragment at 165.
+  const first = firstSentence(show.description);
+  if (first) return first;
   return own;
 }
 
@@ -1376,7 +1381,7 @@ export function studioPage() {
       <label>Session length</label>
       <select id="durationSelect" style="width:100%;padding:12px 14px;border-radius:10px;border:1px solid var(--border);background:var(--bg-2);color:var(--text);font-family:inherit;font-size:0.95rem">${opts}</select>
     </div>
-    <div id="bookingLoader" style="padding:40px 0;color:var(--muted)">Loading booking calendar…</div>
+    <div id="bookingLoader" style="padding:40px 0;color:var(--muted)">Loading the booking calendar</div>
     <iframe id="bookingIframe" title="Book the Straw Hut Studio" style="display:none;width:100%;min-height:720px;border:1px solid var(--border);border-radius:14px;background:#fff" scrolling="no"></iframe>
   </div></section>
   <script src="https://link.msgsndr.com/js/form_embed.js"></script>
