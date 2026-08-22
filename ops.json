@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-08-22T18:36:18.946Z",
+  "generatedAt": "2026-08-22T18:41:18.932Z",
   "note": "Read-only operational snapshot. Emails are masked; no full contact list is stored here.",
   "summary": {
     "showsWithOutreach": 1,
@@ -60,7 +60,7 @@
           {
             "name": "Amaya Espinal",
             "emailMasked": "a***@untitledent.com",
-            "daysSinceFirstEmail": 37,
+            "daysSinceFirstEmail": 38,
             "opened": false,
             "openCount": 0
           },
