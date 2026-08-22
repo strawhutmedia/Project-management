@@ -173,10 +173,19 @@ img { max-width: 100%; display: block; }
 .sel-item:nth-child(6n+2) { grid-column: span 2; }
 .sel-item:nth-child(4n+1):hover,
 .sel-item:nth-child(4n+3):hover { transform: translateY(-8px) scale(1.04); }
-@media (max-width: 900px) { .selections { grid-template-columns: repeat(4, 1fr); gap: 12px; } }
-@media (max-width: 520px) {
-  .selections { grid-template-columns: repeat(3, 1fr); gap: 10px; }
+/* Below desktop the staggered wall stops reading as "curated" and just looks
+   broken — mismatched sizes on stacked rows. Drop the offsets AND the
+   double-width tiles so it becomes a tidy, uniform grid of square covers. */
+@media (max-width: 900px) {
+  .selections { grid-template-columns: repeat(4, 1fr); gap: 12px; align-items: start; }
+  .sel-item,
+  .sel-item:nth-child(4n+1),
+  .sel-item:nth-child(4n+3) { transform: none; }
   .sel-item:nth-child(6n+2) { grid-column: span 1; }
+}
+@media (max-width: 560px) {
+  .selections { grid-template-columns: repeat(3, 1fr); gap: 10px; }
+  .sel-item { border-radius: 12px; }
 }
 
 /* Show grid */
@@ -186,7 +195,13 @@ img { max-width: 100%; display: block; }
 .grid-4 .show-card h3 { font-size: 1.12rem; }
 .grid-4 .show-card .body { padding: 16px 17px 19px; }
 @media (max-width: 900px) { .grid-4 { grid-template-columns: repeat(2, 1fr); } }
-@media (max-width: 460px) { .grid-4 { grid-template-columns: 1fr; } }
+/* Keep two-up on phones — one giant card per row means endless scrolling. */
+@media (max-width: 460px) {
+  .grid-4 { grid-template-columns: repeat(2, 1fr); gap: 12px; }
+  .grid-4 .show-card h3 { font-size: 0.95rem; }
+  .grid-4 .show-card .meta { font-size: 0.74rem; }
+  .grid-4 .show-card .body { padding: 11px 12px 14px; }
+}
 .section-lede { color: var(--muted); max-width: 760px; margin: -8px 0 30px; font-size: 1.02rem; }
 
 /* Big Featured Podcast banner — one show at a time, built from cover art */
