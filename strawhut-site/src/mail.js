@@ -39,10 +39,14 @@ export const CONTACT_ROUTES = {
  * Deliver a contact-form submission to the inbox for its topic, with reply-to
  * set to the sender so the recipient can just hit reply.
  */
-export async function sendContactEmail({ name, email, company, message, topic }) {
+export async function sendContactEmail({ name, email, company, message, topic, flags = [] }) {
   const route = CONTACT_ROUTES[topic] || CONTACT_ROUTES.general;
   const esc = (s) => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  // Never dropped — just labelled, so a mail rule can quarantine it and a real
+  // lead that trips a heuristic still lands in the inbox.
+  const suspect = flags.length ? `[possible spam: ${flags.join(', ')}] ` : '';
   const html = `<h2>New contact form message</h2>
+    ${suspect ? `<p style="background:#fff4d6;padding:8px 10px;border-radius:6px"><strong>⚠ Flagged as possible spam</strong> (${esc(flags.join(', '))}). Delivered anyway in case it's real.</p>` : ''}
     <p><strong>Regarding:</strong> ${esc(route.label)}</p>
     <p><strong>Name:</strong> ${esc(name)}</p>
     <p><strong>Email:</strong> ${esc(email)}</p>
@@ -55,7 +59,7 @@ export async function sendContactEmail({ name, email, company, message, topic })
       Authorization: `Bearer ${process.env.RESEND_API_KEY}`,
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({ from: FROM, to: route.to, subject: `[${route.label}] ${name || 'someone'}`, html, reply_to: email }),
+    body: JSON.stringify({ from: FROM, to: route.to, subject: `${suspect}[${route.label}] ${name || 'someone'}`, html, reply_to: email }),
   });
   if (!res.ok) {
     const body = await res.text().catch(() => '');

@@ -24,6 +24,7 @@ import { refreshPress } from './press.js';
 import { applyMonthlyRotation } from './spotlight.js';
 import { applyPopularSpotlight, megaphoneConfigured } from './popularity.js';
 import { resolveArtwork, imageWidth, MIN_ACCEPTABLE } from './artwork.js';
+import { inspect as inspectSubmission } from './antispam.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PORT = process.env.PORT || 8080;
@@ -33,6 +34,10 @@ const SESSION_SECRET = process.env.SESSION_SECRET || ADMIN_PASSWORD + ':strawhut
 const store = await createStore();
 
 const app = express();
+// Railway terminates TLS and proxies to us, so the socket address is always the
+// edge. Trust exactly one hop so req.ip is the real visitor (and can't be
+// spoofed by an extra X-Forwarded-For entry) — the form rate limit buckets on it.
+app.set('trust proxy', 1);
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
 // Static caching: images/fonts never change → cache hard (30d, immutable);
@@ -735,9 +740,16 @@ app.post('/contact', async (req, res) => {
   if (!name.trim() || !email.trim() || !message.trim()) {
     return res.send(V.contactPage({ error: 'Please fill in your name, email, and a message.', values }));
   }
+  // Invisible bot checks. A rejected submission gets the normal thank-you page:
+  // telling a bot why it failed just teaches it what to fix next time.
+  const check = inspectSubmission(req.body, { ip: req.ip });
+  if (!check.ok) {
+    console.log('[contact] blocked', check.reason, '-', String(email).slice(0, 60));
+    return res.send(V.contactPage({ sent: true }));
+  }
   try {
     if (mailConfigured()) {
-      await sendContactEmail({ name, email, company, message, topic });
+      await sendContactEmail({ name, email, company, message, topic, flags: check.suspicious ? check.flags : [] });
     } else {
       console.log('[contact] (email not configured) message from', email, `[${topic}]`, '-', message.slice(0, 120));
     }
@@ -860,6 +872,17 @@ app.get('/go/:showSlug/:episodeSlug', async (req, res, next) => {
 
 app.post('/subscribe', async (req, res) => {
   const email = (req.body.email || '').trim();
+  const check = inspectSubmission(req.body, { ip: req.ip });
+  if (!check.ok) {
+    console.log('[subscribe] blocked', check.reason, '-', email.slice(0, 60));
+    return res.send(
+      V.messagePage({
+        title: "You're subscribed — Straw Hut Media",
+        heading: "You're on the list! 🎉",
+        message: 'Thanks for subscribing to Straw Hut Media updates.',
+      })
+    );
+  }
   try {
     await store.addSubscriber(email, req.body.name);
     res.send(

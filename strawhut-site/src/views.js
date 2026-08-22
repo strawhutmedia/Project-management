@@ -3,6 +3,7 @@
 // intentionally rendered as feed-provided HTML inside a sandboxed .notes block.
 
 import { esc, toText, formatDuration, formatDate } from './util.js';
+import { formFields } from './antispam.js';
 import {
   canonical,
   organizationJsonLd,
@@ -579,6 +580,7 @@ export function homePage({ shows }) {
       <h2 style="margin-top:0">Get updates from Straw Hut Media</h2>
       <p style="color:var(--muted);margin-top:6px">New shows, new episodes, and behind-the-scenes — straight to your inbox.</p>
       <form method="post" action="/subscribe" onsubmit="window.shmTrack&&shmTrack('subscribe',{});window.fbq&&fbq('track','Subscribe');" style="display:flex;gap:10px;flex-wrap:wrap;justify-content:center;margin-top:18px">
+        ${formFields()}
         <input type="email" name="email" required placeholder="you@email.com" style="flex:1;min-width:240px;padding:13px 16px;border-radius:999px;border:1px solid var(--border);background:var(--bg-2);color:var(--text);font-family:inherit">
         <button class="btn btn-primary" type="submit">Subscribe</button>
       </form>
@@ -1381,6 +1383,7 @@ export function contactPage({ sent = false, error = '', values = {} } = {}) {
            </div>
            <script>window.shmTrack&&shmTrack('contact_submit',{topic:'${esc(values.topic || 'general')}'});window.fbq&&fbq('track','Lead');</script>`
         : `<form class="contact-form" method="POST" action="/contact">
+             ${formFields()}
              ${error ? `<div class="flash err" style="margin-bottom:18px">${esc(error)}</div>` : ''}
              <div class="field"><label>What's this regarding?</label>
                <select name="topic" class="contact-select">
