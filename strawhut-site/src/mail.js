@@ -92,3 +92,35 @@ export async function sendAnnouncement(subscribers, { subject, html }) {
   }
   return { sent, failed, errors };
 }
+
+/** Weekly traffic digest to the owner. Plain, scannable, no tracking pixels. */
+export async function sendTrafficDigest(to, { stats, days = 7, siteUrl }) {
+  if (!mailConfigured()) return { ok: false, reason: 'no RESEND_API_KEY' };
+  const { total, previous, top } = stats;
+  const delta = previous > 0 ? Math.round(((total - previous) / previous) * 100) : null;
+  const arrow = delta === null ? '' : delta >= 0 ? '▲' : '▼';
+  const colour = delta === null ? '#6b7280' : delta >= 0 ? '#00994f' : '#c0392b';
+  const rows = top.slice(0, 15).map((r, i) => `
+    <tr>
+      <td style="padding:7px 10px;color:#9aa2c0;font-size:13px">${i + 1}</td>
+      <td style="padding:7px 10px"><a href="${siteUrl}${r.path}" style="color:#0a7f5c;text-decoration:none">${r.path}</a></td>
+      <td style="padding:7px 10px;text-align:right;font-weight:600">${r.hits.toLocaleString()}</td>
+    </tr>`).join('');
+  const html = `
+  <div style="font-family:-apple-system,Segoe UI,Roboto,sans-serif;max-width:620px;margin:0 auto;color:#12182f">
+    <h2 style="margin:0 0 4px">Straw Hut Media — weekly traffic</h2>
+    <p style="color:#6b7280;margin:0 0 22px;font-size:14px">Last ${days} days on strawhutmedia.com</p>
+    <div style="background:#f5f7fb;border-radius:12px;padding:20px;margin-bottom:22px">
+      <div style="font-size:34px;font-weight:700;line-height:1">${total.toLocaleString()}</div>
+      <div style="color:#6b7280;font-size:14px">page views
+        ${delta === null ? '' : `· <span style="color:${colour};font-weight:600">${arrow} ${Math.abs(delta)}%</span> vs previous ${days} days`}
+      </div>
+    </div>
+    <h3 style="margin:0 0 8px;font-size:15px">Most visited pages</h3>
+    <table style="width:100%;border-collapse:collapse;font-size:14px">${rows || '<tr><td style="padding:10px;color:#6b7280">No visits recorded.</td></tr>'}</table>
+    <p style="margin-top:24px;font-size:13px;color:#6b7280">
+      Full dashboard: <a href="${siteUrl}/admin/analytics" style="color:#0a7f5c">${siteUrl}/admin/analytics</a>
+    </p>
+  </div>`;
+  return sendOne({ to, subject: `Straw Hut traffic — ${total.toLocaleString()} page views this week`, html });
+}

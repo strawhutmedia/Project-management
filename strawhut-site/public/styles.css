@@ -824,3 +824,16 @@ table.admin-table { width: 100%; border-collapse: collapse; }
 /* Notice variant (opt-out regions): lower-key than the blocking opt-in bar. */
 .consent-bar.consent-notice { padding: 12px 0; }
 .consent-bar.consent-notice p { font-size: 0.84rem; }
+
+/* Admin traffic dashboard */
+.tv-cards { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-bottom: 20px; }
+.tv-card { background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 18px; }
+.tv-num { font-size: 1.9rem; font-weight: 700; line-height: 1; font-variant-numeric: tabular-nums; }
+.tv-lab { color: var(--muted); font-size: 0.8rem; margin-top: 6px; }
+.tv-chart { display: flex; align-items: flex-end; gap: 6px; height: 150px; }
+.tv-bar { flex: 1; display: flex; flex-direction: column; justify-content: flex-end; align-items: center; height: 100%; }
+.tv-fill { width: 100%; background: linear-gradient(180deg, var(--accent), #0a8f66); border-radius: 6px 6px 0 0; min-height: 3px; }
+.tv-x { color: var(--muted); font-size: 0.68rem; margin-top: 6px; }
+.tv-track { background: var(--card-2); border-radius: 999px; height: 8px; overflow: hidden; }
+.tv-meter { background: var(--accent); height: 100%; border-radius: 999px; }
+@media (max-width: 820px) { .tv-cards { grid-template-columns: repeat(2, 1fr); } }

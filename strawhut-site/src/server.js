@@ -13,7 +13,7 @@ import { addShowFromFeed, syncShow, syncAll, startScheduler } from './sync.js';
 import * as V from './views.js';
 import * as A from './admin_views.js';
 import { robotsTxt, sitemapXml, llmsTxt } from './seo.js';
-import { sendAnnouncement, mailConfigured, sendContactEmail } from './mail.js';
+import { sendAnnouncement, mailConfigured, sendContactEmail, sendTrafficDigest } from './mail.js';
 import { importFromSite } from './importer.js';
 import { writeLandingCopy, generateLandingCopy, fallbackLandingCopy, aiConfigured, generateShowMetaDescription } from './ai.js';
 import { POSTS, getPost } from './content/resources.js';
@@ -122,6 +122,28 @@ app.use(async (req, res, next) => {
   }
 });
 
+// ---- First-party traffic counting -----------------------------------------
+// Counts real page requests per path, per day, straight into our own Postgres.
+// Aggregate only — no IP, no user agent stored, no cookie — so it needs no
+// consent banner and can't be blocked by tracker blockers. Bots are filtered
+// best-effort so the numbers reflect people.
+const BOT_RE = /bot|crawl|spider|slurp|bingpreview|facebookexternalhit|headless|lighthouse|pingdom|uptime|curl|wget|python-requests|node-fetch|axios|monitor/i;
+app.use((req, res, next) => {
+  next(); // never delay the response
+  try {
+    if (req.method !== 'GET') return;
+    const p = req.path;
+    if (p.includes('.') || p.startsWith('/admin') || p.startsWith('/public') ||
+        p.startsWith('/api') || p === '/healthz' || p === '/robots.txt' ||
+        p === '/sitemap.xml' || p === '/llms.txt') return;
+    if (BOT_RE.test(req.headers['user-agent'] || '')) return;
+    res.on('finish', () => {
+      if (res.statusCode !== 200) return; // only count pages actually served
+      store.recordView(p.length > 200 ? p.slice(0, 200) : p).catch(() => {});
+    });
+  } catch {}
+});
+
 // Spotlight = most-downloaded shows (Megaphone). Falls back to the curated
 // monthly rotation only when Megaphone isn't configured or returns no numbers.
 // Sitewide footer "Recent episodes" rail — refreshed on boot and after each
@@ -154,6 +176,28 @@ async function refreshSpotlight() {
   } catch (e) {
     spotlightStatus = { source: 'error', megaphoneConfigured: megaphoneConfigured(), error: e.message };
     console.error('[spotlight] failed:', e.message);
+  }
+}
+
+// Weekly traffic digest. Checked hourly; sends at most once every 7 days, with
+// the last-sent timestamp persisted so restarts and redeploys don't re-send or
+// reset the clock. Set TRAFFIC_DIGEST=off to disable.
+async function maybeSendTrafficDigest(force = false) {
+  if (process.env.TRAFFIC_DIGEST === 'off' || !mailConfigured()) return { sent: false };
+  try {
+    const last = await store.getState('traffic_digest_at');
+    const due = force || !last || Date.now() - new Date(last).getTime() >= 7 * 864e5;
+    if (!due) return { sent: false };
+    const stats = await store.viewStats(7);
+    const to = process.env.ADMIN_EMAIL || 'ryan@strawhutmedia.com';
+    const siteUrl = (process.env.APP_BASE_URL || 'https://www.strawhutmedia.com').replace(/\/+$/, '');
+    await sendTrafficDigest(to, { stats, days: 7, siteUrl });
+    await store.setState('traffic_digest_at', new Date().toISOString());
+    console.log(`[digest] weekly traffic email sent to ${to} (${stats.total} views)`);
+    return { sent: true, total: stats.total };
+  } catch (e) {
+    console.error('[digest] failed:', e.message);
+    return { sent: false, error: e.message };
   }
 }
 
@@ -204,6 +248,20 @@ app.get('/admin', requireAdmin, async (req, res) => {
   const stats = await store.stats();
   const shows = await withCounts(await store.listShows());
   res.send(A.dashboardPage({ stats, shows, flash: readFlash(req, res) }));
+});
+
+app.post('/admin/analytics/send-digest', requireAdmin, async (req, res) => {
+  const r = await maybeSendTrafficDigest(true);
+  setFlash(res, r.sent
+    ? { type: 'ok', msg: `Traffic digest sent (${r.total} page views).` }
+    : { type: 'err', msg: `Not sent: ${r.error || 'email not configured'}` });
+  res.redirect('/admin/analytics');
+});
+
+app.get('/admin/analytics', requireAdmin, async (req, res) => {
+  const days = Math.min(90, Math.max(1, parseInt(req.query.days || '7', 10)));
+  const stats = await store.viewStats(days);
+  res.send(A.analyticsPage({ stats, days }));
 });
 
 app.get('/admin/shows', requireAdmin, async (req, res) => {
@@ -1016,6 +1074,10 @@ app.listen(PORT, async () => {
 
   // Populate the footer "Recent episodes" rail.
   refreshFooter();
+
+  // Weekly traffic digest — checked hourly, sends once every 7 days.
+  setInterval(() => maybeSendTrafficDigest().catch(() => {}), 60 * 60 * 1000);
+  maybeSendTrafficDigest().catch(() => {});
 
   // Backfill unique, AI-written SEO meta descriptions for shows that don't have
   // one yet. Runs once per boot in the background, paced to be gentle on the
