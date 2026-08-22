@@ -1,6 +1,6 @@
 // Per-show social media strategy dashboard.
 //
-// Seven Claude-driven strategy tools shown as cards. Each card:
+// Nine Claude-driven strategy tools shown as cards. Each card:
 //   - shows the doc's status ("Not yet generated" / "Generated 3d ago")
 //   - Run button → prompts for input if the tool has a [paste] field,
 //                  otherwise fires straight into a Claude call
@@ -28,42 +28,57 @@ const TOOLS: Tool[] = [
   {
     kind: 'strategy',
     label: '1. Full Social Media Strategy',
-    purpose: 'Brand positioning, content direction, audience targeting, monetization plan. Foundation for everything else.',
+    purpose: 'The complete system: positioning, content direction, audience, posting rhythm, engagement habits, tracking, monetization. Run this first — everything else gets its context from here.',
     needsPaste: true,
-    pasteHint: 'Anything you want the strategist to know that isn\'t already on the show record — recent numbers, upcoming pushes, past-run experiments, sponsor pressure, etc.',
+    pasteHint: 'Anything you want the strategist to know that isn\'t already on the show record — recent numbers, upcoming pushes, past-run experiments, sponsor pressure, available time per week, etc.',
     accent: 'stage-mastering',
   },
   {
+    kind: 'profile_audit',
+    label: '2. Fix the Profile',
+    purpose: 'Audit of bio, picture, content, positioning, consistency, and engagement — what\'s helping, what\'s hurting, and the biggest fixes. Fix the account before feeding it more content.',
+    needsPaste: true,
+    pasteHint: 'The profile link, plus paste the current bio text and describe the profile picture, pinned posts, and recent content. The more you paste, the sharper the audit.',
+    accent: 'stage-writing',
+  },
+  {
     kind: 'audience',
-    label: '2. Audience Psychology Breakdown',
+    label: '3. Audience Psychology Breakdown',
     purpose: 'Frustrations, desires, fears, daily content habits — turned into scroll-stopping messaging angles.',
     needsPaste: false,
     accent: 'stage-tracking',
   },
   {
     kind: 'authority',
-    label: '3. Authority Positioning Plan',
+    label: '4. Authority Positioning Plan',
     purpose: 'What separates this show from every competitor. Signature content moves that build authority.',
     needsPaste: false,
     accent: 'stage-overdubs',
   },
   {
     kind: 'pillars',
-    label: '4. Content Pillars That Convert',
+    label: '5. Content Pillars That Convert',
     purpose: '5 pillars the show posts about consistently, each mapped to a goal (reach / trust / buy).',
     needsPaste: false,
     accent: 'stage-producing',
   },
   {
     kind: 'calendar',
-    label: '5. 30-Day Content Plan',
-    purpose: 'Day-by-day calendar with idea, format, message, and goal. References the pillars if they exist.',
+    label: '6. 30-Day Content Plan',
+    purpose: 'A month of hooks in one sitting. Every day: idea, written-out hook, key message, CTA, format, post type (educational / entertaining / personal / authority / community), and goal.',
     needsPaste: false,
     accent: 'stage-stems',
   },
   {
+    kind: 'ideas',
+    label: '7. Never Run Out of Ideas',
+    purpose: 'Idea bank sorted by beginner / intermediate / advanced audience levels — so the show stops writing the same beginner post forever. Evergreen, problem-solving ideas first.',
+    needsPaste: false,
+    accent: 'stage-done',
+  },
+  {
     kind: 'post',
-    label: '6. Post That Stops the Scroll',
+    label: '8. Post That Stops the Scroll',
     purpose: 'One high-engagement post on a specific topic. Hook + body + CTA + why-it-works.',
     needsPaste: true,
     pasteHint: 'The topic. Be specific — "why our last episode\'s guest changed her mind about AI music" beats "AI music".',
@@ -71,7 +86,7 @@ const TOOLS: Tool[] = [
   },
   {
     kind: 'monetization',
-    label: '7. Audience Monetization Strategy',
+    label: '9. Audience Monetization Strategy',
     purpose: 'Offer ideas, pricing, content angles that convert followers to buyers, funnel stages.',
     needsPaste: false,
     accent: 'urgent',
@@ -107,7 +122,7 @@ export default function SocialStrategySection({
       <div>
         <h2 className="text-[11px] uppercase tracking-[0.2em] text-muted font-bold">🧠 Social Media Strategy</h2>
         <p className="text-[11px] text-muted/80 mt-1">
-          Seven strategist tools per show. Build these once and every text post,
+          Nine strategist tools per show. Build these once and every text post,
           carousel, and daily plan generation references them for context.
         </p>
       </div>
@@ -410,13 +425,15 @@ function ViewModal({ tool, doc, onClose, canWrite, onEdited, projectId }: {
 // ============================================================
 function DocumentRenderer({ kind, content }: { kind: StrategyKind; content: Record<string, unknown> }) {
   switch (kind) {
-    case 'strategy':     return <StrategyDoc content={content} />
-    case 'audience':     return <AudienceDoc content={content} />
-    case 'authority':    return <AuthorityDoc content={content} />
-    case 'pillars':      return <PillarsDoc content={content} />
-    case 'calendar':     return <CalendarDoc content={content} />
-    case 'post':         return <PostDoc content={content} />
-    case 'monetization': return <MonetizationDoc content={content} />
+    case 'strategy':      return <StrategyDoc content={content} />
+    case 'profile_audit': return <ProfileAuditDoc content={content} />
+    case 'audience':      return <AudienceDoc content={content} />
+    case 'authority':     return <AuthorityDoc content={content} />
+    case 'pillars':       return <PillarsDoc content={content} />
+    case 'calendar':      return <CalendarDoc content={content} />
+    case 'ideas':         return <IdeasDoc content={content} />
+    case 'post':          return <PostDoc content={content} />
+    case 'monetization':  return <MonetizationDoc content={content} />
   }
 }
 
@@ -442,6 +459,12 @@ function StrategyDoc({ content }: { content: Record<string, unknown> }) {
   const cd = (content.content_direction ?? {}) as Record<string, unknown>
   const at = (content.audience_targeting ?? {}) as Record<string, unknown>
   const mp = (content.monetization_plan ?? {}) as Record<string, unknown>
+  // Newer docs (Aug 2026 playbook) include the full system — posting,
+  // engagement, tracking. Older docs don't; render those sections only
+  // when present so pre-upgrade documents still display cleanly.
+  const ps = content.posting_system as Record<string, unknown> | undefined
+  const ep = content.engagement_plan as Record<string, unknown> | undefined
+  const tr = content.tracking as Record<string, unknown> | undefined
   return (
     <div className="space-y-4">
       <Section title="Brand positioning">
@@ -478,6 +501,39 @@ function StrategyDoc({ content }: { content: Record<string, unknown> }) {
           <BulletList items={Array.isArray(at.what_gets_them_to_follow) ? at.what_gets_them_to_follow : []} />
         </div>
       </Section>
+      {ps && (
+        <Section title="Posting system">
+          <p><span className="text-muted">Cadence:</span> {String(ps.cadence ?? '')}</p>
+          <div className="mt-2">
+            <p className="text-[10px] uppercase tracking-wider text-muted font-bold">Weekly rhythm</p>
+            <BulletList items={Array.isArray(ps.weekly_rhythm) ? ps.weekly_rhythm : []} />
+          </div>
+          {typeof ps.time_budget_fit === 'string' && ps.time_budget_fit && (
+            <p className="text-xs text-muted mt-2 italic">{ps.time_budget_fit}</p>
+          )}
+        </Section>
+      )}
+      {ep && (
+        <Section title="Engagement plan">
+          <div>
+            <p className="text-[10px] uppercase tracking-wider text-muted font-bold">Daily habits</p>
+            <BulletList items={Array.isArray(ep.daily_habits) ? ep.daily_habits : []} />
+          </div>
+          <div className="mt-2">
+            <p className="text-[10px] uppercase tracking-wider text-muted font-bold">Community moves</p>
+            <BulletList items={Array.isArray(ep.community_moves) ? ep.community_moves : []} />
+          </div>
+        </Section>
+      )}
+      {tr && (
+        <Section title="Tracking">
+          <div>
+            <p className="text-[10px] uppercase tracking-wider text-muted font-bold">Metrics to watch</p>
+            <BulletList items={Array.isArray(tr.metrics_to_watch) ? tr.metrics_to_watch : []} />
+          </div>
+          <p className="text-xs text-muted mt-2"><span className="uppercase text-[10px] tracking-wider">Review cadence:</span> {String(tr.review_cadence ?? '')}</p>
+        </Section>
+      )}
       <Section title="Monetization plan">
         <div>
           <p className="text-[10px] uppercase tracking-wider text-muted font-bold">Near term</p>
@@ -579,10 +635,21 @@ function CalendarDoc({ content }: { content: Record<string, unknown> }) {
           <div key={i} className="rounded-lg bg-ink/30 border border-line p-2">
             <div className="flex items-baseline justify-between gap-2">
               <span className="text-[10px] uppercase tracking-wider text-muted font-bold">Day {String(d.day ?? i + 1)}</span>
-              <span className={`text-[9px] uppercase tracking-wider font-bold ${goalStyle(String(d.goal))}`}>{String(d.goal ?? '')}</span>
+              <span className="flex items-center gap-1.5">
+                {typeof d.post_type === 'string' && d.post_type && (
+                  <span className="text-[9px] uppercase tracking-wider font-bold text-muted border border-line rounded-full px-1.5 py-0.5">{d.post_type}</span>
+                )}
+                <span className={`text-[9px] uppercase tracking-wider font-bold ${goalStyle(String(d.goal))}`}>{String(d.goal ?? '')}</span>
+              </span>
             </div>
             <p className="text-sm font-bold text-text mt-1">{String(d.idea ?? '')}</p>
+            {typeof d.hook === 'string' && d.hook && (
+              <p className="text-xs text-text mt-1 italic">“{d.hook}”</p>
+            )}
             <p className="text-xs text-muted mt-1">{String(d.core_message ?? '')}</p>
+            {typeof d.cta === 'string' && d.cta && (
+              <p className="text-xs text-muted mt-1"><span className="uppercase text-[10px] tracking-wider">CTA:</span> {d.cta}</p>
+            )}
             <div className="flex items-center gap-2 mt-2 text-[10px] text-muted">
               <span className="uppercase tracking-wider">{String(d.format ?? '')}</span>
               <span>·</span>
@@ -591,6 +658,59 @@ function CalendarDoc({ content }: { content: Record<string, unknown> }) {
           </div>
         ))}
       </div>
+    </div>
+  )
+}
+
+function ProfileAuditDoc({ content }: { content: Record<string, unknown> }) {
+  const fixes = Array.isArray(content.biggest_fixes) ? content.biggest_fixes as Array<Record<string, unknown>> : []
+  return (
+    <div className="space-y-4">
+      <Section title="First impression"><p>{String(content.first_impression ?? '')}</p></Section>
+      <Section title="What's helping growth"><BulletList items={Array.isArray(content.whats_helping) ? content.whats_helping : []} /></Section>
+      <Section title="What's hurting growth"><BulletList items={Array.isArray(content.whats_hurting) ? content.whats_hurting : []} /></Section>
+      <Section title="Biggest fixes (in order)">
+        <div className="space-y-2">
+          {fixes.map((f, i) => (
+            <div key={i} className="rounded-lg bg-ink/30 border border-line p-2">
+              <p className="font-bold">{i + 1}. {String(f.fix ?? '')}</p>
+              <p className="text-xs text-muted mt-1"><span className="uppercase text-[10px] tracking-wider">Why:</span> {String(f.why ?? '')}</p>
+              <p className="text-xs text-muted mt-1"><span className="uppercase text-[10px] tracking-wider">How:</span> {String(f.how ?? '')}</p>
+            </div>
+          ))}
+        </div>
+      </Section>
+      <Section title="Bio rewrite options"><BulletList items={Array.isArray(content.bio_rewrite_options) ? content.bio_rewrite_options : []} /></Section>
+      <Section title="Consistency"><p className="text-muted">{String(content.consistency_notes ?? '')}</p></Section>
+      <Section title="Engagement"><p className="text-muted">{String(content.engagement_notes ?? '')}</p></Section>
+    </div>
+  )
+}
+
+function IdeasDoc({ content }: { content: Record<string, unknown> }) {
+  const levels: Array<[string, string]> = [
+    ['beginner', 'Beginner audience'],
+    ['intermediate', 'Intermediate audience'],
+    ['advanced', 'Advanced audience'],
+  ]
+  return (
+    <div className="space-y-4">
+      {levels.map(([key, label]) => {
+        const ideas = Array.isArray(content[key]) ? content[key] as Array<Record<string, unknown>> : []
+        return (
+          <Section key={key} title={label}>
+            <div className="space-y-2">
+              {ideas.map((idea, i) => (
+                <div key={i} className="rounded-lg bg-ink/30 border border-line p-2">
+                  <p className="font-bold">{String(idea.idea ?? '')}</p>
+                  <p className="text-xs text-muted mt-1"><span className="uppercase text-[10px] tracking-wider">Solves:</span> {String(idea.problem_it_solves ?? '')}</p>
+                  <p className="text-[10px] text-muted mt-1 uppercase tracking-wider">{String(idea.format ?? '')}</p>
+                </div>
+              ))}
+            </div>
+          </Section>
+        )
+      })}
     </div>
   )
 }

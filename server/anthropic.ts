@@ -1482,7 +1482,7 @@ export async function generateCarouselDeck(input: CarouselGenerateInput): Promis
 }
 
 // ============================================================
-// SOCIAL STRATEGY TOOLS (7 per-show strategy documents)
+// SOCIAL STRATEGY TOOLS (9 per-show strategy documents)
 // ============================================================
 // One entry point — generateSocialStrategyDocument({projectContext,
 // kind, inputContext}) — that dispatches to the right prompt +
@@ -1493,11 +1493,13 @@ export async function generateCarouselDeck(input: CarouselGenerateInput): Promis
 // [paste] fields).
 
 export type StrategyKind =
-  | 'strategy'      // Full Social Media Strategy
+  | 'strategy'      // Full Social Media Strategy (the complete system — run first)
+  | 'profile_audit' // Fix the Profile — audit before feeding it more content
   | 'audience'      // Audience Psychology Breakdown
   | 'authority'     // Authority Positioning Plan
   | 'pillars'       // Content Pillars That Convert
-  | 'calendar'      // 30-Day Content Plan
+  | 'calendar'      // 30-Day Content Plan (hook + key message + CTA + format per day)
+  | 'ideas'         // Never Run Out of Ideas — idea bank by audience level
   | 'post'          // Posts That Stop the Scroll (one-off)
   | 'monetization'  // Audience Monetization Strategy
 
@@ -1556,7 +1558,9 @@ const STRATEGY_SCHEMAS: Record<StrategyKind, Record<string, unknown>> = {
   strategy: {
     type: 'object',
     additionalProperties: false,
-    required: ['brand_positioning', 'content_direction', 'audience_targeting', 'monetization_plan', 'growth_north_star'],
+    required: ['brand_positioning', 'content_direction', 'audience_targeting',
+               'posting_system', 'engagement_plan', 'tracking',
+               'monetization_plan', 'growth_north_star'],
     properties: {
       brand_positioning: {
         type: 'object', additionalProperties: false,
@@ -1586,6 +1590,31 @@ const STRATEGY_SCHEMAS: Record<StrategyKind, Record<string, unknown>> = {
           what_gets_them_to_follow: { type: 'array', items: { type: 'string' } },
         },
       },
+      posting_system: {
+        type: 'object', additionalProperties: false,
+        required: ['cadence', 'weekly_rhythm', 'time_budget_fit'],
+        properties: {
+          cadence: { type: 'string' },
+          weekly_rhythm: { type: 'array', items: { type: 'string' } },
+          time_budget_fit: { type: 'string' },
+        },
+      },
+      engagement_plan: {
+        type: 'object', additionalProperties: false,
+        required: ['daily_habits', 'community_moves'],
+        properties: {
+          daily_habits: { type: 'array', items: { type: 'string' } },
+          community_moves: { type: 'array', items: { type: 'string' } },
+        },
+      },
+      tracking: {
+        type: 'object', additionalProperties: false,
+        required: ['metrics_to_watch', 'review_cadence'],
+        properties: {
+          metrics_to_watch: { type: 'array', items: { type: 'string' } },
+          review_cadence: { type: 'string' },
+        },
+      },
       monetization_plan: {
         type: 'object', additionalProperties: false,
         required: ['near_term', 'medium_term', 'long_term'],
@@ -1596,6 +1625,32 @@ const STRATEGY_SCHEMAS: Record<StrategyKind, Record<string, unknown>> = {
         },
       },
       growth_north_star: { type: 'string' },
+    },
+  },
+  profile_audit: {
+    type: 'object',
+    additionalProperties: false,
+    required: ['first_impression', 'whats_helping', 'whats_hurting',
+               'biggest_fixes', 'bio_rewrite_options', 'consistency_notes', 'engagement_notes'],
+    properties: {
+      first_impression: { type: 'string' },
+      whats_helping: { type: 'array', items: { type: 'string' } },
+      whats_hurting: { type: 'array', items: { type: 'string' } },
+      biggest_fixes: {
+        type: 'array',
+        items: {
+          type: 'object', additionalProperties: false,
+          required: ['fix', 'why', 'how'],
+          properties: {
+            fix: { type: 'string' },
+            why: { type: 'string' },
+            how: { type: 'string' },
+          },
+        },
+      },
+      bio_rewrite_options: { type: 'array', items: { type: 'string' } },
+      consistency_notes: { type: 'string' },
+      engagement_notes: { type: 'string' },
     },
   },
   audience: {
@@ -1676,14 +1731,60 @@ const STRATEGY_SCHEMAS: Record<StrategyKind, Record<string, unknown>> = {
         type: 'array',
         items: {
           type: 'object', additionalProperties: false,
-          required: ['day', 'idea', 'format', 'core_message', 'goal', 'pillar'],
+          required: ['day', 'idea', 'hook', 'format', 'core_message', 'cta', 'post_type', 'goal', 'pillar'],
           properties: {
             day: { type: 'integer' },
             idea: { type: 'string' },
+            hook: { type: 'string' },
             format: { type: 'string' },
             core_message: { type: 'string' },
+            cta: { type: 'string' },
+            post_type: { type: 'string', enum: ['educational', 'entertaining', 'personal', 'authority', 'community'] },
             goal: { type: 'string', enum: ['reach', 'trust', 'buy'] },
             pillar: { type: 'string' },
+          },
+        },
+      },
+    },
+  },
+  ideas: {
+    type: 'object',
+    additionalProperties: false,
+    required: ['beginner', 'intermediate', 'advanced'],
+    properties: {
+      beginner: {
+        type: 'array',
+        items: {
+          type: 'object', additionalProperties: false,
+          required: ['idea', 'problem_it_solves', 'format'],
+          properties: {
+            idea: { type: 'string' },
+            problem_it_solves: { type: 'string' },
+            format: { type: 'string' },
+          },
+        },
+      },
+      intermediate: {
+        type: 'array',
+        items: {
+          type: 'object', additionalProperties: false,
+          required: ['idea', 'problem_it_solves', 'format'],
+          properties: {
+            idea: { type: 'string' },
+            problem_it_solves: { type: 'string' },
+            format: { type: 'string' },
+          },
+        },
+      },
+      advanced: {
+        type: 'array',
+        items: {
+          type: 'object', additionalProperties: false,
+          required: ['idea', 'problem_it_solves', 'format'],
+          properties: {
+            idea: { type: 'string' },
+            problem_it_solves: { type: 'string' },
+            format: { type: 'string' },
           },
         },
       },
@@ -1736,12 +1837,27 @@ const STRATEGY_SCHEMAS: Record<StrategyKind, Record<string, unknown>> = {
 }
 
 const STRATEGY_SYSTEM_PROMPTS: Record<StrategyKind, string> = {
-  strategy: `You are a senior social media strategist who has built brands from zero to millions of followers.
-Review the show's business, niche, target audience, competitors, and growth goals.
-Build a COMPLETE strategy covering brand positioning, content direction, audience targeting,
-and monetization. Be specific to THIS show (not generic advice). Ground every recommendation
-in what the show actually is and what its audience actually cares about.
+  strategy: `Act as this show's $2,000-a-month social media manager.
+Before creating anything, understand the show's niche, audience, goals, brand voice, content
+style, and available time — all of that is in the show block (the Show Brief is authoritative;
+constraints tell you how much time the team actually has). Then build a COMPLETE system, not
+just a positioning doc: planning (brand positioning, content direction, audience targeting),
+posting (a realistic cadence and weekly rhythm that fits the team's available time — say
+explicitly how it fits), engagement (daily habits and community moves that grow the account
+between posts), growth, and tracking (which metrics to watch and how often to review them).
+Be specific to THIS show (not generic advice). Ground every recommendation in what the show
+actually is and what its audience actually cares about. This document is the foundation every
+other tool references — make it complete enough that nothing downstream has to guess.
 Return the JSON matching the schema.`,
+  profile_audit: `You are a social media profile auditor. The operator pasted their profile
+info into input_context — the link, bio text, and/or a description of the profile picture,
+pinned content, recent posts, and engagement. Review the bio, picture, content, positioning,
+messaging, consistency, and engagement. Tell them what is helping growth, what is hurting it,
+and the biggest fixes — ranked, each with why it matters and exactly how to do it. Include
+2-4 rewritten bio options in the show's voice. The principle: fix the account before feeding
+it more content — posting into a broken profile just burns the work faster. Judge only what
+you were actually given; if something important wasn't provided (e.g. no bio text), say so in
+the relevant note instead of inventing it. Return the JSON matching the schema.`,
   audience: `You are an audience psychologist who studies how people consume media online.
 Break down the target audience in detail — frustrations, desires, fears, and daily habits
 around content. Turn that research into specific messaging angles and content topics that
@@ -1758,10 +1874,21 @@ posts about consistently. Each pillar should either attract new followers, estab
 or drive leads / sales — say which. For each pillar, include 3-5 example post topics and
 explain exactly why it connects with the audience. Return the JSON matching the schema.`,
   calendar: `You are a social media planner.
-Build a full 30-day content calendar for this show. Include a daily content idea, post format,
-core message angle, and the goal (reach / trust / buy). Where the show has content pillars in
-sibling_docs, map each day to a pillar. Balance the mix — don't post the same format five days
-in a row. Return the JSON matching the schema.`,
+Build a full 30-day content calendar for this show — a month of hooks in one sitting beats
+deciding what to post every morning. Every day gets: the content idea, the HOOK (the actual
+opening line, written out — not a description of one), the key message, the CTA, the best
+format, and the goal (reach / trust / buy). Mix the post types across the month — educational,
+entertaining, personal, authority, and community posts — and tag each day with its type.
+Where the show has content pillars in sibling docs, map each day to a pillar. Balance the
+mix — don't post the same format or type five days in a row. Return the JSON matching the schema.`,
+  ideas: `You are a content ideation engine for this show's niche.
+Generate a deep bank of original content ideas sorted by audience level — beginner,
+intermediate, and advanced (10-15 ideas per level). Sorting by audience level is what stops
+the show writing the same beginner post forever. Prioritise ideas that educate, solve real
+problems, and stay relevant over time — for each idea, name the specific problem it solves
+for the viewer and the best format for it. Ground the ideas in what the show actually covers
+(recent episodes, pillars, and audience docs when present), not generic niche filler.
+Return the JSON matching the schema.`,
   post: `You are a copywriter for high-engagement social posts.
 Write ONE high-engagement social post on the topic the operator provided (input_context).
 Open with a hook that makes someone stop scrolling, deliver a clear and useful insight in the

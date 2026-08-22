@@ -174,8 +174,8 @@ export type ApiShowBrief = {
 }
 
 export type StrategyKind =
-  | 'strategy' | 'audience' | 'authority' | 'pillars'
-  | 'calendar' | 'post' | 'monetization'
+  | 'strategy' | 'profile_audit' | 'audience' | 'authority' | 'pillars'
+  | 'calendar' | 'ideas' | 'post' | 'monetization'
 
 export type ApiStrategyDocument = {
   id: string
