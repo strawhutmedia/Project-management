@@ -16,6 +16,8 @@ import {
   videoObjectJsonLd,
   studioServiceJsonLd,
   FAQ,
+  pricingOffersJsonLd,
+  showCatalogJsonLd,
 } from './seo.js';
 import { resolvePlatformLinks } from './platforms.js';
 import { CONTACT_ROUTES } from './mail.js';
@@ -557,14 +559,17 @@ export function showsIndexPage({ shows }) {
   ${shows.length ? section('original', 'Original Shows', originals) + section('partner', 'Partner Shows', partners) : `<section class="section"><div class="container"><div class="empty">No shows yet.</div></div></section>`}`;
   return layout({
     title: 'All Shows — Straw Hut Media',
-    description: `Browse all ${shows.length} podcasts produced and distributed by Straw Hut Media.`,
+    description: `Browse all ${shows.length} podcasts in the Straw Hut Media network — award-winning original shows and partner podcasts across comedy, true crime, culture, business, and film, produced and distributed by our Hollywood podcast agency.`,
     body,
     activeNav: '/shows',
     path: '/shows',
-    jsonLd: breadcrumbJsonLd([
-      { name: 'Home', path: '/' },
-      { name: 'Shows', path: '/shows' },
-    ]),
+    jsonLd:
+      breadcrumbJsonLd([
+        { name: 'Home', path: '/' },
+        { name: 'Shows', path: '/shows' },
+      ]) +
+      '\n' +
+      showCatalogJsonLd(shows),
   });
 }
 
@@ -1055,10 +1060,13 @@ export function pricingPage() {
     body,
     activeNav: '',
     path: '/pricing',
-    jsonLd: breadcrumbJsonLd([
-      { name: 'Home', path: '/' },
-      { name: 'Packages & pricing', path: '/pricing' },
-    ]),
+    jsonLd:
+      breadcrumbJsonLd([
+        { name: 'Home', path: '/' },
+        { name: 'Packages & pricing', path: '/pricing' },
+      ]) +
+      '\n' +
+      pricingOffersJsonLd(PACKAGES),
   });
 }
 

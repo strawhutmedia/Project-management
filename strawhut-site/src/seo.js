@@ -286,6 +286,80 @@ export function studioServiceJsonLd() {
 
 // robots.txt — welcome all crawlers AND explicitly the major AI crawlers,
 // because we WANT AI assistants to read and recommend the site.
+// Pricing packages as machine-readable Offers. This is what lets Google show
+// price-rich results and lets AI assistants answer "how much does podcast
+// production cost" with our real numbers instead of a competitor's guess.
+export function pricingOffersJsonLd(packages = []) {
+  const offers = packages
+    .map((p) => {
+      const amount = Number(String(p.price || '').replace(/[^0-9.]/g, ''));
+      if (!amount) return null;
+      return {
+        '@type': 'Offer',
+        name: p.name || p.tier,
+        description: p.tagline || undefined,
+        price: amount,
+        priceCurrency: 'USD',
+        availability: 'https://schema.org/InStock',
+        url: canonical('/pricing'),
+        itemOffered: {
+          '@type': 'Service',
+          name: p.name || p.tier,
+          serviceType: 'Podcast production',
+          provider: { '@type': 'Organization', name: COMPANY.name, url: BASE },
+        },
+      };
+    })
+    .filter(Boolean);
+  if (!offers.length) return '';
+  const prices = offers.map((o) => o.price);
+  return jsonLd({
+    '@context': 'https://schema.org',
+    '@type': 'Service',
+    '@id': canonical('/pricing') + '#packages',
+    name: 'Podcast Production Packages',
+    serviceType: 'Podcast production',
+    url: canonical('/pricing'),
+    description:
+      'Full-service podcast production packages from Straw Hut Media — editing, sound design, distribution, branding, and promotion.',
+    provider: { '@type': 'Organization', name: COMPANY.name, url: BASE },
+    areaServed: 'US',
+    offers: {
+      '@type': 'AggregateOffer',
+      priceCurrency: 'USD',
+      lowPrice: Math.min(...prices),
+      highPrice: Math.max(...prices),
+      offerCount: offers.length,
+      offers,
+    },
+  });
+}
+
+// The full catalog as an ItemList so crawlers and AI see the real breadth of
+// the network (every show, in order) rather than just a page of links.
+export function showCatalogJsonLd(shows = []) {
+  if (!shows.length) return '';
+  return jsonLd({
+    '@context': 'https://schema.org',
+    '@type': 'CollectionPage',
+    '@id': canonical('/shows') + '#catalog',
+    url: canonical('/shows'),
+    name: 'All Shows — Straw Hut Media',
+    description: `The full Straw Hut Media podcast network — ${shows.length} original and partner shows.`,
+    isPartOf: { '@type': 'WebSite', name: COMPANY.name, url: BASE },
+    mainEntity: {
+      '@type': 'ItemList',
+      numberOfItems: shows.length,
+      itemListElement: shows.slice(0, 100).map((s, i) => ({
+        '@type': 'ListItem',
+        position: i + 1,
+        url: canonical('/' + s.slug),
+        name: s.title,
+      })),
+    },
+  });
+}
+
 export function robotsTxt() {
   const aiBots = [
     'GPTBot', 'OAI-SearchBot', 'ChatGPT-User', // OpenAI
