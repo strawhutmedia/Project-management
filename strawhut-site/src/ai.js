@@ -6,7 +6,7 @@
 //   ANTHROPIC_API_KEY   (required for AI copy; falls back to a heuristic if unset)
 //   LANDING_COPY_MODEL  (optional, default claude-sonnet-4-6)
 
-import { toText } from './util.js';
+import { toText, endsSentence} from './util.js';
 
 const KEY = (process.env.ANTHROPIC_API_KEY || '').trim();
 const MODEL = (process.env.LANDING_COPY_MODEL || 'claude-sonnet-4-6').trim();
@@ -112,6 +112,135 @@ const META_SYSTEM = `You write SEO meta descriptions for podcast show pages on S
 Write ONE meta description, 140-160 characters, plain text (no quotes, no emojis, no hashtags).
 It must: describe what THIS show is about, name the host if given, read naturally to a human, and include the words "podcast" and, where it fits, "Straw Hut Media".
 Never use "listen free", "tune in", clickbait, or exclamation points.`;
+
+const BLURB_SYSTEM = `You write short display copy for a podcast network's website.
+
+You are given a show's own description, written and approved by its team. Your job
+is ONLY to shorten it so it fits a small space — never to reinvent it.
+
+Rules:
+- 1 to 2 COMPLETE sentences. It must end on a full stop, question mark or
+  exclamation mark. Never end mid-thought.
+- NEVER use an ellipsis (…  or ...). Not at the end, not anywhere.
+- Stay under the character limit you are given. This is a hard limit.
+- Keep the show's own voice, claims and names. Do not invent hosts, guests,
+  awards, numbers or anything not present in the source.
+- No marketing filler ("dive in", "join us as we"), no hashtags, no URLs,
+  no "on this podcast" throat-clearing. Get to what the show actually is.
+- Plain text only. Return ONLY the copy, nothing else.`;
+
+/**
+ * Shorten a show's own description into display copy that fits, as complete
+ * sentences. Used when the team's copy has no sentence break inside the space
+ * available, so trimming it would otherwise leave a fragment.
+ */
+const EPISODE_SYSTEM = `You write landing-page copy for a podcast episode. The page's job
+is to make a stranger who clicked an ad press play.
+
+Return STRICT JSON, nothing else, with exactly these keys:
+{
+  "hook": "one sentence, max 120 characters, saying why this episode is worth an hour",
+  "takeaways": ["3 to 4 short phrases, max 80 characters each, of what the listener actually gets"]
+}
+
+Rules:
+- Ground everything in the supplied title and description. Do NOT invent claims,
+  statistics, guests or events. Guest names are extracted separately from the
+  title by code — never assert who appears in the episode.
+- No ellipses anywhere. Every string is a complete thought.
+- No hype ("you won't believe", "dive in"), no hashtags, no emoji, no quotes
+  around the values beyond normal JSON syntax.
+- Plain sentences a person would actually say.`;
+
+/**
+ * Landing-page enrichment for one episode: the hook line, key takeaways and any
+ * guests. One call rather than three, generated on first view and cached.
+ */
+export async function generateEpisodeEnrichment({ show, episode, log = () => {} } = {}) {
+  if (!KEY || !episode) return null;
+  const desc = toText(episode.description, 2500);
+  if (!desc && !episode.title) return null;
+  try {
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), 40000);
+    const res = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: { 'x-api-key': KEY, 'anthropic-version': '2023-06-01', 'content-type': 'application/json' },
+      body: JSON.stringify({
+        model: MODEL,
+        max_tokens: 700,
+        temperature: 0.4,
+        system: EPISODE_SYSTEM,
+        messages: [
+          {
+            role: 'user',
+            content: `SHOW: ${show?.title || ''}\nHOST: ${show?.author || ''}\nEPISODE: ${episode.title || ''}\nDESCRIPTION: ${desc}`,
+          },
+        ],
+      }),
+      signal: ctrl.signal,
+    });
+    clearTimeout(timer);
+    if (!res.ok) { log(`ai: episode enrich HTTP ${res.status}`); return null; }
+    const data = await res.json().catch(() => null);
+    const raw = data?.content?.map?.((b) => b.text || '').join('').trim() || '';
+    const json = raw.slice(raw.indexOf('{'), raw.lastIndexOf('}') + 1);
+    let out;
+    try { out = JSON.parse(json); } catch { log('ai: episode enrich returned non-JSON'); return null; }
+
+    const clean = (v) => String(v || '').replace(/\s*(?:\u2026|\.\.\.)\s*/g, ' ').replace(/\s+/g, ' ').trim();
+    const hook = clean(out.hook).slice(0, 160);
+    const takeaways = (Array.isArray(out.takeaways) ? out.takeaways : [])
+      .map(clean).filter((t) => t && t.length <= 110).slice(0, 4);
+    if (!hook && !takeaways.length) return null;
+    return { hook, takeaways };
+  } catch (e) {
+    log(`ai: episode enrich failed — ${e.message}`);
+    return null;
+  }
+}
+
+export async function generateShowBlurb({ show, max = 165, log = () => {} } = {}) {
+  if (!KEY || !show) return null;
+  const desc = toText(show.description, 900);
+  if (!desc) return null;
+  try {
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), 30000);
+    const res = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: { 'x-api-key': KEY, 'anthropic-version': '2023-06-01', 'content-type': 'application/json' },
+      body: JSON.stringify({
+        model: MODEL,
+        max_tokens: 200,
+        temperature: 0.3,
+        system: BLURB_SYSTEM,
+        messages: [
+          {
+            role: 'user',
+            content: `Shorten this to at most ${max} characters, as 1-2 complete sentences.\n\nSHOW: ${show.title || ''}\nHOST: ${show.author || ''}\nDESCRIPTION: ${desc}`,
+          },
+        ],
+      }),
+      signal: ctrl.signal,
+    });
+    clearTimeout(timer);
+    if (!res.ok) { log(`ai: blurb HTTP ${res.status}`); return null; }
+    const data = await res.json().catch(() => null);
+    let text = data?.content?.map?.((b) => b.text || '').join('').trim() || '';
+    text = text.replace(/^["'\s]+|["'\s]+$/g, '').replace(/\s+/g, ' ').replace(/\s*(?:\u2026|\.\.\.)\s*$/, '');
+    // Only accept output that actually satisfies the brief — otherwise the
+    // caller keeps the team's own copy rather than shipping worse text.
+    if (!text || text.length > max || !endsSentence(text)) {
+      log(`ai: blurb rejected for ${show.slug} (len ${text.length}, ends "${text.slice(-12)}")`);
+      return null;
+    }
+    return text;
+  } catch (e) {
+    log(`ai: blurb failed — ${e.message}`);
+    return null;
+  }
+}
 
 export async function generateShowMetaDescription({ show, log = () => {} } = {}) {
   if (!KEY || !show) return null;

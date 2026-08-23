@@ -13,9 +13,9 @@ import { addShowFromFeed, syncShow, syncAll, startScheduler } from './sync.js';
 import * as V from './views.js';
 import * as A from './admin_views.js';
 import { robotsTxt, sitemapXml, llmsTxt } from './seo.js';
-import { sendAnnouncement, mailConfigured, sendContactEmail, sendTrafficDigest } from './mail.js';
+import { sendAnnouncement, mailConfigured, sendContactEmail, sendContactAutoReply, sendTrafficDigest } from './mail.js';
 import { importFromSite } from './importer.js';
-import { writeLandingCopy, generateLandingCopy, fallbackLandingCopy, aiConfigured, generateShowMetaDescription } from './ai.js';
+import { writeLandingCopy, generateLandingCopy, fallbackLandingCopy, aiConfigured, generateShowMetaDescription, generateShowBlurb, generateEpisodeEnrichment } from './ai.js';
 import { POSTS, getPost } from './content/resources.js';
 import { SERVICE_PAGES, getServicePage } from './content/services.js';
 import * as reco from './recommend.js';
@@ -23,6 +23,12 @@ import { matchAllShows, matchShowVideos } from './youtube.js';
 import { refreshPress } from './press.js';
 import { applyMonthlyRotation } from './spotlight.js';
 import { applyPopularSpotlight, megaphoneConfigured } from './popularity.js';
+import { resolveArtwork, imageWidth, MIN_ACCEPTABLE } from './artwork.js';
+import { inspect as inspectSubmission } from './antispam.js';
+import { verifyTurnstile, turnstileConfigured } from './turnstile.js';
+import { ghlConfigured, verifyGhl, upsertContact, ghlLastError,
+         resolveBookingCalendar, ghlBookingState, probeGhlToken, ghlProbeState } from './ghl.js';
+import { toText as plainText, endsSentence } from './util.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PORT = process.env.PORT || 8080;
@@ -32,8 +38,23 @@ const SESSION_SECRET = process.env.SESSION_SECRET || ADMIN_PASSWORD + ':strawhut
 const store = await createStore();
 
 const app = express();
+// Railway terminates TLS and proxies to us, so the socket address is always the
+// edge. Trust exactly one hop so req.ip is the real visitor (and can't be
+// spoofed by an extra X-Forwarded-For entry) — the form rate limit buckets on it.
+app.set('trust proxy', 1);
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
+// Pages carried NO Cache-Control at all, only an ETag. Browsers — Safari
+// especially — then apply heuristic caching and can serve a stale page for
+// hours without revalidating, which made shipped changes look like they had
+// never deployed. `no-cache` means "revalidate every time", not "don't store":
+// the ETag still yields a cheap 304 when nothing changed. Static assets are
+// unaffected — they set their own header further down, and anything with a file
+// extension is skipped here anyway.
+app.use((req, res, next) => {
+  if (!/\.[a-z0-9]{2,5}$/i.test(req.path)) res.setHeader('Cache-Control', 'no-cache');
+  next();
+});
 // Static caching: images/fonts never change → cache hard (30d, immutable);
 // CSS can change on deploy → 1h (repeat views cached, then a cheap revalidate).
 const IMMUTABLE = /\.(jpe?g|png|webp|gif|svg|ico|woff2?|mp3|m4a)$/i;
@@ -47,7 +68,6 @@ app.use('/styles.css', express.static(path.join(__dirname, '..', 'public', 'styl
 // Hidden onboarding app (standalone static; not linked from the site).
 app.use('/onboarding', express.static(path.join(__dirname, '..', 'public', 'onboarding'), staticOpts));
 // Services / packages quote builder (standalone static, from Sales-Quoting).
-app.use('/services', express.static(path.join(__dirname, '..', 'public', 'services'), staticOpts));
 app.use('/public', express.static(path.join(__dirname, '..', 'public'), staticOpts));
 
 // ---- Domain-migration safety net ----------------------------------------
@@ -66,8 +86,12 @@ const CANONICAL_HOST = (() => {
 // consolidates ranking authority instead of splitting it across subdomains.
 // 301 (not deletion) so existing links and indexed pages pass their equity on.
 const LEGACY_SUBDOMAINS = {
-  start: '/podcast-production',   // old GoHighLevel "Start Your Podcast" funnel
-  services: '/pricing',           // old IIS quote tool — now native on /pricing
+  start: '/podcast-production',   // old GoDaddy "Start your podcast" page
+  // The old services subdomain was the quote tool, which now lives on
+  // /pricing — but /pricing is noindex, so sending it there throws away the
+  // subdomain's accumulated ranking. /services is the namesake page, is
+  // indexable, and puts "See packages & pricing" in its hero anyway.
+  services: '/services',
 };
 
 // Renamed shows + old section pages that don't map by a simple id-strip.
@@ -198,6 +222,37 @@ async function maybeSendTrafficDigest(force = false) {
   } catch (e) {
     console.error('[digest] failed:', e.message);
     return { sent: false, error: e.message };
+  }
+}
+
+// Upgrade low-resolution cover art. Several feeds publish show artwork well
+// below Apple's 1400px minimum (some at 256px), which looks soft wherever we
+// render art large. The full-size originals live on Apple, matched EXACTLY by
+// the collection id in each show's Apple URL — never by name — so there is no
+// risk of putting the wrong artwork on a client's page. The result is stored,
+// so each show is resolved once, and calls are paced inside Apple's rate
+// limit. Set ARTWORK_HIRES=off to skip.
+async function backfillArtwork() {
+  if (process.env.ARTWORK_HIRES === 'off') return;
+  try {
+    const shows = await store.listShows();
+    let checked = 0, upgraded = 0;
+    for (const show of shows) {
+      if (show.artwork_url || !show.apple_url) continue;
+      checked++;
+      const w = await imageWidth(show.image_url);
+      if (w >= MIN_ACCEPTABLE) continue;
+      const hi = await resolveArtwork(show);
+      if (hi) {
+        await store.updateShow(show.id, { artwork_url: hi, image_url: hi });
+        upgraded++;
+        console.log(`[artwork] ${show.slug}: ${w || '?'}px -> 3000px`);
+      }
+      await new Promise((r) => setTimeout(r, 4000));
+    }
+    if (checked) console.log(`[artwork] checked ${checked}, upgraded ${upgraded}`);
+  } catch (e) {
+    console.error('[artwork] backfill failed:', e.message);
   }
 }
 
@@ -558,6 +613,24 @@ async function landingFromBody(body) {
 
 app.get('/admin/landing', requireAdmin, async (req, res) => {
   const landings = await store.listLandings();
+  // Campaign pages are auto-created per episode and served from
+  // /go/<show>/<episode> — that's the URL an ad points at, so show that rather
+  // than the /lp/<slug> the record happens to carry. Only a handful of landings
+  // have an episode, so these lookups stay cheap.
+  const shows = new Map();
+  for (const l of landings) {
+    if (!l.show_id || !l.episode_id) continue;
+    try {
+      if (!shows.has(l.show_id)) shows.set(l.show_id, await store.getShowById(l.show_id));
+      const show = shows.get(l.show_id);
+      const ep = await store.getEpisodeById(l.episode_id);
+      if (show && ep) {
+        l.go_url = `/go/${show.slug}/${ep.slug}`;
+        l.show_title = show.title;
+        l.episode_title = ep.title;
+      }
+    } catch { /* a deleted show or episode just leaves it as a plain landing */ }
+  }
   res.send(A.landingsAdminPage({ landings, flash: readFlash(req, res) }));
 });
 app.get('/admin/landing/new', requireAdmin, (req, res) =>
@@ -639,10 +712,66 @@ function readFlash(req, res) {
 }
 
 // ---- Health --------------------------------------------------------------
+// CRM credential state, checked once at boot with a READ-ONLY call so it can be
+// reported without creating a test contact in Ryan's live CRM.
+let _ghlState = ghlConfigured() ? 'checking' : 'unconfigured';
+if (ghlConfigured()) {
+  verifyGhl()
+    .then((r) => {
+      _ghlState = r.ok
+        ? `ok${r.name ? ' (' + r.name + ')' : ''}`
+        : r.state === 'limited'
+        ? `LIMITED${r.name ? ' (' + r.name + ')' : ''} — ${r.error}`
+        : `error: ${r.error || 'unknown'}`;
+      console.log('[ghl]', _ghlState);
+    })
+    .catch((e) => { _ghlState = `error: ${e.message.slice(0, 120)}`; });
+}
+
+// The booking calendar is discovered from GHL rather than pasted into an env
+// var, so /book keeps working when the calendar is renamed or replaced. Read
+// once at boot and re-checked hourly; BOOKING_WIDGET_URL overrides it.
+resolveBookingCalendar().catch(() => {});
+// Read-only, once at boot: which GHL endpoints will this token actually answer?
+probeGhlToken().catch(() => {});
+setInterval(() => { resolveBookingCalendar().catch(() => {}); }, 60 * 60 * 1000).unref();
+
 app.get('/healthz', async (req, res) => {
   const sp = spotlightStatus || {};
   const titles = (sp.shows || []).map((x) => x.title).concat(sp.picks || []);
-  res.json({ ok: true, ...(await store.stats()), spotlight: { source: sp.source, shows: titles } });
+  // Booleans only — never the keys themselves. Tells us at a glance whether the
+  // AI-dependent features (meta descriptions, show blurbs, episode hooks) can
+  // actually run on this service, which is otherwise invisible from outside.
+  res.json({
+    ok: true,
+    ...(await store.stats()),
+    // Railway injects the deployed commit. Without it, "is my change live yet?"
+    // can only be answered by finding something user-visible that changed —
+    // which fails for server-only changes like an auto-reply.
+    commit: (process.env.RAILWAY_GIT_COMMIT_SHA || '').slice(0, 7) || null,
+    features: { ai: aiConfigured(), showSeo: process.env.SHOW_SEO !== 'off', turnstile: turnstileConfigured(), ghl: ghlConfigured() },
+    ghl: _ghlState,
+    ghlProbe: ghlProbeState(),
+    ghlLastError: ghlLastError(),
+    booking: (() => { const b = ghlBookingState();
+      return { state: b.state, source: b.source, calendar: b.name || null, id: b.id || null,
+               error: b.error || null, available: b.options }; })(),
+    enrichedEpisodes: await store.enrichedCount().catch((e) => `error: ${e.message.slice(0, 80)}`),
+    lastEnrichError: _lastEnrichError,
+    spotlight: { source: sp.source, shows: titles },
+  });
+});
+
+// Which shows exist here — used by Podbooster to decide whether to offer the
+// "send ads to Straw Hut Media" option for a campaign. Titles and slugs only,
+// no counts or internals. Cached by the caller; cheap enough to serve openly.
+app.get('/api/shows.json', async (req, res) => {
+  const shows = await store.listShows().catch(() => []);
+  res.json({
+    ok: true,
+    count: shows.length,
+    shows: shows.map((s) => ({ title: s.title, slug: s.slug, show_type: s.show_type || 'original' })),
+  });
 });
 
 // ---- SEO / GEO endpoints --------------------------------------------------
@@ -655,7 +784,7 @@ app.get('/sitemap.xml', async (req, res) => {
   res.type('application/xml').send(
     sitemapXml(shows, episodesByShow, {
       posts: POSTS,
-      servicePaths: SERVICE_PAGES.map((s) => s.path),
+      servicePaths: ['/services', ...SERVICE_PAGES.map((s) => s.path)],
     })
   );
 });
@@ -665,7 +794,10 @@ app.get('/llms.txt', async (req, res) => {
   res.type('text/plain').send(
     llmsTxt(shows, {
       posts: POSTS,
-      services: SERVICE_PAGES.map((s) => ({ title: s.navLabel, path: s.path, summary: s.summary })),
+      services: [
+        { title: 'All services', path: '/services', summary: 'Podcast production, network distribution, advertising and brand partnerships, show development, and Hollywood studio booking.' },
+        ...SERVICE_PAGES.map((s) => ({ title: s.navLabel, path: s.path, summary: s.summary })),
+      ],
     })
   );
 });
@@ -685,34 +817,74 @@ app.get('/privacy', (req, res) => res.send(V.privacyPage()));
 app.get('/studio', (req, res) => res.send(V.studioPage()));
 // We have one studio — the old LA landing page is consolidated into /studio.
 app.get('/podcast-studio-los-angeles', (req, res) => res.redirect(301, '/studio'));
+app.get('/services', (req, res) => res.send(V.servicesHubPage()));
+// The old static page lived at /services/ with the quote quiz at
+// /services/embed.html. Both are gone. Express's non-strict routing already
+// serves /services/ from the route above; the embed page needs a redirect.
+app.get('/services/embed.html', (req, res) => res.redirect(301, '/quote'));
+app.get('/quote', (req, res) => res.redirect(301, '/pricing'));
 
 app.get('/about', (req, res) => res.send(V.aboutPage()));
 
 // 15-minute "are we a fit" discovery call, booked through GoHighLevel so leads
-// land in the CRM. Set BOOKING_WIDGET_URL to the GHL calendar embed URL.
-const BOOKING_WIDGET_URL = process.env.BOOKING_WIDGET_URL || '';
-app.get('/book', (req, res) => res.send(V.bookPage({ widgetUrl: BOOKING_WIDGET_URL })));
+// land in the CRM. The calendar is discovered from GHL at boot; set
+// BOOKING_WIDGET_URL only to override that choice.
+app.get('/book', (req, res) => res.send(V.bookPage({ widgetUrl: ghlBookingState().url })));
 
 // Packages + custom quote builder (embeds the self-hosted Sales-Quoting tool).
 app.get('/pricing', (req, res) => res.send(V.pricingPage()));
 
-app.get('/contact', (req, res) => res.send(V.contactPage()));
+const canBook = () => Boolean(ghlBookingState().url);
+app.get('/contact', (req, res) => res.send(V.contactPage({ canBook: canBook() })));
 app.post('/contact', async (req, res) => {
   const { name = '', email = '', company = '', message = '', topic = 'general' } = req.body || {};
   const values = { name, email, company, message, topic };
   if (!name.trim() || !email.trim() || !message.trim()) {
-    return res.send(V.contactPage({ error: 'Please fill in your name, email, and a message.', values }));
+    return res.send(V.contactPage({ error: 'Please fill in your name, email, and a message.', values, canBook: canBook() }));
   }
+  // Invisible bot checks. A rejected submission gets the normal thank-you page:
+  // telling a bot why it failed just teaches it what to fix next time.
+  const check = inspectSubmission(req.body, { ip: req.ip });
+  if (!check.ok) {
+    console.log('[contact] blocked', check.reason, '-', String(email).slice(0, 60));
+    return res.send(V.contactPage({ sent: true, canBook: canBook() }));
+  }
+  // Turnstile. Only an actively rejected token is treated as proof of a bot;
+  // a missing or unverifiable one is flagged and still delivered.
+  const cf = await verifyTurnstile(req.body['cf-turnstile-response'], req.ip);
+  if (cf.status === 'failed') {
+    console.log('[contact] blocked turnstile', cf.codes.join(','), '-', String(email).slice(0, 60));
+    return res.send(V.contactPage({ sent: true, canBook: canBook() }));
+  }
+  const flags = [...check.flags];
+  if (cf.status === 'missing') flags.push('no-captcha');
+  if (cf.status === 'unreachable') console.warn('[contact] turnstile unreachable:', cf.codes.join(','));
+  const suspicious = check.suspicious || flags.length >= 2;
   try {
     if (mailConfigured()) {
-      await sendContactEmail({ name, email, company, message, topic });
+      await sendContactEmail({ name, email, company, message, topic, flags: suspicious ? flags : [] });
     } else {
       console.log('[contact] (email not configured) message from', email, `[${topic}]`, '-', message.slice(0, 120));
     }
-    res.send(V.contactPage({ sent: true }));
+    // Acknowledge the prospect immediately. Silence until a human replies is
+    // the biggest drop-off point in the funnel; this goes out in under a second
+    // and offers a call they can book without waiting for anyone.
+    if (!suspicious) {
+      sendContactAutoReply({ name, email, topic, canBook: canBook() }).catch((e) =>
+        console.error('[mail] auto-reply failed:', e.message)
+      );
+    }
+    // CRM is a second destination, never a gate: fire-and-forget AFTER the
+    // email so a GHL outage can't delay or fail a real enquiry.
+    upsertContact({
+      name, email, company, message,
+      tags: ['website', 'website-contact', `topic:${topic}`].concat(suspicious ? ['flagged-possible-spam'] : []),
+      source: 'strawhutmedia.com contact form',
+    }).catch((e) => console.error('[ghl] contact push failed:', e.message));
+    res.send(V.contactPage({ sent: true, canBook: canBook() }));
   } catch (e) {
     console.error('[contact] send failed:', e.message);
-    res.send(V.contactPage({ error: 'Something went wrong sending your message. Please email us directly at hello@strawhutmedia.com.', values }));
+    res.send(V.contactPage({ error: 'Something went wrong sending your message. Please email us directly at hello@strawhutmedia.com.', values, canBook: canBook() }));
   }
 });
 
@@ -811,25 +983,58 @@ app.get('/go/resolve', async (req, res) => {
     if (!mShow || !mEp) return res.status(404).json({ ok: false, error: 'episode not found' });
     await resolveOrCreateEpisodeLanding(mShow, mEp);
     const base = (process.env.APP_BASE_URL || `https://${req.headers.host}`).replace(/\/+$/, '');
-    res.json({ ok: true, url: `${base}/go/${mShow.slug}/${mEp.slug}`, show: mShow.title, episode: mEp.title });
+    // Return the CANONICAL episode URL, not /go/ — the episode page is now the
+    // landing page, and handing Google Ads a URL that 301s risks disapproval
+    // and loses the redirect hop on every click.
+    res.json({
+      ok: true,
+      url: `${base}/${mShow.slug}/${mEp.slug}`,
+      show: mShow.title,
+      episode: mEp.title,
+      slug: `${mShow.slug}/${mEp.slug}`,
+    });
   } catch (e) {
     res.status(500).json({ ok: false, error: e.message });
   }
 });
 
+// Legacy campaign URL. The episode page now IS the landing page, so there's one
+// link and one layout; anything still pointing here is sent to the real page,
+// preserving ad query parameters (gclid, utm_*) so attribution survives.
 app.get('/go/:showSlug/:episodeSlug', async (req, res, next) => {
   const show = await store.getShowBySlug(req.params.showSlug);
   if (!show) return next();
   const episode = await store.getEpisodeBySlug(show.id, req.params.episodeSlug);
   if (!episode) return next();
-  const landing = await resolveOrCreateEpisodeLanding(show, episode);
-  res.send(V.landingPage({ landing, show, episode }));
+  // Keep the record so Admin > Landing Pages still lists which episodes are
+  // being advertised, and warm the enrichment for the incoming click.
+  enrichEpisodeInBackground(show, episode);
+  resolveOrCreateEpisodeLanding(show, episode).catch(() => {});
+  const qs = req.originalUrl.includes('?') ? '?' + req.originalUrl.split('?')[1] : '';
+  res.redirect(301, `/${show.slug}/${episode.slug}${qs}`);
 });
 
 app.post('/subscribe', async (req, res) => {
   const email = (req.body.email || '').trim();
+  const check = inspectSubmission(req.body, { ip: req.ip });
+  const cf = await verifyTurnstile(req.body['cf-turnstile-response'], req.ip);
+  if (!check.ok || cf.status === 'failed') {
+    console.log('[subscribe] blocked', check.reason || 'turnstile:' + cf.codes.join(','), '-', email.slice(0, 60));
+    return res.send(
+      V.messagePage({
+        title: "You're subscribed — Straw Hut Media",
+        heading: "You're on the list! 🎉",
+        message: 'Thanks for subscribing to Straw Hut Media updates.',
+      })
+    );
+  }
   try {
     await store.addSubscriber(email, req.body.name);
+    upsertContact({
+      name: req.body.name, email,
+      tags: ['website', 'newsletter'],
+      source: 'strawhutmedia.com subscribe',
+    }).catch((e) => console.error('[ghl] subscribe push failed:', e.message));
     res.send(
       V.messagePage({
         title: "You're subscribed — Straw Hut Media",
@@ -873,11 +1078,50 @@ app.get('/:showSlug', async (req, res, next) => {
 });
 
 // Episode page: /:showSlug/:episodeSlug
+// Landing-page enrichment is generated the first time an episode page is
+// viewed, then cached forever. Doing it on demand rather than backfilling all
+// 5,370 episodes means the cost follows real traffic — most of the catalogue is
+// never looked at, and the pages that are get enriched within one page view.
+const _enriching = new Set();
+let _lastEnrichError = null;
+function enrichEpisodeInBackground(show, episode) {
+  if (!aiConfigured() || process.env.SHOW_SEO === 'off') return;
+  if (episode.ai_hook || _enriching.has(episode.id)) return;
+  _enriching.add(episode.id);
+  generateEpisodeEnrichment({ show, episode, log: (m) => console.log('[episode]', m) })
+    .then((out) => {
+      if (!out) return;
+      return store.updateEpisode(episode.id, {
+        ai_hook: out.hook || null,
+        ai_takeaways: out.takeaways?.length ? JSON.stringify(out.takeaways) : null,
+      });
+    })
+    .catch((e) => {
+      _lastEnrichError = e.message.slice(0, 160);
+      console.error('[episode] enrich failed:', e.message);
+    })
+    .finally(() => _enriching.delete(episode.id));
+}
+
+// Did this visit come from one of our ads? Muted autoplay is applied only to
+// paid traffic — that mirrors Podbooster, whose /ep/ pages are ad destinations
+// and noindex, so it never autoplays at someone arriving from Google. Our
+// episode pages serve both, hence the check.
+function isAdTraffic(req) {
+  const q = req.query || {};
+  const src = String(q.utm_source || '').toLowerCase();
+  const med = String(q.utm_medium || '').toLowerCase();
+  return Boolean(q.gclid || q.gbraid || q.wbraid || src === 'google_ads' || med === 'display' || med === 'cpc');
+}
+
 app.get('/:showSlug/:episodeSlug', async (req, res, next) => {
   const show = await store.getShowBySlug(req.params.showSlug);
   if (!show) return next();
   const episode = await store.getEpisodeBySlug(show.id, req.params.episodeSlug);
   if (!episode) return next();
+
+  // Render immediately with whatever is cached; enrich for the next visitor.
+  enrichEpisodeInBackground(show, episode);
 
   // (3) Recommendations — more from this show + similar episodes elsewhere.
   const fromShow = await store.listEpisodes(show.id, { limit: 6 });
@@ -903,7 +1147,7 @@ app.get('/:showSlug/:episodeSlug', async (req, res, next) => {
     }
   }
 
-  res.send(V.episodePage({ show, episode, moreFromShow, related }));
+  res.send(V.episodePage({ show, episode, moreFromShow, related, adTraffic: isAdTraffic(req) }));
 });
 
 // Smart 404: recover old/mistyped URLs by redirecting to the right page,
@@ -974,6 +1218,71 @@ app.use(async (req, res) => {
 
 // Fill in AI-written SEO meta descriptions for any shows still missing one.
 // Paced and best-effort: silently no-ops without an API key.
+// Display copy for the featured banner and cards. The team's own description is
+// always preferred — we only write a shortened version for shows whose copy has
+// no sentence break inside the space available, where trimming would otherwise
+// leave a dangling fragment. Nothing on the site ever renders an ellipsis.
+const BLURB_MAX = 165;
+async function backfillShowBlurbs() {
+  if (process.env.SHOW_SEO === 'off' || !aiConfigured()) return;
+  const shows = await store.listShows();
+  const needs = shows.filter(
+    (s) => !s.blurb && s.description && !endsSentence(plainText(s.description, BLURB_MAX))
+  );
+  if (!needs.length) return;
+  console.log(`[blurb] shortening ${needs.length} show description(s) that don't trim cleanly…`);
+  let done = 0;
+  for (const show of needs) {
+    try {
+      const text = await generateShowBlurb({ show, max: BLURB_MAX, log: (m) => console.log('[blurb]', m) });
+      if (text) { await store.updateShow(show.id, { blurb: text }); done++; }
+    } catch (e) {
+      console.error('[blurb] show', show.slug, 'failed:', e.message);
+    }
+    await new Promise((r) => setTimeout(r, 900));
+  }
+  console.log(`[blurb] wrote ${done}/${needs.length}`);
+}
+
+// A visitor should never meet a cold page. Enrichment happens on first view,
+// but the FIRST visitor to an episode would see the card without its hook — so
+// warm the episodes people actually land on: the newest few per show, plus any
+// episode an ad points at. Bounded per boot so the cost stays predictable.
+const WARM_PER_SHOW = 3;
+const WARM_MAX = 150;
+async function warmEpisodeEnrichment() {
+  if (process.env.SHOW_SEO === 'off' || !aiConfigured()) return;
+  const shows = await store.listShows();
+  const queue = [];
+  for (const show of shows) {
+    const eps = await store.listEpisodes(show.id, { limit: WARM_PER_SHOW });
+    for (const ep of eps) if (!ep.ai_hook && (ep.description || ep.title)) queue.push({ show, ep });
+  }
+  // Episodes with a landing record are ad destinations — warm those first.
+  const advertised = new Set((await store.listLandings()).map((l) => l.episode_id).filter(Boolean));
+  queue.sort((a, b) => (advertised.has(b.ep.id) ? 1 : 0) - (advertised.has(a.ep.id) ? 1 : 0));
+  const batch = queue.slice(0, WARM_MAX);
+  if (!batch.length) return;
+  console.log(`[episode] warming ${batch.length} episode page(s)…`);
+  let done = 0;
+  for (const { show, ep } of batch) {
+    try {
+      const out = await generateEpisodeEnrichment({ show, episode: ep, log: (m) => console.log('[episode]', m) });
+      if (out) {
+        await store.updateEpisode(ep.id, {
+          ai_hook: out.hook || null,
+          ai_takeaways: out.takeaways?.length ? JSON.stringify(out.takeaways) : null,
+        });
+        done++;
+      }
+    } catch (e) {
+      console.error('[episode] warm failed for', ep.slug, '-', e.message);
+    }
+    await new Promise((r) => setTimeout(r, 1200));
+  }
+  console.log(`[episode] warmed ${done}/${batch.length}`);
+}
+
 async function backfillShowSeo() {
   if (process.env.SHOW_SEO === 'off' || !aiConfigured()) return;
   const shows = await store.listShows();
@@ -1075,6 +1384,9 @@ app.listen(PORT, async () => {
   // Populate the footer "Recent episodes" rail.
   refreshFooter();
 
+  // Upgrade any low-resolution cover art from Apple (background, paced).
+  backfillArtwork().catch((e) => console.error('[artwork]', e.message));
+
   // Weekly traffic digest — checked hourly, sends once every 7 days.
   setInterval(() => maybeSendTrafficDigest().catch(() => {}), 60 * 60 * 1000);
   maybeSendTrafficDigest().catch(() => {});
@@ -1082,7 +1394,10 @@ app.listen(PORT, async () => {
   // Backfill unique, AI-written SEO meta descriptions for shows that don't have
   // one yet. Runs once per boot in the background, paced to be gentle on the
   // API; no-ops entirely if ANTHROPIC_API_KEY isn't set. Set SHOW_SEO=off to skip.
-  backfillShowSeo().catch((e) => console.error('[seo] show backfill failed:', e.message));
+  backfillShowSeo()
+    .then(() => backfillShowBlurbs())
+    .then(() => warmEpisodeEnrichment())
+    .catch((e) => console.error('[seo] show backfill failed:', e.message));
 
   // Pull press mentions in the background so the Press page is populated.
   refreshPress(store, { log: (m) => console.log('[press]', m) })

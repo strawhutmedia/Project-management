@@ -138,3 +138,25 @@ export const PRESS_QUERIES = (process.env.PRESS_QUERIES
   ? process.env.PRESS_QUERIES.split(',')
   : ['"Straw Hut Media"']
 ).map((s) => s.trim()).filter(Boolean);
+
+// Cover-art corrections, keyed by show slug.
+//
+// Some feeds publish genuinely low-resolution show artwork — WICKED and Only
+// Murders both ship 256x256 on Megaphone, far below Apple's 1400px minimum,
+// which looks soft anywhere we render art large. imgix can't help: the pixels
+// don't exist in the source. These point at the full-resolution originals
+// Apple Podcasts serves for the same shows (3000x3000).
+//
+// Applied on every sync, so a feed refresh can't overwrite them. Remove an
+// entry once the publisher uploads proper artwork to their host.
+export const ART_OVERRIDES = {
+  'wicked-the-official-podcast':
+    'https://is1-ssl.mzstatic.com/image/thumb/Podcasts221/v4/8b/e0/af/8be0af1e-b9dd-f2a9-ff3c-ea75b30f67bf/mza_1089145562415357217.jpg/3000x3000bb.jpg',
+  'only-murders-in-the-building':
+    'https://is1-ssl.mzstatic.com/image/thumb/Podcasts211/v4/9b/d3/26/9bd3260e-c645-7cbf-3437-cb933c4f3551/mza_7822044221006137195.jpg/3000x3000bb.jpg',
+};
+
+/** Preferred artwork for a show, falling back to whatever the feed provides. */
+export function artFor(slug, fallback) {
+  return ART_OVERRIDES[slug] || fallback || '';
+}

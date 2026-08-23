@@ -103,6 +103,9 @@ class JsonStore {
   async getEpisodeById(id) {
     return this.db.episodes[id] || null;
   }
+  async enrichedCount() {
+    return Object.values(this.db.episodes).filter((e) => e && e.ai_hook).length;
+  }
   async updateEpisode(id, patch) {
     if (!this.db.episodes[id]) return null;
     this.db.episodes[id] = { ...this.db.episodes[id], ...patch, id };
@@ -312,6 +315,7 @@ class PgStore {
         title        TEXT NOT NULL,
         description  TEXT,
         seo_description TEXT,
+        blurb           TEXT,
         author       TEXT,
         image_url    TEXT,
         feed_url     TEXT UNIQUE NOT NULL,
@@ -341,6 +345,12 @@ class PgStore {
         season        INTEGER,
         embedding     TEXT,
         youtube_id    TEXT,
+        -- Landing-page enrichment, generated on demand and cached forever.
+        ai_hook        TEXT,
+        ai_takeaways   TEXT,
+        guests         TEXT,
+        transcript_text TEXT,
+        quotes         TEXT,
         UNIQUE (show_id, guid)
       );
       CREATE INDEX IF NOT EXISTS idx_episodes_show ON episodes(show_id, published_at DESC);
@@ -410,6 +420,13 @@ class PgStore {
       ALTER TABLE shows    ADD COLUMN IF NOT EXISTS youtube_channel_id TEXT;
       ALTER TABLE shows    ADD COLUMN IF NOT EXISTS platform_links     TEXT;
       ALTER TABLE shows    ADD COLUMN IF NOT EXISTS seo_description    TEXT;
+      ALTER TABLE shows    ADD COLUMN IF NOT EXISTS blurb              TEXT;
+      ALTER TABLE episodes ADD COLUMN IF NOT EXISTS ai_hook            TEXT;
+      ALTER TABLE episodes ADD COLUMN IF NOT EXISTS ai_takeaways       TEXT;
+      ALTER TABLE episodes ADD COLUMN IF NOT EXISTS guests             TEXT;
+      ALTER TABLE episodes ADD COLUMN IF NOT EXISTS transcript_text    TEXT;
+      ALTER TABLE episodes ADD COLUMN IF NOT EXISTS quotes             TEXT;
+      ALTER TABLE shows    ADD COLUMN IF NOT EXISTS artwork_url        TEXT;
       ALTER TABLE shows    ADD COLUMN IF NOT EXISTS last_synced        TIMESTAMPTZ;
       ALTER TABLE episodes ADD COLUMN IF NOT EXISTS episode_number     INTEGER;
       ALTER TABLE episodes ADD COLUMN IF NOT EXISTS season             INTEGER;
@@ -450,17 +467,18 @@ class PgStore {
     const id = existing?.id || show.id || newId();
     const m = { ...existing, ...show, id };
     await this.pool.query(
-      `INSERT INTO shows (id, slug, title, description, author, image_url, feed_url, link, categories, spotify_url, apple_url, show_type, youtube_channel_id, platform_links, featured, sort_order, last_synced, seo_description)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18)
+      `INSERT INTO shows (id, slug, title, description, author, image_url, feed_url, link, categories, spotify_url, apple_url, show_type, youtube_channel_id, platform_links, featured, sort_order, last_synced, seo_description, artwork_url, blurb)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20)
        ON CONFLICT (id) DO UPDATE SET
          slug=$2, title=$3, description=$4, author=$5, image_url=$6, feed_url=$7, link=$8,
-         categories=$9, spotify_url=$10, apple_url=$11, show_type=$12, youtube_channel_id=$13, platform_links=$14, featured=$15, sort_order=$16, last_synced=$17, seo_description=$18`,
+         categories=$9, spotify_url=$10, apple_url=$11, show_type=$12, youtube_channel_id=$13, platform_links=$14, featured=$15, sort_order=$16, last_synced=$17, seo_description=$18, artwork_url=$19, blurb=$20`,
       [
         id, m.slug, m.title, m.description, m.author, m.image_url, m.feed_url, m.link,
         JSON.stringify(m.categories || []), m.spotify_url, m.apple_url,
         m.show_type || 'original', m.youtube_channel_id || null,
         m.platform_links ? (typeof m.platform_links === 'string' ? m.platform_links : JSON.stringify(m.platform_links)) : null,
         !!m.featured, m.sort_order || 0, m.last_synced || null, m.seo_description || null,
+        m.artwork_url || null, m.blurb || null,
       ]
     );
     return this.getShowById(id);
@@ -491,13 +509,29 @@ class PgStore {
     const { rows } = await this.pool.query(`SELECT * FROM episodes WHERE id=$1`, [id]);
     return rows[0] || null;
   }
+  async enrichedCount() {
+    try {
+      const { rows } = await this.pool.query(
+        `SELECT COUNT(*)::int AS c FROM episodes WHERE ai_hook IS NOT NULL AND ai_hook <> ''`
+      );
+      return rows[0].c;
+    } catch (e) {
+      // Surfaces a missing column instead of hiding it behind a silent zero.
+      return `error: ${e.message.slice(0, 80)}`;
+    }
+  }
   async updateEpisode(id, patch) {
     const cur = await this.getEpisodeById(id);
     if (!cur) return null;
     const m = { ...cur, ...patch };
     await this.pool.query(
-      `UPDATE episodes SET title=$2, description=$3, image_url=$4, youtube_id=$5 WHERE id=$1`,
-      [id, m.title, m.description, m.image_url, m.youtube_id || null]
+      `UPDATE episodes SET title=$2, description=$3, image_url=$4, youtube_id=$5,
+         ai_hook=$6, ai_takeaways=$7, guests=$8, transcript_text=$9, quotes=$10 WHERE id=$1`,
+      [
+        id, m.title, m.description, m.image_url, m.youtube_id || null,
+        m.ai_hook || null, m.ai_takeaways || null, m.guests || null,
+        m.transcript_text || null, m.quotes || null,
+      ]
     );
     return this.getEpisodeById(id);
   }

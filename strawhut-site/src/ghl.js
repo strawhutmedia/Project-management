@@ -1,0 +1,313 @@
+// GoHighLevel — push website enquiries into the CRM.
+//
+// Rules this module holds to:
+//
+//  1. ADDITIVE, NEVER BLOCKING. The email to Ryan is the system of record. GHL
+//     is a second destination. Every call is fire-and-forget with a timeout,
+//     and a failure is logged, never thrown at the request — a CRM outage must
+//     not cost a lead or show an error to a prospect.
+//  2. INERT UNTIL CONFIGURED. No token or location id = the module does
+//     nothing, same pattern as tracking and Turnstile.
+//  3. WRITE ONLY WHAT WE WERE GIVEN. No deletes, no bulk operations.
+//
+// API: LeadConnector v2. Auth is a Private Integration Token.
+
+const BASE = 'https://services.leadconnectorhq.com';
+const VERSION = '2021-07-28';
+const TIMEOUT_MS = 10000;
+
+const TOKEN = (process.env.GHL_API_TOKEN || '').trim();
+const LOCATION_ID = (process.env.GHL_LOCATION_ID || '').trim();
+
+export function ghlConfigured() {
+  return Boolean(TOKEN && LOCATION_ID);
+}
+
+let _lastError = null;
+export function ghlLastError() {
+  return _lastError;
+}
+
+async function call(path, { method = 'GET', body, version = VERSION } = {}) {
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), TIMEOUT_MS);
+  try {
+    const res = await fetch(BASE + path, {
+      method,
+      headers: {
+        Authorization: `Bearer ${TOKEN}`,
+        Version: version,
+        'Content-Type': 'application/json',
+        Accept: 'application/json',
+      },
+      body: body ? JSON.stringify(body) : undefined,
+      signal: ctrl.signal,
+    });
+    const text = await res.text();
+    let data = null;
+    try { data = text ? JSON.parse(text) : null; } catch { /* non-JSON error body */ }
+    if (!res.ok) {
+      const msg = (data && (data.message || data.error)) || text.slice(0, 160) || `HTTP ${res.status}`;
+      return { ok: false, status: res.status, error: String(msg).slice(0, 200) };
+    }
+    return { ok: true, data };
+  } catch (e) {
+    return { ok: false, error: e.name === 'AbortError' ? 'timeout' : e.message.slice(0, 160) };
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+/**
+ * Read-only credential check. Confirms the token authenticates and can see the
+ * location, WITHOUT creating anything — so it can run on boot and be reported
+ * in /healthz without polluting the CRM with test contacts.
+ */
+export async function verifyGhl() {
+  if (!ghlConfigured()) return { ok: false, state: 'unconfigured' };
+  const r = await call(`/locations/${encodeURIComponent(LOCATION_ID)}`);
+  if (!r.ok) {
+    _lastError = r.error;
+    return { ok: false, state: 'error', error: r.error };
+  }
+  const name = r.data?.location?.name || r.data?.name || null;
+
+  // Reading the location is NOT proof the integration works. An agency-level
+  // token reads the location fine and is refused on every sub-account
+  // resource — which is exactly the state this was in while /healthz cheerfully
+  // reported "ok (Straw Hut Media)" and no contact had ever reached the CRM.
+  // So check the thing we actually use: can we read contacts? Read-only, one
+  // record, no writes.
+  const c = await call(`/contacts/?locationId=${encodeURIComponent(LOCATION_ID)}&limit=1`);
+  if (!c.ok) {
+    _lastError = c.error;
+    return { ok: false, state: 'limited', name, error: `contacts refused: ${c.error}` };
+  }
+  return { ok: true, state: 'ok', name };
+}
+
+function splitName(full) {
+  const parts = String(full || '').trim().split(/\s+/).filter(Boolean);
+  if (!parts.length) return { firstName: '', lastName: '' };
+  return { firstName: parts[0], lastName: parts.slice(1).join(' ') };
+}
+
+/**
+ * Create or update a contact, then attach the enquiry text as a note so the
+ * CRM shows what they actually asked for. Returns { ok, id } and never throws.
+ */
+export async function upsertContact({ name, email, company, message, tags = [], source = 'strawhutmedia.com' } = {}) {
+  if (!ghlConfigured() || !email) return { ok: false, state: 'skipped' };
+  const { firstName, lastName } = splitName(name);
+  const r = await call('/contacts/upsert', {
+    method: 'POST',
+    body: {
+      locationId: LOCATION_ID,
+      email: String(email).trim(),
+      firstName,
+      lastName,
+      name: String(name || '').trim() || undefined,
+      companyName: String(company || '').trim() || undefined,
+      source,
+      tags: tags.filter(Boolean),
+    },
+  });
+  if (!r.ok) {
+    _lastError = r.error;
+    console.error('[ghl] upsert failed:', r.error);
+    return { ok: false, error: r.error };
+  }
+  const id = r.data?.contact?.id || r.data?.id || null;
+
+  // The message is the whole point of the lead — without it the CRM entry is
+  // just an email address. Attached as a note; a failure here doesn't undo the
+  // contact, which is the more important half.
+  if (id && String(message || '').trim()) {
+    const n = await call(`/contacts/${encodeURIComponent(id)}/notes`, {
+      method: 'POST',
+      body: { body: String(message).slice(0, 5000), userId: undefined },
+    });
+    if (!n.ok) console.error('[ghl] note failed:', n.error);
+  }
+  return { ok: true, id };
+}
+
+// ---- Booking calendar discovery -------------------------------------------
+//
+// The /book page needs the GHL calendar's embed URL. Rather than making a
+// human copy it out of the GHL UI and paste it into an env var — a step that
+// silently rots the day the calendar is renamed or replaced — the server asks
+// GHL for it with the token it already holds. BOOKING_WIDGET_URL still wins if
+// it is set, so a deliberate override is always available.
+
+const WIDGET_BASE = 'https://api.leadconnectorhq.com/widget/booking';
+
+// Straw Hut's real new-business calendar: "Discovery Call" — "Let's talk about
+// podcasts", slug `podcastdiscoverycall`. Read off the company's own public
+// booking page (start.strawhutmedia.com), so it is public information, not a
+// secret. Committed as a floor so /book works even though the API token is
+// scoped to contacts only and cannot list calendars. Discovery still runs and
+// still wins when the token gets `calendars.readonly` — this is what we use
+// when it cannot.
+const KNOWN_CALENDAR_ID = 'ym8vwJwU2MiL5RuW7v68';
+
+// A location usually has several calendars (per-team-member, round robin,
+// event types). We want the short new-business fit call.
+const FIT_RE = /(15[\s-]*min|fit\s*call|discovery|intro(?!duction to)|consult|strategy)/i;
+// Never auto-pick something that is obviously not for prospects.
+const AVOID_RE = /(guest|internal|test|personal|interview|recording|studio\s*session)/i;
+
+// GHL versions its API per resource family, and the value is NOT the same
+// everywhere: Contacts is 2021-07-28, Calendars is 2021-04-15, and newer docs
+// for GET /calendars/ show v3. Sending the wrong one comes back as "The token
+// is not authorized for this scope." — which reads exactly like a missing
+// scope and sent us looking in the wrong place. Try each and report the one
+// that worked.
+const CALENDAR_VERSIONS = ['2021-04-15', 'v3', VERSION];
+
+export async function listCalendars() {
+  if (!ghlConfigured()) return { ok: false, state: 'unconfigured' };
+  const path = `/calendars/?locationId=${encodeURIComponent(LOCATION_ID)}`;
+  let last = null;
+  for (const version of CALENDAR_VERSIONS) {
+    const r = await call(path, { version });
+    if (r.ok) {
+      const list = Array.isArray(r.data?.calendars) ? r.data.calendars
+        : Array.isArray(r.data) ? r.data
+        : [];
+      return { ok: true, calendars: list, version };
+    }
+    last = r;
+    // A 401/403 can be the wrong Version rather than a real scope problem, so
+    // keep trying. Anything else (5xx, timeout) won't be fixed by another
+    // version — stop and report it.
+    if (r.status !== 401 && r.status !== 403) break;
+  }
+  _lastError = last?.error || 'unknown';
+  return { ok: false, error: _lastError, status: last?.status };
+}
+
+/** Highest-scoring active calendar, or null. Exported so it can be reasoned
+ *  about (and tested) without a live API call. */
+export function pickBookingCalendar(calendars = []) {
+  const active = calendars.filter((c) => c && c.id && c.isActive !== false);
+  if (!active.length) return null;
+  const scored = active.map((c) => {
+    const name = String(c.name || '');
+    let s = 0;
+    if (FIT_RE.test(name)) s += 10;
+    if (Number(c.slotDuration) === 15) s += 4;
+    else if (Number(c.slotDuration) === 30) s += 2;
+    if (AVOID_RE.test(name)) s -= 20;
+    return { c, s };
+  });
+  scored.sort((a, b) => b.s - a.s);
+  return scored[0].s > -20 ? scored[0].c : null;
+}
+
+export function bookingWidgetUrl(calendar) {
+  const id = calendar && calendar.id;
+  return id ? `${WIDGET_BASE}/${encodeURIComponent(id)}` : '';
+}
+
+let _booking = { state: 'unresolved', url: '', name: '', id: '', source: '', error: '', options: [] };
+export function ghlBookingState() { return _booking; }
+
+/**
+ * Resolve the calendar to embed on /book. Never throws; on any failure the
+ * page falls back to its "get in touch" panel rather than an empty iframe.
+ */
+export async function resolveBookingCalendar() {
+  const override = (process.env.BOOKING_WIDGET_URL || '').trim();
+  if (override) {
+    _booking = { state: 'ok', url: override, name: '', id: '', source: 'env', error: '', options: [] };
+    return _booking;
+  }
+
+  const known = {
+    state: 'ok',
+    url: `${WIDGET_BASE}/${KNOWN_CALENDAR_ID}`,
+    name: 'Discovery Call',
+    id: KNOWN_CALENDAR_ID,
+    source: 'known',
+    error: '',
+    options: [],
+  };
+
+  if (!ghlConfigured()) {
+    _booking = { ...known, error: 'ghl unconfigured; using the known calendar' };
+    return _booking;
+  }
+
+  const r = await listCalendars();
+  if (!r.ok) {
+    // Token can't list calendars (it is scoped to contacts). Not fatal — we
+    // know which calendar this is; we just can't confirm it against the API.
+    _booking = { ...known, error: `calendar lookup failed (${r.error || 'unknown'}); using the known calendar` };
+    console.warn('[ghl]', _booking.error);
+    return _booking;
+  }
+
+  // Every active calendar, so a wrong pick is diagnosable from /healthz
+  // instead of requiring another deploy to find out what was on offer.
+  const active = r.calendars.filter((c) => c && c.id && c.isActive !== false);
+  const options = active.map((c) => ({ id: c.id, name: c.name || '(unnamed)', minutes: c.slotDuration ?? null }));
+
+  // A confirmed id beats a name heuristic. Only fall through to scoring if the
+  // calendar we know about is gone or switched off.
+  const exact = active.find((c) => c.id === KNOWN_CALENDAR_ID);
+  const pick = exact || pickBookingCalendar(r.calendars);
+  if (!pick) {
+    _booking = { ...known, source: 'known', options, error: 'no suitable active calendar in GHL; using the known calendar' };
+    console.warn('[ghl]', _booking.error);
+    return _booking;
+  }
+  _booking = {
+    state: 'ok',
+    url: bookingWidgetUrl(pick),
+    name: pick.name || '',
+    id: pick.id,
+    source: `${exact ? 'ghl (confirmed)' : 'ghl'} v=${r.version}`,
+    error: '',
+    options,
+  };
+  console.log(`[ghl] booking calendar: ${_booking.name} (${_booking.id}) via ${_booking.source}`);
+  return _booking;
+}
+
+// ---- Token capability probe -----------------------------------------------
+//
+// "The token is not authorized for this scope." is GHL's answer to a missing
+// scope, a wrong Version header, and a path it doesn't recognise — three very
+// different problems with one message. Guessing between them from the outside
+// costs a deploy per guess.
+//
+// So: hit a handful of READ-ONLY endpoints once at boot and report what each
+// one says. Nothing here creates, updates, or deletes. It runs only when GHL
+// is configured, and the result goes to /healthz so the failure is legible
+// without another round trip.
+
+const PROBES = [
+  ['location',        (id) => `/locations/${encodeURIComponent(id)}`,        '2021-07-28'],
+  ['contacts',        (id) => `/contacts/?locationId=${encodeURIComponent(id)}&limit=1`, '2021-07-28'],
+  ['calendars',       (id) => `/calendars/?locationId=${encodeURIComponent(id)}`, '2021-04-15'],
+  ['calendars(noslash)', (id) => `/calendars?locationId=${encodeURIComponent(id)}`, '2021-04-15'],
+  ['calendars(v3)',   (id) => `/calendars/?locationId=${encodeURIComponent(id)}`, 'v3'],
+  ['calendarGroups',  (id) => `/calendars/groups?locationId=${encodeURIComponent(id)}`, '2021-04-15'],
+  ['users',           (id) => `/users/?locationId=${encodeURIComponent(id)}`,  '2021-07-28'],
+];
+
+let _probe = null;
+export function ghlProbeState() { return _probe; }
+
+export async function probeGhlToken() {
+  if (!ghlConfigured()) { _probe = { state: 'unconfigured' }; return _probe; }
+  const out = {};
+  for (const [label, mk, version] of PROBES) {
+    const r = await call(mk(LOCATION_ID), { version });
+    out[label] = r.ok ? 'ok' : `${r.status || '-'} ${String(r.error || '').slice(0, 70)}`;
+  }
+  _probe = out;
+  console.log('[ghl] token probe:', JSON.stringify(out));
+  return _probe;
+}

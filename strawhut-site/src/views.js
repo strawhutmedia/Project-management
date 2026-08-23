@@ -2,7 +2,9 @@
 // Everything user-facing is escaped via esc(); episode show-notes are
 // intentionally rendered as feed-provided HTML inside a sandboxed .notes block.
 
-import { esc, toText, formatDuration, formatDate } from './util.js';
+import { esc, toText, formatDuration, formatDate, endsSentence, firstSentence } from './util.js';
+import { formFields } from './antispam.js';
+import { turnstileWidget } from './turnstile.js';
 import {
   canonical,
   organizationJsonLd,
@@ -56,6 +58,9 @@ const SKIP_SECONDS = 15;
 let _apSeq = 0;
 export function audioPlayer(src, opts = {}) {
   const id = 'ap' + _apSeq++;
+  // Muted autoplay, matching the Podbooster landing page. Only ever set for
+  // visitors arriving from an ad (see server.js) — never for search traffic.
+  const autoplay = !!opts.autoplay;
   const image = opts.image || '';
   const title = opts.title || '';
   const showTitle = opts.showTitle || '';
@@ -79,8 +84,12 @@ export function audioPlayer(src, opts = {}) {
     const dur = (0.65 + (i % 6) * 0.13).toFixed(2);
     return `<span style="height:${h}%;animation-delay:${delay}s;animation-duration:${dur}s"></span>`;
   }).join('')}</div>`;
-  return `<div class="aplayer" id="${id}">
-    <audio preload="none" src="${esc(src)}"></audio>
+  return `<div class="aplayer${autoplay ? ' is-autoplay' : ''}" id="${id}"${autoplay ? ' data-autoplay="1"' : ''}>
+    <audio preload="${autoplay ? 'auto' : 'none'}" src="${esc(src)}"></audio>
+    ${autoplay ? `<button class="aplayer-unmute" type="button" hidden>
+      <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M3 10v4h4l5 5V5L7 10H3zm13.5 2a4.5 4.5 0 0 0-2.5-4.03v8.06A4.5 4.5 0 0 0 16.5 12zM14 3.23v2.06A6.98 6.98 0 0 1 19 12a6.98 6.98 0 0 1-5 6.71v2.06A8.99 8.99 0 0 0 21 12a8.99 8.99 0 0 0-7-8.77z"/></svg>
+      <span>Tap to unmute</span>
+    </button>` : ''}
     ${head}
     ${viz}
     <div class="aplayer-controls">
@@ -138,6 +147,31 @@ export function audioPlayer(src, opts = {}) {
     document.addEventListener('mouseup',function(){dragging=false;});
     bar.addEventListener('click',function(e){seekTo(e.clientX);});
     bar.addEventListener('keydown',function(e){if(e.key==='ArrowLeft'){a.currentTime=Math.max(0,(a.currentTime||0)-SK);}else if(e.key==='ArrowRight'){a.currentTime=Math.min((a.duration||1e9),(a.currentTime||0)+SK);}});
+    // Muted autoplay + "Tap to unmute", the Podbooster landing-page pattern.
+    // Only rendered for ad traffic. Browsers allow muted autoplay but block it
+    // with sound, and iOS blocks it more often than not — so the banner is
+    // revealed ONLY if playback actually started. If it's blocked we do nothing
+    // and the (already loud) play button stands on its own.
+    if(r.getAttribute('data-autoplay')==='1'){
+      var um=r.querySelector('.aplayer-unmute');
+      a.muted=true;
+      var p=a.play();
+      if(p&&p.then)p.then(function(){
+        if(um){um.hidden=false;um.classList.add('pulse');}
+      }).catch(function(){
+        a.muted=false;                       // leave it clean for a manual press
+        if(um)um.hidden=true;
+      });
+      if(um)um.addEventListener('click',function(){
+        a.muted=false;
+        if(vol)vol.classList.remove('muted');
+        um.hidden=true;
+        if(a.paused)a.play();
+        window.shmTrack&&shmTrack('unmute_episode',{});
+      });
+      // Unmuting via the volume control should also retire the banner.
+      if(vol)vol.addEventListener('click',function(){if(um&&!a.muted)um.hidden=true;});
+    }
   })();</script>`;
 }
 
@@ -248,7 +282,32 @@ ${trackingBody()}
 <main>${body}</main>
 ${consentBanner()}
 ${footerBlock()}
-<script>(function(){var sel='.section-head,.fbanner,.impact-inner,.stats-grid,.cta-band,.faq-list,.svc-hero-art,.footer-ig,.footer-top,.grid-4>*,.featured-grid>*,.pillars>*,.inc-item,.resource-card,.svc-shot,.ig-tile,.svc-tile';var els=[].slice.call(document.querySelectorAll(sel));if(!('IntersectionObserver'in window)||!els.length)return;var groups=new Map();var vh=window.innerHeight||document.documentElement.clientHeight;els.forEach(function(el){el.classList.add('reveal');var p=el.parentNode,i=groups.get(p)||0;groups.set(p,i+1);if(i)el.style.transitionDelay=Math.min(i,6)*0.06+'s';if(el.getBoundingClientRect().top<vh*0.92)el.classList.add('is-visible');});var io=new IntersectionObserver(function(en){en.forEach(function(e){if(e.isIntersecting){e.target.classList.add('is-visible');io.unobserve(e.target);}});},{threshold:0.1,rootMargin:'0px 0px -6% 0px'});els.forEach(function(el){if(!el.classList.contains('is-visible'))io.observe(el);});})();</script>
+<script>(function(){
+var sel='.section-head,.fbanner,.impact-inner,.stats-grid,.cta-band,.faq-list,.svc-hero-art,.footer-ig,.footer-top,.grid-4>*,.featured-grid>*,.pillars>*,.inc-item,.resource-card,.svc-shot,.ig-tile,.svc-tile';
+var els=[].slice.call(document.querySelectorAll(sel));
+if(!('IntersectionObserver'in window)||!els.length)return;
+var vh=window.innerHeight||document.documentElement.clientHeight;
+// Measure everything FIRST. Interleaving a read (getBoundingClientRect) with a
+// write (classList.add) forces the browser to recompute layout on every single
+// element, which is what made the first scroll feel like it was catching.
+var tops=els.map(function(el){return el.getBoundingClientRect().top;});
+var groups=new Map();
+var pending=[];
+for(var k=0;k<els.length;k++){
+  var el=els[k],p=el.parentNode,i2=groups.get(p)||0;
+  groups.set(p,i2+1);
+  el.classList.add('reveal');
+  // Anything already on screen at load is shown immediately and never animates
+  // — the page shouldn't play an entrance for content the visitor can see.
+  if(tops[k]<vh*0.95){el.classList.add('is-visible');}
+  else{if(i2)el.style.transitionDelay=Math.min(i2,4)*0.045+'s';pending.push(el);}
+}
+if(!pending.length)return;
+var io=new IntersectionObserver(function(en){
+  en.forEach(function(e){if(e.isIntersecting){e.target.classList.add('is-visible');io.unobserve(e.target);}});
+},{threshold:0,rootMargin:'0px 0px -8% 0px'});
+pending.forEach(function(el){io.observe(el);});
+})();</script>
 </body></html>`;
 }
 
@@ -316,6 +375,7 @@ function footerBlock() {
     <div class="footer-cols">
       <div class="footer-col">
         <div class="footer-h">Services</div>
+        <a href="/services">All Services</a>
         <a href="/podcast-production">Podcast Production</a>
         <a href="/advertise">Advertise With Us</a>
         <a href="/studio">Book the Studio</a>
@@ -400,6 +460,7 @@ function phoneMockup(shows) {
   const slides = picks
     .map(
       (s, i) => `<a class="ph-slide${i === 0 ? ' active' : ''}" href="/${esc(s.slug)}">
+        <span class="ph-show">${esc(s.title)}</span>
         <img src="${esc(s.image_url)}" alt="${esc(s.title)}" loading="lazy">
         <span class="ph-title">${esc(s.title)}</span>
         <span class="ph-sub">${esc(s.author || 'Straw Hut Media')}</span>
@@ -407,16 +468,17 @@ function phoneMockup(shows) {
     )
     .join('');
   return `<div class="ph-wrap" aria-hidden="true"><div class="ph">
-    <div class="ph-notch"></div>
     <div class="ph-screen">
-      <div class="ph-now">Playing from podcast</div>
+      <div class="ph-chrome"><span class="ph-chev">⌄</span><span class="ph-dots">•••</span></div>
       <div class="ph-slides" id="phSlides">${slides}</div>
       <div class="ph-bar"><span></span></div>
-      <div class="ph-times"><em>0:00</em><em>26:33</em></div>
+      <div class="ph-times"><em>0:00</em><em>-26:33</em></div>
       <div class="ph-ctrls">
-        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M11 18V6l-8.5 6 8.5 6Zm.5-6 8.5 6V6l-8.5 6Z"/></svg>
+        <span class="ph-rate">1×</span>
+        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 5V1L7 6l5 5V7a6 6 0 1 1-6 6H4a8 8 0 1 0 8-8Z"/></svg>
         <div class="ph-play"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7L8 5Z"/></svg></div>
-        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M13 6v12l8.5-6L13 6ZM12.5 12 4 6v12l8.5-6Z"/></svg>
+        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 5V1l5 5-5 5V7a6 6 0 1 0 6 6h2a8 8 0 1 1-8-8Z"/></svg>
+        <span class="ph-rate">15</span>
       </div>
     </div>
   </div></div>
@@ -432,6 +494,31 @@ const artOrPlaceholder = (url, alt) =>
 // Owner-curated homepage line-ups. Pinned by slug, in this exact order; any
 // slug not found in the catalog is skipped, and the row is topped up from the
 // rest of that category so it always shows four.
+/**
+ * Display copy for a show, guaranteed to end on a complete sentence and to
+ * contain no ellipsis.
+ *
+ * The team's own approved description comes first — it's only set aside when it
+ * has no sentence break inside the space available, which would leave a
+ * dangling fragment. In that case we use the shortened version written for the
+ * show (see backfillShowBlurbs), then the meta description, and only as a last
+ * resort a clean word-boundary cut.
+ */
+function showBlurb(show, max = 165) {
+  const own = toText(show.description, max);
+  if (own && endsSentence(own)) return own;
+  for (const alt of [show.blurb, show.seo_description]) {
+    const t = toText(alt, max);
+    if (t && endsSentence(t)) return t;
+  }
+  // Nothing fits the budget as a finished sentence. Run slightly long with the
+  // show's own opening sentence rather than stop mid-thought — a complete
+  // sentence at 200 characters reads far better than a fragment at 165.
+  const first = firstSentence(show.description);
+  if (first) return first;
+  return own;
+}
+
 const HOME_ORIGINAL_SLUGS = ['naked-lunch', 'dont-be-alone-with-jay-kogen', 'behind-the-shadows-w-harvey-guillen', 'pride'];
 const HOME_PARTNER_SLUGS = ['wicked-the-official-podcast', 'only-murders-in-the-building', 'seen-on-the-screen-with-jacqueline-coley', 'commune-with-jeff-krasno'];
 
@@ -486,7 +573,7 @@ export function homePage({ shows }) {
         <div class="fb-info">
           <h3>${esc(s.title)}</h3>
           ${s.author ? `<div class="fb-host">${esc(s.author)}</div>` : ''}
-          <p>${esc(toText(s.description, 300))}</p>
+          <p>${esc(showBlurb(s))}</p>
           <span class="btn btn-primary">Start Listening →</span>
         </div>
       </a>`
@@ -577,8 +664,10 @@ export function homePage({ shows }) {
       <h2 style="margin-top:0">Get updates from Straw Hut Media</h2>
       <p style="color:var(--muted);margin-top:6px">New shows, new episodes, and behind-the-scenes — straight to your inbox.</p>
       <form method="post" action="/subscribe" onsubmit="window.shmTrack&&shmTrack('subscribe',{});window.fbq&&fbq('track','Subscribe');" style="display:flex;gap:10px;flex-wrap:wrap;justify-content:center;margin-top:18px">
+        ${formFields()}
         <input type="email" name="email" required placeholder="you@email.com" style="flex:1;min-width:240px;padding:13px 16px;border-radius:999px;border:1px solid var(--border);background:var(--bg-2);color:var(--text);font-family:inherit">
         <button class="btn btn-primary" type="submit">Subscribe</button>
+        ${turnstileWidget({ lazy: true, action: 'subscribe' })}
       </form>
     </div>
   </div></section>`;
@@ -604,7 +693,7 @@ const SERVICES = [
 
 export function showsIndexPage({ shows }) {
   // A curated wall of cover art — the network at a glance, above the lists.
-  const selections = shows.filter((s) => s.image_url).slice(0, 16);
+  const selections = shows.filter((s) => s.image_url).slice(0, 24);
   const card = (s) => `<a class="show-card" href="/${esc(s.slug)}">
       ${s.featured ? '<span class="badge">Featured</span>' : ''}
       <div class="art">${artOrPlaceholder(s.image_url, s.title)}</div>
@@ -630,14 +719,14 @@ export function showsIndexPage({ shows }) {
     <div class="section-head"><h2>The Network</h2><a class="count" href="#original">Browse all →</a></div>
     <div class="selections">
       ${selections
-        .slice(0, 8)
+        .slice(0, 12)
         .map(
           (s) => `<a class="sel-item" href="/${esc(s.slug)}" title="${esc(s.title)}"><img src="${esc(s.image_url)}" alt="${esc(s.title)}" loading="lazy"></a>`
         )
         .join('')}
       ${phoneMockup(selections)}
       ${selections
-        .slice(8, 16)
+        .slice(12, 24)
         .map(
           (s) => `<a class="sel-item" href="/${esc(s.slug)}" title="${esc(s.title)}"><img src="${esc(s.image_url)}" alt="${esc(s.title)}" loading="lazy"></a>`
         )
@@ -1010,12 +1099,17 @@ export function aboutPage() {
 // --- Book a call (GoHighLevel-backed 15-min fit call) -----------------------
 
 export function bookPage({ widgetUrl = '' } = {}) {
+  // Scheduling lives in GoHighLevel so every booking is a CRM event that can
+  // trigger reminders and follow-up. When no calendar is configured we say so
+  // and route to the contact form — never a scheduler that might be cancelled.
   const embed = widgetUrl
     ? `<iframe src="${esc(widgetUrl)}" title="Book a 15-minute call with Straw Hut Media" scrolling="no" id="shmBookingWidget" style="width:100%;min-height:740px;border:1px solid var(--border);border-radius:14px;background:#fff"></iframe>
        <script src="https://link.msgsndr.com/js/form_embed.js"></script>`
-    : `<div class="calendly-inline-widget" data-url="https://calendly.com/strawhutmedia/discovery?hide_gdpr_banner=1&background_color=12182f&text_color=f2f3f8&primary_color=00cc8e" style="min-width:320px;height:740px"></div>
-       <script src="https://assets.calendly.com/assets/external/widget.js" async></script>
-       <noscript><p class="booking-note"><a href="https://calendly.com/strawhutmedia/discovery" target="_blank" rel="noopener">Open the scheduler to book your 15-minute call →</a></p></noscript>`;
+    : `<div class="panel" style="padding:28px;text-align:center">
+         <h2 style="margin-top:0">Tell us about your show</h2>
+         <p style="color:var(--muted);max-width:520px;margin:0 auto 18px">Send us a note and we'll come straight back with a time that works.</p>
+         <a class="btn btn-primary" href="/contact">Get in touch →</a>
+       </div>`;
   const body = `
   <section class="hero" style="padding-bottom:16px"><div class="container">
     <div class="breadcrumb" style="padding:0 0 14px"><a href="/">Home</a> / Book a call</div>
@@ -1023,14 +1117,36 @@ export function bookPage({ widgetUrl = '' } = {}) {
     <p>Book a free 15-minute call. Tell us about your show or your idea, and we'll tell you honestly whether — and how — we can help. No slides, no hard sell, no obligation.</p>
   </div></section>
   <section class="section" style="padding-top:8px"><div class="container">
-    <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(220px,1fr));margin-bottom:28px">
+    <div class="panel" id="shmQuoteCtx" style="display:none;padding:18px 20px;margin-bottom:20px">
+      <div style="font-weight:600;margin-bottom:6px">You're asking about <span class="accent" id="shmQuoteCtxPkg"></span></div>
+      <p style="color:var(--muted);margin:0;font-size:.92rem;line-height:1.55">We've kept your answers — no need to repeat them. Pick a time and we'll come to the call already up to speed.</p>
+    </div>
+    ${embed}
+
+    <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(220px,1fr));margin-top:28px">
       <article class="show-card" style="padding:20px 22px"><h3 style="margin-top:0">What we'll cover</h3><p class="meta" style="line-height:1.55">Your idea or existing show, what you're trying to build, and wherever you're stuck.</p></article>
       <article class="show-card" style="padding:20px 22px"><h3 style="margin-top:0">What you'll leave with</h3><p class="meta" style="line-height:1.55">A straight answer on whether we're the right partner — and the smartest next step either way.</p></article>
       <article class="show-card" style="padding:20px 22px"><h3 style="margin-top:0">How long</h3><p class="meta" style="line-height:1.55">Fifteen minutes. That's genuinely it.</p></article>
     </div>
-    ${embed}
   </div></section>
-  <script>window.shmTrack&&shmTrack('book_call_view',{});</script>`;
+  <script>
+  (function(){
+    window.shmTrack&&shmTrack('book_call_view',{});
+    // Carry a package pick or finished quote over from /pricing so the visitor
+    // can see we kept it, and so /contact can prefill it if they write instead.
+    var pkg='';
+    try{ pkg=new URLSearchParams(window.location.search).get('package')||''; }catch(e){}
+    if(!pkg){ try{
+      var raw=(window.sessionStorage&&sessionStorage.getItem('shm_quote'))||(window.localStorage&&localStorage.getItem('shm_quote'))||'';
+      if(raw) pkg=(JSON.parse(raw)||{}).pkg||'';
+    }catch(e){} }
+    if(pkg){
+      var box=document.getElementById('shmQuoteCtx');
+      var name=document.getElementById('shmQuoteCtxPkg');
+      if(box&&name){ name.textContent=pkg; box.style.display='block'; }
+    }
+  })();
+  </script>`;
   return layout({
     title: 'Book a 15-Minute Fit Call — Straw Hut Media',
     description:
@@ -1045,9 +1161,154 @@ export function bookPage({ widgetUrl = '' } = {}) {
   });
 }
 
+// --- Services hub ----------------------------------------------------------
+// /services used to be a static file dropped into public/ — Inter instead of
+// Poppins, the pre-brand green, no nav, no footer, no canonical, no schema. It
+// was the only page on the site that didn't look like the site.
+//
+// It is now a real page: the five things Straw Hut actually sells, each linking
+// to the page that sells it properly. No prices here, so unlike /pricing it can
+// stay indexable — which matters, because "podcast production services" is the
+// search this company needs to win.
+
+const SERVICE_LINES = [
+  {
+    name: 'Podcast production',
+    href: '/podcast-production',
+    text: 'One team owns the whole show — development, creative direction, recording, editing, sound design, and publishing. You host; we handle everything else.',
+    serviceType: 'Podcast production',
+  },
+  {
+    name: 'Network distribution',
+    href: '/shows',
+    text: 'Join a network of award-winning originals and partner shows. Published and optimized across Apple Podcasts, Spotify, YouTube, and everywhere else people listen.',
+    serviceType: 'Podcast distribution',
+  },
+  {
+    name: 'Advertising & brand partnerships',
+    href: '/advertise',
+    text: 'Host-read ads, branded segments, and full branded series across our shows — plus paid campaigns that put your episodes in front of new listeners.',
+    serviceType: 'Podcast advertising',
+  },
+  {
+    name: 'Show development',
+    href: '/podcast-production#development',
+    text: "Concept, format, positioning, and a launch plan. The work that decides whether a show lands before a single episode is recorded.",
+    serviceType: 'Podcast show development',
+  },
+  {
+    name: 'Studio booking',
+    href: '/studio',
+    text: 'Our fully-equipped Hollywood studio — pro audio and multi-camera 4K video, from $125/hour. Book by the hour and walk out with publish-ready files.',
+    serviceType: 'Recording studio rental',
+  },
+];
+
+const SERVICES_FAQ = [
+  ['What services does Straw Hut Media offer?',
+   'Straw Hut Media is a full-service podcast production company and network in Hollywood. We offer podcast production (development, recording, editing, sound design, and publishing), distribution through our network, podcast advertising and brand partnerships, show development, and hourly booking of our Hollywood recording studio.'],
+  ['Do you work with brands, or only individual creators?',
+   'Both. We produce award-winning original shows, flagship podcasts for individual creators and personalities, and branded podcasts for companies who want to build authority with an audience. We have worked with partners including Universal, Disney, and Hulu.'],
+  ['Can I use just one service, or do I have to take the whole package?',
+   'You can use one. Plenty of clients book the studio by the hour, or come to us only for advertising on our network, without any production work. If you want the whole show handled end to end, that is what the production packages are for.'],
+  ['How much does it cost?',
+   'It depends on format, episode length, frequency, and how much of the work you want us to own. Our packages page lays out three production tiers and a custom quote builder that gives you a real number in a couple of minutes; the studio is priced by the hour at $125 for 1080p and $150 for 4K.'],
+  ['How do I get started?',
+   'Book a free 15-minute discovery call. Tell us about the show or the idea, and we will tell you honestly whether — and how — we can help. No slides and no hard sell.'],
+];
+
+export function servicesHubPage() {
+  const pillars = SERVICE_LINES.map((s, i) => `
+    <a class="pillar pillar-link" href="${esc(s.href)}">
+      <div class="pillar-num">${String(i + 1).padStart(2, '0')}</div>
+      <div class="pillar-body">
+        <h3>${esc(s.name)}</h3>
+        <p>${esc(s.text)}</p>
+        <span class="pillar-arrow">Learn more →</span>
+      </div>
+    </a>`).join('');
+
+  const body = `
+  <section class="hero" style="padding-bottom:10px"><div class="container">
+    <div class="breadcrumb" style="padding:0 0 14px"><a href="/">Home</a> / Services</div>
+    <h1>Everything a podcast needs, <span class="accent">under one roof</span></h1>
+    <p>Straw Hut Media is a full-service podcast production company and network based in Hollywood. We build shows from the idea up, distribute them, sell the ads that pay for them, and rent the studio they are recorded in — and you can use any one piece of that on its own.</p>
+    <div style="margin-top:22px">
+      <a class="btn btn-primary" href="/book">Book a 15-min fit call →</a>
+      <a class="btn btn-ghost" href="/pricing" style="margin-left:8px">See packages &amp; pricing</a>
+    </div>
+  </div></section>
+
+  <section class="section" style="padding-top:14px"><div class="container">
+    <div class="section-head"><h2>What we do</h2></div>
+    <div class="pillars">${pillars}</div>
+  </div></section>
+
+  <section class="section"><div class="container">
+    <div class="section-head"><h2>How working with us actually goes</h2></div>
+    <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(260px,1fr))">
+      <article class="show-card" style="padding:22px 24px">
+        <h3 style="margin-top:0">1 · A straight conversation</h3>
+        <p class="meta" style="line-height:1.55">Fifteen minutes on what you are building and where you are stuck. If we are not the right partner, we say so and point you somewhere better.</p>
+      </article>
+      <article class="show-card" style="padding:22px 24px">
+        <h3 style="margin-top:0">2 · A scope and a real number</h3>
+        <p class="meta" style="line-height:1.55">Format, frequency, and what we own versus what you keep — priced before anything starts, so there are no surprises later.</p>
+      </article>
+      <article class="show-card" style="padding:22px 24px">
+        <h3 style="margin-top:0">3 · We make the show</h3>
+        <p class="meta" style="line-height:1.55">One team, one point of contact, and episodes that ship on schedule. You keep your show, your feed, and your IP throughout.</p>
+      </article>
+    </div>
+  </div></section>
+
+  ${faqSection(SERVICES_FAQ, 'Podcast services — frequently asked')}
+
+  <section class="section"><div class="container"><div class="cta-band">
+    <h2>Not sure which piece you need?</h2>
+    <p>That is exactly what the call is for. Fifteen minutes, an honest answer, no obligation.</p>
+    <a class="btn btn-primary" href="/book">Book a 15-min fit call →</a>
+  </div></div></section>`;
+
+  const itemList = `<script type="application/ld+json">${JSON.stringify({
+    '@context': 'https://schema.org',
+    '@type': 'ItemList',
+    name: 'Straw Hut Media podcast services',
+    itemListElement: SERVICE_LINES.map((s, i) => ({
+      '@type': 'ListItem',
+      position: i + 1,
+      item: {
+        '@type': 'Service',
+        name: s.name,
+        serviceType: s.serviceType,
+        description: s.text,
+        url: canonical(s.href.split('#')[0]),
+        provider: { '@type': 'Organization', name: 'Straw Hut Media', url: canonical('/') },
+      },
+    })),
+  }).replace(/</g, '\\u003c')}</script>`;
+
+  return layout({
+    title: 'Podcast Services — Production, Distribution & Advertising | Straw Hut Media',
+    description:
+      'Straw Hut Media is a full-service podcast production company and network in Hollywood — podcast production, network distribution, advertising and brand partnerships, show development, and studio booking.',
+    body,
+    activeNav: '/services',
+    path: '/services',
+    jsonLd:
+      organizationJsonLd() +
+      '\n' + itemList +
+      '\n' + faqJsonLdFrom(SERVICES_FAQ) +
+      '\n' + breadcrumbJsonLd([
+        { name: 'Home', path: '/' },
+        { name: 'Services', path: '/services' },
+      ]),
+  });
+}
+
 // --- Pricing / packages + custom quote builder -----------------------------
 // Native (no iframe): package cards in our own design + the quote quiz embedded
-// directly. Calendly opens at page level so the buttons actually work.
+// directly. Package interest hands off to /book, which is GoHighLevel-backed.
 const PACKAGES = [
   {
     tier: 'Essential', name: 'Essential Podcast Package', price: '$2,450',
@@ -1128,21 +1389,26 @@ export function pricingPage() {
   <script src="/public/quote/widget.js"></script>
   <script>
   (function(){
-    var CALENDLY_URL='https://calendly.com/strawhutmedia/discovery';
     var NL=String.fromCharCode(10);
     var openBtn=document.getElementById('openQuizBtn'), quiz=document.getElementById('quiz-view');
     if(openBtn&&quiz){openBtn.addEventListener('click',function(){quiz.style.display='block';quiz.scrollIntoView({behavior:'smooth'});window.shmTrack&&shmTrack('pricing_quiz_open',{});});}
-    function loadCalendly(cb){if(window.Calendly){cb&&cb();return;}var l=document.createElement('link');l.href='https://assets.calendly.com/assets/external/widget.css';l.rel='stylesheet';document.head.appendChild(l);var s=document.createElement('script');s.src='https://assets.calendly.com/assets/external/widget.js';s.onload=cb;document.head.appendChild(s);}
-    loadCalendly();
+    // Booking is GoHighLevel only — send package interest to /book so the
+    // booking lands in the CRM and can trigger follow-up.
     var btns=document.querySelectorAll('.pkg-cta');
-    for(var i=0;i<btns.length;i++){(function(btn){btn.addEventListener('click',function(){
-      var pkg=btn.getAttribute('data-package'), features=btn.getAttribute('data-features');
-      var summary='=== PACKAGE SELECTION ==='+NL+NL+'Selected Package: '+pkg+NL+NL+'--- What is Included ---'+NL+features.split(', ').map(function(f){return '\\u2022 '+f;}).join(NL);
+    for(var i=0;i<btns.length;i++){(function(btn){btn.addEventListener('click',function(e){
+      e.preventDefault();
+      var pkg=btn.getAttribute('data-package')||'';
+      var feats=btn.getAttribute('data-features')||'';
+      var summary='=== PACKAGE SELECTION ==='+NL+NL+'Selected package: '+pkg+NL+NL+"--- What's included ---"+NL
+        +feats.split(', ').map(function(f){return '\u2022 '+f;}).join(NL);
+      try{
+        var payload=JSON.stringify({summary:summary,pkg:pkg,ts:Date.now()});
+        if(window.sessionStorage)sessionStorage.setItem('shm_quote',payload);
+        if(window.localStorage)localStorage.setItem('shm_quote',payload);
+      }catch(e2){}
       window.shmTrack&&shmTrack('pricing_package_click',{pkg:pkg});
-      if(window.Calendly){window.Calendly.initPopupWidget({url:CALENDLY_URL+'?hide_gdpr_banner=1&background_color=12182f&text_color=f2f3f8&primary_color=00cc8e',prefill:{customAnswers:{a1:summary}}});}
-      else{window.open(CALENDLY_URL,'_blank');}
+      window.location.href='/book?package='+encodeURIComponent(pkg);
     });})(btns[i]);}
-    window.shmTrack&&shmTrack('pricing_view',{});
   })();
   </script>`;
   return layout({
@@ -1164,6 +1430,17 @@ export function pricingPage() {
       '\n' +
       pricingOffersJsonLd(PACKAGES),
   });
+}
+
+function lpHighlight(ep) {
+  // Transcript pull-quotes only. There was a guest line here; it just repeated
+  // names already in the episode title two lines above, so it was noise.
+  const quotes = jsonList(ep.quotes);
+  if (!quotes.length) return '';
+  return `<div class="lp-quotes">${quotes
+    .slice(0, 2)
+    .map((q) => `<blockquote class="lp-quote"><p>&ldquo;${esc(q)}&rdquo;</p><span>From the episode</span></blockquote>`)
+    .join('')}</div>`;
 }
 
 export function landingPage({ landing, show, episode }) {
@@ -1201,26 +1478,36 @@ ${trackingHead()}${FONT}<link rel="stylesheet" href="/styles.css?v=${CSS_V}">${g
 ${trackingBody()}
 <main class="lp-wrap"><div class="lp-card">
   <a class="lp-brand" href="/">Straw Hut Media<span class="dot">.</span></a>
-  <div class="lp-head">
-    ${cover ? `<img class="lp-cover" src="${esc(cover)}" alt="${esc(headline)}">` : ''}
-    <div class="lp-head-text">
-      ${show ? `<div class="lp-eyebrow">${esc(show.title)}</div>` : ''}
-      <h1 class="lp-title">${esc(headline)}</h1>
-      ${dateline ? `<div class="lp-date">${esc(dateline)}</div>` : ''}
-    </div>
-  </div>
-  ${player ? `<div class="lp-playcue"><span class="lp-playcue-arrow">▶</span> Press play</div>${player}` : ''}
-  ${landing.cta_url ? `<a class="btn btn-primary lp-cta-btn" id="lpCta" href="${esc(landing.cta_url)}">${esc(landing.cta_label || 'Listen now')}</a>` : ''}
-  ${landing.subhead ? `<p class="lp-sub">${esc(landing.subhead)}</p>` : ''}
+  ${show ? `<p class="lp-show-name">${esc(show.title)}</p>` : ''}
+  ${cover ? `<img class="lp-cover" src="${esc(cover)}" alt="${esc(headline)}">` : ''}
+  <h1 class="lp-title">${esc(headline)}</h1>
+  ${dateline ? `<p class="lp-date">${esc(dateline)}</p>` : ''}
+  ${
+    ep.ai_hook
+      ? `<div class="lp-hook"><p class="lp-hook-label">Why listen</p><p class="lp-hook-text">${esc(ep.ai_hook)}</p></div>`
+      : landing.subhead
+        ? `<div class="lp-hook"><p class="lp-hook-label">Why listen</p><p class="lp-hook-text">${esc(landing.subhead)}</p></div>`
+        : ''
+  }
+  ${player || ''}
+  ${lpHighlight(ep)}
+  ${body ? `<div class="lp-divider"></div><div class="lp-desc notes">${body}</div>` : ''}
   ${
     show
-      ? `<div class="lp-subscribe">
-           <div class="lp-sub-label">Subscribe to ${esc(show.title)}</div>
+      ? `<div class="lp-divider"></div>
+         <div class="lp-subscribe">
+           <p class="lp-sub-label">Enjoy the episode?</p>
+           <p class="lp-sub-show">Subscribe to ${esc(show.title)}</p>
            ${platformRow(show)}
          </div>`
       : ''
   }
-  ${body ? `<div class="lp-desc notes">${body}</div>` : ''}
+  ${shareRow(headline)}
+  ${
+    landing.cta_url
+      ? `<a class="btn btn-primary lp-cta-btn" id="lpCta" href="${esc(landing.cta_url)}">${esc(landing.cta_label || 'Listen now')}</a>`
+      : ''
+  }
 </div></main>
 <script>(function(){
   // Attribution: keep gclid/utm and append to the CTA so conversions track.
@@ -1325,7 +1612,7 @@ export function studioPage() {
       <label>Session length</label>
       <select id="durationSelect" style="width:100%;padding:12px 14px;border-radius:10px;border:1px solid var(--border);background:var(--bg-2);color:var(--text);font-family:inherit;font-size:0.95rem">${opts}</select>
     </div>
-    <div id="bookingLoader" style="padding:40px 0;color:var(--muted)">Loading booking calendar…</div>
+    <div id="bookingLoader" style="padding:40px 0;color:var(--muted)">Loading the booking calendar</div>
     <iframe id="bookingIframe" title="Book the Straw Hut Studio" style="display:none;width:100%;min-height:720px;border:1px solid var(--border);border-radius:14px;background:#fff" scrolling="no"></iframe>
   </div></section>
   <script src="https://link.msgsndr.com/js/form_embed.js"></script>
@@ -1362,7 +1649,7 @@ export function studioPage() {
   });
 }
 
-export function contactPage({ sent = false, error = '', values = {} } = {}) {
+export function contactPage({ sent = false, error = '', values = {}, canBook = true } = {}) {
   const v = (k) => esc(values[k] || '');
   const body = `
   <section class="hero" style="padding-bottom:20px"><div class="container">
@@ -1375,10 +1662,18 @@ export function contactPage({ sent = false, error = '', values = {} } = {}) {
       sent
         ? `<div class="contact-thanks">
              <h2 style="margin:0 0 8px">Thanks — message received.</h2>
-             <p style="color:var(--muted);margin:0">We read every note and reply personally. Talk soon.</p>
+             <p style="color:var(--muted);margin:0 0 6px">We read every note and reply personally, and a confirmation is on its way to your inbox.</p>
+             ${
+               canBook
+                 ? `<p style="color:var(--muted);margin:0 0 20px">Don't want to wait? Grab a free 15 minutes now.</p>
+                    <a class="btn btn-primary" href="/book">Book a 15-minute call →</a>`
+                 : `<p style="color:var(--muted);margin:0 0 20px">You'll hear back from us shortly — usually the same day.</p>
+                    <a class="btn btn-ghost" href="/shows">Hear our shows</a>`
+             }
            </div>
            <script>window.shmTrack&&shmTrack('contact_submit',{topic:'${esc(values.topic || 'general')}'});window.fbq&&fbq('track','Lead');</script>`
         : `<form class="contact-form" method="POST" action="/contact">
+             ${formFields()}
              ${error ? `<div class="flash err" style="margin-bottom:18px">${esc(error)}</div>` : ''}
              <div class="field"><label>What's this regarding?</label>
                <select name="topic" class="contact-select">
@@ -1393,8 +1688,23 @@ export function contactPage({ sent = false, error = '', values = {} } = {}) {
              </div>
              <div class="field"><label>Company / show <span style="color:var(--muted);font-weight:400">(optional)</span></label><input type="text" name="company" value="${v('company')}"></div>
              <div class="field"><label>What can we help with?</label><textarea name="message" rows="6" required>${v('message')}</textarea></div>
+             ${turnstileWidget({ action: 'contact' })}
              <button class="btn btn-primary" type="submit">Send message</button>
-           </form>`
+           </form>
+           <script>
+           (function(){
+             // If they built a quote or picked a package first, bring it with
+             // them — it lands in the email and on their CRM contact.
+             var box=document.querySelector('.contact-form textarea[name="message"]');
+             if(!box||box.value.trim())return;
+             var raw='';
+             try{ raw=(window.sessionStorage&&sessionStorage.getItem('shm_quote'))||(window.localStorage&&localStorage.getItem('shm_quote'))||''; }catch(e){}
+             if(!raw)return;
+             var q=null; try{ q=JSON.parse(raw); }catch(e){}
+             if(!q||!q.summary)return;
+             box.value=q.summary+String.fromCharCode(10,10)+'--- '+String.fromCharCode(10)+'Anything you want to add:'+String.fromCharCode(10);
+           })();
+           </script>`
     }
   </div></section>`;
   return layout({
@@ -1523,25 +1833,108 @@ function epRecCard(showSlug, showTitle, ep, showImage) {
   </a>`;
 }
 
-export function episodePage({ show, episode, moreFromShow = [], related = [] }) {
+// --- Episode landing-page blocks -------------------------------------------
+// These mirror what makes the Podbooster campaign pages convert: a one-line
+// reason to listen, what you actually get, who's on it, and an easy way to
+// follow or share. All of it degrades to nothing when the data isn't there.
+
+const jsonList = (v) => {
+  if (!v) return [];
+  if (Array.isArray(v)) return v;
+  try { const p = JSON.parse(v); return Array.isArray(p) ? p : []; } catch { return []; }
+};
+
+function episodeHook(episode) {
+  const hook = String(episode.ai_hook || '').trim();
+  if (!hook) return '';
+  return `<p class="ep-hook">${esc(hook)}</p>`;
+}
+
+function episodeTakeaways(episode) {
+  const items = jsonList(episode.ai_takeaways);
+  if (!items.length) return '';
+  return `<div class="ep-takeaways">
+    <h2 class="ep-block-h">In this episode</h2>
+    <ul>${items.map((t) => `<li>${esc(t)}</li>`).join('')}</ul>
+  </div>`;
+}
+
+/** Share row — native share sheet on a phone, copy-to-clipboard everywhere else. */
+function shareRow(title) {
+  const t = String(title || '').replace(/'/g, "\\'");
+  return `<div class="ep-share">
+    <button class="ep-share-btn" type="button" onclick="shmShare(this,'${esc(t)}')" aria-label="Share this episode">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M4 12v7a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-7"/><path d="M12 15V3"/><path d="m8 7 4-4 4 4"/></svg>
+      <span>Share</span>
+    </button>
+    <span class="ep-share-toast" hidden>Link copied</span>
+  </div>
+  <script>window.shmShare=window.shmShare||function(btn,title){
+  var url=location.href, toast=btn.parentNode.querySelector('.ep-share-toast');
+  window.shmTrack&&shmTrack('share_episode',{episode:title});
+  if(navigator.share){navigator.share({title:title,url:url}).catch(function(){});return;}
+  var done=function(){if(!toast)return;toast.hidden=false;setTimeout(function(){toast.hidden=true;},2200);};
+  if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(url).then(done).catch(function(){});return;}
+  var i=document.createElement('input');i.value=url;document.body.appendChild(i);i.select();
+  try{document.execCommand('copy');done();}catch(e){}document.body.removeChild(i);};</script>`;
+}
+
+export function episodePage({ show, episode, moreFromShow = [], related = [], adTraffic = false }) {
+  // One page, one URL, one layout. The top of the page is the same card layout
+  // as the campaign landing page (which converts), and the SEO depth — full
+  // show notes, about-the-show, and internal links to more episodes — sits
+  // below it. There is no separate /go/ page to keep in sync any more.
+  const cover = episode.image_url || show.image_url || '';
+  const dateline = [
+    episode.published_at ? formatDate(episode.published_at) : '',
+    episode.duration ? formatDuration(episode.duration) : '',
+  ]
+    .filter(Boolean)
+    .join(' · ');
   const body = `
   <article>
-  <section class="episode-hero"><div class="container">
-    <div class="breadcrumb" style="padding-bottom:18px"><a href="/">Home</a> / <a href="/${esc(show.slug)}">${esc(show.title)}</a> / Episode</div>
-    <div class="episode-hero-grid">
-      <div class="art">${artOrPlaceholder(episode.image_url || show.image_url, episode.title + ' — ' + show.title)}</div>
-      <div>
-        <a class="show-link" href="/${esc(show.slug)}">${esc(show.title)}</a>
-        <h1>${esc(episode.title)}</h1>
-        <div class="sub">${episode.published_at ? `<time datetime="${esc(new Date(episode.published_at).toISOString())}">${esc(formatDate(episode.published_at))}</time>` : ''}${episode.duration ? ' · ' + esc(formatDuration(episode.duration)) : ''}${episode.youtube_id ? ' · <span class="pill on">▶ Watch on video</span>' : ''}</div>
-        ${episode.youtube_id ? `<div class="video-embed"><iframe src="https://www.youtube-nocookie.com/embed/${esc(episode.youtube_id)}" title="${esc(episode.title)}" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen loading="lazy"></iframe></div>` : ''}
-        ${
-          episode.audio_url
-            ? audioPlayer(episode.audio_url, { title: episode.title, showTitle: show.title, image: episode.image_url || show.image_url, duration: episode.duration }) + platformRow(show)
-            : platformRow(show) || `<p class="sub">Audio unavailable for this episode.</p>`
-        }
+  <section class="ep-lp">${
+    cover ? `<img class="ep-tint" src="${esc(cover)}" alt="" aria-hidden="true" loading="lazy">` : ''
+  }<div class="container">
+    <div class="breadcrumb ep-lp-crumb"><a href="/">Home</a> / <a href="/${esc(show.slug)}">${esc(show.title)}</a> / Episode</div>
+    <div class="lp-card">
+      <div class="lp-head">
+        ${cover ? `<img class="lp-cover" src="${esc(cover)}" alt="${esc(episode.title)} — ${esc(show.title)}">` : ''}
+        <div class="lp-head-text">
+          <a class="lp-show-name" href="/${esc(show.slug)}">${esc(show.title)}</a>
+          <h1 class="lp-title${episode.title.length > 100 ? ' is-xlong' : episode.title.length > 62 ? ' is-long' : ''}">${esc(episode.title)}</h1>
+          ${dateline ? `<p class="lp-date">${esc(dateline)}</p>` : ''}
+        </div>
       </div>
+      ${
+        episode.ai_hook
+          ? `<div class="lp-hook"><p class="lp-hook-label">Why listen</p><p class="lp-hook-text">${esc(episode.ai_hook)}</p></div>`
+          : ''
+      }
+      ${
+        episode.youtube_id
+          ? `<div class="video-embed"><iframe src="https://www.youtube-nocookie.com/embed/${esc(episode.youtube_id)}" title="${esc(episode.title)}" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen loading="lazy"></iframe></div>`
+          : ''
+      }
+      ${
+        episode.audio_url
+          ? audioPlayer(episode.audio_url, { title: episode.title, showTitle: show.title, image: cover, duration: episode.duration, autoplay: adTraffic })
+          : `<p class="sub">Audio unavailable for this episode.</p>`
+      }
+      ${lpHighlight(episode)}
+      ${
+        platformRow(show)
+          ? `<div class="lp-divider"></div>
+             <div class="lp-subscribe">
+               <p class="lp-sub-label">Enjoy the episode?</p>
+               <p class="lp-sub-show">Subscribe to ${esc(show.title)}</p>
+               ${platformRow(show)}
+             </div>`
+          : ''
+      }
+      ${shareRow(episode.title)}
     </div>
+    ${episodeTakeaways(episode)}
   </div></section>
 
   <section class="section"><div class="container">

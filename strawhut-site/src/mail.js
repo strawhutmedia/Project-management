@@ -39,10 +39,74 @@ export const CONTACT_ROUTES = {
  * Deliver a contact-form submission to the inbox for its topic, with reply-to
  * set to the sender so the recipient can just hit reply.
  */
-export async function sendContactEmail({ name, email, company, message, topic }) {
+/**
+ * Instant acknowledgement to the PROSPECT, with a way to book immediately.
+ *
+ * Until this existed, someone who filled the contact form heard nothing at all
+ * until a human happened to read the inbox. Speed of first response is the
+ * single biggest lever on whether an enquiry turns into a client, and silence
+ * is the worst possible first impression from a production company.
+ *
+ * Deliberately short and human — it is not a marketing email. Never throws:
+ * failing to acknowledge must not fail the submission.
+ */
+export async function sendContactAutoReply({ name, email, topic, canBook = true }) {
+  if (!process.env.RESEND_API_KEY || !email) return { ok: false, skipped: true };
+  const site = (process.env.APP_BASE_URL || 'https://www.strawhutmedia.com').replace(/\/+$/, '');
+  const esc = (x) => String(x == null ? '' : x).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  const first = String(name || '').trim().split(/\s+/)[0] || 'there';
+  // Someone who just used the contact form must never be sent to /book while
+  // no calendar is live — /book would route them straight back to the form
+  // they came from. Silence beats a loop.
+  const isGuest = topic === 'booking';
+  const offerCall = !isGuest && canBook;
+  const html = `<div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;font-size:16px;line-height:1.6;color:#1a1a1a">
+    <p>Hi ${esc(first)},</p>
+    <p>Thanks for reaching out to Straw Hut Media — your message landed and a real person will read it.</p>
+    ${
+      isGuest
+        ? `<p>We'll come back to you about guesting on one of our shows.</p>`
+        : offerCall
+        ? `<p>If it's easier than waiting on email, you can grab a free 15-minute call right now and we'll tell you straight whether we're the right partner for what you're building:</p>
+           <p><a href="${site}/book" style="display:inline-block;background:#00cc8e;color:#023324;font-weight:700;text-decoration:none;padding:12px 26px;border-radius:999px">Book a 15-minute call →</a></p>
+           <p style="font-size:14px;color:#555">No slides, no hard sell. Fifteen minutes.</p>`
+        : `<p>We'll come back to you shortly — usually the same day — with a straight answer on whether we're the right partner for what you're building, and a time to talk it through.</p>`
+    }
+    <p>— Straw Hut Media</p>
+    <p style="font-size:13px;color:#888">Full-service podcast production &amp; network · <a href="${site}" style="color:#0a8f66">strawhutmedia.com</a></p>
+  </div>`;
+  try {
+    const res = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${process.env.RESEND_API_KEY}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        from: FROM,
+        to: email,
+        subject: offerCall ? "Thanks for reaching out — want to grab 15 minutes?" : 'Thanks for getting in touch — Straw Hut Media',
+        html,
+        reply_to: 'hello@strawhutmedia.com',
+      }),
+    });
+    if (!res.ok) {
+      const b = await res.text().catch(() => '');
+      console.error('[mail] auto-reply failed:', res.status, b.slice(0, 160));
+      return { ok: false };
+    }
+    return { ok: true };
+  } catch (e) {
+    console.error('[mail] auto-reply error:', e.message);
+    return { ok: false };
+  }
+}
+
+export async function sendContactEmail({ name, email, company, message, topic, flags = [] }) {
   const route = CONTACT_ROUTES[topic] || CONTACT_ROUTES.general;
   const esc = (s) => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  // Never dropped — just labelled, so a mail rule can quarantine it and a real
+  // lead that trips a heuristic still lands in the inbox.
+  const suspect = flags.length ? `[possible spam: ${flags.join(', ')}] ` : '';
   const html = `<h2>New contact form message</h2>
+    ${suspect ? `<p style="background:#fff4d6;padding:8px 10px;border-radius:6px"><strong>⚠ Flagged as possible spam</strong> (${esc(flags.join(', '))}). Delivered anyway in case it's real.</p>` : ''}
     <p><strong>Regarding:</strong> ${esc(route.label)}</p>
     <p><strong>Name:</strong> ${esc(name)}</p>
     <p><strong>Email:</strong> ${esc(email)}</p>
@@ -55,7 +119,7 @@ export async function sendContactEmail({ name, email, company, message, topic })
       Authorization: `Bearer ${process.env.RESEND_API_KEY}`,
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({ from: FROM, to: route.to, subject: `[${route.label}] ${name || 'someone'}`, html, reply_to: email }),
+    body: JSON.stringify({ from: FROM, to: route.to, subject: `${suspect}[${route.label}] ${name || 'someone'}`, html, reply_to: email }),
   });
   if (!res.ok) {
     const body = await res.text().catch(() => '');

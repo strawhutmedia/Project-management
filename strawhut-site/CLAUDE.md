@@ -7,6 +7,53 @@ generates show + episode pages automatically.
 
 ---
 
+## 📱 MOBILE FIRST — check the phone BEFORE you call anything done
+
+**Roughly 90% of visitors reach this site on a phone.** Desktop and tablet must
+look good; the phone must look *incredible*. If you designed or verified on
+desktop and checked the phone afterwards — or not at all — you did it wrong.
+
+**Every change that touches markup or CSS must be rendered and looked at on a
+phone viewport before it is committed.** Not reasoned about. Rendered.
+
+```
+node tools/mobile-audit.mjs                        # audit live at 390px
+node tools/mobile-audit.mjs --base http://localhost:8080
+node tools/mobile-audit.mjs --shot home            # + screenshots to look at
+```
+
+The harness renders real pages in headless Chromium (downloading and
+re-pointing remote images so cover art actually appears) and reports
+horizontal overflow, elements wider than the viewport, text under 11.5px,
+touch targets under 32px, and **uncaught JS errors** (`js:` column). Read the
+screenshots — the numbers catch structural breakage, but only your eyes catch
+ugly.
+
+Rules that came out of real bugs on this site:
+
+- **A hidden overflow is not a passing grade.** `.hero { overflow: hidden }`
+  meant a 475px-wide waveform silently *clipped the homepage headline* on every
+  phone while the "no horizontal scroll" check passed. Check element widths
+  against the viewport, not just `scrollWidth`.
+- **Give grid/flex children `min-width: 0`.** They default to `min-width: auto`,
+  so one wide child (a waveform, a long word, a table) drags the whole track
+  past the screen edge.
+- **A grid whose item count doesn't divide by the column count leaves a hole**
+  that reads as missing content. Pick counts that divide by 3 and 4, or wrap
+  and centre.
+- **Touch targets ≥44px, text ≥12px.** 10px type and a 23px link are fine on a
+  27" monitor and miserable in a hand.
+- Decorative strips built from many fixed-width bars need a reduced count on
+  phones — squeezing 90 bars into 390px just clips them.
+- **Escape regexes twice inside template literals.** Every inline `<script>` in
+  this codebase is a template literal, where `\/` collapses to `/` and `\b` to a
+  backspace character. `/^(Europe|Atlantic\/(Azores...))/` shipped as an
+  unterminated regex, so the whole script block failed to *parse* — Google
+  Consent Mode and the cookie banner were dead on every page for weeks with no
+  server-side symptom. Write `\\/` and `\\b`. The `js:` column now catches it.
+
+---
+
 ## ⭐ NUMBER ONE GOAL — non-negotiable, applies to EVERY page
 
 **Strong SEO + AI-discoverability (GEO) on every single public page, so that
@@ -48,8 +95,20 @@ component, or route you add MUST ship SEO on day one — never "later."**
 - **Studio (`/studio`)** — Service + LocalBusiness/RecordingStudio + per-hour
   Offers ($125 1080p, $150 4K), Hollywood/LA `areaServed`. This is a direct
   revenue page; treat it like a money page.
-- **Services (`/services`)** — the packages page. Keep it crawlable and
-  described in Organization `makesOffer` + `llms.txt`.
+- **Services (`/services`)** — the services hub: the five lines of business,
+  each linking to the page that sells it, plus an `ItemList` of `Service`
+  nodes and a `FAQPage`. Deliberately carries **no prices**, so unlike
+  `/pricing` (noindex by owner decision) it stays indexable — which matters,
+  because "podcast production services" is the search this company needs to
+  win. Rendered by `servicesHubPage()` in `views.js`; add a line of business by
+  adding an entry to `SERVICE_LINES`.
+
+  It replaced a static drop-in at `public/services/index.html` that was served
+  by an `express.static` mount and shadowed everything: Inter instead of
+  Poppins, the pre-brand `#2dd4a0` green, no nav, no footer, no canonical, no
+  schema. **Don't put page HTML in `public/`** — a static mount silently wins
+  over a route, and the page skips `layout()` and therefore every SEO
+  guarantee on the checklist above.
 
 ### Tracking & retargeting (env-gated, `src/tracking.js`)
 
@@ -63,6 +122,107 @@ Set these on Railway (inert until set); no code change needed:
 | `GOOGLE_ADS_ID` | Google Ads remarketing + conversions (`AW-XXXX`) |
 | `META_PIXEL_ID` | Facebook / Instagram retargeting |
 | `TIKTOK_PIXEL_ID` | TikTok retargeting |
+
+### GoHighLevel — the token must be a SUB-ACCOUNT token
+
+`GHL_API_TOKEN` has to be a Private Integration created **inside the Straw Hut
+Media sub-account**, not at the agency/company level. An agency token reads
+`GET /locations/{id}` perfectly happily and is refused on every sub-account
+resource — contacts, calendars, users — with *"The token is not authorized for
+this scope."* (and `/users/` gives the tell: *"Token's user type mismatch!"*).
+
+That cost real time on 2026-08-23: `/healthz` reported `ok (Straw Hut Media)`
+because `verifyGhl()` only read the location, so the CRM looked connected while
+**no contact had ever actually reached it**. `verifyGhl()` now reads one
+contact as well and reports `LIMITED` when it can't, and `probeGhlToken()`
+(read-only, once at boot) reports what the token can reach in `/healthz`
+under `ghlProbe`. Believe the probe, not the top line.
+
+Also: GHL versions its API per resource family and the values differ —
+Contacts `2021-07-28`, Calendars `2021-04-15` (docs also show `v3`). A wrong
+Version header returns the same "not authorized for this scope" message as a
+real permissions problem, so check the version before blaming the scopes.
+
+### Booking is GoHighLevel, and only GoHighLevel
+
+Every "book a call" path on the site ends at `/book`, which embeds a GHL
+calendar. The third-party scheduler that used to run the package CTAs and the
+quote quiz was cancelled on 2026-08-23 — **do not reintroduce a second
+scheduler.** One calendar means every booking is a CRM event that can fire
+reminders and follow-up, which is the whole point.
+
+**The calendar is discovered, not configured.** `resolveBookingCalendar()` in
+`ghl.js` resolves in this order:
+
+1. `BOOKING_WIDGET_URL` — an explicit override, if set.
+2. The GHL API — list the location's calendars at boot and hourly. If
+   `KNOWN_CALENDAR_ID` is among them and active, use it (a confirmed id beats a
+   name heuristic); otherwise score them and take the winner.
+3. `KNOWN_CALENDAR_ID` — the committed floor.
+
+`KNOWN_CALENDAR_ID` is `ym8vwJwU2MiL5RuW7v68`, the real **"Discovery Call"**
+calendar ("Let's talk about podcasts", slug `podcastdiscoverycall`). It was
+read off Straw Hut's own public booking page at `start.strawhutmedia.com` —
+public information, not a secret — because the API token is scoped to contacts
+only and GHL answers `GET /calendars/` with *"The token is not authorized for
+this scope."* Grant `calendars.readonly` on the Private Integration token and
+step 2 starts working; the token string doesn't change, so Railway needs no
+edit. `/healthz` reports which calendar was chosen, how (`env` / `ghl` /
+`ghl (confirmed)` / `known`), and every active calendar it could have picked.
+
+`/book` only falls back to its honest "get in touch" panel if all three fail.
+It never renders an empty or dead scheduler.
+
+**Never point at `/book` when there is no calendar behind it.** The contact
+form's thanks panel and the auto-reply email both take `canBook` (from
+`ghlBookingState().url`) for exactly this reason — without it they sent someone
+who had just written to us to a page whose only action was to write to us.
+
+Package picks on `/pricing` and finished quotes from the quiz stash a
+`shm_quote` payload (`{summary, pkg, ts}`) in session+localStorage and hand off
+to `/book?package=…`. `/book` shows it back to the visitor; `/contact`
+prefills the message box with it, so the whole quote reaches the inbox and the
+GHL contact note. `gclid`/`utm_*` ride along on the hop.
+
+### Form protection (`src/antispam.js` + `src/turnstile.js`)
+
+Public forms (`/contact`, homepage subscribe) are protected by, in order:
+honeypot → HMAC-signed render token (≥3s fill) → per-IP rate limit →
+Cloudflare Turnstile. **Ryan approved Turnstile as a stack addition on
+2026-08-22** — it is the only exception to the "no new external services" rule.
+
+| Env var | Purpose |
+|---|---|
+| `TURNSTILE_SITE_KEY` | Public key, rendered in the widget |
+| `TURNSTILE_SECRET_KEY` | Server-side key for `siteverify` |
+
+Both unset = Turnstile is completely inert (`turnstileWidget()` returns `''`),
+and the first three layers still run.
+
+**Three rules — do not break them:**
+
+1. **Turnstile loads ONLY on pages that contain a form.** There is deliberately
+   no hook in `layout()`; the script tag is emitted next to the widget. On the
+   homepage it is `lazy` — the Cloudflare script isn't requested until someone
+   focuses the subscribe field. If you add a new public form, call
+   `turnstileWidget()` inside it; never move this into `layout()`.
+2. **NEVER post a deliverable submission to the LIVE contact form.** It sends
+   real email to Ryan's inbox. On 2026-08-23 a verification POST
+   ("Jane Doe / jane@label.com / We would like to launch a show, can we talk?")
+   landed as a genuine-looking lead and he began drafting a reply and looping in
+   a colleague to book a meeting with a person who doesn't exist.
+
+   Verify delivery logic against a LOCAL server (`mailConfigured()` is false
+   without `RESEND_API_KEY`, so it only logs). Against production, verify only
+   things that don't send: that the widget renders, that the hidden fields are
+   present, and that a cold bot POST is *blocked* (blocked submissions never
+   email). If a live delivery test is genuinely unavoidable, make it
+   unmistakable — name it `CLAUDE TEST — IGNORE` — and tell Ryan before it lands.
+
+3. **Only an actively *rejected* token blocks.** A missing or unverifiable
+   token (ad blocker, corporate proxy, Cloudflare outage) is flagged and the
+   message is still delivered. Content heuristics likewise only flag. Losing
+   one real client inquiry costs more than a hundred spam emails.
 
 `shmTrack(event, params)` fans one event out to dataLayer/gtag/fbq/ttq. Wired
 events: `play_episode`, `contact_submit`, `subscribe`, `platform_click`,
@@ -102,14 +262,27 @@ host as a real IABv2 download for that show. `preload="none"` ensures only
 actual plays count, not page loads. Keep it this way — do not proxy or rehost
 audio, which would break host-side download counting.
 
+**One deliberate exception: ad traffic autoplays muted.** Visitors arriving with
+`gclid` / `gbraid` / `wbraid`, `utm_source=google_ads`, or
+`utm_medium=display|cpc` get muted autoplay plus a "Tap to unmute" banner,
+mirroring the Podbooster landing page (`opts.autoplay` on `audioPlayer()`, set
+from `isAdTraffic(req)` in `server.js`). Organic and search traffic is untouched
+and keeps `preload="none"`.
+
+Ryan approved this knowing the trade-off: autoplay produces host-counted
+downloads nobody chose to start, which inflates the figures reported to
+advertisers. It is confined to paid traffic for exactly that reason — the same
+scope Podbooster's autoplay already has, since its `/ep/` pages are noindex ad
+destinations. **Do not widen it to organic traffic** without asking him again.
+
 ## Architecture
 
 - Node/Express (ES modules), server-rendered HTML via template strings in
   `src/views.js`. No template engine.
 - Storage: Postgres in prod (`src/store.js` PgStore), JSON-file fallback with no
   `DATABASE_URL`.
-- Deploy: Railway service, root directory `strawhut-site`, current branch
-  `claude/networks-open-302u9k`. Push → auto-build → redeploy.
+- Deploy: Railway service, root directory `strawhut-site`, branch `main`.
+  Push → auto-build → redeploy.
 - Homepage spotlight ranks shows by **real Megaphone downloads** (S3 IABv2
   export, `src/megaphoneS3.js` + `src/popularity.js`), top 3 featured,
   refreshed automatically.
