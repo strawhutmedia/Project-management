@@ -282,11 +282,17 @@ export function episodeEditPage({ show, episode, flash }) {
 }
 
 export function landingsAdminPage({ landings, flash }) {
+  const campaignCount = landings.filter((l) => l.go_url).length;
   const rows = landings
     .map(
       (l) => `<tr>
-      <td>${esc(l.title || l.headline || l.slug)}</td>
-      <td><a href="/lp/${esc(l.slug)}" target="_blank">/lp/${esc(l.slug)}</a></td>
+      <td>${
+        l.go_url
+          ? `<span class="pill on">Campaign</span> ${esc(l.episode_title || l.title || l.slug)}
+             <div style="color:var(--muted);font-size:0.82rem;margin-top:3px">${esc(l.show_title || '')}</div>`
+          : `<span class="pill">Custom</span> ${esc(l.title || l.headline || l.slug)}`
+      }</td>
+      <td><a href="${esc(l.go_url || '/lp/' + l.slug)}" target="_blank">${esc(l.go_url || '/lp/' + l.slug)}</a></td>
       <td>${l.indexable ? '<span class="pill on">Indexed</span>' : '<span class="pill">Hidden</span>'}</td>
       <td class="actions">
         <a class="btn btn-sm" href="/admin/landing/${esc(l.id)}/edit">Edit</a>
@@ -298,7 +304,9 @@ export function landingsAdminPage({ landings, flash }) {
   const body = `
     <h1>Landing Pages</h1>
     ${flash ? `<div class="flash ${flash.type}">${esc(flash.msg)}</div>` : ''}
-    <p style="color:var(--muted);max-width:640px;margin-top:-8px">Standalone, unlisted pages for Google Ads traffic — like an episode page you can fully customize. Not linked from the site; hidden from search by default.</p>
+    <p style="color:var(--muted);max-width:660px;margin-top:-8px">Unlisted pages for ad traffic — hidden from search, not linked from the site.
+    <strong>Campaign</strong> pages are created automatically the first time an ad points at an episode; their URL is the one to give Google Ads.
+    <strong>Custom</strong> pages are ones you built by hand.${campaignCount ? ` Currently ${campaignCount} campaign page${campaignCount === 1 ? '' : 's'}.` : ''}</p>
     <div style="margin:14px 0"><a class="btn btn-primary" href="/admin/landing/new">➕ New landing page</a></div>
     <div class="panel">
       <table class="admin-table"><thead><tr><th>Name</th><th>URL</th><th>Search</th><th></th></tr></thead>

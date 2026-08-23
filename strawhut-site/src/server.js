@@ -597,6 +597,24 @@ async function landingFromBody(body) {
 
 app.get('/admin/landing', requireAdmin, async (req, res) => {
   const landings = await store.listLandings();
+  // Campaign pages are auto-created per episode and served from
+  // /go/<show>/<episode> — that's the URL an ad points at, so show that rather
+  // than the /lp/<slug> the record happens to carry. Only a handful of landings
+  // have an episode, so these lookups stay cheap.
+  const shows = new Map();
+  for (const l of landings) {
+    if (!l.show_id || !l.episode_id) continue;
+    try {
+      if (!shows.has(l.show_id)) shows.set(l.show_id, await store.getShowById(l.show_id));
+      const show = shows.get(l.show_id);
+      const ep = await store.getEpisodeById(l.episode_id);
+      if (show && ep) {
+        l.go_url = `/go/${show.slug}/${ep.slug}`;
+        l.show_title = show.title;
+        l.episode_title = ep.title;
+      }
+    } catch { /* a deleted show or episode just leaves it as a plain landing */ }
+  }
   res.send(A.landingsAdminPage({ landings, flash: readFlash(req, res) }));
 });
 app.get('/admin/landing/new', requireAdmin, (req, res) =>
