@@ -902,16 +902,20 @@ app.get('/go/resolve', async (req, res) => {
   }
 });
 
+// Legacy campaign URL. The episode page now IS the landing page, so there's one
+// link and one layout; anything still pointing here is sent to the real page,
+// preserving ad query parameters (gclid, utm_*) so attribution survives.
 app.get('/go/:showSlug/:episodeSlug', async (req, res, next) => {
   const show = await store.getShowBySlug(req.params.showSlug);
   if (!show) return next();
   const episode = await store.getEpisodeBySlug(show.id, req.params.episodeSlug);
   if (!episode) return next();
-  // This is an ad destination — enrich it too, so paid traffic lands on the
-  // strongest version of the page as soon as possible.
+  // Keep the record so Admin > Landing Pages still lists which episodes are
+  // being advertised, and warm the enrichment for the incoming click.
   enrichEpisodeInBackground(show, episode);
-  const landing = await resolveOrCreateEpisodeLanding(show, episode);
-  res.send(V.landingPage({ landing, show, episode }));
+  resolveOrCreateEpisodeLanding(show, episode).catch(() => {});
+  const qs = req.originalUrl.includes('?') ? '?' + req.originalUrl.split('?')[1] : '';
+  res.redirect(301, `/${show.slug}/${episode.slug}${qs}`);
 });
 
 app.post('/subscribe', async (req, res) => {

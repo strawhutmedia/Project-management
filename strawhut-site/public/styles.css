@@ -1043,13 +1043,13 @@ table.admin-table { width: 100%; border-collapse: collapse; }
 
 /* Artwork tint — a blurred copy of the cover behind the hero, so each episode
    carries its own colour, the same trick the featured band uses. */
-.episode-hero { position: relative; overflow: hidden; }
-.episode-hero > .container { position: relative; z-index: 2; }
+.ep-lp { position: relative; overflow: hidden; padding: 8px 0 34px; }
+.ep-lp > .container { position: relative; z-index: 2; }
 .ep-tint {
   position: absolute; inset: 0; width: 100%; height: 100%; z-index: 0;
   object-fit: cover; filter: blur(60px) saturate(1.5) brightness(0.5); transform: scale(1.4);
 }
-.episode-hero::after {
+.ep-lp::after {
   content: ""; position: absolute; inset: 0; z-index: 1; pointer-events: none;
   background: linear-gradient(180deg, rgba(18,24,47,0.82) 0%, rgba(18,24,47,0.88) 55%, var(--bg) 100%);
 }
@@ -1162,3 +1162,12 @@ table.admin-table { width: 100%; border-collapse: collapse; }
   .lp-cover { width: 152px; height: 152px; }
   .lp-title { font-size: 1.18rem; }
 }
+
+/* The episode page uses the same card as the campaign landing page, centred in
+   the normal container rather than in the standalone /go/ shell. One layout
+   definition serves both — there is no second page to keep in sync. */
+.ep-lp .lp-card { margin: 0 auto; }
+.ep-lp-crumb { padding: 14px 0 16px; }
+.ep-lp .ep-takeaways { max-width: 540px; margin: 24px auto 0; }
+a.lp-show-name { text-decoration: none; display: inline-block; padding: 6px 0; }
+a.lp-show-name:hover { color: #00e6a0; }

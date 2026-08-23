@@ -259,3 +259,18 @@ Notes:
   - Two old rules (`.lp-desc`, `.lp-subscribe`) drew their own top borders,
     which doubled up against the new explicit dividers into two stacked lines.
     Caught by screenshotting.
+- **One page, one link.** Ryan: *"why can't you just make EVERY episode page in
+  the landing page layout? Then it's the same link."* He was right — the
+  two-page split (public episode page + separate `/go/` campaign page) was
+  over-engineering. The episode page now uses the campaign card layout at the
+  top and keeps the SEO depth below it: full show notes, About the show, More
+  from this show, You might also like, breadcrumbs and JSON-LD all intact.
+  - `/go/<show>/<episode>` now 301s to the canonical episode URL, preserving
+    `gclid`/`utm_*` so attribution survives. It still records the landing so
+    Admin → Landing Pages keeps listing which episodes are advertised.
+  - One layout definition (`.lp-card`) serves both, so there's no second page
+    to keep in sync — and the ad destination is now an indexable page that
+    accrues SEO value instead of a throwaway `noindex` duplicate.
+  - Verified nothing was lost: h1, JSON-LD, show notes, about-show, internal
+    links to more episodes all still render. Mobile at 390px: no horizontal
+    scroll, no tap target under 32px.

@@ -1663,30 +1663,55 @@ function shareRow(title) {
 }
 
 export function episodePage({ show, episode, moreFromShow = [], related = [] }) {
+  // One page, one URL, one layout. The top of the page is the same card layout
+  // as the campaign landing page (which converts), and the SEO depth — full
+  // show notes, about-the-show, and internal links to more episodes — sits
+  // below it. There is no separate /go/ page to keep in sync any more.
+  const cover = episode.image_url || show.image_url || '';
+  const dateline = [
+    episode.published_at ? formatDate(episode.published_at) : '',
+    episode.duration ? formatDuration(episode.duration) : '',
+  ]
+    .filter(Boolean)
+    .join(' · ');
   const body = `
   <article>
-  <section class="episode-hero">${
-    episode.image_url || show.image_url
-      ? `<img class="ep-tint" src="${esc(episode.image_url || show.image_url)}" alt="" aria-hidden="true" loading="lazy">`
-      : ''
+  <section class="ep-lp">${
+    cover ? `<img class="ep-tint" src="${esc(cover)}" alt="" aria-hidden="true" loading="lazy">` : ''
   }<div class="container">
-    <div class="breadcrumb" style="padding-bottom:18px"><a href="/">Home</a> / <a href="/${esc(show.slug)}">${esc(show.title)}</a> / Episode</div>
-    <div class="episode-hero-grid">
-      <div class="art">${artOrPlaceholder(episode.image_url || show.image_url, episode.title + ' — ' + show.title)}</div>
-      <div>
-        <a class="show-link" href="/${esc(show.slug)}">${esc(show.title)}</a>
-        <h1>${esc(episode.title)}</h1>
-        <div class="sub">${episode.published_at ? `<time datetime="${esc(new Date(episode.published_at).toISOString())}">${esc(formatDate(episode.published_at))}</time>` : ''}${episode.duration ? ' · ' + esc(formatDuration(episode.duration)) : ''}${episode.youtube_id ? ' · <span class="pill on">▶ Watch on video</span>' : ''}</div>
-        ${episodeHook(episode)}
-        ${guestCard(episode)}
-        ${episode.youtube_id ? `<div class="video-embed"><iframe src="https://www.youtube-nocookie.com/embed/${esc(episode.youtube_id)}" title="${esc(episode.title)}" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen loading="lazy"></iframe></div>` : ''}
-        ${
-          episode.audio_url
-            ? audioPlayer(episode.audio_url, { title: episode.title, showTitle: show.title, image: episode.image_url || show.image_url, duration: episode.duration }) + platformRow(show)
-            : platformRow(show) || `<p class="sub">Audio unavailable for this episode.</p>`
-        }
-        ${shareRow(episode.title)}
-      </div>
+    <div class="breadcrumb ep-lp-crumb"><a href="/">Home</a> / <a href="/${esc(show.slug)}">${esc(show.title)}</a> / Episode</div>
+    <div class="lp-card">
+      <a class="lp-show-name" href="/${esc(show.slug)}">${esc(show.title)}</a>
+      ${cover ? `<img class="lp-cover" src="${esc(cover)}" alt="${esc(episode.title)} — ${esc(show.title)}">` : ''}
+      <h1 class="lp-title">${esc(episode.title)}</h1>
+      ${dateline ? `<p class="lp-date">${esc(dateline)}</p>` : ''}
+      ${
+        episode.ai_hook
+          ? `<div class="lp-hook"><p class="lp-hook-label">Why listen</p><p class="lp-hook-text">${esc(episode.ai_hook)}</p></div>`
+          : ''
+      }
+      ${
+        episode.youtube_id
+          ? `<div class="video-embed"><iframe src="https://www.youtube-nocookie.com/embed/${esc(episode.youtube_id)}" title="${esc(episode.title)}" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen loading="lazy"></iframe></div>`
+          : ''
+      }
+      ${
+        episode.audio_url
+          ? audioPlayer(episode.audio_url, { title: episode.title, showTitle: show.title, image: cover, duration: episode.duration })
+          : `<p class="sub">Audio unavailable for this episode.</p>`
+      }
+      ${lpHighlight(episode)}
+      ${
+        platformRow(show)
+          ? `<div class="lp-divider"></div>
+             <div class="lp-subscribe">
+               <p class="lp-sub-label">Enjoy the episode?</p>
+               <p class="lp-sub-show">Subscribe to ${esc(show.title)}</p>
+               ${platformRow(show)}
+             </div>`
+          : ''
+      }
+      ${shareRow(episode.title)}
     </div>
     ${episodeTakeaways(episode)}
   </div></section>
