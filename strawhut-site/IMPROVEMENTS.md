@@ -206,3 +206,43 @@ UI, inline links inside body copy).
   Result across all 30 real descriptions: **30/30 complete sentences**, median
   123 characters, longest 232. The AI blurb remains as an upgrade that produces
   something shorter when the key is available.
+
+## Episode pages as campaign landing pages (2026-08-23)
+
+Ryan's spec: ads run in Podbooster, but for Straw Hut shows he wants the option
+to send clicks to strawhutmedia.com — which means every episode page has to be
+as strong a landing page as Podbooster's `/ep/` pages.
+
+Read Podbooster's landing page (`routes/rss.js`) to see what actually makes it
+convert: an AI hook line, key takeaways, guest names, pull-quotes from the
+transcript, a real player, follow links, share, and artwork-derived theming.
+
+Shipped on the Straw Hut episode page:
+
+- **AI hook line** — one sentence on why the episode is worth an hour.
+- **"In this episode"** — 3–4 concrete takeaways.
+- **Guest card** — names pulled from the episode, empty when there are none.
+- **Share** — native share sheet on a phone, copy-to-clipboard elsewhere.
+- **Artwork theming** — a blurred copy of the cover tints the hero, same trick
+  as the featured band, so each episode carries its own colour.
+- Follow/subscribe links were already there via `platformRow()`.
+
+Generation is **on demand**: the first view of an episode fires a background
+enrichment call and caches it forever (mirroring Podbooster's precompute), so
+cost follows real traffic instead of 5,370 upfront calls. The `/go/` ad landing
+pages trigger it too, so paid traffic gets the enriched page immediately.
+
+Pull-quotes need transcripts, which the feeds don't carry. Measured the options:
+the full catalogue is ~5,000 hours ≈ $1,290 one-time at Deepgram's verified
+$0.0043/min, plus ~$8/month to keep up (32 episodes/month). Ryan chose to
+transcribe **only episodes we advertise** (~$0.25 each) and revisit the rest later.
+
+Notes:
+- `updateEpisode` listed its columns explicitly, so the new fields would have
+  been silently dropped — the same trap as `artwork_url` and `blurb`. Fixed.
+- First render put the tint image inside the container, so it painted over the
+  copy and made the hero unreadable. Caught by screenshotting it, not by reading
+  the CSS. Moved outside and deepened the scrim.
+- `/healthz` now reports which optional features are configured (booleans only),
+  because a backfill that silently no-ops is otherwise indistinguishable from one
+  that ran. It confirmed `ai: true` on the website service.

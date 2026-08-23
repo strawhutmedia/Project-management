@@ -1034,3 +1034,71 @@ table.admin-table { width: 100%; border-collapse: collapse; }
   .stat-source { font-size: 0.78rem; }
   .badge, .pkg-badge, .aplayer-eyebrow, .aplayer-status { font-size: 0.75rem; }
 }
+
+/* --- Episode landing-page blocks -------------------------------------------
+   The episode page doubles as the destination for paid campaigns, so it has to
+   sell the episode, not just list it: a reason to listen, what you get, who's
+   on it, and one tap to follow or share. Mirrors what works on the Podbooster
+   campaign pages. */
+
+/* Artwork tint — a blurred copy of the cover behind the hero, so each episode
+   carries its own colour, the same trick the featured band uses. */
+.episode-hero { position: relative; overflow: hidden; }
+.episode-hero > .container { position: relative; z-index: 2; }
+.ep-tint {
+  position: absolute; inset: 0; width: 100%; height: 100%; z-index: 0;
+  object-fit: cover; filter: blur(60px) saturate(1.5) brightness(0.5); transform: scale(1.4);
+}
+.episode-hero::after {
+  content: ""; position: absolute; inset: 0; z-index: 1; pointer-events: none;
+  background: linear-gradient(180deg, rgba(18,24,47,0.82) 0%, rgba(18,24,47,0.88) 55%, var(--bg) 100%);
+}
+
+.ep-hook {
+  margin: 14px 0 0; font-size: 1.12rem; line-height: 1.45; font-weight: 600;
+  color: #fff; max-width: 620px;
+  border-left: 3px solid var(--accent); padding-left: 14px;
+}
+.ep-guests {
+  display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; margin-top: 14px;
+}
+.ep-guests-label {
+  font-size: 0.68rem; font-weight: 700; letter-spacing: 0.09em; text-transform: uppercase;
+  color: var(--accent);
+}
+.ep-guests-names { color: #fff; font-weight: 600; }
+
+.ep-takeaways { margin: 26px 0 4px; max-width: 720px; }
+.ep-block-h {
+  font-size: 0.72rem; font-weight: 700; letter-spacing: 0.09em; text-transform: uppercase;
+  color: var(--muted); margin: 0 0 12px;
+}
+.ep-takeaways ul { list-style: none; padding: 0; margin: 0; display: grid; gap: 10px; }
+.ep-takeaways li {
+  position: relative; padding-left: 26px; color: rgba(255,255,255,0.9); line-height: 1.45;
+}
+.ep-takeaways li::before {
+  content: ""; position: absolute; left: 6px; top: 0.62em;
+  width: 7px; height: 7px; border-radius: 50%; background: var(--accent);
+}
+
+.ep-share { display: flex; align-items: center; gap: 12px; margin-top: 16px; }
+.ep-share-btn {
+  display: inline-flex; align-items: center; gap: 8px;
+  padding: 11px 18px; min-height: 44px;
+  border-radius: 999px; border: 1px solid var(--border);
+  background: rgba(255,255,255,0.06); color: var(--text);
+  font-family: inherit; font-size: 0.92rem; font-weight: 600; cursor: pointer;
+  transition: background 0.2s, border-color 0.2s;
+}
+.ep-share-btn:hover { background: rgba(255,255,255,0.12); border-color: var(--accent); }
+.ep-share-btn svg { width: 17px; height: 17px; }
+.ep-share-toast { color: var(--accent); font-size: 0.88rem; font-weight: 600; }
+
+@media (max-width: 640px) {
+  .ep-hook { font-size: 1.02rem; padding-left: 12px; }
+  .ep-takeaways { margin-top: 22px; }
+  /* Both were under the 44px touch guidance on a phone. */
+  .show-link { display: inline-block; padding: 8px 0; }
+  .aplayer-speed { min-height: 40px; min-width: 44px; }
+}

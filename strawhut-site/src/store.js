@@ -342,6 +342,12 @@ class PgStore {
         season        INTEGER,
         embedding     TEXT,
         youtube_id    TEXT,
+        -- Landing-page enrichment, generated on demand and cached forever.
+        ai_hook        TEXT,
+        ai_takeaways   TEXT,
+        guests         TEXT,
+        transcript_text TEXT,
+        quotes         TEXT,
         UNIQUE (show_id, guid)
       );
       CREATE INDEX IF NOT EXISTS idx_episodes_show ON episodes(show_id, published_at DESC);
@@ -412,6 +418,11 @@ class PgStore {
       ALTER TABLE shows    ADD COLUMN IF NOT EXISTS platform_links     TEXT;
       ALTER TABLE shows    ADD COLUMN IF NOT EXISTS seo_description    TEXT;
       ALTER TABLE shows    ADD COLUMN IF NOT EXISTS blurb              TEXT;
+      ALTER TABLE episodes ADD COLUMN IF NOT EXISTS ai_hook            TEXT;
+      ALTER TABLE episodes ADD COLUMN IF NOT EXISTS ai_takeaways       TEXT;
+      ALTER TABLE episodes ADD COLUMN IF NOT EXISTS guests             TEXT;
+      ALTER TABLE episodes ADD COLUMN IF NOT EXISTS transcript_text    TEXT;
+      ALTER TABLE episodes ADD COLUMN IF NOT EXISTS quotes             TEXT;
       ALTER TABLE shows    ADD COLUMN IF NOT EXISTS artwork_url        TEXT;
       ALTER TABLE shows    ADD COLUMN IF NOT EXISTS last_synced        TIMESTAMPTZ;
       ALTER TABLE episodes ADD COLUMN IF NOT EXISTS episode_number     INTEGER;
@@ -500,8 +511,13 @@ class PgStore {
     if (!cur) return null;
     const m = { ...cur, ...patch };
     await this.pool.query(
-      `UPDATE episodes SET title=$2, description=$3, image_url=$4, youtube_id=$5 WHERE id=$1`,
-      [id, m.title, m.description, m.image_url, m.youtube_id || null]
+      `UPDATE episodes SET title=$2, description=$3, image_url=$4, youtube_id=$5,
+         ai_hook=$6, ai_takeaways=$7, guests=$8, transcript_text=$9, quotes=$10 WHERE id=$1`,
+      [
+        id, m.title, m.description, m.image_url, m.youtube_id || null,
+        m.ai_hook || null, m.ai_takeaways || null, m.guests || null,
+        m.transcript_text || null, m.quotes || null,
+      ]
     );
     return this.getEpisodeById(id);
   }

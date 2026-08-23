@@ -15,7 +15,7 @@ import * as A from './admin_views.js';
 import { robotsTxt, sitemapXml, llmsTxt } from './seo.js';
 import { sendAnnouncement, mailConfigured, sendContactEmail, sendTrafficDigest } from './mail.js';
 import { importFromSite } from './importer.js';
-import { writeLandingCopy, generateLandingCopy, fallbackLandingCopy, aiConfigured, generateShowMetaDescription, generateShowBlurb } from './ai.js';
+import { writeLandingCopy, generateLandingCopy, fallbackLandingCopy, aiConfigured, generateShowMetaDescription, generateShowBlurb, generateEpisodeEnrichment } from './ai.js';
 import { POSTS, getPost } from './content/resources.js';
 import { SERVICE_PAGES, getServicePage } from './content/services.js';
 import * as reco from './recommend.js';
@@ -887,6 +887,9 @@ app.get('/go/:showSlug/:episodeSlug', async (req, res, next) => {
   if (!show) return next();
   const episode = await store.getEpisodeBySlug(show.id, req.params.episodeSlug);
   if (!episode) return next();
+  // This is an ad destination — enrich it too, so paid traffic lands on the
+  // strongest version of the page as soon as possible.
+  enrichEpisodeInBackground(show, episode);
   const landing = await resolveOrCreateEpisodeLanding(show, episode);
   res.send(V.landingPage({ landing, show, episode }));
 });
@@ -950,11 +953,36 @@ app.get('/:showSlug', async (req, res, next) => {
 });
 
 // Episode page: /:showSlug/:episodeSlug
+// Landing-page enrichment is generated the first time an episode page is
+// viewed, then cached forever. Doing it on demand rather than backfilling all
+// 5,370 episodes means the cost follows real traffic — most of the catalogue is
+// never looked at, and the pages that are get enriched within one page view.
+const _enriching = new Set();
+function enrichEpisodeInBackground(show, episode) {
+  if (!aiConfigured() || process.env.SHOW_SEO === 'off') return;
+  if (episode.ai_hook || _enriching.has(episode.id)) return;
+  _enriching.add(episode.id);
+  generateEpisodeEnrichment({ show, episode, log: (m) => console.log('[episode]', m) })
+    .then((out) => {
+      if (!out) return;
+      return store.updateEpisode(episode.id, {
+        ai_hook: out.hook || null,
+        ai_takeaways: out.takeaways?.length ? JSON.stringify(out.takeaways) : null,
+        guests: out.guests?.length ? JSON.stringify(out.guests) : null,
+      });
+    })
+    .catch((e) => console.error('[episode] enrich failed:', e.message))
+    .finally(() => _enriching.delete(episode.id));
+}
+
 app.get('/:showSlug/:episodeSlug', async (req, res, next) => {
   const show = await store.getShowBySlug(req.params.showSlug);
   if (!show) return next();
   const episode = await store.getEpisodeBySlug(show.id, req.params.episodeSlug);
   if (!episode) return next();
+
+  // Render immediately with whatever is cached; enrich for the next visitor.
+  enrichEpisodeInBackground(show, episode);
 
   // (3) Recommendations — more from this show + similar episodes elsewhere.
   const fromShow = await store.listEpisodes(show.id, { limit: 6 });

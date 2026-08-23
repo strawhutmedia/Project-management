@@ -134,6 +134,75 @@ Rules:
  * sentences. Used when the team's copy has no sentence break inside the space
  * available, so trimming it would otherwise leave a fragment.
  */
+const EPISODE_SYSTEM = `You write landing-page copy for a podcast episode. The page's job
+is to make a stranger who clicked an ad press play.
+
+Return STRICT JSON, nothing else, with exactly these keys:
+{
+  "hook": "one sentence, max 120 characters, saying why this episode is worth an hour",
+  "takeaways": ["3 to 4 short phrases, max 80 characters each, of what the listener actually gets"],
+  "guests": ["full names of guests appearing in this episode"]
+}
+
+Rules:
+- Ground everything in the supplied title and description. Do NOT invent guests,
+  claims, statistics or events. If no guest is identifiable, return an empty array.
+- The host is not a guest. Neither is the show itself.
+- No ellipses anywhere. Every string is a complete thought.
+- No hype ("you won't believe", "dive in"), no hashtags, no emoji, no quotes
+  around the values beyond normal JSON syntax.
+- Plain sentences a person would actually say.`;
+
+/**
+ * Landing-page enrichment for one episode: the hook line, key takeaways and any
+ * guests. One call rather than three, generated on first view and cached.
+ */
+export async function generateEpisodeEnrichment({ show, episode, log = () => {} } = {}) {
+  if (!KEY || !episode) return null;
+  const desc = toText(episode.description, 2500);
+  if (!desc && !episode.title) return null;
+  try {
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), 40000);
+    const res = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: { 'x-api-key': KEY, 'anthropic-version': '2023-06-01', 'content-type': 'application/json' },
+      body: JSON.stringify({
+        model: MODEL,
+        max_tokens: 700,
+        temperature: 0.4,
+        system: EPISODE_SYSTEM,
+        messages: [
+          {
+            role: 'user',
+            content: `SHOW: ${show?.title || ''}\nHOST: ${show?.author || ''}\nEPISODE: ${episode.title || ''}\nDESCRIPTION: ${desc}`,
+          },
+        ],
+      }),
+      signal: ctrl.signal,
+    });
+    clearTimeout(timer);
+    if (!res.ok) { log(`ai: episode enrich HTTP ${res.status}`); return null; }
+    const data = await res.json().catch(() => null);
+    const raw = data?.content?.map?.((b) => b.text || '').join('').trim() || '';
+    const json = raw.slice(raw.indexOf('{'), raw.lastIndexOf('}') + 1);
+    let out;
+    try { out = JSON.parse(json); } catch { log('ai: episode enrich returned non-JSON'); return null; }
+
+    const clean = (v) => String(v || '').replace(/\s*(?:\u2026|\.\.\.)\s*/g, ' ').replace(/\s+/g, ' ').trim();
+    const hook = clean(out.hook).slice(0, 160);
+    const takeaways = (Array.isArray(out.takeaways) ? out.takeaways : [])
+      .map(clean).filter((t) => t && t.length <= 110).slice(0, 4);
+    const guests = (Array.isArray(out.guests) ? out.guests : [])
+      .map(clean).filter((g) => g && g.length <= 60 && /\s/.test(g)).slice(0, 4);
+    if (!hook && !takeaways.length && !guests.length) return null;
+    return { hook, takeaways, guests };
+  } catch (e) {
+    log(`ai: episode enrich failed — ${e.message}`);
+    return null;
+  }
+}
+
 export async function generateShowBlurb({ show, max = 165, log = () => {} } = {}) {
   if (!KEY || !show) return null;
   const desc = toText(show.description, 900);

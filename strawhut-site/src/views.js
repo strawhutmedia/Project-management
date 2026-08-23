@@ -1581,10 +1581,69 @@ function epRecCard(showSlug, showTitle, ep, showImage) {
   </a>`;
 }
 
+// --- Episode landing-page blocks -------------------------------------------
+// These mirror what makes the Podbooster campaign pages convert: a one-line
+// reason to listen, what you actually get, who's on it, and an easy way to
+// follow or share. All of it degrades to nothing when the data isn't there.
+
+const jsonList = (v) => {
+  if (!v) return [];
+  if (Array.isArray(v)) return v;
+  try { const p = JSON.parse(v); return Array.isArray(p) ? p : []; } catch { return []; }
+};
+
+function episodeHook(episode) {
+  const hook = String(episode.ai_hook || '').trim();
+  if (!hook) return '';
+  return `<p class="ep-hook">${esc(hook)}</p>`;
+}
+
+function episodeTakeaways(episode) {
+  const items = jsonList(episode.ai_takeaways);
+  if (!items.length) return '';
+  return `<div class="ep-takeaways">
+    <h2 class="ep-block-h">In this episode</h2>
+    <ul>${items.map((t) => `<li>${esc(t)}</li>`).join('')}</ul>
+  </div>`;
+}
+
+function guestCard(episode) {
+  const guests = jsonList(episode.guests);
+  if (!guests.length) return '';
+  return `<div class="ep-guests">
+    <span class="ep-guests-label">${guests.length > 1 ? 'Guests' : 'Guest'}</span>
+    <span class="ep-guests-names">${guests.map((g) => esc(g)).join(' · ')}</span>
+  </div>`;
+}
+
+/** Share row — native share sheet on a phone, copy-to-clipboard everywhere else. */
+function shareRow(title) {
+  const t = String(title || '').replace(/'/g, "\\'");
+  return `<div class="ep-share">
+    <button class="ep-share-btn" type="button" onclick="shmShare(this,'${esc(t)}')" aria-label="Share this episode">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M4 12v7a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-7"/><path d="M12 15V3"/><path d="m8 7 4-4 4 4"/></svg>
+      <span>Share</span>
+    </button>
+    <span class="ep-share-toast" hidden>Link copied</span>
+  </div>
+  <script>window.shmShare=window.shmShare||function(btn,title){
+  var url=location.href, toast=btn.parentNode.querySelector('.ep-share-toast');
+  window.shmTrack&&shmTrack('share_episode',{episode:title});
+  if(navigator.share){navigator.share({title:title,url:url}).catch(function(){});return;}
+  var done=function(){if(!toast)return;toast.hidden=false;setTimeout(function(){toast.hidden=true;},2200);};
+  if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(url).then(done).catch(function(){});return;}
+  var i=document.createElement('input');i.value=url;document.body.appendChild(i);i.select();
+  try{document.execCommand('copy');done();}catch(e){}document.body.removeChild(i);};</script>`;
+}
+
 export function episodePage({ show, episode, moreFromShow = [], related = [] }) {
   const body = `
   <article>
-  <section class="episode-hero"><div class="container">
+  <section class="episode-hero">${
+    episode.image_url || show.image_url
+      ? `<img class="ep-tint" src="${esc(episode.image_url || show.image_url)}" alt="" aria-hidden="true" loading="lazy">`
+      : ''
+  }<div class="container">
     <div class="breadcrumb" style="padding-bottom:18px"><a href="/">Home</a> / <a href="/${esc(show.slug)}">${esc(show.title)}</a> / Episode</div>
     <div class="episode-hero-grid">
       <div class="art">${artOrPlaceholder(episode.image_url || show.image_url, episode.title + ' — ' + show.title)}</div>
@@ -1592,14 +1651,18 @@ export function episodePage({ show, episode, moreFromShow = [], related = [] }) 
         <a class="show-link" href="/${esc(show.slug)}">${esc(show.title)}</a>
         <h1>${esc(episode.title)}</h1>
         <div class="sub">${episode.published_at ? `<time datetime="${esc(new Date(episode.published_at).toISOString())}">${esc(formatDate(episode.published_at))}</time>` : ''}${episode.duration ? ' · ' + esc(formatDuration(episode.duration)) : ''}${episode.youtube_id ? ' · <span class="pill on">▶ Watch on video</span>' : ''}</div>
+        ${episodeHook(episode)}
+        ${guestCard(episode)}
         ${episode.youtube_id ? `<div class="video-embed"><iframe src="https://www.youtube-nocookie.com/embed/${esc(episode.youtube_id)}" title="${esc(episode.title)}" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen loading="lazy"></iframe></div>` : ''}
         ${
           episode.audio_url
             ? audioPlayer(episode.audio_url, { title: episode.title, showTitle: show.title, image: episode.image_url || show.image_url, duration: episode.duration }) + platformRow(show)
             : platformRow(show) || `<p class="sub">Audio unavailable for this episode.</p>`
         }
+        ${shareRow(episode.title)}
       </div>
     </div>
+    ${episodeTakeaways(episode)}
   </div></section>
 
   <section class="section"><div class="container">
