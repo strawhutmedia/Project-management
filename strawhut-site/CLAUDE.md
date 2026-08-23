@@ -169,6 +169,19 @@ host as a real IABv2 download for that show. `preload="none"` ensures only
 actual plays count, not page loads. Keep it this way — do not proxy or rehost
 audio, which would break host-side download counting.
 
+**One deliberate exception: ad traffic autoplays muted.** Visitors arriving with
+`gclid` / `gbraid` / `wbraid`, `utm_source=google_ads`, or
+`utm_medium=display|cpc` get muted autoplay plus a "Tap to unmute" banner,
+mirroring the Podbooster landing page (`opts.autoplay` on `audioPlayer()`, set
+from `isAdTraffic(req)` in `server.js`). Organic and search traffic is untouched
+and keeps `preload="none"`.
+
+Ryan approved this knowing the trade-off: autoplay produces host-counted
+downloads nobody chose to start, which inflates the figures reported to
+advertisers. It is confined to paid traffic for exactly that reason — the same
+scope Podbooster's autoplay already has, since its `/ep/` pages are noindex ad
+destinations. **Do not widen it to organic traffic** without asking him again.
+
 ## Architecture
 
 - Node/Express (ES modules), server-rendered HTML via template strings in
