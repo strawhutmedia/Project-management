@@ -98,6 +98,11 @@ for (const route of PAGES) {
     const ctx = await b.newContext({ viewport: { width, height: 844 }, isMobile: true, hasTouch: true, deviceScaleFactor: 2 });
     await ctx.route('**/*', r => r.request().url().startsWith('file://') ? r.continue() : r.abort());
     const p = await ctx.newPage();
+    // Uncaught JS is a mobile bug too — a script that fails to parse takes the
+    // whole block with it. A broken regex escape in a template literal killed
+    // consent mode and the cookie banner site-wide before this was checked.
+    const jsErrors = [];
+    p.on('pageerror', (e) => jsErrors.push(String(e.message).slice(0, 120)));
     await p.goto('file://' + snap.file, { waitUntil: 'load' });
     await p.waitForTimeout(900);
     await p.evaluate(() => scrollTo(0, document.body.scrollHeight));
@@ -105,11 +110,12 @@ for (const route of PAGES) {
     const r = await p.evaluate(findings, width);
     r.wide = r.wide.filter(x => !WIDE_OK.test(x));
     r.tiny = r.tiny.filter(x => !TINY_OK.test(x));
-    const n = (r.overflow > 0 ? 1 : 0) + r.wide.length + r.tiny.length + r.taps.length;
+    r.js = [...new Set(jsErrors)];
+    const n = (r.overflow > 0 ? 1 : 0) + r.wide.length + r.tiny.length + r.taps.length + r.js.length;
     total += n;
     console.log(`${n ? '⚠' : '✓'} ${snap.name.padEnd(20)} ${width}px  ` +
-      `scroll:${(r.overflow > 0 ? r.overflow + 'px' : 'ok').padEnd(6)} wide:${String(r.wide.length).padEnd(3)} tiny:${String(r.tiny.length).padEnd(3)} taps:${r.taps.length}`);
-    for (const [k, v] of [['wide', r.wide], ['tiny', r.tiny], ['taps', r.taps]])
+      `scroll:${(r.overflow > 0 ? r.overflow + 'px' : 'ok').padEnd(6)} wide:${String(r.wide.length).padEnd(3)} tiny:${String(r.tiny.length).padEnd(3)} taps:${String(r.taps.length).padEnd(3)} js:${r.js.length}`);
+    for (const [k, v] of [['wide', r.wide], ['tiny', r.tiny], ['taps', r.taps], ['js', r.js]])
       if (v.length) console.log(`     ${k}: ${v.slice(0, 5).join(', ')}`);
     if (SHOT && snap.name === SHOT) {
       const h = await p.evaluate(() => document.body.scrollHeight);

@@ -77,8 +77,9 @@
   document.head.appendChild(style);
 
   // ── Configuration ────────────────────────────────────────────
-  // Replace with your Calendly scheduling URL
-  var CALENDLY_URL = 'https://calendly.com/strawhutmedia/discovery';
+  // Booking is GoHighLevel only — the old scheduler was retired. The CTA hands
+  // the finished quote to /book so the conversation carries into the CRM.
+  var BOOKING_PATH = '/book';
 
   // ── Helpers ────────────────────────────────────────────────────
   var CHK = '<svg viewBox="0 0 16 16"><polyline points="3.5 8 6.5 11 12.5 5"/></svg>';
@@ -613,26 +614,23 @@
     return lines.join('\n');
   }
 
-  // ── Build Calendly URL with prefilled quiz data ────────────
-  function buildCalendlyUrl() {
-    var summary = buildAnswerSummary();
-    // Calendly supports a1, a2, etc. for custom question answers
-    // We put the full summary in a1 (set up a custom text question in Calendly)
-    var url = CALENDLY_URL + '?a1=' + encodeURIComponent(summary);
-    return url;
+  // ── Hand the finished quote off to the booking page ──────────
+  // Stashed browser-side so /book can show it back to the visitor and
+  // /contact can carry the whole thing into the CRM with their details.
+  function stashQuote(summary, label) {
+    try {
+      var payload = JSON.stringify({ summary: summary, pkg: label, ts: Date.now() });
+      if (window.sessionStorage) sessionStorage.setItem('shm_quote', payload);
+      if (window.localStorage) localStorage.setItem('shm_quote', payload);
+    } catch (e) {}
   }
 
-  // ── Load Calendly widget script ────────────────────────────
-  function loadCalendlyWidget(callback) {
-    if (window.Calendly) { callback(); return; }
-    var link = document.createElement('link');
-    link.href = 'https://assets.calendly.com/assets/external/widget.css';
-    link.rel = 'stylesheet';
-    document.head.appendChild(link);
-    var script = document.createElement('script');
-    script.src = 'https://assets.calendly.com/assets/external/widget.js';
-    script.onload = callback;
-    document.head.appendChild(script);
+  function buildBookingUrl(label) {
+    var url = BOOKING_PATH + '?package=' + encodeURIComponent(label || 'Custom quote');
+    // Keep ad attribution (gclid / utm_*) alive across the hop.
+    var qs = window.location.search || '';
+    if (qs.length > 1) url += '&' + qs.slice(1);
+    return url;
   }
 
   function showResult() {
@@ -654,24 +652,12 @@
     }
     document.getElementById('shm-feat-list').innerHTML = fhtml;
 
-    // Preload Calendly widget
-    loadCalendlyWidget(function() {});
-
     document.getElementById('shm-cta').onclick = function() {
-      var summary = buildAnswerSummary();
-      // Try Calendly popup first, fall back to direct link
-      if (window.Calendly) {
-        window.Calendly.initPopupWidget({
-          url: CALENDLY_URL + '?hide_gdpr_banner=1',
-          prefill: {
-            customAnswers: {
-              a1: summary
-            }
-          }
-        });
-      } else {
-        window.open(buildCalendlyUrl(), '_blank');
-      }
+      var pkgLabel = label.name + ' — $' + price.toLocaleString() +
+        (answers.frequency === 'limited-run' ? ' per episode' : ' per month');
+      stashQuote(buildAnswerSummary(), pkgLabel);
+      window.shmTrack && window.shmTrack('quote_complete', { pkg: pkgLabel, price: price });
+      window.location.href = buildBookingUrl(pkgLabel);
     };
   }
 

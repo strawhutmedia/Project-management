@@ -1098,12 +1098,17 @@ export function aboutPage() {
 // --- Book a call (GoHighLevel-backed 15-min fit call) -----------------------
 
 export function bookPage({ widgetUrl = '' } = {}) {
+  // Scheduling lives in GoHighLevel so every booking is a CRM event that can
+  // trigger reminders and follow-up. When no calendar is configured we say so
+  // and route to the contact form — never a scheduler that might be cancelled.
   const embed = widgetUrl
     ? `<iframe src="${esc(widgetUrl)}" title="Book a 15-minute call with Straw Hut Media" scrolling="no" id="shmBookingWidget" style="width:100%;min-height:740px;border:1px solid var(--border);border-radius:14px;background:#fff"></iframe>
        <script src="https://link.msgsndr.com/js/form_embed.js"></script>`
-    : `<div class="calendly-inline-widget" data-url="https://calendly.com/strawhutmedia/discovery?hide_gdpr_banner=1&background_color=12182f&text_color=f2f3f8&primary_color=00cc8e" style="min-width:320px;height:740px"></div>
-       <script src="https://assets.calendly.com/assets/external/widget.js" async></script>
-       <noscript><p class="booking-note"><a href="https://calendly.com/strawhutmedia/discovery" target="_blank" rel="noopener">Open the scheduler to book your 15-minute call →</a></p></noscript>`;
+    : `<div class="panel" style="padding:28px;text-align:center">
+         <h2 style="margin-top:0">Tell us about your show</h2>
+         <p style="color:var(--muted);max-width:520px;margin:0 auto 18px">Send us a note and we'll come straight back with a time that works.</p>
+         <a class="btn btn-primary" href="/contact">Get in touch →</a>
+       </div>`;
   const body = `
   <section class="hero" style="padding-bottom:16px"><div class="container">
     <div class="breadcrumb" style="padding:0 0 14px"><a href="/">Home</a> / Book a call</div>
@@ -1111,14 +1116,36 @@ export function bookPage({ widgetUrl = '' } = {}) {
     <p>Book a free 15-minute call. Tell us about your show or your idea, and we'll tell you honestly whether — and how — we can help. No slides, no hard sell, no obligation.</p>
   </div></section>
   <section class="section" style="padding-top:8px"><div class="container">
-    <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(220px,1fr));margin-bottom:28px">
+    <div class="panel" id="shmQuoteCtx" style="display:none;padding:18px 20px;margin-bottom:20px">
+      <div style="font-weight:600;margin-bottom:6px">You're asking about <span class="accent" id="shmQuoteCtxPkg"></span></div>
+      <p style="color:var(--muted);margin:0;font-size:.92rem;line-height:1.55">We've kept your answers — no need to repeat them. Pick a time and we'll come to the call already up to speed.</p>
+    </div>
+    ${embed}
+
+    <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(220px,1fr));margin-top:28px">
       <article class="show-card" style="padding:20px 22px"><h3 style="margin-top:0">What we'll cover</h3><p class="meta" style="line-height:1.55">Your idea or existing show, what you're trying to build, and wherever you're stuck.</p></article>
       <article class="show-card" style="padding:20px 22px"><h3 style="margin-top:0">What you'll leave with</h3><p class="meta" style="line-height:1.55">A straight answer on whether we're the right partner — and the smartest next step either way.</p></article>
       <article class="show-card" style="padding:20px 22px"><h3 style="margin-top:0">How long</h3><p class="meta" style="line-height:1.55">Fifteen minutes. That's genuinely it.</p></article>
     </div>
-    ${embed}
   </div></section>
-  <script>window.shmTrack&&shmTrack('book_call_view',{});</script>`;
+  <script>
+  (function(){
+    window.shmTrack&&shmTrack('book_call_view',{});
+    // Carry a package pick or finished quote over from /pricing so the visitor
+    // can see we kept it, and so /contact can prefill it if they write instead.
+    var pkg='';
+    try{ pkg=new URLSearchParams(window.location.search).get('package')||''; }catch(e){}
+    if(!pkg){ try{
+      var raw=(window.sessionStorage&&sessionStorage.getItem('shm_quote'))||(window.localStorage&&localStorage.getItem('shm_quote'))||'';
+      if(raw) pkg=(JSON.parse(raw)||{}).pkg||'';
+    }catch(e){} }
+    if(pkg){
+      var box=document.getElementById('shmQuoteCtx');
+      var name=document.getElementById('shmQuoteCtxPkg');
+      if(box&&name){ name.textContent=pkg; box.style.display='block'; }
+    }
+  })();
+  </script>`;
   return layout({
     title: 'Book a 15-Minute Fit Call — Straw Hut Media',
     description:
@@ -1135,7 +1162,7 @@ export function bookPage({ widgetUrl = '' } = {}) {
 
 // --- Pricing / packages + custom quote builder -----------------------------
 // Native (no iframe): package cards in our own design + the quote quiz embedded
-// directly. Calendly opens at page level so the buttons actually work.
+// directly. Package interest hands off to /book, which is GoHighLevel-backed.
 const PACKAGES = [
   {
     tier: 'Essential', name: 'Essential Podcast Package', price: '$2,450',
@@ -1216,21 +1243,26 @@ export function pricingPage() {
   <script src="/public/quote/widget.js"></script>
   <script>
   (function(){
-    var CALENDLY_URL='https://calendly.com/strawhutmedia/discovery';
     var NL=String.fromCharCode(10);
     var openBtn=document.getElementById('openQuizBtn'), quiz=document.getElementById('quiz-view');
     if(openBtn&&quiz){openBtn.addEventListener('click',function(){quiz.style.display='block';quiz.scrollIntoView({behavior:'smooth'});window.shmTrack&&shmTrack('pricing_quiz_open',{});});}
-    function loadCalendly(cb){if(window.Calendly){cb&&cb();return;}var l=document.createElement('link');l.href='https://assets.calendly.com/assets/external/widget.css';l.rel='stylesheet';document.head.appendChild(l);var s=document.createElement('script');s.src='https://assets.calendly.com/assets/external/widget.js';s.onload=cb;document.head.appendChild(s);}
-    loadCalendly();
+    // Booking is GoHighLevel only — send package interest to /book so the
+    // booking lands in the CRM and can trigger follow-up.
     var btns=document.querySelectorAll('.pkg-cta');
-    for(var i=0;i<btns.length;i++){(function(btn){btn.addEventListener('click',function(){
-      var pkg=btn.getAttribute('data-package'), features=btn.getAttribute('data-features');
-      var summary='=== PACKAGE SELECTION ==='+NL+NL+'Selected Package: '+pkg+NL+NL+'--- What is Included ---'+NL+features.split(', ').map(function(f){return '\\u2022 '+f;}).join(NL);
+    for(var i=0;i<btns.length;i++){(function(btn){btn.addEventListener('click',function(e){
+      e.preventDefault();
+      var pkg=btn.getAttribute('data-package')||'';
+      var feats=btn.getAttribute('data-features')||'';
+      var summary='=== PACKAGE SELECTION ==='+NL+NL+'Selected package: '+pkg+NL+NL+"--- What's included ---"+NL
+        +feats.split(', ').map(function(f){return '\u2022 '+f;}).join(NL);
+      try{
+        var payload=JSON.stringify({summary:summary,pkg:pkg,ts:Date.now()});
+        if(window.sessionStorage)sessionStorage.setItem('shm_quote',payload);
+        if(window.localStorage)localStorage.setItem('shm_quote',payload);
+      }catch(e2){}
       window.shmTrack&&shmTrack('pricing_package_click',{pkg:pkg});
-      if(window.Calendly){window.Calendly.initPopupWidget({url:CALENDLY_URL+'?hide_gdpr_banner=1&background_color=12182f&text_color=f2f3f8&primary_color=00cc8e',prefill:{customAnswers:{a1:summary}}});}
-      else{window.open(CALENDLY_URL,'_blank');}
+      window.location.href='/book?package='+encodeURIComponent(pkg);
     });})(btns[i]);}
-    window.shmTrack&&shmTrack('pricing_view',{});
   })();
   </script>`;
   return layout({
@@ -1507,7 +1539,21 @@ export function contactPage({ sent = false, error = '', values = {} } = {}) {
              <div class="field"><label>What can we help with?</label><textarea name="message" rows="6" required>${v('message')}</textarea></div>
              ${turnstileWidget({ action: 'contact' })}
              <button class="btn btn-primary" type="submit">Send message</button>
-           </form>`
+           </form>
+           <script>
+           (function(){
+             // If they built a quote or picked a package first, bring it with
+             // them — it lands in the email and on their CRM contact.
+             var box=document.querySelector('.contact-form textarea[name="message"]');
+             if(!box||box.value.trim())return;
+             var raw='';
+             try{ raw=(window.sessionStorage&&sessionStorage.getItem('shm_quote'))||(window.localStorage&&localStorage.getItem('shm_quote'))||''; }catch(e){}
+             if(!raw)return;
+             var q=null; try{ q=JSON.parse(raw); }catch(e){}
+             if(!q||!q.summary)return;
+             box.value=q.summary+String.fromCharCode(10,10)+'--- '+String.fromCharCode(10)+'Anything you want to add:'+String.fromCharCode(10);
+           })();
+           </script>`
     }
   </div></section>`;
   return layout({

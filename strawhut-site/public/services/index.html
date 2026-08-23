@@ -473,7 +473,9 @@
   <script src="widget.js"></script>
   <script>
     (function() {
-      var CALENDLY_URL = 'https://calendly.com/strawhutmedia/discovery';
+      // Booking runs through GoHighLevel at /book — the old third-party
+      // scheduler was retired, so package interest goes there instead.
+      var BOOKING_PATH = '/book';
       var packagesView = document.getElementById('packages-view');
       var quizView = document.getElementById('quiz-view');
 
@@ -489,22 +491,6 @@
         window.scrollTo({ top: 0, behavior: 'smooth' });
       });
 
-      // ── Calendly for package "Get Started" buttons ──────────
-      function loadCalendly(callback) {
-        if (window.Calendly) { callback(); return; }
-        var link = document.createElement('link');
-        link.href = 'https://assets.calendly.com/assets/external/widget.css';
-        link.rel = 'stylesheet';
-        document.head.appendChild(link);
-        var script = document.createElement('script');
-        script.src = 'https://assets.calendly.com/assets/external/widget.js';
-        script.onload = callback;
-        document.head.appendChild(script);
-      }
-
-      // Preload Calendly on page load
-      loadCalendly(function() {});
-
       var pkgBtns = document.querySelectorAll('.shm-pkg-cta');
       for (var i = 0; i < pkgBtns.length; i++) {
         (function(btn) {
@@ -516,18 +502,12 @@
               + '--- What\'s Included ---\n'
               + features.split(', ').map(function(f) { return '• ' + f; }).join('\n');
 
-            if (window.Calendly) {
-              window.Calendly.initPopupWidget({
-                url: CALENDLY_URL + '?hide_gdpr_banner=1',
-                prefill: {
-                  customAnswers: {
-                    a1: summary
-                  }
-                }
-              });
-            } else {
-              window.open(CALENDLY_URL + '?a1=' + encodeURIComponent(summary), '_blank');
-            }
+            try {
+              var payload = JSON.stringify({ summary: summary, pkg: pkg, ts: Date.now() });
+              if (window.sessionStorage) sessionStorage.setItem('shm_quote', payload);
+              if (window.localStorage) localStorage.setItem('shm_quote', payload);
+            } catch (e) {}
+            window.location.href = BOOKING_PATH + '?package=' + encodeURIComponent(pkg);
           });
         })(pkgBtns[i]);
       }

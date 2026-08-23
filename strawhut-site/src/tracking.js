@@ -51,7 +51,7 @@ if(c==='essential')return;
 // rather than in the footer banner — otherwise the initial pageview is sent
 // under 'denied' and lost. UK/EEA/CH stays denied until explicit acceptance.
 try{var tz=(Intl.DateTimeFormat().resolvedOptions().timeZone||'');
-var eu=/^(Europe|Atlantic\/(Azores|Madeira|Canary|Faroe|Reykjavik))/.test(tz);
+var eu=/^(Europe|Atlantic\\/(Azores|Madeira|Canary|Faroe|Reykjavik))/.test(tz);
 if(!eu)gtag('consent','update',G);}catch(e){}})();
 window.dataLayer.push({site:'${j(SITE_ID)}'});</script>`;
 
@@ -110,10 +110,10 @@ var stored=null;try{stored=localStorage.getItem('shm_consent');}catch(e){}
 function needsOptIn(){
   try{
     var tz=(Intl.DateTimeFormat().resolvedOptions().timeZone||'');
-    if(/^(Europe|Atlantic\/(Azores|Madeira|Canary|Faroe|Reykjavik))/.test(tz)) return true;
+    if(/^(Europe|Atlantic\\/(Azores|Madeira|Canary|Faroe|Reykjavik))/.test(tz)) return true;
     var l=(navigator.languages||[navigator.language||'']).join(',');
-    return /\b(en-GB|en-IE|de|fr|es|it|nl|pt|pl|sv|da|fi|no|cs|sk|hu|ro|bg|hr|sl|et|lv|lt|el|mt|ga)\b/i.test(l)
-      && !/\ben-US\b/i.test(l);
+    return /\\b(en-GB|en-IE|de|fr|es|it|nl|pt|pl|sv|da|fi|no|cs|sk|hu|ro|bg|hr|sl|et|lv|lt|el|mt|ga)\\b/i.test(l)
+      && !/\\ben-US\\b/i.test(l);
   }catch(e){ return true; } // fail closed
 }
 if(!stored){

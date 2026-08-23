@@ -24,9 +24,10 @@ node tools/mobile-audit.mjs --shot home            # + screenshots to look at
 
 The harness renders real pages in headless Chromium (downloading and
 re-pointing remote images so cover art actually appears) and reports
-horizontal overflow, elements wider than the viewport, text under 11.5px, and
-touch targets under 32px. Read the screenshots — the numbers catch structural
-breakage, but only your eyes catch ugly.
+horizontal overflow, elements wider than the viewport, text under 11.5px,
+touch targets under 32px, and **uncaught JS errors** (`js:` column). Read the
+screenshots — the numbers catch structural breakage, but only your eyes catch
+ugly.
 
 Rules that came out of real bugs on this site:
 
@@ -44,6 +45,12 @@ Rules that came out of real bugs on this site:
   27" monitor and miserable in a hand.
 - Decorative strips built from many fixed-width bars need a reduced count on
   phones — squeezing 90 bars into 390px just clips them.
+- **Escape regexes twice inside template literals.** Every inline `<script>` in
+  this codebase is a template literal, where `\/` collapses to `/` and `\b` to a
+  backspace character. `/^(Europe|Atlantic\/(Azores...))/` shipped as an
+  unterminated regex, so the whole script block failed to *parse* — Google
+  Consent Mode and the cookie banner were dead on every page for weeks with no
+  server-side symptom. Write `\\/` and `\\b`. The `js:` column now catches it.
 
 ---
 
@@ -103,6 +110,23 @@ Set these on Railway (inert until set); no code change needed:
 | `GOOGLE_ADS_ID` | Google Ads remarketing + conversions (`AW-XXXX`) |
 | `META_PIXEL_ID` | Facebook / Instagram retargeting |
 | `TIKTOK_PIXEL_ID` | TikTok retargeting |
+
+### Booking is GoHighLevel, and only GoHighLevel
+
+Every "book a call" path on the site ends at `/book`, which embeds the GHL
+calendar from `BOOKING_WIDGET_URL`. The third-party scheduler that used to run
+the package CTAs and the quote quiz was cancelled on 2026-08-23 — **do not
+reintroduce a second scheduler.** One calendar means every booking is a CRM
+event that can fire reminders and follow-up, which is the whole point.
+
+With `BOOKING_WIDGET_URL` unset, `/book` says so honestly and routes to
+`/contact` — it never renders an empty or dead scheduler.
+
+Package picks on `/pricing` and finished quotes from the quiz stash a
+`shm_quote` payload (`{summary, pkg, ts}`) in session+localStorage and hand off
+to `/book?package=…`. `/book` shows it back to the visitor; `/contact`
+prefills the message box with it, so the whole quote reaches the inbox and the
+GHL contact note. `gclid`/`utm_*` ride along on the hop.
 
 ### Form protection (`src/antispam.js` + `src/turnstile.js`)
 
@@ -201,8 +225,8 @@ destinations. **Do not widen it to organic traffic** without asking him again.
   `src/views.js`. No template engine.
 - Storage: Postgres in prod (`src/store.js` PgStore), JSON-file fallback with no
   `DATABASE_URL`.
-- Deploy: Railway service, root directory `strawhut-site`, current branch
-  `claude/networks-open-302u9k`. Push → auto-build → redeploy.
+- Deploy: Railway service, root directory `strawhut-site`, branch `main`.
+  Push → auto-build → redeploy.
 - Homepage spotlight ranks shows by **real Megaphone downloads** (S3 IABv2
   export, `src/megaphoneS3.js` + `src/popularity.js`), top 3 featured,
   refreshed automatically.
