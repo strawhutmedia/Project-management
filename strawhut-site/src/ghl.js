@@ -262,3 +262,40 @@ export async function resolveBookingCalendar() {
   console.log(`[ghl] booking calendar: ${_booking.name} (${_booking.id}) via ${_booking.source}`);
   return _booking;
 }
+
+// ---- Token capability probe -----------------------------------------------
+//
+// "The token is not authorized for this scope." is GHL's answer to a missing
+// scope, a wrong Version header, and a path it doesn't recognise — three very
+// different problems with one message. Guessing between them from the outside
+// costs a deploy per guess.
+//
+// So: hit a handful of READ-ONLY endpoints once at boot and report what each
+// one says. Nothing here creates, updates, or deletes. It runs only when GHL
+// is configured, and the result goes to /healthz so the failure is legible
+// without another round trip.
+
+const PROBES = [
+  ['location',        (id) => `/locations/${encodeURIComponent(id)}`,        '2021-07-28'],
+  ['contacts',        (id) => `/contacts/?locationId=${encodeURIComponent(id)}&limit=1`, '2021-07-28'],
+  ['calendars',       (id) => `/calendars/?locationId=${encodeURIComponent(id)}`, '2021-04-15'],
+  ['calendars(noslash)', (id) => `/calendars?locationId=${encodeURIComponent(id)}`, '2021-04-15'],
+  ['calendars(v3)',   (id) => `/calendars/?locationId=${encodeURIComponent(id)}`, 'v3'],
+  ['calendarGroups',  (id) => `/calendars/groups?locationId=${encodeURIComponent(id)}`, '2021-04-15'],
+  ['users',           (id) => `/users/?locationId=${encodeURIComponent(id)}`,  '2021-07-28'],
+];
+
+let _probe = null;
+export function ghlProbeState() { return _probe; }
+
+export async function probeGhlToken() {
+  if (!ghlConfigured()) { _probe = { state: 'unconfigured' }; return _probe; }
+  const out = {};
+  for (const [label, mk, version] of PROBES) {
+    const r = await call(mk(LOCATION_ID), { version });
+    out[label] = r.ok ? 'ok' : `${r.status || '-'} ${String(r.error || '').slice(0, 70)}`;
+  }
+  _probe = out;
+  console.log('[ghl] token probe:', JSON.stringify(out));
+  return _probe;
+}
