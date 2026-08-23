@@ -274,3 +274,17 @@ Notes:
   - Verified nothing was lost: h1, JSON-LD, show notes, about-show, internal
     links to more episodes all still render. Mobile at 390px: no horizontal
     scroll, no tap target under 32px.
+- **Play button above the fold, and animated.** Pressing play is the whole point
+  of the page, and the stacked header pushed the control to ~800px on a phone —
+  below the fold. On handsets the cover now sits left of the title, which lifts
+  the control to ~530px. Long titles were the risk Ryan flagged: a 143-character
+  title still landed at 736px on a 360px screen, so the title steps down a size
+  by actual character count (never truncated — no ellipses anywhere). Measured
+  across three title lengths at 360/390/430px: **every case now above the fold**,
+  worst case 613px.
+  The control also breathes a soft halo until the first play, which stops once
+  playing and is disabled under `prefers-reduced-motion`.
+- **No cold pages.** Enrichment runs on first view, so the very first visitor to
+  an episode would have seen a card with no hook. Now the newest 3 episodes per
+  show are warmed in the background at boot (advertised episodes first), capped
+  at 150 per boot so the cost stays predictable.

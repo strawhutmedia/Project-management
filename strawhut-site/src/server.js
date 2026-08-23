@@ -1133,6 +1133,46 @@ async function backfillShowBlurbs() {
   console.log(`[blurb] wrote ${done}/${needs.length}`);
 }
 
+// A visitor should never meet a cold page. Enrichment happens on first view,
+// but the FIRST visitor to an episode would see the card without its hook — so
+// warm the episodes people actually land on: the newest few per show, plus any
+// episode an ad points at. Bounded per boot so the cost stays predictable.
+const WARM_PER_SHOW = 3;
+const WARM_MAX = 150;
+async function warmEpisodeEnrichment() {
+  if (process.env.SHOW_SEO === 'off' || !aiConfigured()) return;
+  const shows = await store.listShows();
+  const queue = [];
+  for (const show of shows) {
+    const eps = await store.listEpisodes(show.id, { limit: WARM_PER_SHOW });
+    for (const ep of eps) if (!ep.ai_hook && (ep.description || ep.title)) queue.push({ show, ep });
+  }
+  // Episodes with a landing record are ad destinations — warm those first.
+  const advertised = new Set((await store.listLandings()).map((l) => l.episode_id).filter(Boolean));
+  queue.sort((a, b) => (advertised.has(b.ep.id) ? 1 : 0) - (advertised.has(a.ep.id) ? 1 : 0));
+  const batch = queue.slice(0, WARM_MAX);
+  if (!batch.length) return;
+  console.log(`[episode] warming ${batch.length} episode page(s)…`);
+  let done = 0;
+  for (const { show, ep } of batch) {
+    try {
+      const out = await generateEpisodeEnrichment({ show, episode: ep, log: (m) => console.log('[episode]', m) });
+      if (out) {
+        await store.updateEpisode(ep.id, {
+          ai_hook: out.hook || null,
+          ai_takeaways: out.takeaways?.length ? JSON.stringify(out.takeaways) : null,
+          guests: out.guests?.length ? JSON.stringify(out.guests) : null,
+        });
+        done++;
+      }
+    } catch (e) {
+      console.error('[episode] warm failed for', ep.slug, '-', e.message);
+    }
+    await new Promise((r) => setTimeout(r, 1200));
+  }
+  console.log(`[episode] warmed ${done}/${batch.length}`);
+}
+
 async function backfillShowSeo() {
   if (process.env.SHOW_SEO === 'off' || !aiConfigured()) return;
   const shows = await store.listShows();
@@ -1246,6 +1286,7 @@ app.listen(PORT, async () => {
   // API; no-ops entirely if ANTHROPIC_API_KEY isn't set. Set SHOW_SEO=off to skip.
   backfillShowSeo()
     .then(() => backfillShowBlurbs())
+    .then(() => warmEpisodeEnrichment())
     .catch((e) => console.error('[seo] show backfill failed:', e.message));
 
   // Pull press mentions in the background so the Press page is populated.

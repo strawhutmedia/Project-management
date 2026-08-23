@@ -1171,3 +1171,63 @@ table.admin-table { width: 100%; border-collapse: collapse; }
 .ep-lp .ep-takeaways { max-width: 540px; margin: 24px auto 0; }
 a.lp-show-name { text-decoration: none; display: inline-block; padding: 6px 0; }
 a.lp-show-name:hover { color: #00e6a0; }
+
+/* --- Episode card header: get the play button above the fold ---------------
+   Stacked (cover centred, then title) pushed the play control to ~800px on a
+   phone — below the fold, and pressing play is the entire point of the page.
+   On handsets the cover sits left of the title so the control lands high. */
+.ep-lp .lp-head { display: flex; flex-direction: column; align-items: center; gap: 0; text-align: center; margin: 0; }
+.ep-lp .lp-head-text { min-width: 0; width: 100%; }
+
+@media (max-width: 640px) {
+  .ep-lp .lp-head {
+    flex-direction: row; align-items: center; gap: 14px; text-align: left; margin-bottom: 16px;
+  }
+  .ep-lp .lp-cover { width: 104px; height: 104px; margin: 0; flex: 0 0 auto; border-radius: 14px; }
+  .ep-lp .lp-head-text { text-align: left; }
+  .ep-lp .lp-show-name { margin: 0 0 3px; padding: 0; font-size: 0.76rem; }
+  /* Long titles wrap in a narrower column, so size down a step and tighten the
+     leading rather than truncating — nothing on this site gets an ellipsis. */
+  .ep-lp .lp-title { font-size: 1.04rem; line-height: 1.22; margin: 0 0 3px; }
+  .ep-lp .lp-date { font-size: 0.82rem; margin: 0; }
+  /* Compact the hook so it informs without pushing the control down. */
+  .ep-lp .lp-hook { margin-bottom: 14px; padding: 12px 14px; }
+  .ep-lp .lp-hook-text { font-size: 0.95rem; line-height: 1.4; }
+  .ep-lp .lp-card { padding: 18px 16px 22px; }
+  .ep-lp-crumb { padding: 10px 0 12px; }
+}
+
+/* The play control is the conversion event on this page. Until the first play
+   it breathes a soft halo to pull the eye; once playing the halo stops. */
+.aplayer-toggle { position: relative; }
+.aplayer:not(.is-playing) .aplayer-toggle::after {
+  content: ""; position: absolute; inset: -7px; border-radius: 50%;
+  border: 2px solid var(--accent); pointer-events: none;
+  animation: apPulse 2.4s cubic-bezier(0.22, 0.61, 0.36, 1) infinite;
+}
+@keyframes apPulse {
+  0%   { transform: scale(0.94); opacity: 0.55; }
+  70%  { transform: scale(1.22); opacity: 0; }
+  100% { transform: scale(1.22); opacity: 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .aplayer:not(.is-playing) .aplayer-toggle::after { animation: none; opacity: 0.4; transform: none; }
+}
+.ep-lp .aplayer-toggle { width: 76px; height: 76px; }
+.ep-lp .aplayer-toggle svg { width: 30px; height: 30px; }
+
+/* Long titles wrap to many lines in the narrow column beside the cover, which
+   pushes the play control under the fold. Step the size down by actual title
+   length — never truncate, since nothing here gets an ellipsis. */
+@media (max-width: 640px) {
+  .ep-lp .lp-title.is-long  { font-size: 0.95rem; line-height: 1.2; }
+  .ep-lp .lp-title.is-xlong { font-size: 0.88rem; line-height: 1.18; }
+}
+@media (max-width: 380px) {
+  .ep-lp .lp-cover { width: 92px; height: 92px; }
+  .ep-lp .lp-title { font-size: 0.98rem; }
+  .ep-lp .lp-title.is-long  { font-size: 0.9rem; }
+  .ep-lp .lp-title.is-xlong { font-size: 0.84rem; }
+  .ep-lp .lp-hook { padding: 10px 12px; margin-bottom: 12px; }
+  .ep-lp .lp-hook-text { font-size: 0.9rem; }
+}

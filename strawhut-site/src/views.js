@@ -1681,10 +1681,14 @@ export function episodePage({ show, episode, moreFromShow = [], related = [] }) 
   }<div class="container">
     <div class="breadcrumb ep-lp-crumb"><a href="/">Home</a> / <a href="/${esc(show.slug)}">${esc(show.title)}</a> / Episode</div>
     <div class="lp-card">
-      <a class="lp-show-name" href="/${esc(show.slug)}">${esc(show.title)}</a>
-      ${cover ? `<img class="lp-cover" src="${esc(cover)}" alt="${esc(episode.title)} — ${esc(show.title)}">` : ''}
-      <h1 class="lp-title">${esc(episode.title)}</h1>
-      ${dateline ? `<p class="lp-date">${esc(dateline)}</p>` : ''}
+      <div class="lp-head">
+        ${cover ? `<img class="lp-cover" src="${esc(cover)}" alt="${esc(episode.title)} — ${esc(show.title)}">` : ''}
+        <div class="lp-head-text">
+          <a class="lp-show-name" href="/${esc(show.slug)}">${esc(show.title)}</a>
+          <h1 class="lp-title${episode.title.length > 100 ? ' is-xlong' : episode.title.length > 62 ? ' is-long' : ''}">${esc(episode.title)}</h1>
+          ${dateline ? `<p class="lp-date">${esc(dateline)}</p>` : ''}
+        </div>
+      </div>
       ${
         episode.ai_hook
           ? `<div class="lp-hook"><p class="lp-hook-label">Why listen</p><p class="lp-hook-text">${esc(episode.ai_hook)}</p></div>`
