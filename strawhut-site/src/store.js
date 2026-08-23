@@ -103,6 +103,9 @@ class JsonStore {
   async getEpisodeById(id) {
     return this.db.episodes[id] || null;
   }
+  async enrichedCount() {
+    return Object.values(this.db.episodes).filter((e) => e && e.ai_hook).length;
+  }
   async updateEpisode(id, patch) {
     if (!this.db.episodes[id]) return null;
     this.db.episodes[id] = { ...this.db.episodes[id], ...patch, id };
@@ -505,6 +508,17 @@ class PgStore {
   async getEpisodeById(id) {
     const { rows } = await this.pool.query(`SELECT * FROM episodes WHERE id=$1`, [id]);
     return rows[0] || null;
+  }
+  async enrichedCount() {
+    try {
+      const { rows } = await this.pool.query(
+        `SELECT COUNT(*)::int AS c FROM episodes WHERE ai_hook IS NOT NULL AND ai_hook <> ''`
+      );
+      return rows[0].c;
+    } catch (e) {
+      // Surfaces a missing column instead of hiding it behind a silent zero.
+      return `error: ${e.message.slice(0, 80)}`;
+    }
   }
   async updateEpisode(id, patch) {
     const cur = await this.getEpisodeById(id);

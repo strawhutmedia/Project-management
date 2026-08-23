@@ -688,6 +688,8 @@ app.get('/healthz', async (req, res) => {
     ok: true,
     ...(await store.stats()),
     features: { ai: aiConfigured(), showSeo: process.env.SHOW_SEO !== 'off', turnstile: turnstileConfigured() },
+    enrichedEpisodes: await store.enrichedCount().catch((e) => `error: ${e.message.slice(0, 80)}`),
+    lastEnrichError: _lastEnrichError,
     spotlight: { source: sp.source, shows: titles },
   });
 });
@@ -958,6 +960,7 @@ app.get('/:showSlug', async (req, res, next) => {
 // 5,370 episodes means the cost follows real traffic — most of the catalogue is
 // never looked at, and the pages that are get enriched within one page view.
 const _enriching = new Set();
+let _lastEnrichError = null;
 function enrichEpisodeInBackground(show, episode) {
   if (!aiConfigured() || process.env.SHOW_SEO === 'off') return;
   if (episode.ai_hook || _enriching.has(episode.id)) return;
@@ -971,7 +974,10 @@ function enrichEpisodeInBackground(show, episode) {
         guests: out.guests?.length ? JSON.stringify(out.guests) : null,
       });
     })
-    .catch((e) => console.error('[episode] enrich failed:', e.message))
+    .catch((e) => {
+      _lastEnrichError = e.message.slice(0, 160);
+      console.error('[episode] enrich failed:', e.message);
+    })
     .finally(() => _enriching.delete(episode.id));
 }
 
