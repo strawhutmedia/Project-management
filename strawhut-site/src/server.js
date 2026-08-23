@@ -714,7 +714,11 @@ let _ghlState = ghlConfigured() ? 'checking' : 'unconfigured';
 if (ghlConfigured()) {
   verifyGhl()
     .then((r) => {
-      _ghlState = r.ok ? `ok${r.name ? ' (' + r.name + ')' : ''}` : `error: ${r.error || 'unknown'}`;
+      _ghlState = r.ok
+        ? `ok${r.name ? ' (' + r.name + ')' : ''}`
+        : r.state === 'limited'
+        ? `LIMITED${r.name ? ' (' + r.name + ')' : ''} — ${r.error}`
+        : `error: ${r.error || 'unknown'}`;
       console.log('[ghl]', _ghlState);
     })
     .catch((e) => { _ghlState = `error: ${e.message.slice(0, 120)}`; });
@@ -744,6 +748,7 @@ app.get('/healthz', async (req, res) => {
     features: { ai: aiConfigured(), showSeo: process.env.SHOW_SEO !== 'off', turnstile: turnstileConfigured(), ghl: ghlConfigured() },
     ghl: _ghlState,
     ghlProbe: ghlProbeState(),
+    ghlLastError: ghlLastError(),
     booking: (() => { const b = ghlBookingState();
       return { state: b.state, source: b.source, calendar: b.name || null, id: b.id || null,
                error: b.error || null, available: b.options }; })(),

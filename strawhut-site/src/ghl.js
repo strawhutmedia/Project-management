@@ -71,6 +71,18 @@ export async function verifyGhl() {
     return { ok: false, state: 'error', error: r.error };
   }
   const name = r.data?.location?.name || r.data?.name || null;
+
+  // Reading the location is NOT proof the integration works. An agency-level
+  // token reads the location fine and is refused on every sub-account
+  // resource — which is exactly the state this was in while /healthz cheerfully
+  // reported "ok (Straw Hut Media)" and no contact had ever reached the CRM.
+  // So check the thing we actually use: can we read contacts? Read-only, one
+  // record, no writes.
+  const c = await call(`/contacts/?locationId=${encodeURIComponent(LOCATION_ID)}&limit=1`);
+  if (!c.ok) {
+    _lastError = c.error;
+    return { ok: false, state: 'limited', name, error: `contacts refused: ${c.error}` };
+  }
   return { ok: true, state: 'ok', name };
 }
 

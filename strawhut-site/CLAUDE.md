@@ -123,6 +123,26 @@ Set these on Railway (inert until set); no code change needed:
 | `META_PIXEL_ID` | Facebook / Instagram retargeting |
 | `TIKTOK_PIXEL_ID` | TikTok retargeting |
 
+### GoHighLevel — the token must be a SUB-ACCOUNT token
+
+`GHL_API_TOKEN` has to be a Private Integration created **inside the Straw Hut
+Media sub-account**, not at the agency/company level. An agency token reads
+`GET /locations/{id}` perfectly happily and is refused on every sub-account
+resource — contacts, calendars, users — with *"The token is not authorized for
+this scope."* (and `/users/` gives the tell: *"Token's user type mismatch!"*).
+
+That cost real time on 2026-08-23: `/healthz` reported `ok (Straw Hut Media)`
+because `verifyGhl()` only read the location, so the CRM looked connected while
+**no contact had ever actually reached it**. `verifyGhl()` now reads one
+contact as well and reports `LIMITED` when it can't, and `probeGhlToken()`
+(read-only, once at boot) reports what the token can reach in `/healthz`
+under `ghlProbe`. Believe the probe, not the top line.
+
+Also: GHL versions its API per resource family and the values differ —
+Contacts `2021-07-28`, Calendars `2021-04-15` (docs also show `v3`). A wrong
+Version header returns the same "not authorized for this scope" message as a
+real permissions problem, so check the version before blaming the scopes.
+
 ### Booking is GoHighLevel, and only GoHighLevel
 
 Every "book a call" path on the site ends at `/book`, which embeds a GHL
