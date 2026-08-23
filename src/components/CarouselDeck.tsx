@@ -13,6 +13,7 @@
 // here, not duplicated in either caller.
 import { useEffect, useRef, useState } from 'react'
 import JSZip from 'jszip'
+import { jsPDF } from 'jspdf'
 import {
   renderDeckSlideCanvas,
   preloadDeckImages,
@@ -65,6 +66,27 @@ export function DeckGrid({ preset, slides }: { preset: ShowDeckPreset; slides: S
     }
   }
 
+  // LinkedIn carousels are DOCUMENT posts — one multi-page PDF, not a
+  // set of images. Same 1080×1350 slides, bundled as PDF pages (JPEG
+  // inside to keep the file well under LinkedIn's 100MB cap).
+  async function downloadLinkedInPdf() {
+    setBusy(true)
+    try {
+      const pdf = new jsPDF({ unit: 'px', format: [1080, 1350], orientation: 'portrait' })
+      for (let i = 0; i < editedSlides.length; i++) {
+        const canvas = renderDeckSlideCanvas(
+          { preset, slide: editedSlides[i], index: i + 1, total: editedSlides.length, images },
+          { fullSize: true },
+        )
+        if (i > 0) pdf.addPage([1080, 1350], 'portrait')
+        pdf.addImage(canvas.toDataURL('image/jpeg', 0.92), 'JPEG', 0, 0, 1080, 1350)
+      }
+      pdf.save(`${preset.key}-carousel-linkedin.pdf`)
+    } finally {
+      setBusy(false)
+    }
+  }
+
   if (editedSlides.length === 0) {
     return <p className="text-sm text-muted italic">No renderable slides.</p>
   }
@@ -85,13 +107,22 @@ export function DeckGrid({ preset, slides }: { preset: ShowDeckPreset; slides: S
           />
         ))}
       </div>
-      <button
-        onClick={() => void downloadZip()}
-        disabled={busy}
-        className="rounded-lg bg-gradient-to-r from-stage-producing to-stage-mastering text-white font-bold uppercase tracking-wider text-[11px] px-4 py-2.5 disabled:opacity-50"
-      >
-        {busy ? 'Bundling…' : `↓ Download all ${editedSlides.length} slides as ZIP`}
-      </button>
+      <div className="flex flex-wrap items-center gap-2">
+        <button
+          onClick={() => void downloadZip()}
+          disabled={busy}
+          className="rounded-lg bg-gradient-to-r from-stage-producing to-stage-mastering text-white font-bold uppercase tracking-wider text-[11px] px-4 py-2.5 disabled:opacity-50"
+        >
+          {busy ? 'Bundling…' : `↓ ${editedSlides.length} PNGs as ZIP (Instagram)`}
+        </button>
+        <button
+          onClick={() => void downloadLinkedInPdf()}
+          disabled={busy}
+          className="rounded-lg bg-gradient-to-r from-stage-stems to-stage-mixing text-white font-bold uppercase tracking-wider text-[11px] px-4 py-2.5 disabled:opacity-50"
+        >
+          {busy ? 'Bundling…' : '↓ One PDF (LinkedIn document post)'}
+        </button>
+      </div>
     </div>
   )
 }
