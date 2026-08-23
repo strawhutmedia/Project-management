@@ -1484,7 +1484,9 @@ export function contactPage({ sent = false, error = '', values = {} } = {}) {
       sent
         ? `<div class="contact-thanks">
              <h2 style="margin:0 0 8px">Thanks — message received.</h2>
-             <p style="color:var(--muted);margin:0">We read every note and reply personally. Talk soon.</p>
+             <p style="color:var(--muted);margin:0 0 6px">We read every note and reply personally, and a confirmation is on its way to your inbox.</p>
+             <p style="color:var(--muted);margin:0 0 20px">Don't want to wait? Grab a free 15 minutes now.</p>
+             <a class="btn btn-primary" href="/book">Book a 15-minute call →</a>
            </div>
            <script>window.shmTrack&&shmTrack('contact_submit',{topic:'${esc(values.topic || 'general')}'});window.fbq&&fbq('track','Lead');</script>`
         : `<form class="contact-form" method="POST" action="/contact">

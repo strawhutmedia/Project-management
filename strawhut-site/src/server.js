@@ -13,7 +13,7 @@ import { addShowFromFeed, syncShow, syncAll, startScheduler } from './sync.js';
 import * as V from './views.js';
 import * as A from './admin_views.js';
 import { robotsTxt, sitemapXml, llmsTxt } from './seo.js';
-import { sendAnnouncement, mailConfigured, sendContactEmail, sendTrafficDigest } from './mail.js';
+import { sendAnnouncement, mailConfigured, sendContactEmail, sendContactAutoReply, sendTrafficDigest } from './mail.js';
 import { importFromSite } from './importer.js';
 import { writeLandingCopy, generateLandingCopy, fallbackLandingCopy, aiConfigured, generateShowMetaDescription, generateShowBlurb, generateEpisodeEnrichment } from './ai.js';
 import { POSTS, getPost } from './content/resources.js';
@@ -830,6 +830,14 @@ app.post('/contact', async (req, res) => {
       await sendContactEmail({ name, email, company, message, topic, flags: suspicious ? flags : [] });
     } else {
       console.log('[contact] (email not configured) message from', email, `[${topic}]`, '-', message.slice(0, 120));
+    }
+    // Acknowledge the prospect immediately. Silence until a human replies is
+    // the biggest drop-off point in the funnel; this goes out in under a second
+    // and offers a call they can book without waiting for anyone.
+    if (!suspicious) {
+      sendContactAutoReply({ name, email, topic }).catch((e) =>
+        console.error('[mail] auto-reply failed:', e.message)
+      );
     }
     // CRM is a second destination, never a gate: fire-and-forget AFTER the
     // email so a GHL outage can't delay or fail a real enquiry.

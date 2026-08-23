@@ -39,6 +39,60 @@ export const CONTACT_ROUTES = {
  * Deliver a contact-form submission to the inbox for its topic, with reply-to
  * set to the sender so the recipient can just hit reply.
  */
+/**
+ * Instant acknowledgement to the PROSPECT, with a way to book immediately.
+ *
+ * Until this existed, someone who filled the contact form heard nothing at all
+ * until a human happened to read the inbox. Speed of first response is the
+ * single biggest lever on whether an enquiry turns into a client, and silence
+ * is the worst possible first impression from a production company.
+ *
+ * Deliberately short and human — it is not a marketing email. Never throws:
+ * failing to acknowledge must not fail the submission.
+ */
+export async function sendContactAutoReply({ name, email, topic }) {
+  if (!process.env.RESEND_API_KEY || !email) return { ok: false, skipped: true };
+  const site = (process.env.APP_BASE_URL || 'https://www.strawhutmedia.com').replace(/\/+$/, '');
+  const esc = (x) => String(x == null ? '' : x).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  const first = String(name || '').trim().split(/\s+/)[0] || 'there';
+  const isGuest = topic === 'booking';
+  const html = `<div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;font-size:16px;line-height:1.6;color:#1a1a1a">
+    <p>Hi ${esc(first)},</p>
+    <p>Thanks for reaching out to Straw Hut Media — your message landed and a real person will read it.</p>
+    ${
+      isGuest
+        ? `<p>We'll come back to you about guesting on one of our shows.</p>`
+        : `<p>If it's easier than waiting on email, you can grab a free 15-minute call right now and we'll tell you straight whether we're the right partner for what you're building:</p>
+           <p><a href="${site}/book" style="display:inline-block;background:#00cc8e;color:#023324;font-weight:700;text-decoration:none;padding:12px 26px;border-radius:999px">Book a 15-minute call →</a></p>
+           <p style="font-size:14px;color:#555">No slides, no hard sell. Fifteen minutes.</p>`
+    }
+    <p>— Straw Hut Media</p>
+    <p style="font-size:13px;color:#888">Full-service podcast production &amp; network · <a href="${site}" style="color:#0a8f66">strawhutmedia.com</a></p>
+  </div>`;
+  try {
+    const res = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${process.env.RESEND_API_KEY}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        from: FROM,
+        to: email,
+        subject: isGuest ? 'Thanks for getting in touch — Straw Hut Media' : "Thanks for reaching out — want to grab 15 minutes?",
+        html,
+        reply_to: 'hello@strawhutmedia.com',
+      }),
+    });
+    if (!res.ok) {
+      const b = await res.text().catch(() => '');
+      console.error('[mail] auto-reply failed:', res.status, b.slice(0, 160));
+      return { ok: false };
+    }
+    return { ok: true };
+  } catch (e) {
+    console.error('[mail] auto-reply error:', e.message);
+    return { ok: false };
+  }
+}
+
 export async function sendContactEmail({ name, email, company, message, topic, flags = [] }) {
   const route = CONTACT_ROUTES[topic] || CONTACT_ROUTES.general;
   const esc = (s) => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');

@@ -350,3 +350,10 @@ Notes:
   - **Boot check is READ-ONLY** (`GET /locations/{id}`), so credentials are
     verified and reported in `/healthz` without creating a test contact in a
     live CRM. Written this way deliberately after the Jane Doe incident.
+- **Closed the biggest funnel leak: prospects heard nothing.** A contact-form
+  submission emailed Ryan and sent the sender *nothing at all* — they sat in
+  silence until a human read the inbox. Now an instant acknowledgement goes to
+  the prospect with a "Book a 15-minute call" button, and the thank-you page
+  offers the same instead of being a dead end. Suppressed for submissions the
+  antispam heuristics flagged, so we never auto-reply to a bot. Never throws —
+  failing to acknowledge must not fail the submission.
