@@ -42,6 +42,17 @@ const app = express();
 app.set('trust proxy', 1);
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
+// Pages carried NO Cache-Control at all, only an ETag. Browsers — Safari
+// especially — then apply heuristic caching and can serve a stale page for
+// hours without revalidating, which made shipped changes look like they had
+// never deployed. `no-cache` means "revalidate every time", not "don't store":
+// the ETag still yields a cheap 304 when nothing changed. Static assets are
+// unaffected — they set their own header further down, and anything with a file
+// extension is skipped here anyway.
+app.use((req, res, next) => {
+  if (!/\.[a-z0-9]{2,5}$/i.test(req.path)) res.setHeader('Cache-Control', 'no-cache');
+  next();
+});
 // Static caching: images/fonts never change → cache hard (30d, immutable);
 // CSS can change on deploy → 1h (repeat views cached, then a cheap revalidate).
 const IMMUTABLE = /\.(jpe?g|png|webp|gif|svg|ico|woff2?|mp3|m4a)$/i;
