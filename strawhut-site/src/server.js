@@ -723,6 +723,18 @@ app.get('/healthz', async (req, res) => {
   });
 });
 
+// Which shows exist here — used by Podbooster to decide whether to offer the
+// "send ads to Straw Hut Media" option for a campaign. Titles and slugs only,
+// no counts or internals. Cached by the caller; cheap enough to serve openly.
+app.get('/api/shows.json', async (req, res) => {
+  const shows = await store.listShows().catch(() => []);
+  res.json({
+    ok: true,
+    count: shows.length,
+    shows: shows.map((s) => ({ title: s.title, slug: s.slug, show_type: s.show_type || 'original' })),
+  });
+});
+
 // ---- SEO / GEO endpoints --------------------------------------------------
 app.get('/robots.txt', (req, res) => res.type('text/plain').send(robotsTxt()));
 
