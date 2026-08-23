@@ -119,3 +119,102 @@ export async function upsertContact({ name, email, company, message, tags = [], 
   }
   return { ok: true, id };
 }
+
+// ---- Booking calendar discovery -------------------------------------------
+//
+// The /book page needs the GHL calendar's embed URL. Rather than making a
+// human copy it out of the GHL UI and paste it into an env var — a step that
+// silently rots the day the calendar is renamed or replaced — the server asks
+// GHL for it with the token it already holds. BOOKING_WIDGET_URL still wins if
+// it is set, so a deliberate override is always available.
+
+const WIDGET_BASE = 'https://api.leadconnectorhq.com/widget/booking';
+
+// A location usually has several calendars (per-team-member, round robin,
+// event types). We want the short new-business fit call.
+const FIT_RE = /(15[\s-]*min|fit\s*call|discovery|intro(?!duction to)|consult|strategy)/i;
+// Never auto-pick something that is obviously not for prospects.
+const AVOID_RE = /(guest|internal|test|personal|interview|recording|studio\s*session)/i;
+
+export async function listCalendars() {
+  if (!ghlConfigured()) return { ok: false, state: 'unconfigured' };
+  const r = await call(`/calendars/?locationId=${encodeURIComponent(LOCATION_ID)}`);
+  if (!r.ok) {
+    _lastError = r.error;
+    return { ok: false, error: r.error, status: r.status };
+  }
+  const list = Array.isArray(r.data?.calendars) ? r.data.calendars
+    : Array.isArray(r.data) ? r.data
+    : [];
+  return { ok: true, calendars: list };
+}
+
+/** Highest-scoring active calendar, or null. Exported so it can be reasoned
+ *  about (and tested) without a live API call. */
+export function pickBookingCalendar(calendars = []) {
+  const active = calendars.filter((c) => c && c.id && c.isActive !== false);
+  if (!active.length) return null;
+  const scored = active.map((c) => {
+    const name = String(c.name || '');
+    let s = 0;
+    if (FIT_RE.test(name)) s += 10;
+    if (Number(c.slotDuration) === 15) s += 4;
+    else if (Number(c.slotDuration) === 30) s += 2;
+    if (AVOID_RE.test(name)) s -= 20;
+    return { c, s };
+  });
+  scored.sort((a, b) => b.s - a.s);
+  return scored[0].s > -20 ? scored[0].c : null;
+}
+
+export function bookingWidgetUrl(calendar) {
+  const id = calendar && calendar.id;
+  return id ? `${WIDGET_BASE}/${encodeURIComponent(id)}` : '';
+}
+
+let _booking = { state: 'unresolved', url: '', name: '', id: '', source: '', error: '', options: [] };
+export function ghlBookingState() { return _booking; }
+
+/**
+ * Resolve the calendar to embed on /book. Never throws; on any failure the
+ * page falls back to its "get in touch" panel rather than an empty iframe.
+ */
+export async function resolveBookingCalendar() {
+  const override = (process.env.BOOKING_WIDGET_URL || '').trim();
+  if (override) {
+    _booking = { state: 'ok', url: override, name: '', id: '', source: 'env', error: '', options: [] };
+    return _booking;
+  }
+  if (!ghlConfigured()) {
+    _booking = { ..._booking, state: 'unconfigured', url: '', source: '' };
+    return _booking;
+  }
+  const r = await listCalendars();
+  if (!r.ok) {
+    _booking = { ..._booking, state: 'error', url: '', source: '', error: r.error || 'unknown' };
+    console.error('[ghl] calendar lookup failed:', _booking.error);
+    return _booking;
+  }
+  // Every active calendar, so a wrong auto-pick is diagnosable from /healthz
+  // instead of requiring another deploy to find out what was on offer.
+  const options = r.calendars
+    .filter((c) => c && c.id && c.isActive !== false)
+    .map((c) => ({ id: c.id, name: c.name || '(unnamed)', minutes: c.slotDuration ?? null }));
+  const pick = pickBookingCalendar(r.calendars);
+  if (!pick) {
+    _booking = { state: 'none', url: '', name: '', id: '', source: '', error: 'no suitable active calendar', options };
+    console.error('[ghl] no bookable calendar among', options.length, 'active');
+    return _booking;
+  }
+  _booking = {
+    state: 'ok',
+    url: bookingWidgetUrl(pick),
+    name: pick.name || '',
+    id: pick.id,
+    source: 'ghl',
+    error: '',
+    options,
+  };
+  console.log(`[ghl] booking calendar: ${_booking.name} (${_booking.id})`);
+  return _booking;
+}

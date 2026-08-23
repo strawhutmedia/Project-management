@@ -113,14 +113,23 @@ Set these on Railway (inert until set); no code change needed:
 
 ### Booking is GoHighLevel, and only GoHighLevel
 
-Every "book a call" path on the site ends at `/book`, which embeds the GHL
-calendar from `BOOKING_WIDGET_URL`. The third-party scheduler that used to run
-the package CTAs and the quote quiz was cancelled on 2026-08-23 — **do not
-reintroduce a second scheduler.** One calendar means every booking is a CRM
-event that can fire reminders and follow-up, which is the whole point.
+Every "book a call" path on the site ends at `/book`, which embeds a GHL
+calendar. The third-party scheduler that used to run the package CTAs and the
+quote quiz was cancelled on 2026-08-23 — **do not reintroduce a second
+scheduler.** One calendar means every booking is a CRM event that can fire
+reminders and follow-up, which is the whole point.
 
-With `BOOKING_WIDGET_URL` unset, `/book` says so honestly and routes to
-`/contact` — it never renders an empty or dead scheduler.
+**The calendar is discovered, not configured.** `resolveBookingCalendar()` in
+`ghl.js` asks GHL for the location's calendars at boot (and hourly), scores
+them, and builds the embed URL from the winner's id. Nobody has to paste a
+widget URL, and nothing breaks when the calendar is renamed. `/healthz`
+reports which one was chosen plus every active calendar it could have picked,
+so a wrong pick is diagnosable without a deploy. Set `BOOKING_WIDGET_URL` only
+to override the choice.
+
+If discovery fails — no calendars, none suitable, or the token lacks the
+`calendars.readonly` scope — `/book` says so honestly and routes to `/contact`.
+It never renders an empty or dead scheduler.
 
 Package picks on `/pricing` and finished quotes from the quiz stash a
 `shm_quote` payload (`{summary, pkg, ts}`) in session+localStorage and hand off

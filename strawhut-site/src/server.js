@@ -26,7 +26,8 @@ import { applyPopularSpotlight, megaphoneConfigured } from './popularity.js';
 import { resolveArtwork, imageWidth, MIN_ACCEPTABLE } from './artwork.js';
 import { inspect as inspectSubmission } from './antispam.js';
 import { verifyTurnstile, turnstileConfigured } from './turnstile.js';
-import { ghlConfigured, verifyGhl, upsertContact, ghlLastError } from './ghl.js';
+import { ghlConfigured, verifyGhl, upsertContact, ghlLastError,
+         resolveBookingCalendar, ghlBookingState } from './ghl.js';
 import { toText as plainText, endsSentence } from './util.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -720,6 +721,12 @@ if (ghlConfigured()) {
     .catch((e) => { _ghlState = `error: ${e.message.slice(0, 120)}`; });
 }
 
+// The booking calendar is discovered from GHL rather than pasted into an env
+// var, so /book keeps working when the calendar is renamed or replaced. Read
+// once at boot and re-checked hourly; BOOKING_WIDGET_URL overrides it.
+resolveBookingCalendar().catch(() => {});
+setInterval(() => { resolveBookingCalendar().catch(() => {}); }, 60 * 60 * 1000).unref();
+
 app.get('/healthz', async (req, res) => {
   const sp = spotlightStatus || {};
   const titles = (sp.shows || []).map((x) => x.title).concat(sp.picks || []);
@@ -735,6 +742,9 @@ app.get('/healthz', async (req, res) => {
     commit: (process.env.RAILWAY_GIT_COMMIT_SHA || '').slice(0, 7) || null,
     features: { ai: aiConfigured(), showSeo: process.env.SHOW_SEO !== 'off', turnstile: turnstileConfigured(), ghl: ghlConfigured() },
     ghl: _ghlState,
+    booking: (() => { const b = ghlBookingState();
+      return { state: b.state, source: b.source, calendar: b.name || null, id: b.id || null,
+               error: b.error || null, available: b.options }; })(),
     enrichedEpisodes: await store.enrichedCount().catch((e) => `error: ${e.message.slice(0, 80)}`),
     lastEnrichError: _lastEnrichError,
     spotlight: { source: sp.source, shows: titles },
@@ -797,9 +807,9 @@ app.get('/podcast-studio-los-angeles', (req, res) => res.redirect(301, '/studio'
 app.get('/about', (req, res) => res.send(V.aboutPage()));
 
 // 15-minute "are we a fit" discovery call, booked through GoHighLevel so leads
-// land in the CRM. Set BOOKING_WIDGET_URL to the GHL calendar embed URL.
-const BOOKING_WIDGET_URL = process.env.BOOKING_WIDGET_URL || '';
-app.get('/book', (req, res) => res.send(V.bookPage({ widgetUrl: BOOKING_WIDGET_URL })));
+// land in the CRM. The calendar is discovered from GHL at boot; set
+// BOOKING_WIDGET_URL only to override that choice.
+app.get('/book', (req, res) => res.send(V.bookPage({ widgetUrl: ghlBookingState().url })));
 
 // Packages + custom quote builder (embeds the self-hosted Sales-Quoting tool).
 app.get('/pricing', (req, res) => res.send(V.pricingPage()));
