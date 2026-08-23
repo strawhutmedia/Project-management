@@ -246,3 +246,16 @@ Notes:
 - `/healthz` now reports which optional features are configured (booleans only),
   because a backfill that silently no-ops is otherwise indistinguishable from one
   that ran. It confirmed `ai: true` on the website service.
+- **Campaign landing page (`/go/…`) rebuilt to Podbooster's layout.** Ryan: "the
+  Podbooster landing page layout is great." Read `routes/rss.js` and matched the
+  skeleton exactly — one centred column: show name → large cover → title →
+  duration → "Why listen" hook box → player (big play ring, skip 15s either
+  side) → guests or transcript pull-quotes → divider → description → divider →
+  "Enjoy the episode? / Subscribe to X" + platform links → share. Straw Hut
+  brand, Podbooster structure.
+  - Their page generates `ai_takeaways` but never renders them, so the landing
+    page doesn't either; takeaways stay on the public episode page where they
+    add indexable content.
+  - Two old rules (`.lp-desc`, `.lp-subscribe`) drew their own top borders,
+    which doubled up against the new explicit dividers into two stacked lines.
+    Caught by screenshotting.

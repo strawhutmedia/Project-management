@@ -660,7 +660,7 @@ main { overflow-x: clip; }
 .lp-body { background: var(--bg); }
 .lp-wrap { min-height: 100vh; display: flex; justify-content: center; align-items: flex-start; padding: 26px 16px 60px; }
 .lp-card { width: 100%; max-width: 540px; background: var(--card); border: 1px solid var(--border); border-radius: 24px; padding: 32px 26px 28px; text-align: center; box-shadow: var(--shadow); }
-.lp-brand { display: inline-block; font-weight: 700; font-size: 1.02rem; letter-spacing: 0.02em; color: var(--text); margin-bottom: 18px; }
+.lp-brand { display: inline-block; padding: 8px 4px; font-weight: 700; font-size: 1.02rem; letter-spacing: 0.02em; color: var(--text); margin-bottom: 18px; }
 .lp-brand .dot { color: var(--accent); }
 /* Compact horizontal header keeps the player high up (goal #1 = press play) */
 .lp-head { display: flex; align-items: center; gap: 14px; text-align: left; margin-bottom: 16px; }
@@ -679,14 +679,14 @@ main { overflow-x: clip; }
 .lp-card .aplayer { max-width: 100%; margin: 0 0 4px; background: rgba(0,204,142,0.05); border-color: rgba(0,204,142,0.2); box-shadow: none; }
 .lp-card .aplayer-head { display: none; } /* card already shows cover + title */
 /* subscribe row, compact + centered */
-.lp-subscribe { margin-top: 24px; padding-top: 22px; border-top: 1px solid var(--border); }
+.lp-subscribe { margin-top: 24px; }
 .lp-sub-label { font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; color: var(--muted); margin-bottom: 14px; }
 .lp-subscribe .listen-on { max-width: 100%; margin: 0; }
 .lp-subscribe .listen-on-label { display: none; }
 .lp-subscribe .platform-links { justify-content: center; gap: 7px; }
 .lp-subscribe .platform-link { padding: 6px 11px; font-size: 0.76rem; }
 /* description, quiet + left-aligned below a divider */
-.lp-desc { text-align: left; margin-top: 22px; padding-top: 20px; border-top: 1px solid var(--border); color: var(--muted); font-size: 0.92rem; line-height: 1.7; }
+.lp-desc { text-align: left; margin-top: 22px; color: var(--muted); font-size: 0.92rem; line-height: 1.7; }
 .lp-desc :where(h1,h2,h3) { font-size: 1rem; color: var(--text); }
 
 /* Contact */
@@ -1101,4 +1101,64 @@ table.admin-table { width: 100%; border-collapse: collapse; }
   /* Both were under the 44px touch guidance on a phone. */
   .show-link { display: inline-block; padding: 8px 0; }
   .aplayer-speed { min-height: 40px; min-width: 44px; }
+}
+
+/* --- Campaign landing page (/go/…) -----------------------------------------
+   Layout deliberately mirrors the Podbooster /ep/ page, which converts well:
+   one centred column — show name, big cover, title, duration, "Why listen",
+   player, guests or pull-quotes, description, subscribe, share. Straw Hut
+   brand, Podbooster skeleton. */
+.lp-card { text-align: center; padding: 30px 22px 26px; }
+.lp-show-name {
+  margin: 14px 0 16px; font-size: 0.82rem; font-weight: 700;
+  letter-spacing: 0.06em; color: var(--accent);
+}
+.lp-cover {
+  display: block; width: 168px; height: 168px; margin: 0 auto 18px;
+  border-radius: 18px; object-fit: cover;
+  box-shadow: 0 18px 44px rgba(0, 0, 0, 0.5);
+}
+.lp-title { font-size: 1.32rem; font-weight: 800; line-height: 1.25; margin: 0 0 6px; }
+.lp-date { color: var(--muted); font-size: 0.9rem; margin: 0 0 20px; }
+
+.lp-hook {
+  text-align: left; margin: 0 0 20px; padding: 15px 17px;
+  background: rgba(0, 204, 142, 0.07); border: 1px solid rgba(0, 204, 142, 0.2);
+  border-radius: 14px;
+}
+.lp-hook-label {
+  margin: 0 0 6px; font-size: 0.66rem; font-weight: 700;
+  letter-spacing: 0.1em; text-transform: uppercase; color: var(--accent);
+}
+.lp-hook-text { margin: 0; color: #fff; font-size: 1rem; line-height: 1.45; font-weight: 600; }
+
+.lp-guests, .lp-quotes {
+  text-align: left; margin: 18px 0 0; padding: 15px 17px;
+  background: rgba(255, 255, 255, 0.04); border: 1px solid var(--border); border-radius: 14px;
+}
+.lp-guests-label {
+  margin: 0 0 5px; font-size: 0.66rem; font-weight: 700;
+  letter-spacing: 0.1em; text-transform: uppercase; color: var(--accent);
+}
+.lp-guests-name { margin: 0; color: #fff; font-weight: 600; }
+.lp-quote { margin: 0 0 12px; }
+.lp-quote:last-child { margin-bottom: 0; }
+.lp-quote p { margin: 0 0 5px; color: #fff; font-size: 1rem; line-height: 1.5; font-style: italic; }
+.lp-quote span { font-size: 0.72rem; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); }
+
+.lp-divider { height: 1px; background: var(--border); margin: 24px 0; }
+.lp-desc { text-align: left; }
+
+.lp-subscribe { text-align: center; }
+.lp-sub-label { margin: 0 0 2px; color: var(--muted); font-size: 0.92rem; }
+.lp-sub-show { margin: 0 0 14px; font-size: 1.05rem; font-weight: 700; color: #fff; }
+.lp-subscribe .listen-on-label { display: none; }
+.lp-subscribe .platform-links { justify-content: center; }
+
+.lp-card .ep-share { justify-content: center; margin-top: 22px; }
+
+@media (max-width: 480px) {
+  .lp-card { padding: 26px 18px 24px; }
+  .lp-cover { width: 152px; height: 152px; }
+  .lp-title { font-size: 1.18rem; }
 }

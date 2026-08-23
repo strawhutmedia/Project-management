@@ -1222,6 +1222,22 @@ export function pricingPage() {
   });
 }
 
+function lpHighlight(ep) {
+  const quotes = jsonList(ep.quotes);
+  if (quotes.length) {
+    return `<div class="lp-quotes">${quotes
+      .slice(0, 2)
+      .map((q) => `<blockquote class="lp-quote"><p>&ldquo;${esc(q)}&rdquo;</p><span>From the episode</span></blockquote>`)
+      .join('')}</div>`;
+  }
+  const guests = jsonList(ep.guests);
+  if (!guests.length) return '';
+  return `<div class="lp-guests">
+    <p class="lp-guests-label">${guests.length > 1 ? 'Guests' : 'Guest'}</p>
+    <p class="lp-guests-name">${guests.map((g) => esc(g)).join('<span class="lp-guest-sep"> &bull; </span>')}</p>
+  </div>`;
+}
+
 export function landingPage({ landing, show, episode }) {
   const ep = episode || {};
   const heroImg = landing.hero_image_url || ep.image_url || show?.image_url || '';
@@ -1257,26 +1273,36 @@ ${trackingHead()}${FONT}<link rel="stylesheet" href="/styles.css?v=${CSS_V}">${g
 ${trackingBody()}
 <main class="lp-wrap"><div class="lp-card">
   <a class="lp-brand" href="/">Straw Hut Media<span class="dot">.</span></a>
-  <div class="lp-head">
-    ${cover ? `<img class="lp-cover" src="${esc(cover)}" alt="${esc(headline)}">` : ''}
-    <div class="lp-head-text">
-      ${show ? `<div class="lp-eyebrow">${esc(show.title)}</div>` : ''}
-      <h1 class="lp-title">${esc(headline)}</h1>
-      ${dateline ? `<div class="lp-date">${esc(dateline)}</div>` : ''}
-    </div>
-  </div>
-  ${player ? `<div class="lp-playcue"><span class="lp-playcue-arrow">▶</span> Press play</div>${player}` : ''}
-  ${landing.cta_url ? `<a class="btn btn-primary lp-cta-btn" id="lpCta" href="${esc(landing.cta_url)}">${esc(landing.cta_label || 'Listen now')}</a>` : ''}
-  ${landing.subhead ? `<p class="lp-sub">${esc(landing.subhead)}</p>` : ''}
+  ${show ? `<p class="lp-show-name">${esc(show.title)}</p>` : ''}
+  ${cover ? `<img class="lp-cover" src="${esc(cover)}" alt="${esc(headline)}">` : ''}
+  <h1 class="lp-title">${esc(headline)}</h1>
+  ${dateline ? `<p class="lp-date">${esc(dateline)}</p>` : ''}
+  ${
+    ep.ai_hook
+      ? `<div class="lp-hook"><p class="lp-hook-label">Why listen</p><p class="lp-hook-text">${esc(ep.ai_hook)}</p></div>`
+      : landing.subhead
+        ? `<div class="lp-hook"><p class="lp-hook-label">Why listen</p><p class="lp-hook-text">${esc(landing.subhead)}</p></div>`
+        : ''
+  }
+  ${player || ''}
+  ${lpHighlight(ep)}
+  ${body ? `<div class="lp-divider"></div><div class="lp-desc notes">${body}</div>` : ''}
   ${
     show
-      ? `<div class="lp-subscribe">
-           <div class="lp-sub-label">Subscribe to ${esc(show.title)}</div>
+      ? `<div class="lp-divider"></div>
+         <div class="lp-subscribe">
+           <p class="lp-sub-label">Enjoy the episode?</p>
+           <p class="lp-sub-show">Subscribe to ${esc(show.title)}</p>
            ${platformRow(show)}
          </div>`
       : ''
   }
-  ${body ? `<div class="lp-desc notes">${body}</div>` : ''}
+  ${shareRow(headline)}
+  ${
+    landing.cta_url
+      ? `<a class="btn btn-primary lp-cta-btn" id="lpCta" href="${esc(landing.cta_url)}">${esc(landing.cta_label || 'Listen now')}</a>`
+      : ''
+  }
 </div></main>
 <script>(function(){
   // Attribution: keep gclid/utm and append to the CTA so conversions track.
