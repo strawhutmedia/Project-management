@@ -907,7 +907,16 @@ app.get('/go/resolve', async (req, res) => {
     if (!mShow || !mEp) return res.status(404).json({ ok: false, error: 'episode not found' });
     await resolveOrCreateEpisodeLanding(mShow, mEp);
     const base = (process.env.APP_BASE_URL || `https://${req.headers.host}`).replace(/\/+$/, '');
-    res.json({ ok: true, url: `${base}/go/${mShow.slug}/${mEp.slug}`, show: mShow.title, episode: mEp.title });
+    // Return the CANONICAL episode URL, not /go/ — the episode page is now the
+    // landing page, and handing Google Ads a URL that 301s risks disapproval
+    // and loses the redirect hop on every click.
+    res.json({
+      ok: true,
+      url: `${base}/${mShow.slug}/${mEp.slug}`,
+      show: mShow.title,
+      episode: mEp.title,
+      slug: `${mShow.slug}/${mEp.slug}`,
+    });
   } catch (e) {
     res.status(500).json({ ok: false, error: e.message });
   }
