@@ -126,7 +126,20 @@ and the first three layers still run.
    homepage it is `lazy` — the Cloudflare script isn't requested until someone
    focuses the subscribe field. If you add a new public form, call
    `turnstileWidget()` inside it; never move this into `layout()`.
-2. **Only an actively *rejected* token blocks.** A missing or unverifiable
+2. **NEVER post a deliverable submission to the LIVE contact form.** It sends
+   real email to Ryan's inbox. On 2026-08-23 a verification POST
+   ("Jane Doe / jane@label.com / We would like to launch a show, can we talk?")
+   landed as a genuine-looking lead and he began drafting a reply and looping in
+   a colleague to book a meeting with a person who doesn't exist.
+
+   Verify delivery logic against a LOCAL server (`mailConfigured()` is false
+   without `RESEND_API_KEY`, so it only logs). Against production, verify only
+   things that don't send: that the widget renders, that the hidden fields are
+   present, and that a cold bot POST is *blocked* (blocked submissions never
+   email). If a live delivery test is genuinely unavoidable, make it
+   unmistakable — name it `CLAUDE TEST — IGNORE` — and tell Ryan before it lands.
+
+3. **Only an actively *rejected* token blocks.** A missing or unverifiable
    token (ad blocker, corporate proxy, Cloudflare outage) is flagged and the
    message is still delivered. Content heuristics likewise only flag. Losing
    one real client inquiry costs more than a hundred spam emails.
