@@ -375,6 +375,7 @@ function footerBlock() {
     <div class="footer-cols">
       <div class="footer-col">
         <div class="footer-h">Services</div>
+        <a href="/services">All Services</a>
         <a href="/podcast-production">Podcast Production</a>
         <a href="/advertise">Advertise With Us</a>
         <a href="/studio">Book the Studio</a>
@@ -1157,6 +1158,151 @@ export function bookPage({ widgetUrl = '' } = {}) {
       { name: 'Home', path: '/' },
       { name: 'Book a call', path: '/book' },
     ]),
+  });
+}
+
+// --- Services hub ----------------------------------------------------------
+// /services used to be a static file dropped into public/ — Inter instead of
+// Poppins, the pre-brand green, no nav, no footer, no canonical, no schema. It
+// was the only page on the site that didn't look like the site.
+//
+// It is now a real page: the five things Straw Hut actually sells, each linking
+// to the page that sells it properly. No prices here, so unlike /pricing it can
+// stay indexable — which matters, because "podcast production services" is the
+// search this company needs to win.
+
+const SERVICE_LINES = [
+  {
+    name: 'Podcast production',
+    href: '/podcast-production',
+    text: 'One team owns the whole show — development, creative direction, recording, editing, sound design, and publishing. You host; we handle everything else.',
+    serviceType: 'Podcast production',
+  },
+  {
+    name: 'Network distribution',
+    href: '/shows',
+    text: 'Join a network of award-winning originals and partner shows. Published and optimized across Apple Podcasts, Spotify, YouTube, and everywhere else people listen.',
+    serviceType: 'Podcast distribution',
+  },
+  {
+    name: 'Advertising & brand partnerships',
+    href: '/advertise',
+    text: 'Host-read ads, branded segments, and full branded series across our shows — plus paid campaigns that put your episodes in front of new listeners.',
+    serviceType: 'Podcast advertising',
+  },
+  {
+    name: 'Show development',
+    href: '/podcast-production#development',
+    text: "Concept, format, positioning, and a launch plan. The work that decides whether a show lands before a single episode is recorded.",
+    serviceType: 'Podcast show development',
+  },
+  {
+    name: 'Studio booking',
+    href: '/studio',
+    text: 'Our fully-equipped Hollywood studio — pro audio and multi-camera 4K video, from $125/hour. Book by the hour and walk out with publish-ready files.',
+    serviceType: 'Recording studio rental',
+  },
+];
+
+const SERVICES_FAQ = [
+  ['What services does Straw Hut Media offer?',
+   'Straw Hut Media is a full-service podcast production company and network in Hollywood. We offer podcast production (development, recording, editing, sound design, and publishing), distribution through our network, podcast advertising and brand partnerships, show development, and hourly booking of our Hollywood recording studio.'],
+  ['Do you work with brands, or only individual creators?',
+   'Both. We produce award-winning original shows, flagship podcasts for individual creators and personalities, and branded podcasts for companies who want to build authority with an audience. We have worked with partners including Universal, Disney, and Hulu.'],
+  ['Can I use just one service, or do I have to take the whole package?',
+   'You can use one. Plenty of clients book the studio by the hour, or come to us only for advertising on our network, without any production work. If you want the whole show handled end to end, that is what the production packages are for.'],
+  ['How much does it cost?',
+   'It depends on format, episode length, frequency, and how much of the work you want us to own. Our packages page lays out three production tiers and a custom quote builder that gives you a real number in a couple of minutes; the studio is priced by the hour at $125 for 1080p and $150 for 4K.'],
+  ['How do I get started?',
+   'Book a free 15-minute discovery call. Tell us about the show or the idea, and we will tell you honestly whether — and how — we can help. No slides and no hard sell.'],
+];
+
+export function servicesHubPage() {
+  const pillars = SERVICE_LINES.map((s, i) => `
+    <a class="pillar pillar-link" href="${esc(s.href)}">
+      <div class="pillar-num">${String(i + 1).padStart(2, '0')}</div>
+      <div class="pillar-body">
+        <h3>${esc(s.name)}</h3>
+        <p>${esc(s.text)}</p>
+        <span class="pillar-arrow">Learn more →</span>
+      </div>
+    </a>`).join('');
+
+  const body = `
+  <section class="hero" style="padding-bottom:10px"><div class="container">
+    <div class="breadcrumb" style="padding:0 0 14px"><a href="/">Home</a> / Services</div>
+    <h1>Everything a podcast needs, <span class="accent">under one roof</span></h1>
+    <p>Straw Hut Media is a full-service podcast production company and network based in Hollywood. We build shows from the idea up, distribute them, sell the ads that pay for them, and rent the studio they are recorded in — and you can use any one piece of that on its own.</p>
+    <div style="margin-top:22px">
+      <a class="btn btn-primary" href="/book">Book a 15-min fit call →</a>
+      <a class="btn btn-ghost" href="/pricing" style="margin-left:8px">See packages &amp; pricing</a>
+    </div>
+  </div></section>
+
+  <section class="section" style="padding-top:14px"><div class="container">
+    <div class="section-head"><h2>What we do</h2></div>
+    <div class="pillars">${pillars}</div>
+  </div></section>
+
+  <section class="section"><div class="container">
+    <div class="section-head"><h2>How working with us actually goes</h2></div>
+    <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(260px,1fr))">
+      <article class="show-card" style="padding:22px 24px">
+        <h3 style="margin-top:0">1 · A straight conversation</h3>
+        <p class="meta" style="line-height:1.55">Fifteen minutes on what you are building and where you are stuck. If we are not the right partner, we say so and point you somewhere better.</p>
+      </article>
+      <article class="show-card" style="padding:22px 24px">
+        <h3 style="margin-top:0">2 · A scope and a real number</h3>
+        <p class="meta" style="line-height:1.55">Format, frequency, and what we own versus what you keep — priced before anything starts, so there are no surprises later.</p>
+      </article>
+      <article class="show-card" style="padding:22px 24px">
+        <h3 style="margin-top:0">3 · We make the show</h3>
+        <p class="meta" style="line-height:1.55">One team, one point of contact, and episodes that ship on schedule. You keep your show, your feed, and your IP throughout.</p>
+      </article>
+    </div>
+  </div></section>
+
+  ${faqSection(SERVICES_FAQ, 'Podcast services — frequently asked')}
+
+  <section class="section"><div class="container"><div class="cta-band">
+    <h2>Not sure which piece you need?</h2>
+    <p>That is exactly what the call is for. Fifteen minutes, an honest answer, no obligation.</p>
+    <a class="btn btn-primary" href="/book">Book a 15-min fit call →</a>
+  </div></div></section>`;
+
+  const itemList = `<script type="application/ld+json">${JSON.stringify({
+    '@context': 'https://schema.org',
+    '@type': 'ItemList',
+    name: 'Straw Hut Media podcast services',
+    itemListElement: SERVICE_LINES.map((s, i) => ({
+      '@type': 'ListItem',
+      position: i + 1,
+      item: {
+        '@type': 'Service',
+        name: s.name,
+        serviceType: s.serviceType,
+        description: s.text,
+        url: canonical(s.href.split('#')[0]),
+        provider: { '@type': 'Organization', name: 'Straw Hut Media', url: canonical('/') },
+      },
+    })),
+  }).replace(/</g, '\\u003c')}</script>`;
+
+  return layout({
+    title: 'Podcast Services — Production, Distribution & Advertising | Straw Hut Media',
+    description:
+      'Straw Hut Media is a full-service podcast production company and network in Hollywood — podcast production, network distribution, advertising and brand partnerships, show development, and studio booking.',
+    body,
+    activeNav: '/services',
+    path: '/services',
+    jsonLd:
+      organizationJsonLd() +
+      '\n' + itemList +
+      '\n' + faqJsonLdFrom(SERVICES_FAQ) +
+      '\n' + breadcrumbJsonLd([
+        { name: 'Home', path: '/' },
+        { name: 'Services', path: '/services' },
+      ]),
   });
 }
 

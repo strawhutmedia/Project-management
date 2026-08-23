@@ -35,7 +35,7 @@ const WIDE_OK = /marquee|fb-bg|hero-wave|footer-wave/;
 const TINY_OK = /^(span\.ph-|em$|div\.ph-)/;
 
 const PAGES = ['/', '/shows', '/studio', '/contact', '/pricing', '/press', '/resources',
-  '/podcast-production', '/advertise', '/privacy', '/book'];
+  '/podcast-production', '/advertise', '/privacy', '/book', '/services'];
 
 const curl = (u) => { try { return execFileSync('curl', ['-sS', '-L', '--max-time', '30', u], { maxBuffer: 1 << 28 }); } catch { return Buffer.alloc(0); } };
 

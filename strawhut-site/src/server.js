@@ -68,7 +68,6 @@ app.use('/styles.css', express.static(path.join(__dirname, '..', 'public', 'styl
 // Hidden onboarding app (standalone static; not linked from the site).
 app.use('/onboarding', express.static(path.join(__dirname, '..', 'public', 'onboarding'), staticOpts));
 // Services / packages quote builder (standalone static, from Sales-Quoting).
-app.use('/services', express.static(path.join(__dirname, '..', 'public', 'services'), staticOpts));
 app.use('/public', express.static(path.join(__dirname, '..', 'public'), staticOpts));
 
 // ---- Domain-migration safety net ----------------------------------------
@@ -773,7 +772,7 @@ app.get('/sitemap.xml', async (req, res) => {
   res.type('application/xml').send(
     sitemapXml(shows, episodesByShow, {
       posts: POSTS,
-      servicePaths: SERVICE_PAGES.map((s) => s.path),
+      servicePaths: ['/services', ...SERVICE_PAGES.map((s) => s.path)],
     })
   );
 });
@@ -783,7 +782,10 @@ app.get('/llms.txt', async (req, res) => {
   res.type('text/plain').send(
     llmsTxt(shows, {
       posts: POSTS,
-      services: SERVICE_PAGES.map((s) => ({ title: s.navLabel, path: s.path, summary: s.summary })),
+      services: [
+        { title: 'All services', path: '/services', summary: 'Podcast production, network distribution, advertising and brand partnerships, show development, and Hollywood studio booking.' },
+        ...SERVICE_PAGES.map((s) => ({ title: s.navLabel, path: s.path, summary: s.summary })),
+      ],
     })
   );
 });
@@ -803,6 +805,12 @@ app.get('/privacy', (req, res) => res.send(V.privacyPage()));
 app.get('/studio', (req, res) => res.send(V.studioPage()));
 // We have one studio — the old LA landing page is consolidated into /studio.
 app.get('/podcast-studio-los-angeles', (req, res) => res.redirect(301, '/studio'));
+app.get('/services', (req, res) => res.send(V.servicesHubPage()));
+// The old static page lived at /services/ with the quote quiz at
+// /services/embed.html. Both are gone. Express's non-strict routing already
+// serves /services/ from the route above; the embed page needs a redirect.
+app.get('/services/embed.html', (req, res) => res.redirect(301, '/quote'));
+app.get('/quote', (req, res) => res.redirect(301, '/pricing'));
 
 app.get('/about', (req, res) => res.send(V.aboutPage()));
 

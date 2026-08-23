@@ -95,8 +95,20 @@ component, or route you add MUST ship SEO on day one — never "later."**
 - **Studio (`/studio`)** — Service + LocalBusiness/RecordingStudio + per-hour
   Offers ($125 1080p, $150 4K), Hollywood/LA `areaServed`. This is a direct
   revenue page; treat it like a money page.
-- **Services (`/services`)** — the packages page. Keep it crawlable and
-  described in Organization `makesOffer` + `llms.txt`.
+- **Services (`/services`)** — the services hub: the five lines of business,
+  each linking to the page that sells it, plus an `ItemList` of `Service`
+  nodes and a `FAQPage`. Deliberately carries **no prices**, so unlike
+  `/pricing` (noindex by owner decision) it stays indexable — which matters,
+  because "podcast production services" is the search this company needs to
+  win. Rendered by `servicesHubPage()` in `views.js`; add a line of business by
+  adding an entry to `SERVICE_LINES`.
+
+  It replaced a static drop-in at `public/services/index.html` that was served
+  by an `express.static` mount and shadowed everything: Inter instead of
+  Poppins, the pre-brand `#2dd4a0` green, no nav, no footer, no canonical, no
+  schema. **Don't put page HTML in `public/`** — a static mount silently wins
+  over a route, and the page skips `layout()` and therefore every SEO
+  guarantee on the checklist above.
 
 ### Tracking & retargeting (env-gated, `src/tracking.js`)
 
