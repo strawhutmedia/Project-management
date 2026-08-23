@@ -119,7 +119,7 @@ Cloudflare Turnstile. **Ryan approved Turnstile as a stack addition on
 Both unset = Turnstile is completely inert (`turnstileWidget()` returns `''`),
 and the first three layers still run.
 
-**Two rules — do not break them:**
+**Three rules — do not break them:**
 
 1. **Turnstile loads ONLY on pages that contain a form.** There is deliberately
    no hook in `layout()`; the script tag is emitted next to the widget. On the
