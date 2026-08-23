@@ -729,6 +729,10 @@ app.get('/healthz', async (req, res) => {
   res.json({
     ok: true,
     ...(await store.stats()),
+    // Railway injects the deployed commit. Without it, "is my change live yet?"
+    // can only be answered by finding something user-visible that changed —
+    // which fails for server-only changes like an auto-reply.
+    commit: (process.env.RAILWAY_GIT_COMMIT_SHA || '').slice(0, 7) || null,
     features: { ai: aiConfigured(), showSeo: process.env.SHOW_SEO !== 'off', turnstile: turnstileConfigured(), ghl: ghlConfigured() },
     ghl: _ghlState,
     enrichedEpisodes: await store.enrichedCount().catch((e) => `error: ${e.message.slice(0, 80)}`),
