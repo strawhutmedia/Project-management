@@ -120,16 +120,31 @@ scheduler.** One calendar means every booking is a CRM event that can fire
 reminders and follow-up, which is the whole point.
 
 **The calendar is discovered, not configured.** `resolveBookingCalendar()` in
-`ghl.js` asks GHL for the location's calendars at boot (and hourly), scores
-them, and builds the embed URL from the winner's id. Nobody has to paste a
-widget URL, and nothing breaks when the calendar is renamed. `/healthz`
-reports which one was chosen plus every active calendar it could have picked,
-so a wrong pick is diagnosable without a deploy. Set `BOOKING_WIDGET_URL` only
-to override the choice.
+`ghl.js` resolves in this order:
 
-If discovery fails — no calendars, none suitable, or the token lacks the
-`calendars.readonly` scope — `/book` says so honestly and routes to `/contact`.
+1. `BOOKING_WIDGET_URL` — an explicit override, if set.
+2. The GHL API — list the location's calendars at boot and hourly. If
+   `KNOWN_CALENDAR_ID` is among them and active, use it (a confirmed id beats a
+   name heuristic); otherwise score them and take the winner.
+3. `KNOWN_CALENDAR_ID` — the committed floor.
+
+`KNOWN_CALENDAR_ID` is `ym8vwJwU2MiL5RuW7v68`, the real **"Discovery Call"**
+calendar ("Let's talk about podcasts", slug `podcastdiscoverycall`). It was
+read off Straw Hut's own public booking page at `start.strawhutmedia.com` —
+public information, not a secret — because the API token is scoped to contacts
+only and GHL answers `GET /calendars/` with *"The token is not authorized for
+this scope."* Grant `calendars.readonly` on the Private Integration token and
+step 2 starts working; the token string doesn't change, so Railway needs no
+edit. `/healthz` reports which calendar was chosen, how (`env` / `ghl` /
+`ghl (confirmed)` / `known`), and every active calendar it could have picked.
+
+`/book` only falls back to its honest "get in touch" panel if all three fail.
 It never renders an empty or dead scheduler.
+
+**Never point at `/book` when there is no calendar behind it.** The contact
+form's thanks panel and the auto-reply email both take `canBook` (from
+`ghlBookingState().url`) for exactly this reason — without it they sent someone
+who had just written to us to a page whose only action was to write to us.
 
 Package picks on `/pricing` and finished quotes from the quiz stash a
 `shm_quote` payload (`{summary, pkg, ts}`) in session+localStorage and hand off

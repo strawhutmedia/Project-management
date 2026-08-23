@@ -130,6 +130,15 @@ export async function upsertContact({ name, email, company, message, tags = [], 
 
 const WIDGET_BASE = 'https://api.leadconnectorhq.com/widget/booking';
 
+// Straw Hut's real new-business calendar: "Discovery Call" — "Let's talk about
+// podcasts", slug `podcastdiscoverycall`. Read off the company's own public
+// booking page (start.strawhutmedia.com), so it is public information, not a
+// secret. Committed as a floor so /book works even though the API token is
+// scoped to contacts only and cannot list calendars. Discovery still runs and
+// still wins when the token gets `calendars.readonly` — this is what we use
+// when it cannot.
+const KNOWN_CALENDAR_ID = 'ym8vwJwU2MiL5RuW7v68';
+
 // A location usually has several calendars (per-team-member, round robin,
 // event types). We want the short new-business fit call.
 const FIT_RE = /(15[\s-]*min|fit\s*call|discovery|intro(?!duction to)|consult|strategy)/i;
@@ -185,25 +194,43 @@ export async function resolveBookingCalendar() {
     _booking = { state: 'ok', url: override, name: '', id: '', source: 'env', error: '', options: [] };
     return _booking;
   }
+
+  const known = {
+    state: 'ok',
+    url: `${WIDGET_BASE}/${KNOWN_CALENDAR_ID}`,
+    name: 'Discovery Call',
+    id: KNOWN_CALENDAR_ID,
+    source: 'known',
+    error: '',
+    options: [],
+  };
+
   if (!ghlConfigured()) {
-    _booking = { ..._booking, state: 'unconfigured', url: '', source: '' };
+    _booking = { ...known, error: 'ghl unconfigured; using the known calendar' };
     return _booking;
   }
+
   const r = await listCalendars();
   if (!r.ok) {
-    _booking = { ..._booking, state: 'error', url: '', source: '', error: r.error || 'unknown' };
-    console.error('[ghl] calendar lookup failed:', _booking.error);
+    // Token can't list calendars (it is scoped to contacts). Not fatal — we
+    // know which calendar this is; we just can't confirm it against the API.
+    _booking = { ...known, error: `calendar lookup failed (${r.error || 'unknown'}); using the known calendar` };
+    console.warn('[ghl]', _booking.error);
     return _booking;
   }
-  // Every active calendar, so a wrong auto-pick is diagnosable from /healthz
+
+  // Every active calendar, so a wrong pick is diagnosable from /healthz
   // instead of requiring another deploy to find out what was on offer.
-  const options = r.calendars
-    .filter((c) => c && c.id && c.isActive !== false)
-    .map((c) => ({ id: c.id, name: c.name || '(unnamed)', minutes: c.slotDuration ?? null }));
-  const pick = pickBookingCalendar(r.calendars);
+  const active = r.calendars.filter((c) => c && c.id && c.isActive !== false);
+  const options = active.map((c) => ({ id: c.id, name: c.name || '(unnamed)', minutes: c.slotDuration ?? null }));
+
+  // A confirmed id beats a name heuristic. Only fall through to scoring if the
+  // calendar we know about is gone or switched off.
+  const exact = active.find((c) => c.id === KNOWN_CALENDAR_ID);
+  const pick = exact || pickBookingCalendar(r.calendars);
   if (!pick) {
-    _booking = { state: 'none', url: '', name: '', id: '', source: '', error: 'no suitable active calendar', options };
-    console.error('[ghl] no bookable calendar among', options.length, 'active');
+    _booking = { ...known, source: 'known', options, error: 'no suitable active calendar in GHL; using the known calendar' };
+    console.warn('[ghl]', _booking.error);
     return _booking;
   }
   _booking = {
@@ -211,10 +238,10 @@ export async function resolveBookingCalendar() {
     url: bookingWidgetUrl(pick),
     name: pick.name || '',
     id: pick.id,
-    source: 'ghl',
+    source: exact ? 'ghl (confirmed)' : 'ghl',
     error: '',
     options,
   };
-  console.log(`[ghl] booking calendar: ${_booking.name} (${_booking.id})`);
+  console.log(`[ghl] booking calendar: ${_booking.name} (${_booking.id}) via ${_booking.source}`);
   return _booking;
 }
