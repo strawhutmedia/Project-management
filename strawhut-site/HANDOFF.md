@@ -152,6 +152,20 @@ Google Ads and Meta UIs, not in the site.
 
 ---
 
+## Backlog — wanted, not started, not blocking anything
+
+- **Transcribe advertised episodes on demand** (Deepgram) to fill the pull-quote
+  slot under the player on episode landing pages. Ryan asked for this a while
+  back; it only needs to run for episodes we actually run ads to, so it can be
+  triggered the same way `enrichEpisodeInBackground()` already is in
+  `server.js`. Would need `DEEPGRAM_API_KEY` and Ryan's sign-off, since it is a
+  new external service.
+- **Per-project pipelines** in Slate (podcasts/films rather than the album
+  default). Noted in the root `CLAUDE.md`.
+- **Host / talent pages** (`Person` schema) and **case studies** — the two
+  highest-value remaining SEO assets. See the ideas backlog at the bottom of
+  `strawhut-site/CLAUDE.md`.
+
 ## Gotchas that have already cost real time
 
 - **Every inline `<script>` is a JS template literal.** `\/` collapses to `/`
