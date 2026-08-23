@@ -1,7 +1,9 @@
 # Straw Hut site — open work, handed off 2026-08-23
 
-Read this at the start of a session that is picking up the subdomain redirects
-or the GoHighLevel token. Delete the file once both are done.
+Read this at the start of a session that is picking up the GoHighLevel token
+(JOB 2). JOB 1 (subdomain redirects) is DONE — see its section for what
+actually shipped, because the plan changed. Delete the file once JOB 2 and
+JOB 3 are done.
 
 **Needs from Ryan:** the **Railway** connector enabled for the session, and his
 **GoDaddy API key + secret** pasted in when you ask (GoDaddy → Developer Portal
@@ -31,7 +33,52 @@ Last commit at handoff: `f28c3d4`.
 
 ---
 
-## JOB 1 — Retire two subdomains onto the main site (the blocked one)
+## JOB 1 — Retire two subdomains onto the main site — ✅ DONE 2026-08-23, NOT the way planned below
+
+**Shipped via GoDaddy domain forwarding, not Railway custom domains.** Ryan
+explicitly rejected putting these hostnames on Railway (and the Hobby plan's
+2-custom-domains-per-service limit blocked the third domain anyway). What is
+live now:
+
+- GoDaddy 301 forwards (v2 API, `PERMANENT_REDIRECT`, no masking):
+  - `start.strawhutmedia.com` → `https://www.strawhutmedia.com/podcast-production`
+  - `services.strawhutmedia.com` → `https://www.strawhutmedia.com/services`
+- Both subdomains' A records now point at GoDaddy's forwarding IPs
+  `15.197.225.128` + `3.33.251.168` (same pair as the pre-existing `invest.`
+  and `join.` forwards). The old `72.167.33.245` records are gone.
+- `www`, `slate`, apex, MX and TXT records untouched and verified.
+- GoDaddy provisions the HTTPS cert for a newly forwarded hostname ~20-60 min
+  after DNS flips (if it stalls, delete + recreate the forward once DNS has
+  fully propagated — that re-triggered issuance for `start`). Both verified
+  serving the 301 over https and http.
+- One known limitation vs. the Railway plan: GoDaddy forwarding only redirects
+  the root URL. Deep paths (`start.strawhutmedia.com/anything`) return 404
+  instead of redirecting. Accepted trade-off for retired subdomains.
+
+**Corrections to the notes below (they cost this session real time):**
+
+1. **The forwarding API is NOT dead.** The previous session only tried
+   `/v1/domains/{domain}/forwards`-style paths. The real API is
+   `GET/POST/PUT/DELETE https://api.godaddy.com/v2/customers/{customerId}/domains/forwards/{fqdn}`
+   with body `{"type":"REDIRECT_PERMANENT","url":"..."}`. The `customerId` is
+   a UUID, resolved via
+   `GET /v1/shoppers/{shopperNumber}?includes=customerId` — Ryan's shopper /
+   customer number is `14621307` (it's in old GoDaddy renewal emails, not a
+   secret). `/v1/shoppers/me` does not work; you need the number.
+2. **Leftover to clean up someday (optional):** a `start.strawhutmedia.com`
+   custom-domain entry was briefly added to the STRAW HUT SITE Railway service
+   before Ryan vetoed the Railway approach. The connector cannot delete custom
+   domains, so it is still registered there — inert (no DNS points at it, no
+   cost), removable in the Railway dashboard under the service's Networking
+   settings. There may also be a stale "staged change" in that environment;
+   discard it.
+3. The `LEGACY_SUBDOMAINS` middleware in `src/server.js` is now permanently
+   inert (the subdomains never reach the app). Harmless; leave it as a
+   belt-and-suspenders fallback.
+
+The original plan, kept for context:
+
+### ~~JOB 1 original plan (superseded)~~
 
 Two old GoDaddy-hosted pages are still live on the domain and competing with
 the new site:
