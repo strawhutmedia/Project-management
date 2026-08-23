@@ -28,7 +28,7 @@ export function ghlLastError() {
   return _lastError;
 }
 
-async function call(path, { method = 'GET', body } = {}) {
+async function call(path, { method = 'GET', body, version = VERSION } = {}) {
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), TIMEOUT_MS);
   try {
@@ -36,7 +36,7 @@ async function call(path, { method = 'GET', body } = {}) {
       method,
       headers: {
         Authorization: `Bearer ${TOKEN}`,
-        Version: VERSION,
+        Version: version,
         'Content-Type': 'application/json',
         Accept: 'application/json',
       },
@@ -145,17 +145,34 @@ const FIT_RE = /(15[\s-]*min|fit\s*call|discovery|intro(?!duction to)|consult|st
 // Never auto-pick something that is obviously not for prospects.
 const AVOID_RE = /(guest|internal|test|personal|interview|recording|studio\s*session)/i;
 
+// GHL versions its API per resource family, and the value is NOT the same
+// everywhere: Contacts is 2021-07-28, Calendars is 2021-04-15, and newer docs
+// for GET /calendars/ show v3. Sending the wrong one comes back as "The token
+// is not authorized for this scope." — which reads exactly like a missing
+// scope and sent us looking in the wrong place. Try each and report the one
+// that worked.
+const CALENDAR_VERSIONS = ['2021-04-15', 'v3', VERSION];
+
 export async function listCalendars() {
   if (!ghlConfigured()) return { ok: false, state: 'unconfigured' };
-  const r = await call(`/calendars/?locationId=${encodeURIComponent(LOCATION_ID)}`);
-  if (!r.ok) {
-    _lastError = r.error;
-    return { ok: false, error: r.error, status: r.status };
+  const path = `/calendars/?locationId=${encodeURIComponent(LOCATION_ID)}`;
+  let last = null;
+  for (const version of CALENDAR_VERSIONS) {
+    const r = await call(path, { version });
+    if (r.ok) {
+      const list = Array.isArray(r.data?.calendars) ? r.data.calendars
+        : Array.isArray(r.data) ? r.data
+        : [];
+      return { ok: true, calendars: list, version };
+    }
+    last = r;
+    // A 401/403 can be the wrong Version rather than a real scope problem, so
+    // keep trying. Anything else (5xx, timeout) won't be fixed by another
+    // version — stop and report it.
+    if (r.status !== 401 && r.status !== 403) break;
   }
-  const list = Array.isArray(r.data?.calendars) ? r.data.calendars
-    : Array.isArray(r.data) ? r.data
-    : [];
-  return { ok: true, calendars: list };
+  _lastError = last?.error || 'unknown';
+  return { ok: false, error: _lastError, status: last?.status };
 }
 
 /** Highest-scoring active calendar, or null. Exported so it can be reasoned
@@ -238,7 +255,7 @@ export async function resolveBookingCalendar() {
     url: bookingWidgetUrl(pick),
     name: pick.name || '',
     id: pick.id,
-    source: exact ? 'ghl (confirmed)' : 'ghl',
+    source: `${exact ? 'ghl (confirmed)' : 'ghl'} v=${r.version}`,
     error: '',
     options,
   };
