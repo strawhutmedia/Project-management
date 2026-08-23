@@ -1296,3 +1296,29 @@ a.lp-show-name:hover { color: #00e6a0; }
   .ep-lp .lp-hook { margin: 14px 0 16px; padding: 14px 15px; }
 }
 
+
+/* --- "Tap to unmute" -------------------------------------------------------
+   Shown only when muted autoplay actually started (ad traffic). Full-width and
+   loud, because the visitor needs to know audio is already running and one tap
+   turns it on — the Podbooster pattern. */
+.aplayer-unmute {
+  display: flex; align-items: center; justify-content: center; gap: 10px;
+  width: 100%; margin: 0 0 14px; padding: 15px 20px;
+  border: 0; border-radius: 14px; cursor: pointer; font-family: inherit;
+  font-size: 1.05rem; font-weight: 800; letter-spacing: 0.01em;
+  color: var(--accent-ink);
+  background: linear-gradient(135deg, var(--accent), #00a06f);
+  box-shadow: 0 10px 30px rgba(0, 204, 142, 0.5);
+  transition: transform 0.12s, box-shadow 0.15s;
+}
+.aplayer-unmute[hidden] { display: none; }
+.aplayer-unmute svg { width: 26px; height: 26px; flex: 0 0 auto; }
+.aplayer-unmute:hover { box-shadow: 0 14px 40px rgba(0, 204, 142, 0.7); }
+.aplayer-unmute:active { transform: scale(0.975); }
+.aplayer-unmute.pulse { animation: unmutePulse 1.6s ease-in-out infinite; }
+@keyframes unmutePulse {
+  0%, 100% { box-shadow: 0 10px 30px rgba(0, 204, 142, 0.5); }
+  50%      { box-shadow: 0 14px 44px rgba(0, 204, 142, 0.85); }
+}
+@media (prefers-reduced-motion: reduce) { .aplayer-unmute.pulse { animation: none; } }
+@media (max-width: 480px) { .aplayer-unmute { font-size: 0.98rem; padding: 14px 16px; } }

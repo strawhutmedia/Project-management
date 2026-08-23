@@ -319,3 +319,22 @@ Notes:
   while idle — it used to sit flat and grey, which made the player look switched
   off. Everything stops the moment audio starts, and all of it is disabled under
   `prefers-reduced-motion`. Play control centre still at 523px — above the fold.
+- **Muted autoplay + "Tap to unmute", matching Podbooster.** Ryan asked for
+  parity after I flagged the download-inflation trade-off; he reaffirmed, so
+  it's built.
+  - **Scoped to ad traffic only** — `gclid`/`gbraid`/`wbraid`, or
+    `utm_source=google_ads`, or `utm_medium=display|cpc`. This *is* the faithful
+    port: Podbooster's `/ep/` pages are noindex ad destinations, so it never
+    autoplays at someone arriving from Google. Our episode page serves both, so
+    the check keeps search visitors untouched (and keeps the inflation confined
+    to paid traffic, exactly as Podbooster's is).
+  - `preload` stays `none` for organic and becomes `auto` only for ad traffic.
+  - The banner is revealed **only if playback actually started**. Browsers block
+    autoplay-with-sound and iOS often blocks it muted too; on rejection the
+    player unmutes itself and the (already loud) play button stands alone.
+  - Unmuting via the volume control also retires the banner. `unmute_episode`
+    fires through `shmTrack`. Pulse disabled under `prefers-reduced-motion`.
+  - **Standing caveat, recorded here deliberately:** autoplay generates
+    Megaphone-counted downloads nobody chose to start, which inflates the
+    figures reported to advertisers. Ryan's call, made knowingly. The
+    `preload="none"` note in CLAUDE.md now has this exception documented.

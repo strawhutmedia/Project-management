@@ -1034,6 +1034,17 @@ function enrichEpisodeInBackground(show, episode) {
     .finally(() => _enriching.delete(episode.id));
 }
 
+// Did this visit come from one of our ads? Muted autoplay is applied only to
+// paid traffic — that mirrors Podbooster, whose /ep/ pages are ad destinations
+// and noindex, so it never autoplays at someone arriving from Google. Our
+// episode pages serve both, hence the check.
+function isAdTraffic(req) {
+  const q = req.query || {};
+  const src = String(q.utm_source || '').toLowerCase();
+  const med = String(q.utm_medium || '').toLowerCase();
+  return Boolean(q.gclid || q.gbraid || q.wbraid || src === 'google_ads' || med === 'display' || med === 'cpc');
+}
+
 app.get('/:showSlug/:episodeSlug', async (req, res, next) => {
   const show = await store.getShowBySlug(req.params.showSlug);
   if (!show) return next();
@@ -1067,7 +1078,7 @@ app.get('/:showSlug/:episodeSlug', async (req, res, next) => {
     }
   }
 
-  res.send(V.episodePage({ show, episode, moreFromShow, related }));
+  res.send(V.episodePage({ show, episode, moreFromShow, related, adTraffic: isAdTraffic(req) }));
 });
 
 // Smart 404: recover old/mistyped URLs by redirecting to the right page,

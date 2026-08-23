@@ -58,6 +58,9 @@ const SKIP_SECONDS = 15;
 let _apSeq = 0;
 export function audioPlayer(src, opts = {}) {
   const id = 'ap' + _apSeq++;
+  // Muted autoplay, matching the Podbooster landing page. Only ever set for
+  // visitors arriving from an ad (see server.js) — never for search traffic.
+  const autoplay = !!opts.autoplay;
   const image = opts.image || '';
   const title = opts.title || '';
   const showTitle = opts.showTitle || '';
@@ -81,8 +84,12 @@ export function audioPlayer(src, opts = {}) {
     const dur = (0.65 + (i % 6) * 0.13).toFixed(2);
     return `<span style="height:${h}%;animation-delay:${delay}s;animation-duration:${dur}s"></span>`;
   }).join('')}</div>`;
-  return `<div class="aplayer" id="${id}">
-    <audio preload="none" src="${esc(src)}"></audio>
+  return `<div class="aplayer${autoplay ? ' is-autoplay' : ''}" id="${id}"${autoplay ? ' data-autoplay="1"' : ''}>
+    <audio preload="${autoplay ? 'auto' : 'none'}" src="${esc(src)}"></audio>
+    ${autoplay ? `<button class="aplayer-unmute" type="button" hidden>
+      <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M3 10v4h4l5 5V5L7 10H3zm13.5 2a4.5 4.5 0 0 0-2.5-4.03v8.06A4.5 4.5 0 0 0 16.5 12zM14 3.23v2.06A6.98 6.98 0 0 1 19 12a6.98 6.98 0 0 1-5 6.71v2.06A8.99 8.99 0 0 0 21 12a8.99 8.99 0 0 0-7-8.77z"/></svg>
+      <span>Tap to unmute</span>
+    </button>` : ''}
     ${head}
     ${viz}
     <div class="aplayer-controls">
@@ -140,6 +147,31 @@ export function audioPlayer(src, opts = {}) {
     document.addEventListener('mouseup',function(){dragging=false;});
     bar.addEventListener('click',function(e){seekTo(e.clientX);});
     bar.addEventListener('keydown',function(e){if(e.key==='ArrowLeft'){a.currentTime=Math.max(0,(a.currentTime||0)-SK);}else if(e.key==='ArrowRight'){a.currentTime=Math.min((a.duration||1e9),(a.currentTime||0)+SK);}});
+    // Muted autoplay + "Tap to unmute", the Podbooster landing-page pattern.
+    // Only rendered for ad traffic. Browsers allow muted autoplay but block it
+    // with sound, and iOS blocks it more often than not — so the banner is
+    // revealed ONLY if playback actually started. If it's blocked we do nothing
+    // and the (already loud) play button stands on its own.
+    if(r.getAttribute('data-autoplay')==='1'){
+      var um=r.querySelector('.aplayer-unmute');
+      a.muted=true;
+      var p=a.play();
+      if(p&&p.then)p.then(function(){
+        if(um){um.hidden=false;um.classList.add('pulse');}
+      }).catch(function(){
+        a.muted=false;                       // leave it clean for a manual press
+        if(um)um.hidden=true;
+      });
+      if(um)um.addEventListener('click',function(){
+        a.muted=false;
+        if(vol)vol.classList.remove('muted');
+        um.hidden=true;
+        if(a.paused)a.play();
+        window.shmTrack&&shmTrack('unmute_episode',{});
+      });
+      // Unmuting via the volume control should also retire the banner.
+      if(vol)vol.addEventListener('click',function(){if(um&&!a.muted)um.hidden=true;});
+    }
   })();</script>`;
 }
 
@@ -1648,7 +1680,7 @@ function shareRow(title) {
   try{document.execCommand('copy');done();}catch(e){}document.body.removeChild(i);};</script>`;
 }
 
-export function episodePage({ show, episode, moreFromShow = [], related = [] }) {
+export function episodePage({ show, episode, moreFromShow = [], related = [], adTraffic = false }) {
   // One page, one URL, one layout. The top of the page is the same card layout
   // as the campaign landing page (which converts), and the SEO depth — full
   // show notes, about-the-show, and internal links to more episodes — sits
@@ -1687,7 +1719,7 @@ export function episodePage({ show, episode, moreFromShow = [], related = [] }) 
       }
       ${
         episode.audio_url
-          ? audioPlayer(episode.audio_url, { title: episode.title, showTitle: show.title, image: cover, duration: episode.duration })
+          ? audioPlayer(episode.audio_url, { title: episode.title, showTitle: show.title, image: cover, duration: episode.duration, autoplay: adTraffic })
           : `<p class="sub">Audio unavailable for this episode.</p>`
       }
       ${lpHighlight(episode)}
