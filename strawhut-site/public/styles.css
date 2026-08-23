@@ -1187,21 +1187,57 @@ a.lp-show-name:hover { color: #00e6a0; }
 /* The play control is the conversion event on this page. Until the first play
    it breathes a soft halo to pull the eye; once playing the halo stops. */
 .aplayer-toggle { position: relative; }
-.aplayer:not(.is-playing) .aplayer-toggle::after {
-  content: ""; position: absolute; inset: -7px; border-radius: 50%;
+
+/* --- The play control -------------------------------------------------------
+   On a landing/episode card this button IS the conversion event, so it stops
+   being a quiet outline and becomes the loudest thing on the page: solid brand
+   fill, two sonar rings expanding out of it, and a glow that breathes. All of
+   it stops the moment audio starts — motion that keeps going after you've done
+   what it asked is just noise. */
+.lp-card .aplayer-toggle {
+  width: 84px; height: 84px;
+  background: linear-gradient(150deg, var(--accent), #00a06f);
+  border-color: transparent; color: var(--accent-ink);
+  box-shadow: 0 12px 34px rgba(0, 204, 142, 0.42);
+}
+.lp-card .aplayer-toggle svg { width: 34px; height: 34px; }
+.lp-card .aplayer-toggle:hover { background: linear-gradient(150deg, #12e8a4, var(--accent)); color: var(--accent-ink); }
+
+.lp-card .aplayer:not(.is-playing) .aplayer-toggle::before,
+.lp-card .aplayer:not(.is-playing) .aplayer-toggle::after {
+  content: ""; position: absolute; inset: 0; border-radius: 50%;
   border: 2px solid var(--accent); pointer-events: none;
-  animation: apPulse 2.4s cubic-bezier(0.22, 0.61, 0.36, 1) infinite;
+  animation: apSonar 2.6s cubic-bezier(0.22, 0.61, 0.36, 1) infinite;
 }
-@keyframes apPulse {
-  0%   { transform: scale(0.94); opacity: 0.55; }
-  70%  { transform: scale(1.22); opacity: 0; }
-  100% { transform: scale(1.22); opacity: 0; }
+.lp-card .aplayer:not(.is-playing) .aplayer-toggle::after { animation-delay: 1.3s; }
+@keyframes apSonar {
+  0%   { transform: scale(1);   opacity: 0.7; }
+  100% { transform: scale(1.95); opacity: 0; }
 }
+.lp-card .aplayer:not(.is-playing) .aplayer-toggle { animation: apBreathe 2.6s ease-in-out infinite; }
+@keyframes apBreathe {
+  0%, 100% { box-shadow: 0 12px 34px rgba(0, 204, 142, 0.40); }
+  50%      { box-shadow: 0 16px 48px rgba(0, 204, 142, 0.78); }
+}
+
+/* The waveform sat flat and grey until you pressed play, which made the whole
+   player look switched off. Idle it now shimmers at low amplitude — alive, but
+   clearly not yet playing. */
+.lp-card .aplayer:not(.is-playing) .aplayer-viz span {
+  opacity: 0.75;
+  animation-name: vizIdle; animation-iteration-count: infinite;
+  animation-timing-function: ease-in-out; animation-direction: alternate;
+}
+@keyframes vizIdle { from { transform: scaleY(0.28); } to { transform: scaleY(0.58); } }
+
 @media (prefers-reduced-motion: reduce) {
-  .aplayer:not(.is-playing) .aplayer-toggle::after { animation: none; opacity: 0.4; transform: none; }
+  .lp-card .aplayer:not(.is-playing) .aplayer-toggle,
+  .lp-card .aplayer:not(.is-playing) .aplayer-toggle::before,
+  .lp-card .aplayer:not(.is-playing) .aplayer-toggle::after,
+  .lp-card .aplayer:not(.is-playing) .aplayer-viz span { animation: none; }
+  .lp-card .aplayer:not(.is-playing) .aplayer-toggle::before { opacity: 0.35; }
+  .lp-card .aplayer:not(.is-playing) .aplayer-toggle::after { opacity: 0; }
 }
-.ep-lp .aplayer-toggle { width: 76px; height: 76px; }
-.ep-lp .aplayer-toggle svg { width: 30px; height: 30px; }
 
 /* Long titles wrap to many lines in the narrow column beside the cover, which
    pushes the play control under the fold. Step the size down by actual title

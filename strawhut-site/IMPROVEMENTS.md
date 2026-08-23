@@ -311,3 +311,11 @@ Notes:
   Correct — the line restated names sitting two lines above it. Deleted the
   block, the `guests.js` extractor, the AI field and ~1.1KB of dead CSS. The
   pull-quote slot under the player remains for when transcripts land.
+- **Made the play control the loudest thing on the page.** A faint outline ring
+  wasn't pulling anyone in. On landing/episode cards the control is now a solid
+  brand-gradient disc with a dark icon (a primary action, not a quiet outline),
+  84px, with **two sonar rings** expanding out of it on a staggered 2.6s loop and
+  a glow that breathes. The waveform above it also shimmers at low amplitude
+  while idle — it used to sit flat and grey, which made the player look switched
+  off. Everything stops the moment audio starts, and all of it is disabled under
+  `prefers-reduced-motion`. Play control centre still at 523px — above the fold.
