@@ -306,3 +306,8 @@ Notes:
   wrong guest list — both were fabricated test fixtures, not the site.
   `/tmp/pw/realprev.py` now previews local CSS/markup against the real live page
   with the real cover art, so a screenshot can't misrepresent what ships.
+- **Guest section removed entirely.** Ryan: *"both Jeff and Billy are in the
+  fucking title... People can just read the title and see who the guests are."*
+  Correct — the line restated names sitting two lines above it. Deleted the
+  block, the `guests.js` extractor, the AI field and ~1.1KB of dead CSS. The
+  pull-quote slot under the player remains for when transcripts land.
