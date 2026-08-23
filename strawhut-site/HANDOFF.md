@@ -1,14 +1,14 @@
 # Straw Hut site — open work, handed off 2026-08-23
 
-Read this at the start of a session that is picking up the GoHighLevel token
-(JOB 2). JOB 1 (subdomain redirects) is DONE — see its section for what
-actually shipped, because the plan changed. Delete the file once JOB 2 and
-JOB 3 are done.
+JOB 1 (subdomain redirects) and JOB 2 (GoHighLevel token) are both DONE as of
+2026-08-23 — see their sections. Only JOB 3 (ad attribution onto the GHL
+contact) is left, and it is now UNBLOCKED. Delete this file once JOB 3 ships.
 
-**Needs from Ryan:** the **Railway** connector enabled for the session, and his
-**GoDaddy API key + secret** pasted in when you ask (GoDaddy → Developer Portal
-→ API Keys → the Production key). The previous session had the GoDaddy key but
-containers are ephemeral, so it does not carry over. Ask for it; don't guess.
+**Needs from Ryan (only if reopening JOB 1/JOB 2):** the **Railway** connector
+enabled for the session; his **GoDaddy API key + secret** for DNS work
+(GoDaddy → Developer Portal → API Keys → Production); and, for GHL, a
+**sub-account Private Integration token** (see JOB 2). Containers are
+ephemeral, so none of these carry over between sessions — ask; don't guess.
 
 ---
 
@@ -142,7 +142,38 @@ change.
 
 ---
 
-## JOB 2 — The GHL token is the wrong kind, and it's breaking lead capture
+## JOB 2 — GHL token was the wrong kind — ✅ DONE 2026-08-23
+
+Ryan created a new **sub-account Private Integration token** (prefix `pit-…`)
+from inside the Straw Hut Media location, with contacts (view+edit) and
+calendars (view) scopes. It replaced `GHL_API_TOKEN` on the Railway STRAW HUT
+SITE service (set via the Railway connector; auto-redeploy). Verified live:
+
+- `/healthz` flipped from `LIMITED … contacts refused` to **`ok (Straw Hut
+  Media)`**; probe now reads `contacts=ok`, `users=ok` (the old
+  `Token's user type mismatch!` tell is gone), and `booking.source` is
+  **`ghl (confirmed)` v=2021-04-15** — so calendar discovery works now too,
+  not just the committed floor.
+- Full write path proven by direct API (not via the live form, so no email to
+  Ryan): upsert a `CLAUDE TEST — IGNORE` contact → attach a note → read back →
+  **delete** → confirm gone. Nothing left in the CRM.
+
+Useful facts discovered while doing this, for whoever touches GHL next:
+
+- The location id is **`TrsMh89uPvyZdZ6ZrIyy`** (this is the value of
+  `GHL_LOCATION_ID`). A sub-account PIT can't list `/locations/`, but you can
+  read it back off any calendar object: `GET /calendars/{KNOWN_CALENDAR_ID}`
+  (Version `2021-04-15`) returns `locationId`.
+- Quick token-type test WITHOUT the location id: `GET /contacts/?limit=1` with
+  no `locationId`. A good sub-account token → `422 locationId is required`. The
+  bad agency token → `401 … not authorized for this scope`, and `GET /users/`
+  → `Token's user type mismatch!`.
+- There is **no GHL connector** in the Claude session and **no API** to mint a
+  Private Integration — it is a human action in the GHL dashboard. The token
+  must come from Ryan.
+
+### ~~JOB 2 original diagnosis (kept for context)~~
+### The GHL token is the wrong kind, and it's breaking lead capture
 
 `GHL_API_TOKEN` on the Railway service is an **agency/company-level** Private
 Integration. It reads `GET /locations/{id}` fine and is refused on every
