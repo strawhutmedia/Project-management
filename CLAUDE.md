@@ -96,6 +96,22 @@ at the Scheduler in `planned` status; a human QAs, publishes manually, and
 flips slots to `posted`. Do not add a posting integration without Ryan's
 explicit approval.
 
+## Audience CRM (per-show email lists)
+
+Each podcast project has an email list (`audience_contacts`) fed by a public
+capture webhook (`POST /api/audience/hooks/:token`, per-show secret token on
+`projects.audience_capture_token`). ManyChat's External Request action posts
+captured emails here from comment-trigger DM flows; contacts also mirror into
+a lazily-created per-show Resend audience (`projects.resend_audience_id`).
+Lists are per-SHOW on purpose — fans follow shows, not the network.
+
+**Fan-facing email rule:** Slate never sends email to fans. Broadcasts go out
+from the Resend dashboard, and must use a from-address that is NOT the system
+sender (`slate@strawhutmedia.net` is for magic links/invites/alerts only).
+Only `strawhutmedia.net` is verified in Resend today — a fan-facing address
+on another domain (e.g. `@strawhutmedia.com` or a per-show domain) requires
+verifying that domain in Resend first.
+
 ## Permissions
 
 - **Admin** (currently Ryan only): invite/remove users, delete projects/songs,
