@@ -12,6 +12,7 @@ import DueDateChip from '../components/DueDateChip'
 import TranscriptsSection from '../components/TranscriptsSection'
 import ClipsSection from '../components/ClipsSection'
 import SocialsSection from '../components/SocialsSection'
+import EpisodeCarouselCard from '../components/EpisodeCarouselCard'
 import { useAuth } from '../auth'
 
 export default function SongPage() {
@@ -188,6 +189,7 @@ export default function SongPage() {
                 <TranscriptsSection projectId={song.projectId} songId={song.id} canWrite={canWrite}
                   projectRoot={song.projectRoot} />
                 <SocialsSection projectId={song.projectId} songId={song.id} canWrite={canWrite} members={members} showName={song.projectName} coverArtUrl={song.projectCoverArtUrl ?? null} />
+                <EpisodeCarouselCard songId={song.id} canWrite={canWrite} />
                 <ClipsSection projectId={song.projectId} songId={song.id} canWrite={canWrite}
                   projectRoot={song.projectRoot} />
               </>
