@@ -86,8 +86,12 @@ const CANONICAL_HOST = (() => {
 // consolidates ranking authority instead of splitting it across subdomains.
 // 301 (not deletion) so existing links and indexed pages pass their equity on.
 const LEGACY_SUBDOMAINS = {
-  start: '/podcast-production',   // old GoHighLevel "Start Your Podcast" funnel
-  services: '/pricing',           // old IIS quote tool — now native on /pricing
+  start: '/podcast-production',   // old GoDaddy "Start your podcast" page
+  // The old services subdomain was the quote tool, which now lives on
+  // /pricing — but /pricing is noindex, so sending it there throws away the
+  // subdomain's accumulated ranking. /services is the namesake page, is
+  // indexable, and puts "See packages & pricing" in its hero anyway.
+  services: '/services',
 };
 
 // Renamed shows + old section pages that don't map by a simple id-strip.
