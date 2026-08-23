@@ -20,6 +20,7 @@ import { pool } from '../db'
 import { requireUser, type SessionUser } from '../auth'
 import { assertWriter } from '../permissions'
 import { logError, logInfo } from '../diag'
+import { sendAdminAlert } from '../email'
 import { syncContactToResend, resyncProject } from '../audience_resend'
 
 export const audienceRouter = Router()
@@ -34,12 +35,15 @@ function cleanStr(v: unknown, max: number): string | null {
 audienceRouter.post('/hooks/:token', async (req, res) => {
   const token = req.params.token
   if (!token || token.length < 16) { res.status(404).json({ error: 'not_found' }); return }
-  const proj = await pool.query<{ id: string }>(
-    `SELECT id FROM projects WHERE audience_capture_token = $1`,
+  const proj = await pool.query<{ id: string; name: string; lead_alerts: boolean }>(
+    `SELECT id, name, audience_lead_alerts AS lead_alerts
+       FROM projects WHERE audience_capture_token = $1`,
     [token],
   )
   if (proj.rows.length === 0) { res.status(404).json({ error: 'not_found' }); return }
   const projectId = proj.rows[0].id
+  const projectName = proj.rows[0].name
+  const leadAlerts = proj.rows[0].lead_alerts === true
 
   const email = cleanStr(req.body?.email, 320)?.toLowerCase() ?? null
   if (!email || !EMAIL_RE.test(email)) {
@@ -71,6 +75,24 @@ audienceRouter.post('/hooks/:token', async (req, res) => {
     // Resend mirror is fire-and-forget — capture must stay fast for
     // ManyChat's request timeout.
     void syncContactToResend({ projectId, contactId: contact.id, email, name })
+    // Lead alert (sales-pipeline lists only): tell the admin the moment
+    // a NEW lead lands — a lead answered in the hour closes; one found
+    // next week doesn't. No dedupe key: every new lead is its own email.
+    // Re-captures of an existing contact stay silent.
+    if (leadAlerts && contact.created) {
+      const lines = [
+        `New lead for ${projectName}:`,
+        '',
+        `  Email:   ${email}`,
+        name ? `  Name:    ${name}` : null,
+        handle ? `  Handle:  ${handle}` : null,
+        triggerWord ? `  Trigger: ${triggerWord}` : null,
+        `  Source:  ${source}`,
+        '',
+        'Reply while it\'s warm. Full list in Slate → show page → Audience.',
+      ].filter((l): l is string => l !== null)
+      void sendAdminAlert(`New lead: ${email} (${projectName})`, lines.join('\n'))
+    }
     logInfo('audience: contact captured', { projectId, source, new: contact.created })
     res.json({ ok: true, new: contact.created })
   } catch (err) {
@@ -126,11 +148,13 @@ audienceRouter.get('/projects/:projectId', async (req, res) => {
   )
   // Capture token: admins + project writers can see/mint it.
   let capture: { token: string; url: string } | null = null
+  let leadAlerts = false
   const isWriter = user.role === 'admin' || await assertProjectAccess(user.id, user.role, projectId)
   if (isWriter) {
-    const t = await pool.query<{ audience_capture_token: string | null }>(
-      `SELECT audience_capture_token FROM projects WHERE id = $1`, [projectId],
+    const t = await pool.query<{ audience_capture_token: string | null; audience_lead_alerts: boolean }>(
+      `SELECT audience_capture_token, audience_lead_alerts FROM projects WHERE id = $1`, [projectId],
     )
+    leadAlerts = t.rows[0]?.audience_lead_alerts === true
     let token = t.rows[0]?.audience_capture_token ?? null
     if (!token) {
       token = crypto.randomBytes(24).toString('base64url')
@@ -154,6 +178,7 @@ audienceRouter.get('/projects/:projectId', async (req, res) => {
     },
     recent: recent.rows,
     capture,
+    leadAlerts,
   })
 })
 
@@ -210,6 +235,20 @@ audienceRouter.post('/projects/:projectId/resync', async (req, res) => {
   if (!await assertWriter(user, projectId, res)) return
   const pushed = await resyncProject(projectId)
   res.json({ ok: true, pushed })
+})
+
+// Toggle instant lead alerts — admin only. On = every NEW capture for
+// this project emails the admin immediately (sales-pipeline mode).
+audienceRouter.post('/projects/:projectId/lead-alerts', async (req, res) => {
+  const user = (req as typeof req & { user: SessionUser }).user
+  if (user.role !== 'admin') { res.status(403).json({ error: 'admin_only' }); return }
+  const enabled = req.body?.enabled === true
+  const { rowCount } = await pool.query(
+    `UPDATE projects SET audience_lead_alerts = $2 WHERE id = $1`,
+    [req.params.projectId, enabled],
+  )
+  if ((rowCount ?? 0) === 0) { res.status(404).json({ error: 'not_found' }); return }
+  res.json({ ok: true, enabled })
 })
 
 // Rotate the capture token — admin only (invalidates the old URL in
