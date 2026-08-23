@@ -37,6 +37,19 @@ export default function AudienceSection({ projectId, canWrite }: {
     }
   }
 
+  async function toggleLeadAlerts() {
+    if (!data) return
+    try {
+      const r = await api.audienceSetLeadAlerts(projectId, !data.leadAlerts)
+      setNote(r.enabled
+        ? 'Lead alerts ON — every new capture emails the admin immediately.'
+        : 'Lead alerts off.')
+      await load()
+    } catch (err) {
+      setNote(err instanceof Error ? err.message : 'failed')
+    }
+  }
+
   async function resync() {
     try {
       const r = await api.audienceResync(projectId)
@@ -117,6 +130,18 @@ export default function AudienceSection({ projectId, canWrite }: {
               <li>That's it — every capture lands here and mirrors to this show's Resend audience automatically.</li>
             </ol>
           )}
+          <label className="flex items-center gap-2 text-[11px] text-muted cursor-pointer select-none">
+            <input
+              type="checkbox"
+              checked={data.leadAlerts}
+              onChange={() => void toggleLeadAlerts()}
+              className="accent-current"
+            />
+            <span>
+              <strong className="text-text">Instant lead alerts</strong> — email the admin the moment a new
+              contact is captured. Turn on for client-lead lists (sales pipeline); leave off for fan lists.
+            </span>
+          </label>
           {typeof s?.unsynced === 'number' && s.unsynced > 0 && (
             <button
               onClick={() => void resync()}

@@ -1021,7 +1021,12 @@ export const api = {
       stats: { total: number; last7: number; last30: number; unsubscribed: number; unsynced: number }
       recent: Array<{ id: string; email: string; name: string | null; handle: string | null; source: string; trigger_word: string | null; resend_synced_at: string | null; created_at: string }>
       capture: { token: string; url: string } | null
+      leadAlerts: boolean
     }>(`/api/audience/projects/${projectId}`),
+  audienceSetLeadAlerts: (projectId: string, enabled: boolean) =>
+    request<{ ok: true; enabled: boolean }>(`/api/audience/projects/${projectId}/lead-alerts`, {
+      method: 'POST', body: JSON.stringify({ enabled }),
+    }),
   audienceAddContact: (projectId: string, email: string, name?: string) =>
     request<{ ok: true }>(`/api/audience/projects/${projectId}/contacts`, {
       method: 'POST', body: JSON.stringify({ email, name }),
