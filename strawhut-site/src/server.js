@@ -25,7 +25,7 @@ import { applyMonthlyRotation } from './spotlight.js';
 import { applyPopularSpotlight, megaphoneConfigured } from './popularity.js';
 import { resolveArtwork, imageWidth, MIN_ACCEPTABLE } from './artwork.js';
 import { inspect as inspectSubmission } from './antispam.js';
-import { verifyTurnstile } from './turnstile.js';
+import { verifyTurnstile, turnstileConfigured } from './turnstile.js';
 import { toText as plainText, endsSentence } from './util.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -681,7 +681,15 @@ function readFlash(req, res) {
 app.get('/healthz', async (req, res) => {
   const sp = spotlightStatus || {};
   const titles = (sp.shows || []).map((x) => x.title).concat(sp.picks || []);
-  res.json({ ok: true, ...(await store.stats()), spotlight: { source: sp.source, shows: titles } });
+  // Booleans only — never the keys themselves. Tells us at a glance whether the
+  // AI-dependent features (meta descriptions, show blurbs, episode hooks) can
+  // actually run on this service, which is otherwise invisible from outside.
+  res.json({
+    ok: true,
+    ...(await store.stats()),
+    features: { ai: aiConfigured(), showSeo: process.env.SHOW_SEO !== 'off', turnstile: turnstileConfigured() },
+    spotlight: { source: sp.source, shows: titles },
+  });
 });
 
 // ---- SEO / GEO endpoints --------------------------------------------------
