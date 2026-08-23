@@ -993,7 +993,6 @@ function enrichEpisodeInBackground(show, episode) {
       return store.updateEpisode(episode.id, {
         ai_hook: out.hook || null,
         ai_takeaways: out.takeaways?.length ? JSON.stringify(out.takeaways) : null,
-        guests: out.guests?.length ? JSON.stringify(out.guests) : null,
       });
     })
     .catch((e) => {
@@ -1161,7 +1160,6 @@ async function warmEpisodeEnrichment() {
         await store.updateEpisode(ep.id, {
           ai_hook: out.hook || null,
           ai_takeaways: out.takeaways?.length ? JSON.stringify(out.takeaways) : null,
-          guests: out.guests?.length ? JSON.stringify(out.guests) : null,
         });
         done++;
       }

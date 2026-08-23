@@ -140,14 +140,13 @@ is to make a stranger who clicked an ad press play.
 Return STRICT JSON, nothing else, with exactly these keys:
 {
   "hook": "one sentence, max 120 characters, saying why this episode is worth an hour",
-  "takeaways": ["3 to 4 short phrases, max 80 characters each, of what the listener actually gets"],
-  "guests": ["full names of guests appearing in this episode"]
+  "takeaways": ["3 to 4 short phrases, max 80 characters each, of what the listener actually gets"]
 }
 
 Rules:
-- Ground everything in the supplied title and description. Do NOT invent guests,
-  claims, statistics or events. If no guest is identifiable, return an empty array.
-- The host is not a guest. Neither is the show itself.
+- Ground everything in the supplied title and description. Do NOT invent claims,
+  statistics, guests or events. Guest names are extracted separately from the
+  title by code — never assert who appears in the episode.
 - No ellipses anywhere. Every string is a complete thought.
 - No hype ("you won't believe", "dive in"), no hashtags, no emoji, no quotes
   around the values beyond normal JSON syntax.
@@ -193,10 +192,8 @@ export async function generateEpisodeEnrichment({ show, episode, log = () => {} 
     const hook = clean(out.hook).slice(0, 160);
     const takeaways = (Array.isArray(out.takeaways) ? out.takeaways : [])
       .map(clean).filter((t) => t && t.length <= 110).slice(0, 4);
-    const guests = (Array.isArray(out.guests) ? out.guests : [])
-      .map(clean).filter((g) => g && g.length <= 60 && /\s/.test(g)).slice(0, 4);
-    if (!hook && !takeaways.length && !guests.length) return null;
-    return { hook, takeaways, guests };
+    if (!hook && !takeaways.length) return null;
+    return { hook, takeaways };
   } catch (e) {
     log(`ai: episode enrich failed — ${e.message}`);
     return null;

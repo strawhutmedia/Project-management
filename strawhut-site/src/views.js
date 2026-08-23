@@ -4,6 +4,7 @@
 
 import { esc, toText, formatDuration, formatDate, endsSentence, firstSentence } from './util.js';
 import { formFields } from './antispam.js';
+import { extractGuests } from './guests.js';
 import { turnstileWidget } from './turnstile.js';
 import {
   canonical,
@@ -1222,7 +1223,7 @@ export function pricingPage() {
   });
 }
 
-function lpHighlight(ep) {
+function lpHighlight(ep, showTitle) {
   const quotes = jsonList(ep.quotes);
   if (quotes.length) {
     return `<div class="lp-quotes">${quotes
@@ -1230,12 +1231,13 @@ function lpHighlight(ep) {
       .map((q) => `<blockquote class="lp-quote"><p>&ldquo;${esc(q)}&rdquo;</p><span>From the episode</span></blockquote>`)
       .join('')}</div>`;
   }
-  const guests = jsonList(ep.guests);
+  const guests = extractGuests(ep.title, showTitle);
   if (!guests.length) return '';
-  return `<div class="lp-guests">
-    <p class="lp-guests-label">${guests.length > 1 ? 'Guests' : 'Guest'}</p>
-    <p class="lp-guests-name">${guests.map((g) => esc(g)).join('<span class="lp-guest-sep"> &bull; </span>')}</p>
-  </div>`;
+  // Reads as a sentence, not a labelled field: "With A · B" fits one line where
+  // "GUESTS / A • B" wrapped to two.
+  return `<p class="lp-guests"><span class="lp-guests-label">With</span> <span class="lp-guests-name">${guests
+    .map((g) => esc(g))
+    .join('<span class="lp-guest-sep"> &middot; </span>')}</span></p>`;
 }
 
 export function landingPage({ landing, show, episode }) {
@@ -1285,7 +1287,7 @@ ${trackingBody()}
         : ''
   }
   ${player || ''}
-  ${lpHighlight(ep)}
+  ${lpHighlight(ep, show?.title)}
   ${body ? `<div class="lp-divider"></div><div class="lp-desc notes">${body}</div>` : ''}
   ${
     show
@@ -1633,8 +1635,8 @@ function episodeTakeaways(episode) {
   </div>`;
 }
 
-function guestCard(episode) {
-  const guests = jsonList(episode.guests);
+function guestCard(episode, show) {
+  const guests = extractGuests(episode.title, show?.title);
   if (!guests.length) return '';
   return `<div class="ep-guests">
     <span class="ep-guests-label">${guests.length > 1 ? 'Guests' : 'Guest'}</span>
@@ -1704,7 +1706,7 @@ export function episodePage({ show, episode, moreFromShow = [], related = [] }) 
           ? audioPlayer(episode.audio_url, { title: episode.title, showTitle: show.title, image: cover, duration: episode.duration })
           : `<p class="sub">Audio unavailable for this episode.</p>`
       }
-      ${lpHighlight(episode)}
+      ${lpHighlight(episode, show.title)}
       ${
         platformRow(show)
           ? `<div class="lp-divider"></div>

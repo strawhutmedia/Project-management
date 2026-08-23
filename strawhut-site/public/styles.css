@@ -1231,3 +1231,56 @@ a.lp-show-name:hover { color: #00e6a0; }
   .ep-lp .lp-hook { padding: 10px 12px; margin-bottom: 12px; }
   .ep-lp .lp-hook-text { font-size: 0.9rem; }
 }
+
+/* --- Episode card: fewer boxes ---------------------------------------------
+   The first pass nested a bordered box inside a bordered box inside the card —
+   hook, player and guests each in their own outlined rectangle, which read as a
+   grid rather than a page. Now the card is the only container: the hook is a
+   gradient band (same family as the homepage impact band), the player sits on
+   the card with no frame of its own, and guests are a line of text. */
+
+/* "Why listen" — a gradient band, not an outlined box. */
+.ep-lp .lp-hook {
+  position: relative; border: 0; border-radius: 16px;
+  background: linear-gradient(115deg, #0d2a22 0%, #103a2c 48%, #0f2038 100%);
+  padding: 16px 18px; margin: 18px 0 18px; overflow: hidden;
+}
+.ep-lp .lp-hook::before {
+  content: ""; position: absolute; inset: 0; pointer-events: none;
+  background: radial-gradient(70% 130% at 88% 12%, rgba(0, 204, 142, 0.26), transparent 62%);
+}
+.ep-lp .lp-hook-label,
+.ep-lp .lp-hook-text { position: relative; }
+.ep-lp .lp-hook-text { color: #eafff7; }
+
+/* The player belongs to the card, so it loses its own frame. */
+.ep-lp .aplayer {
+  background: transparent; border: 0; box-shadow: none;
+  padding: 4px 0 0; margin: 0 auto;
+}
+
+/* Guests read as a line, not a panel. */
+.ep-lp .lp-guests {
+  background: none; border: 0; border-radius: 0; padding: 10px 0 0; margin: 0;
+  text-align: center;
+}
+.ep-lp .lp-guests-label {
+  display: inline; margin: 0 6px 0 0; font-size: 0.7rem; letter-spacing: 0.09em;
+}
+.ep-lp .lp-guests-name { display: inline; font-weight: 600; }
+
+/* Quotes stay visually distinct but lose the hard outline. */
+.ep-lp .lp-quotes {
+  background: rgba(255, 255, 255, 0.03); border: 0;
+  border-left: 3px solid var(--accent); border-radius: 0 12px 12px 0;
+}
+
+/* Takeaways sit on the page, not in a panel. */
+.ep-lp .ep-takeaways { text-align: left; }
+@media (max-width: 640px) {
+  .ep-lp .lp-hook { margin: 14px 0 16px; padding: 14px 15px; }
+}
+
+.ep-lp .lp-guests { font-size: 0.92rem; color: rgba(255, 255, 255, 0.9); }
+.ep-lp .lp-guests-label { text-transform: none; letter-spacing: 0; font-weight: 600; color: var(--muted); font-size: 0.92rem; display: inline; margin: 0; }
+.ep-lp .lp-guest-sep { color: var(--muted); }

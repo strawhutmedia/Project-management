@@ -288,3 +288,21 @@ Notes:
   an episode would have seen a card with no hook. Now the newest 3 episodes per
   show are warmed in the background at boot (advertised episodes first), capped
   at 150 per boot so the cost stays predictable.
+- **Guests are now extracted from the title, never generated.** Ryan spotted a
+  guest list that didn't match the episode and said, correctly, *"if there's
+  gonna be mistakes, I'd rather not have it."* Podbooster doesn't use AI for
+  this either — `extractGuests` in `routes/rss.js` is strict regex over the
+  episode title with guards against role words, ALL-CAPS headers and the show's
+  own name. Ported it to `src/guests.js` (adding `&` as a separator and two
+  patterns for Straw Hut's "Name & Name, …" title style) and dropped guests from
+  the AI prompt entirely. A name can now only appear if it is literally in the
+  title; the failure mode is showing nothing.
+- **Card redesigned — fewer boxes.** It was a bordered box inside a bordered box
+  inside the card, which read as a grid. The card is now the only container: the
+  hook is a gradient band (same family as the homepage impact band), the player
+  has no frame of its own, and guests are a line of text ("With A · B") rather
+  than a panel.
+- **Preview harness fixed.** Two screenshots I sent showed wrong artwork and a
+  wrong guest list — both were fabricated test fixtures, not the site.
+  `/tmp/pw/realprev.py` now previews local CSS/markup against the real live page
+  with the real cover art, so a screenshot can't misrepresent what ships.
