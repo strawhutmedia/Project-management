@@ -26,6 +26,7 @@ import { applyPopularSpotlight, megaphoneConfigured } from './popularity.js';
 import { resolveArtwork, imageWidth, MIN_ACCEPTABLE } from './artwork.js';
 import { inspect as inspectSubmission } from './antispam.js';
 import { verifyTurnstile, turnstileConfigured } from './turnstile.js';
+import { ghlConfigured, verifyGhl, upsertContact, ghlLastError } from './ghl.js';
 import { toText as plainText, endsSentence } from './util.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -707,6 +708,18 @@ function readFlash(req, res) {
 }
 
 // ---- Health --------------------------------------------------------------
+// CRM credential state, checked once at boot with a READ-ONLY call so it can be
+// reported without creating a test contact in Ryan's live CRM.
+let _ghlState = ghlConfigured() ? 'checking' : 'unconfigured';
+if (ghlConfigured()) {
+  verifyGhl()
+    .then((r) => {
+      _ghlState = r.ok ? `ok${r.name ? ' (' + r.name + ')' : ''}` : `error: ${r.error || 'unknown'}`;
+      console.log('[ghl]', _ghlState);
+    })
+    .catch((e) => { _ghlState = `error: ${e.message.slice(0, 120)}`; });
+}
+
 app.get('/healthz', async (req, res) => {
   const sp = spotlightStatus || {};
   const titles = (sp.shows || []).map((x) => x.title).concat(sp.picks || []);
@@ -716,7 +729,8 @@ app.get('/healthz', async (req, res) => {
   res.json({
     ok: true,
     ...(await store.stats()),
-    features: { ai: aiConfigured(), showSeo: process.env.SHOW_SEO !== 'off', turnstile: turnstileConfigured() },
+    features: { ai: aiConfigured(), showSeo: process.env.SHOW_SEO !== 'off', turnstile: turnstileConfigured(), ghl: ghlConfigured() },
+    ghl: _ghlState,
     enrichedEpisodes: await store.enrichedCount().catch((e) => `error: ${e.message.slice(0, 80)}`),
     lastEnrichError: _lastEnrichError,
     spotlight: { source: sp.source, shows: titles },
@@ -817,6 +831,13 @@ app.post('/contact', async (req, res) => {
     } else {
       console.log('[contact] (email not configured) message from', email, `[${topic}]`, '-', message.slice(0, 120));
     }
+    // CRM is a second destination, never a gate: fire-and-forget AFTER the
+    // email so a GHL outage can't delay or fail a real enquiry.
+    upsertContact({
+      name, email, company, message,
+      tags: ['website', 'website-contact', `topic:${topic}`].concat(suspicious ? ['flagged-possible-spam'] : []),
+      source: 'strawhutmedia.com contact form',
+    }).catch((e) => console.error('[ghl] contact push failed:', e.message));
     res.send(V.contactPage({ sent: true }));
   } catch (e) {
     console.error('[contact] send failed:', e.message);
@@ -966,6 +987,11 @@ app.post('/subscribe', async (req, res) => {
   }
   try {
     await store.addSubscriber(email, req.body.name);
+    upsertContact({
+      name: req.body.name, email,
+      tags: ['website', 'newsletter'],
+      source: 'strawhutmedia.com subscribe',
+    }).catch((e) => console.error('[ghl] subscribe push failed:', e.message));
     res.send(
       V.messagePage({
         title: "You're subscribed — Straw Hut Media",

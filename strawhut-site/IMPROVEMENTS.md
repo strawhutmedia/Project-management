@@ -338,3 +338,15 @@ Notes:
     Megaphone-counted downloads nobody chose to start, which inflates the
     figures reported to advertisers. Ryan's call, made knowingly. The
     `preload="none"` note in CLAUDE.md now has this exception documented.
+- **GoHighLevel integration** (`src/ghl.js`). Contact-form and subscribe
+  submissions create/update a CRM contact, with the enquiry text attached as a
+  note (without it the CRM entry is just an email address). Tagged
+  `website` + `website-contact` + `topic:<topic>`, and `flagged-possible-spam`
+  when the antispam heuristics flagged it, so junk is filterable in GHL.
+  - **Additive, never blocking.** The email to Ryan stays the system of record;
+    the CRM push is fire-and-forget *after* it, with a 10s timeout. A GHL outage
+    cannot delay, fail, or lose an enquiry.
+  - **Inert until configured** — same pattern as Turnstile and the pixels.
+  - **Boot check is READ-ONLY** (`GET /locations/{id}`), so credentials are
+    verified and reported in `/healthz` without creating a test contact in a
+    live CRM. Written this way deliberately after the Jane Doe incident.
