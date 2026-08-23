@@ -1503,7 +1503,7 @@ export function studioPage() {
   });
 }
 
-export function contactPage({ sent = false, error = '', values = {} } = {}) {
+export function contactPage({ sent = false, error = '', values = {}, canBook = true } = {}) {
   const v = (k) => esc(values[k] || '');
   const body = `
   <section class="hero" style="padding-bottom:20px"><div class="container">
@@ -1517,8 +1517,13 @@ export function contactPage({ sent = false, error = '', values = {} } = {}) {
         ? `<div class="contact-thanks">
              <h2 style="margin:0 0 8px">Thanks — message received.</h2>
              <p style="color:var(--muted);margin:0 0 6px">We read every note and reply personally, and a confirmation is on its way to your inbox.</p>
-             <p style="color:var(--muted);margin:0 0 20px">Don't want to wait? Grab a free 15 minutes now.</p>
-             <a class="btn btn-primary" href="/book">Book a 15-minute call →</a>
+             ${
+               canBook
+                 ? `<p style="color:var(--muted);margin:0 0 20px">Don't want to wait? Grab a free 15 minutes now.</p>
+                    <a class="btn btn-primary" href="/book">Book a 15-minute call →</a>`
+                 : `<p style="color:var(--muted);margin:0 0 20px">You'll hear back from us shortly — usually the same day.</p>
+                    <a class="btn btn-ghost" href="/shows">Hear our shows</a>`
+             }
            </div>
            <script>window.shmTrack&&shmTrack('contact_submit',{topic:'${esc(values.topic || 'general')}'});window.fbq&&fbq('track','Lead');</script>`
         : `<form class="contact-form" method="POST" action="/contact">

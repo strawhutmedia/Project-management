@@ -814,26 +814,27 @@ app.get('/book', (req, res) => res.send(V.bookPage({ widgetUrl: ghlBookingState(
 // Packages + custom quote builder (embeds the self-hosted Sales-Quoting tool).
 app.get('/pricing', (req, res) => res.send(V.pricingPage()));
 
-app.get('/contact', (req, res) => res.send(V.contactPage()));
+const canBook = () => Boolean(ghlBookingState().url);
+app.get('/contact', (req, res) => res.send(V.contactPage({ canBook: canBook() })));
 app.post('/contact', async (req, res) => {
   const { name = '', email = '', company = '', message = '', topic = 'general' } = req.body || {};
   const values = { name, email, company, message, topic };
   if (!name.trim() || !email.trim() || !message.trim()) {
-    return res.send(V.contactPage({ error: 'Please fill in your name, email, and a message.', values }));
+    return res.send(V.contactPage({ error: 'Please fill in your name, email, and a message.', values, canBook: canBook() }));
   }
   // Invisible bot checks. A rejected submission gets the normal thank-you page:
   // telling a bot why it failed just teaches it what to fix next time.
   const check = inspectSubmission(req.body, { ip: req.ip });
   if (!check.ok) {
     console.log('[contact] blocked', check.reason, '-', String(email).slice(0, 60));
-    return res.send(V.contactPage({ sent: true }));
+    return res.send(V.contactPage({ sent: true, canBook: canBook() }));
   }
   // Turnstile. Only an actively rejected token is treated as proof of a bot;
   // a missing or unverifiable one is flagged and still delivered.
   const cf = await verifyTurnstile(req.body['cf-turnstile-response'], req.ip);
   if (cf.status === 'failed') {
     console.log('[contact] blocked turnstile', cf.codes.join(','), '-', String(email).slice(0, 60));
-    return res.send(V.contactPage({ sent: true }));
+    return res.send(V.contactPage({ sent: true, canBook: canBook() }));
   }
   const flags = [...check.flags];
   if (cf.status === 'missing') flags.push('no-captcha');
@@ -849,7 +850,7 @@ app.post('/contact', async (req, res) => {
     // the biggest drop-off point in the funnel; this goes out in under a second
     // and offers a call they can book without waiting for anyone.
     if (!suspicious) {
-      sendContactAutoReply({ name, email, topic }).catch((e) =>
+      sendContactAutoReply({ name, email, topic, canBook: canBook() }).catch((e) =>
         console.error('[mail] auto-reply failed:', e.message)
       );
     }
@@ -860,10 +861,10 @@ app.post('/contact', async (req, res) => {
       tags: ['website', 'website-contact', `topic:${topic}`].concat(suspicious ? ['flagged-possible-spam'] : []),
       source: 'strawhutmedia.com contact form',
     }).catch((e) => console.error('[ghl] contact push failed:', e.message));
-    res.send(V.contactPage({ sent: true }));
+    res.send(V.contactPage({ sent: true, canBook: canBook() }));
   } catch (e) {
     console.error('[contact] send failed:', e.message);
-    res.send(V.contactPage({ error: 'Something went wrong sending your message. Please email us directly at hello@strawhutmedia.com.', values }));
+    res.send(V.contactPage({ error: 'Something went wrong sending your message. Please email us directly at hello@strawhutmedia.com.', values, canBook: canBook() }));
   }
 });
 

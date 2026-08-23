@@ -50,21 +50,27 @@ export const CONTACT_ROUTES = {
  * Deliberately short and human — it is not a marketing email. Never throws:
  * failing to acknowledge must not fail the submission.
  */
-export async function sendContactAutoReply({ name, email, topic }) {
+export async function sendContactAutoReply({ name, email, topic, canBook = true }) {
   if (!process.env.RESEND_API_KEY || !email) return { ok: false, skipped: true };
   const site = (process.env.APP_BASE_URL || 'https://www.strawhutmedia.com').replace(/\/+$/, '');
   const esc = (x) => String(x == null ? '' : x).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
   const first = String(name || '').trim().split(/\s+/)[0] || 'there';
+  // Someone who just used the contact form must never be sent to /book while
+  // no calendar is live — /book would route them straight back to the form
+  // they came from. Silence beats a loop.
   const isGuest = topic === 'booking';
+  const offerCall = !isGuest && canBook;
   const html = `<div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;font-size:16px;line-height:1.6;color:#1a1a1a">
     <p>Hi ${esc(first)},</p>
     <p>Thanks for reaching out to Straw Hut Media — your message landed and a real person will read it.</p>
     ${
       isGuest
         ? `<p>We'll come back to you about guesting on one of our shows.</p>`
-        : `<p>If it's easier than waiting on email, you can grab a free 15-minute call right now and we'll tell you straight whether we're the right partner for what you're building:</p>
+        : offerCall
+        ? `<p>If it's easier than waiting on email, you can grab a free 15-minute call right now and we'll tell you straight whether we're the right partner for what you're building:</p>
            <p><a href="${site}/book" style="display:inline-block;background:#00cc8e;color:#023324;font-weight:700;text-decoration:none;padding:12px 26px;border-radius:999px">Book a 15-minute call →</a></p>
            <p style="font-size:14px;color:#555">No slides, no hard sell. Fifteen minutes.</p>`
+        : `<p>We'll come back to you shortly — usually the same day — with a straight answer on whether we're the right partner for what you're building, and a time to talk it through.</p>`
     }
     <p>— Straw Hut Media</p>
     <p style="font-size:13px;color:#888">Full-service podcast production &amp; network · <a href="${site}" style="color:#0a8f66">strawhutmedia.com</a></p>
@@ -76,7 +82,7 @@ export async function sendContactAutoReply({ name, email, topic }) {
       body: JSON.stringify({
         from: FROM,
         to: email,
-        subject: isGuest ? 'Thanks for getting in touch — Straw Hut Media' : "Thanks for reaching out — want to grab 15 minutes?",
+        subject: offerCall ? "Thanks for reaching out — want to grab 15 minutes?" : 'Thanks for getting in touch — Straw Hut Media',
         html,
         reply_to: 'hello@strawhutmedia.com',
       }),
