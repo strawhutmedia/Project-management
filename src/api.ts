@@ -1015,6 +1015,19 @@ export const api = {
     }
     return res.json() as Promise<{ ok: true; path: string }>
   },
+  // Per-show audience (email list)
+  audienceOverview: (projectId: string) =>
+    request<{
+      stats: { total: number; last7: number; last30: number; unsubscribed: number; unsynced: number }
+      recent: Array<{ id: string; email: string; name: string | null; handle: string | null; source: string; trigger_word: string | null; resend_synced_at: string | null; created_at: string }>
+      capture: { token: string; url: string } | null
+    }>(`/api/audience/projects/${projectId}`),
+  audienceAddContact: (projectId: string, email: string, name?: string) =>
+    request<{ ok: true }>(`/api/audience/projects/${projectId}/contacts`, {
+      method: 'POST', body: JSON.stringify({ email, name }),
+    }),
+  audienceResync: (projectId: string) =>
+    request<{ ok: true; pushed: number }>(`/api/audience/projects/${projectId}/resync`, { method: 'POST' }),
   // Socials autopilot
   runSocialsAutopilot: (projectId: string, force = false) =>
     request<{ ok: true; skipped: string | null; itemCount: number }>(

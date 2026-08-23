@@ -30,6 +30,7 @@ import { teleprompterRouter } from './routes/teleprompter'
 import { teleprompterRemoteRouter } from './routes/teleprompter_remote'
 import { invoicingRouter } from './routes/invoicing'
 import { intakeRouter } from './routes/intake'
+import { audienceRouter } from './routes/audience'
 import { quickbooksRouter } from './routes/quickbooks'
 import { handleResendWebhook } from './routes/outreach_webhook'
 import { seedBackInYourArms } from './seeds/back_in_your_arms'
@@ -123,6 +124,9 @@ app.use('/api/teleprompter', teleprompterRouter)
 app.use('/api/invoicing', invoicingRouter)
 // PUBLIC (token-gated, no login) — vendors submit their W9 via a private link.
 app.use('/api/intake', intakeRouter)
+// Per-show audience lists. The /hooks/:token capture route inside is
+// public (ManyChat posts to it); everything else requires a session.
+app.use('/api/audience', audienceRouter)
 app.use('/api/qb', quickbooksRouter)
 
 // Public per-show one-sheet page (guest outreach). Mounted at the root
