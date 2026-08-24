@@ -445,18 +445,32 @@ main { overflow-x: clip; }
   border-radius: 2px; background: linear-gradient(180deg, var(--accent), rgba(0,204,142,0.15));
   transform-origin: top center;   /* base (no JS): fully drawn */
 }
-/* Scroll-linked: JS sets scaleY from the section's scroll progress each frame,
-   so the line fills as you scroll down and retracts as you scroll up. The tiny
-   linear transition just smooths between rAF samples. */
-.ba-anim .ba-line { transform: scaleY(0); transition: transform 0.12s linear; }
+/* Scroll-linked: JS sets scaleY (fill) and opacity (fade) from the section's
+   scroll progress each frame. The line draws down lighting each check, and once
+   all are lit it fades away, leaving the filled checks. Reverses on scroll-up.
+   The tiny linear transitions just smooth between rAF samples. */
+.ba-anim .ba-line { transform: scaleY(0); transition: transform 0.12s linear, opacity 0.2s linear; }
 /* Rows rise + fade. */
 .ba-anim .ba-list li { opacity: 0; transform: translateY(16px);
   transition: opacity 0.5s ease, transform 0.55s cubic-bezier(0.22,0.61,0.36,1); }
 .ba-anim.ba-in .ba-list li { opacity: 1; transform: none; }
-/* Marks pop with a little overshoot. */
-.ba-anim .ba-mark { opacity: 0; transform: scale(0.3);
+/* Before ✕ marks pop in with a little overshoot on entry. (After checks are
+   handled by the scroll line below — they light up as it reaches them.) */
+.ba-anim .ba-before .ba-mark { opacity: 0; transform: scale(0.3);
   transition: opacity 0.3s ease, transform 0.5s cubic-bezier(0.34,1.56,0.64,1); }
-.ba-anim.ba-in .ba-mark { opacity: 1; transform: scale(1); }
+.ba-anim.ba-in .ba-before .ba-mark { opacity: 1; transform: scale(1); }
+/* After checks: dim until the scroll line reaches them, then they fill in.
+   Gated behind .ba-anim, so with JS off / reduced-motion they render lit. */
+.ba-anim .ba-after-card .ba-check {
+  background: rgba(255,255,255,0.05); color: rgba(210,255,238,0.4);
+  border: 1px solid rgba(0,204,142,0.16);
+  transition: background-color 0.28s ease, color 0.28s ease, border-color 0.28s ease, transform 0.28s ease;
+  transition-delay: 0s !important;
+}
+.ba-anim .ba-after-card .ba-check.ba-lit {
+  background: rgba(0,204,142,0.22); color: var(--accent);
+  border-color: rgba(0,204,142,0.4); transform: scale(1.07);
+}
 /* Per-row stagger (applies to the row and its mark together). */
 .ba-anim.ba-in .ba-list li:nth-of-type(1), .ba-anim.ba-in .ba-list li:nth-of-type(1) .ba-mark { transition-delay: 0.05s; }
 .ba-anim.ba-in .ba-list li:nth-of-type(2), .ba-anim.ba-in .ba-list li:nth-of-type(2) .ba-mark { transition-delay: 0.12s; }

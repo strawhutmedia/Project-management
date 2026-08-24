@@ -594,19 +594,26 @@ export function beforeAfterSection() {
       var io=new IntersectionObserver(function(en){en.forEach(function(e){if(e.isIntersecting){go();io.disconnect();}});},{threshold:0,rootMargin:'0px 0px -12% 0px'});
       io.observe(s);
     }else{go();}
-    // Scroll-linked draw: fill the line to match how far through the section
-    // we have scrolled, so it moves up and down with the scroll direction.
+    // Scroll-linked draw: the line fills down as you scroll, lighting each
+    // check as it reaches it; once all are lit (progress ~0.8) the line fades
+    // out over the last stretch. Everything reverses when you scroll back up.
+    var checks=s.querySelectorAll('.ba-after-card .ba-check');
     var ticking=false;
     function update(){
       ticking=false;
-      if(!line)return;
       var r=s.getBoundingClientRect();
       var vh=window.innerHeight||document.documentElement.clientHeight;
-      if(r.bottom<-40||r.top>vh+40)return; /* skip work when far off-screen */
+      if(r.bottom<-60||r.top>vh+60)return; /* skip work when far off-screen */
       var total=r.height-vh;
       var p=total>0?(-r.top)/total:(vh-r.top)/(vh+r.height);
       p=p<0?0:(p>1?1:p);
-      line.style.transform='scaleY('+p+')';
+      var fill=p/0.8; if(fill>1)fill=1;             /* line fully drawn by 80% through */
+      var op=(1-p)/0.2; if(op<0)op=0; if(op>1)op=1; /* then fades out over the last 20% */
+      if(line){line.style.transform='scaleY('+fill+')';line.style.opacity=op;}
+      for(var i=0;i<checks.length;i++){
+        if(fill>=(i+0.5)/checks.length)checks[i].classList.add('ba-lit');
+        else checks[i].classList.remove('ba-lit');
+      }
     }
     function onScroll(){if(!ticking){ticking=true;requestAnimationFrame(update);}}
     window.addEventListener('scroll',onScroll,{passive:true});
