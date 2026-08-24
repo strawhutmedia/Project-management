@@ -537,6 +537,50 @@ function curateRow(pool, pinnedSlugs, count = 4) {
   return picked.slice(0, count);
 }
 
+// Before / After Straw Hut — a pinned-scroll comparison (Manychat-style).
+// The "After" panel is position:sticky so it stays in view while the taller
+// "Before" column scrolls past on desktop. Pure CSS — no scroll-jacking, no JS.
+// On phones (<=760px) it degrades to a simple vertical stack (see .ba-* CSS).
+const BEFORE_AFTER = {
+  before: [
+    "Recording in a closet, praying the audio's usable",
+    'Editing all weekend instead of running your business',
+    'Episodes that drop whenever you finally get to them',
+    'A show nobody can find',
+  ],
+  after: [
+    'Show up, talk, walk out — we handle the rest',
+    'Pro Hollywood studio, multicam 4K, publish-ready files',
+    'Episodes ship on schedule, every time',
+    'Distributed, promoted, actually growing',
+  ],
+};
+
+export function beforeAfterSection() {
+  const beforeItems = BEFORE_AFTER.before
+    .map((t) => `<li><span class="ba-mark ba-x" aria-hidden="true">✕</span><span>${esc(t)}</span></li>`)
+    .join('');
+  const afterItems = BEFORE_AFTER.after
+    .map((t) => `<li><span class="ba-mark ba-check" aria-hidden="true">✓</span><span>${esc(t)}</span></li>`)
+    .join('');
+  return `<section class="section ba-section" id="before-after"><div class="container">
+    <div class="section-head"><h2>Doing it alone vs. doing it with us</h2></div>
+    <div class="ba-grid">
+      <div class="ba-col ba-before">
+        <div class="ba-col-head"><span class="ba-tag">Before Straw Hut</span></div>
+        <ul class="ba-list">${beforeItems}</ul>
+      </div>
+      <div class="ba-col ba-after-col">
+        <div class="ba-after-card">
+          <div class="ba-col-head"><span class="ba-tag ba-tag-on">After Straw Hut</span></div>
+          <ul class="ba-list">${afterItems}</ul>
+          <a class="btn btn-primary ba-cta" href="/book">Book a 15-min fit call →</a>
+        </div>
+      </div>
+    </div>
+  </div></section>`;
+}
+
 export function homePage({ shows }) {
   const featured = shows.filter((s) => s.featured);
   const originals = shows.filter((s) => (s.show_type || 'original') !== 'partnered');
@@ -640,6 +684,8 @@ export function homePage({ shows }) {
       </div>
     </div>
   </div></section>
+
+  ${beforeAfterSection()}
 
   ${
     partners.length
@@ -958,6 +1004,8 @@ export function servicePage(cfg, { shows = [] } = {}) {
     </div></section>`
     )
     .join('');
+  // Before/After comparison — only on the podcast-production page.
+  const beforeAfter = cfg.slug === 'podcast-production' ? beforeAfterSection() : '';
   const body = `
   <section class="hero"><div class="container hero-inner">
     <div class="hero-copy">
@@ -978,6 +1026,7 @@ export function servicePage(cfg, { shows = [] } = {}) {
   </div></section>`
       : ''
   }
+  ${beforeAfter}
   ${marquee}
   ${sections}
   ${studioStrip}

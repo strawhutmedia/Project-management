@@ -16,7 +16,8 @@
 }
 
 * { box-sizing: border-box; }
-html { scroll-behavior: smooth; }
+/* No global smooth-scroll: it makes trackpad scrolling feel glitchy on long,
+   heavy pages. Removed for scroll performance. */
 body {
   margin: 0;
   font-family: 'Poppins', system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
@@ -39,8 +40,10 @@ main { overflow-x: clip; }
 /* Header */
 .site-header {
   position: sticky; top: 0; z-index: 50;
-  background: rgba(18, 24, 47, 0.82);
-  backdrop-filter: blur(12px);
+  /* Was rgba(...,0.82) + backdrop-filter: blur(12px). The blur re-composited
+     every scroll frame (jank). Dropped the blur and raised opacity so the bar
+     reads the same without the per-frame repaint. */
+  background: rgba(18, 24, 47, 0.95);
   border-bottom: 1px solid var(--border);
 }
 .site-header .container {
@@ -131,7 +134,7 @@ main { overflow-x: clip; }
 
 /* Moving cover-art marquee */
 .marquee { overflow: hidden; padding: 14px 0 6px; -webkit-mask-image: linear-gradient(90deg, transparent, #000 6%, #000 94%, transparent); mask-image: linear-gradient(90deg, transparent, #000 6%, #000 94%, transparent); }
-.marquee-track { display: flex; gap: 18px; width: max-content; animation: marquee-scroll 150s linear infinite; }
+.marquee-track { display: flex; gap: 18px; width: max-content; animation: marquee-scroll 150s linear infinite; will-change: transform; }
 /* Second row scrolls the opposite way — its own keyframe so nothing in the
    `animation` shorthand can reset the direction. */
 .marquee-track.reverse { animation-name: marquee-scroll-rev; }
@@ -360,6 +363,57 @@ main { overflow-x: clip; }
 .impact-copy h2 { font-size: clamp(1.6rem, 3.4vw, 2.5rem); margin: 0 0 12px; line-height: 1.08; }
 .impact-copy p { color: #c6d6cf; margin: 0; font-size: 1.05rem; }
 .impact-cta { display: flex; flex-direction: column; gap: 12px; min-width: 220px; }
+
+/* Before / After Straw Hut — pinned-scroll comparison (Manychat-style).
+   The two columns share a grid row; with the default `stretch`, the shorter
+   "After" cell grows to the full height of the taller "Before" list, giving the
+   sticky card inside it room to travel. Pure CSS — no scroll-jacking. */
+.ba-grid {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 26px;
+  align-items: stretch;
+}
+.ba-col { min-width: 0; }                /* never let a long line push past the edge */
+.ba-col-head { margin: 0 0 16px; }
+.ba-tag {
+  display: inline-block; padding: 7px 16px; border-radius: 999px;
+  font-weight: 700; font-size: 0.82rem; letter-spacing: 0.04em; text-transform: uppercase;
+  background: var(--card-2); color: var(--muted); border: 1px solid var(--border);
+}
+.ba-tag-on { background: var(--accent); color: var(--accent-ink); border-color: transparent; }
+.ba-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 16px; }
+.ba-list li {
+  display: flex; align-items: center; gap: 14px; min-width: 0;
+  padding: 22px; border-radius: 16px; line-height: 1.4; font-size: 1.05rem; font-weight: 500;
+}
+.ba-mark {
+  flex: 0 0 auto; width: 30px; height: 30px; border-radius: 999px;
+  display: inline-flex; align-items: center; justify-content: center;
+  font-weight: 800; font-size: 0.95rem;
+}
+/* Before: dim + grim. The extra min-height makes this column tall, which is
+   what creates the scroll distance the sticky "After" card pins against. */
+.ba-before .ba-list li {
+  background: var(--card); border: 1px solid var(--border); color: var(--muted); min-height: 116px;
+}
+.ba-x { background: rgba(255,128,128,0.14); color: #ff8f8f; }
+/* After: bright, on-brand, and pinned. */
+.ba-after-card {
+  position: sticky; top: 92px;
+  background: linear-gradient(150deg, rgba(0,204,142,0.16), rgba(0,204,142,0.05) 55%, rgba(213,155,30,0.09));
+  border: 1px solid rgba(0,204,142,0.45); border-radius: 22px; padding: 26px 24px 28px; box-shadow: var(--shadow);
+}
+.ba-after-card .ba-list li {
+  background: rgba(0,204,142,0.08); border: 1px solid rgba(0,204,142,0.22); color: var(--text);
+}
+.ba-check { background: rgba(0,204,142,0.2); color: var(--accent); }
+.ba-cta { margin-top: 22px; }
+/* Phones: stack, drop the pin, no forced heights, no overflow. */
+@media (max-width: 760px) {
+  .ba-grid { grid-template-columns: 1fr; gap: 18px; }
+  .ba-after-card { position: static; top: auto; }
+  .ba-before .ba-list li { min-height: 0; }
+  .ba-list li { padding: 16px; font-size: 1rem; }
+}
 
 /* Service page — hero cover-art collage */
 .svc-hero-art { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
@@ -899,7 +953,7 @@ table.admin-table { width: 100%; border-collapse: collapse; }
   .nav {
     position: absolute; top: 100%; left: 0; right: 0;
     flex-direction: column; align-items: stretch; gap: 0;
-    background: rgba(18, 24, 47, 0.98); backdrop-filter: blur(12px);
+    background: rgba(18, 24, 47, 0.98); /* opaque; no backdrop-filter (scroll perf) */
     border-bottom: 1px solid var(--border);
     max-height: 0; overflow: hidden; transition: max-height 0.28s ease;
   }
@@ -934,7 +988,7 @@ table.admin-table { width: 100%; border-collapse: collapse; }
 /* Cookie consent bar — fixed to the bottom, above everything, dismissible. */
 .consent-bar {
   position: fixed; left: 0; right: 0; bottom: 0; z-index: 200;
-  background: rgba(18, 24, 47, 0.97); backdrop-filter: blur(12px);
+  background: rgba(18, 24, 47, 0.97); /* opaque; no backdrop-filter (scroll perf) */
   border-top: 1px solid var(--border); box-shadow: 0 -10px 30px rgba(0,0,0,0.35);
   padding: 16px 0;
 }
