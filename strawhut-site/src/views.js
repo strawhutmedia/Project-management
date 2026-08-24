@@ -736,7 +736,7 @@ export function homePage({ shows }) {
   ${
     partners.length
       ? `<section class="section" id="partnered"><div class="container">
-    <div class="section-head"><h2>Partner Shows</h2><a class="count" href="/shows#partner">View all ${partners.length} →</a></div>
+    <div class="section-head"><h2>Branded Shows</h2><a class="count" href="/shows#partner">View all ${partners.length} →</a></div>
     <div class="grid grid-4">${cards(partnerPicks)}</div>
   </div></section>`
       : ''
@@ -827,7 +827,7 @@ export function showsIndexPage({ shows }) {
   </div></section>`
       : ''
   }
-  ${shows.length ? section('original', 'Original Shows', originals) + section('partner', 'Partner Shows', partners) : `<section class="section"><div class="container"><div class="empty">No shows yet.</div></div></section>`}`;
+  ${shows.length ? section('original', 'Original Shows', originals) + section('partner', 'Branded Shows', partners) : `<section class="section"><div class="container"><div class="empty">No shows yet.</div></div></section>`}`;
   return layout({
     title: 'All Shows — Straw Hut Media',
     description: `Browse all ${shows.length} podcasts in the Straw Hut Media network — award-winning original shows and partner podcasts across comedy, true crime, culture, business, and film, produced and distributed by our Hollywood podcast agency.`,
@@ -1280,7 +1280,7 @@ const SERVICE_LINES = [
   {
     name: 'Network distribution',
     href: '/shows',
-    text: 'Join a network of award-winning originals and partner shows. Published and optimized across Apple Podcasts, Spotify, YouTube, and everywhere else people listen.',
+    text: 'Join a network of award-winning originals and branded shows. Published and optimized across Apple Podcasts, Spotify, YouTube, and everywhere else people listen.',
     serviceType: 'Podcast distribution',
   },
   {

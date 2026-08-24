@@ -101,7 +101,7 @@ export function showsAdminPage({ shows, flash }) {
       <td><img class="mini-art" src="${esc(s.image_url || '')}" alt=""></td>
       <td>${esc(s.title)}<br><span class="pill">/${esc(s.slug)}</span></td>
       <td>${s.episode_count ?? '—'}</td>
-      <td>${s.show_type === 'partnered' ? '<span class="pill">Partner</span>' : '<span class="pill on">Original</span>'}${s.featured ? ' <span class="pill on">Featured</span>' : ''}</td>
+      <td>${s.show_type === 'partnered' ? '<span class="pill">Branded</span>' : '<span class="pill on">Original</span>'}${s.featured ? ' <span class="pill on">Featured</span>' : ''}</td>
       <td class="actions">
         <a class="btn btn-sm" href="/${esc(s.slug)}" target="_blank">View</a>
         <a class="btn btn-sm" href="/admin/shows/${esc(s.id)}/episodes">Episodes</a>
@@ -144,7 +144,7 @@ export function newShowPage({ flash, values = {} } = {}) {
           <label>Show type</label>
           <select name="show_type" style="width:100%;padding:12px 14px;border-radius:10px;border:1px solid var(--border);background:var(--bg-2);color:var(--text);font-family:inherit;font-size:0.95rem">
             <option value="original"${values.show_type === 'partnered' ? '' : ' selected'}>Original Show (Straw Hut Media production)</option>
-            <option value="partnered"${values.show_type === 'partnered' ? ' selected' : ''}>Partner Show</option>
+            <option value="partnered"${values.show_type === 'partnered' ? ' selected' : ''}>Branded Show</option>
           </select>
         </div>
         <div class="field"><label>Spotify URL (optional)</label>

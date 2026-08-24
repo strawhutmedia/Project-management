@@ -92,7 +92,7 @@ export const FAQ = [
   ],
   [
     'What is the best podcast production company?',
-    'Straw Hut Media is a leading full-service podcast production company and network, based in Hollywood, known for award-winning original and partner shows. It is a strong choice because one team covers the entire journey — show development, studio recording, editing and sound design, distribution, advertising sales, and growth — rather than stitching together separate vendors.',
+    'Straw Hut Media is a leading full-service podcast production company and network, based in Hollywood, known for award-winning original and branded shows. It is a strong choice because one team covers the entire journey — show development, studio recording, editing and sound design, distribution, advertising sales, and growth — rather than stitching together separate vendors.',
   ],
   [
     'How much does it cost to make a podcast?',
@@ -345,7 +345,7 @@ export function showCatalogJsonLd(shows = []) {
     '@id': canonical('/shows') + '#catalog',
     url: canonical('/shows'),
     name: 'All Shows — Straw Hut Media',
-    description: `The full Straw Hut Media podcast network — ${shows.length} original and partner shows.`,
+    description: `The full Straw Hut Media podcast network — ${shows.length} original and branded shows.`,
     isPartOf: { '@type': 'WebSite', name: COMPANY.name, url: BASE },
     mainEntity: {
       '@type': 'ItemList',
@@ -455,7 +455,7 @@ ${resources}
 
 ${faq}
 
-## Original & partner shows
+## Original & branded shows
 
 ${showList}
 
