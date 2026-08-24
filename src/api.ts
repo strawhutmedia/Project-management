@@ -742,6 +742,37 @@ export type ApiTeleprompterSession = {
   updatedByName: string | null
 }
 
+// ── Cash flow tracker (owner-only money log) ──
+export type ApiCashflowEntry = {
+  id: string
+  kind: 'in' | 'out'
+  amountCents: number
+  occurredOn: string
+  category: string
+  counterparty: string
+  notes: string
+  createdAt: string
+  updatedAt: string
+}
+
+export type ApiCashflowMonth = {
+  month: string
+  inCents: number
+  outCents: number
+  netCents: number
+  endingBalanceCents: number
+}
+
+export type ApiCashflowOverview = {
+  settings: { startingBalanceCents: number; startingDate: string }
+  currentBalanceCents: number
+  totalInCents: number
+  totalOutCents: number
+  entryCount: number
+  months: ApiCashflowMonth[]
+  currentMonthCategories: { kind: 'in' | 'out'; category: string; totalCents: number }[]
+}
+
 // ── Contractor invoicing (admin payroll tool) ──
 export type ApiInvoiceLineItem = {
   desc: string
@@ -886,6 +917,28 @@ export const api = {
       method: 'POST',
       body: JSON.stringify(to ? { to } : {}),
     }),
+  // Cash flow tracker (owner-only)
+  cashflowOverview: () => request<ApiCashflowOverview>('/api/cashflow/overview'),
+  cashflowEntries: (opts?: { month?: string; limit?: number }) => {
+    const qs = new URLSearchParams()
+    if (opts?.month) qs.set('month', opts.month)
+    if (opts?.limit) qs.set('limit', String(opts.limit))
+    const suffix = qs.toString() ? `?${qs.toString()}` : ''
+    return request<{ entries: ApiCashflowEntry[] }>(`/api/cashflow/entries${suffix}`)
+  },
+  createCashflowEntry: (body: {
+    kind: 'in' | 'out'; amountCents: number; occurredOn: string
+    category?: string; counterparty?: string; notes?: string
+  }) => request<{ entry: ApiCashflowEntry }>('/api/cashflow/entries', { method: 'POST', body: JSON.stringify(body) }),
+  updateCashflowEntry: (id: string, body: Partial<{
+    kind: 'in' | 'out'; amountCents: number; occurredOn: string
+    category: string; counterparty: string; notes: string
+  }>) => request<{ entry: ApiCashflowEntry }>(`/api/cashflow/entries/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
+  deleteCashflowEntry: (id: string) =>
+    request<{ ok: true }>(`/api/cashflow/entries/${id}`, { method: 'DELETE' }),
+  updateCashflowSettings: (patch: Partial<{ startingBalanceCents: number; startingDate: string }>) =>
+    request<{ settings: { startingBalanceCents: number; startingDate: string } }>('/api/cashflow/settings', { method: 'PATCH', body: JSON.stringify(patch) }),
+
   // QuickBooks connection (AR side)
   qbStatus: () => request<{ configured: boolean; connected: boolean; env: string; realmId: string | null; redirectUri: string }>('/api/qb/status'),
   qbDisconnect: () => request<{ ok: true }>('/api/qb/disconnect', { method: 'POST' }),

@@ -18,6 +18,7 @@ import RemotePage from './pages/RemotePage'
 import Profile from './pages/Profile'
 import Settings from './pages/Settings'
 import InvoicingPage from './pages/InvoicingPage'
+import CashFlowPage from './pages/CashFlowPage'
 import VendorIntakePage from './pages/VendorIntakePage'
 import { AuthProvider, useAuth } from './auth'
 
@@ -71,6 +72,7 @@ export default function App() {
           <Route path="projects/:projectId/songs/:songId" element={<SongPage />} />
           <Route path="scheduler" element={<SchedulerPage />} />
           <Route path="invoicing" element={<InvoicingPage />} />
+          <Route path="cashflow" element={<CashFlowPage />} />
           <Route path="carousel-preview" element={<CarouselPreviewPage />} />
           <Route path="admin/outreach" element={<OutreachHubPage />} />
           <Route path="admin/outreach/shows/:projectId" element={<OutreachShowPage />} />
