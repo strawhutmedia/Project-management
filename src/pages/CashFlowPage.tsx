@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useAuth } from '../auth'
 import { api, type ApiCashflowEntry, type ApiCashflowOverview } from '../api'
 
-// ── money + date helpers ─────────────────────────────────────────────
+// ── money + date helpers ───────────────────────────────────
 const money = (cents: number) => {
   const sign = cents < 0 ? '-' : ''
   return sign + '$' + (Math.abs(cents) / 100).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
@@ -24,7 +24,7 @@ const fmtMonth = (ym: string) => {
 const todayISO = () => new Date().toISOString().slice(0, 10)
 const currentMonth = () => new Date().toISOString().slice(0, 7)
 
-// ── shared UI atoms (Slate design system) ────────────────────────────
+// ── shared UI atoms (Slate design system) ──────────────────────────
 const card = 'rounded-2xl border border-line bg-panel/60'
 const inputCls = 'w-full bg-ink/60 border border-line rounded-xl px-3 py-2 text-text placeholder:text-muted/60 focus:outline-none focus:border-stage-mastering/60'
 const labelCls = 'text-[11px] uppercase tracking-wider font-bold text-muted'
@@ -74,10 +74,11 @@ type EntryDraft = {
   category: string
   counterparty: string
   notes: string
+  isRecurring: boolean
 }
 
 const emptyDraft = (kind: 'in' | 'out' = 'in'): EntryDraft => ({
-  kind, amount: '', occurredOn: todayISO(), category: '', counterparty: '', notes: '',
+  kind, amount: '', occurredOn: todayISO(), category: '', counterparty: '', notes: '', isRecurring: true,
 })
 
 const IN_CATEGORIES = ['Client payment', 'Podbooster', 'Ad revenue', 'Production fee', 'Sponsorship', 'Other income']
@@ -136,7 +137,7 @@ export default function CashFlowPage() {
     setEditingId(e.id)
     setDraft({
       kind: e.kind, amount: centsToInput(e.amountCents), occurredOn: e.occurredOn,
-      category: e.category, counterparty: e.counterparty, notes: e.notes,
+      category: e.category, counterparty: e.counterparty, notes: e.notes, isRecurring: e.isRecurring,
     })
     amountRef.current?.focus()
     window.scrollTo({ top: 0, behavior: 'smooth' })
@@ -154,6 +155,7 @@ export default function CashFlowPage() {
       const body = {
         kind: draft.kind, amountCents, occurredOn: draft.occurredOn,
         category: draft.category.trim(), counterparty: draft.counterparty.trim(), notes: draft.notes.trim(),
+        isRecurring: draft.isRecurring,
       }
       if (editingId) {
         await api.updateCashflowEntry(editingId, body)
@@ -252,6 +254,34 @@ export default function CashFlowPage() {
           tone={thisMonth.netCents >= 0 ? 'good' : 'bad'} />
       </div>
 
+      {/* Baseline vs one-time — the sustainable number vs lumpy project wins */}
+      <div className={`${card} p-4`}>
+        <div className="flex items-center justify-between mb-3">
+          <div className="font-bold text-text">Recurring baseline vs one-time · this month</div>
+          <div className="text-xs text-muted">What you can count on, separate from big one-off jobs</div>
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          <div className="rounded-xl border border-line bg-ink/40 p-3">
+            <div className={labelCls}>Recurring net (baseline)</div>
+            <div className={`text-xl font-bold mt-1 tabular-nums ${overview.currentMonthBaseline.recurringNetCents >= 0 ? 'text-stage-done' : 'text-urgent'}`}>
+              {(overview.currentMonthBaseline.recurringNetCents >= 0 ? '+' : '') + money(overview.currentMonthBaseline.recurringNetCents)}
+            </div>
+            <div className="text-xs text-muted mt-1">
+              {money(overview.currentMonthBaseline.recurringInCents)} in − {money(overview.currentMonthBaseline.recurringOutCents)} out
+            </div>
+          </div>
+          <div className="rounded-xl border border-line bg-ink/40 p-3">
+            <div className={labelCls}>One-time net</div>
+            <div className={`text-xl font-bold mt-1 tabular-nums ${overview.currentMonthBaseline.oneTimeNetCents > 0 ? 'text-stage-done' : overview.currentMonthBaseline.oneTimeNetCents < 0 ? 'text-urgent' : 'text-muted'}`}>
+              {(overview.currentMonthBaseline.oneTimeNetCents > 0 ? '+' : '') + money(overview.currentMonthBaseline.oneTimeNetCents)}
+            </div>
+            <div className="text-xs text-muted mt-1">
+              {money(overview.currentMonthBaseline.oneTimeInCents)} in − {money(overview.currentMonthBaseline.oneTimeOutCents)} out
+            </div>
+          </div>
+        </div>
+      </div>
+
       {/* Quick add / edit */}
       <div className={`${card} p-4 space-y-3`}>
         <div className="flex items-center justify-between">
@@ -307,7 +337,14 @@ export default function CashFlowPage() {
             placeholder="Invoice #, what it was for…"
             onKeyDown={(e) => { if (e.key === 'Enter') void submit() }} />
         </div>
-        <div className="flex justify-end">
+        <div className="flex items-center justify-between flex-wrap gap-2">
+          <label className="flex items-center gap-2 text-sm text-muted cursor-pointer select-none">
+            <input type="checkbox" checked={draft.isRecurring}
+              onChange={(e) => setDraft((d) => ({ ...d, isRecurring: e.target.checked }))}
+              className="rounded border-line accent-stage-mastering" />
+            Recurring monthly {draft.kind === 'in' ? '(a steady client)' : '(a regular cost)'}
+            <span className="text-muted/70">— uncheck for a one-off {draft.kind === 'in' ? 'project payment' : 'purchase'}</span>
+          </label>
           <Btn variant="primary" onClick={() => void submit()} disabled={saving}>
             {saving ? 'Saving…' : editingId ? 'Save changes' : draft.kind === 'in' ? 'Log money in' : 'Log money out'}
           </Btn>
@@ -395,6 +432,11 @@ export default function CashFlowPage() {
                     <span className="font-semibold">{e.counterparty || e.category || (e.kind === 'in' ? 'Income' : 'Expense')}</span>
                     {e.counterparty && e.category && <span className="text-muted"> · {e.category}</span>}
                     {e.notes && <span className="text-muted"> — {e.notes}</span>}
+                    {!e.isRecurring && (
+                      <span className="ml-2 inline-flex items-center rounded-full border border-line bg-line/30 text-muted px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider align-middle">
+                        One-time
+                      </span>
+                    )}
                   </div>
                   <div className="text-xs text-muted">{fmtDate(e.occurredOn)}</div>
                 </div>
