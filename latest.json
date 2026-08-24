@@ -1,9 +1,9 @@
 {
   "version": "0.2.2",
-  "now": "2026-08-24T14:59:40.713Z",
+  "now": "2026-08-24T15:06:38.979Z",
   "boot": {
-    "startedAt": "2026-08-24T14:59:40.114Z",
-    "completedAt": "2026-08-24T14:59:40.700Z",
+    "startedAt": "2026-08-24T15:06:38.210Z",
+    "completedAt": "2026-08-24T15:06:38.966Z",
     "error": null
   },
   "env": {
@@ -136,7 +136,10 @@
       "100_socials_autopilot.sql",
       "101_audience.sql",
       "102_audience_lead_alerts.sql",
-      "103_carousel_decks.sql"
+      "103_carousel_decks.sql",
+      "104_cashflow.sql",
+      "105_cashflow_seed_aug2026.sql",
+      "106_cashflow_recurring_flag.sql"
     ],
     "userCount": 12,
     "projectCount": 16
@@ -144,7 +147,7 @@
   "recentLog": [
     {
       "level": "info",
-      "ts": "2026-08-24T14:59:40.113Z",
+      "ts": "2026-08-24T15:06:38.209Z",
       "msg": "serving client from",
       "data": {
         "clientDir": "/app/dist"
@@ -152,7 +155,7 @@
     },
     {
       "level": "info",
-      "ts": "2026-08-24T14:59:40.114Z",
+      "ts": "2026-08-24T15:06:38.210Z",
       "msg": "boot starting",
       "data": {
         "cwd": "/app",
@@ -163,12 +166,12 @@
     },
     {
       "level": "info",
-      "ts": "2026-08-24T14:59:40.533Z",
+      "ts": "2026-08-24T15:06:38.750Z",
       "msg": "migrations complete"
     },
     {
       "level": "info",
-      "ts": "2026-08-24T14:59:40.671Z",
+      "ts": "2026-08-24T15:06:38.954Z",
       "msg": "wardrobe outfits: applied",
       "data": {
         "projectId": "12f53ed1-c6c7-4c11-8d7b-06d91744c9af",
@@ -179,7 +182,7 @@
     },
     {
       "level": "info",
-      "ts": "2026-08-24T14:59:40.671Z",
+      "ts": "2026-08-24T15:06:38.954Z",
       "msg": "BIYA seed: project already exists, ensured shoot days",
       "data": {
         "projectId": "12f53ed1-c6c7-4c11-8d7b-06d91744c9af"
@@ -187,17 +190,17 @@
     },
     {
       "level": "info",
-      "ts": "2026-08-24T14:59:40.700Z",
+      "ts": "2026-08-24T15:06:38.966Z",
       "msg": "listening on :8080"
     },
     {
       "level": "info",
-      "ts": "2026-08-24T14:59:40.701Z",
+      "ts": "2026-08-24T15:06:38.966Z",
       "msg": "scheduler started (every 5 min)"
     },
     {
       "level": "info",
-      "ts": "2026-08-24T14:59:40.703Z",
+      "ts": "2026-08-24T15:06:38.969Z",
       "msg": "autopilot: loop started",
       "data": {
         "tickMinutes": 10
