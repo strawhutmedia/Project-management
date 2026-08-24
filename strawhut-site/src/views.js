@@ -23,7 +23,7 @@ import {
 } from './seo.js';
 import { resolvePlatformLinks } from './platforms.js';
 import { CONTACT_ROUTES } from './mail.js';
-import { trackingHead, trackingBody, consentBanner } from './tracking.js';
+import { trackingHead, trackingBody, consentBanner, attributionFields } from './tracking.js';
 import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
@@ -1674,6 +1674,7 @@ export function contactPage({ sent = false, error = '', values = {}, canBook = t
            <script>window.shmTrack&&shmTrack('contact_submit',{topic:'${esc(values.topic || 'general')}'});window.fbq&&fbq('track','Lead');</script>`
         : `<form class="contact-form" method="POST" action="/contact">
              ${formFields()}
+             ${attributionFields()}
              ${error ? `<div class="flash err" style="margin-bottom:18px">${esc(error)}</div>` : ''}
              <div class="field"><label>What's this regarding?</label>
                <select name="topic" class="contact-select">

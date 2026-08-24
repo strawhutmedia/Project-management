@@ -29,6 +29,7 @@ import { verifyTurnstile, turnstileConfigured } from './turnstile.js';
 import { ghlConfigured, verifyGhl, upsertContact, ghlLastError,
          resolveBookingCalendar, ghlBookingState, probeGhlToken, ghlProbeState } from './ghl.js';
 import { toText as plainText, endsSentence } from './util.js';
+import { ATTR_KEYS } from './tracking.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PORT = process.env.PORT || 8080;
@@ -874,12 +875,24 @@ app.post('/contact', async (req, res) => {
         console.error('[mail] auto-reply failed:', e.message)
       );
     }
+    // Ad attribution: the contact form carries the first-touch gclid/utm values
+    // (captured on the ad-landing page, stashed in the shm_attr cookie, and
+    // replayed into hidden fields) so we can tell which ad spend produced this
+    // lead. Pulled straight from the posted body; empty/absent when the visitor
+    // arrived organically.
+    const attribution = {};
+    for (const k of ATTR_KEYS) {
+      const val = String((req.body || {})[k] || '').trim();
+      if (val) attribution[k] = val.slice(0, 200);
+    }
+
     // CRM is a second destination, never a gate: fire-and-forget AFTER the
     // email so a GHL outage can't delay or fail a real enquiry.
     upsertContact({
       name, email, company, message,
       tags: ['website', 'website-contact', `topic:${topic}`].concat(suspicious ? ['flagged-possible-spam'] : []),
       source: 'strawhutmedia.com contact form',
+      attribution,
     }).catch((e) => console.error('[ghl] contact push failed:', e.message));
     res.send(V.contactPage({ sent: true, canBook: canBook() }));
   } catch (e) {
