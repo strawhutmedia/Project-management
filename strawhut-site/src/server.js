@@ -29,6 +29,7 @@ import { verifyTurnstile, turnstileConfigured } from './turnstile.js';
 import { ghlConfigured, verifyGhl, upsertContact, ghlLastError,
          resolveBookingCalendar, ghlBookingState, probeGhlToken, ghlProbeState } from './ghl.js';
 import { toText as plainText, endsSentence } from './util.js';
+import { handleLeadHook } from './leadHook.js';
 import { ATTR_KEYS } from './tracking.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -44,6 +45,7 @@ const app = express();
 // spoofed by an extra X-Forwarded-For entry) — the form rate limit buckets on it.
 app.set('trust proxy', 1);
 app.use(express.urlencoded({ extended: true }));
+app.use(express.json({ limit: '1mb' })); // for POST /hooks/leads (Gmail sync)
 app.use(cookieParser());
 // Pages carried NO Cache-Control at all, only an ETag. Browsers — Safari
 // especially — then apply heuristic caching and can serve a stale page for
@@ -837,6 +839,10 @@ app.get('/pricing', (req, res) => res.send(V.pricingPage()));
 
 const canBook = () => Boolean(ghlBookingState().url);
 app.get('/contact', (req, res) => res.send(V.contactPage({ canBook: canBook() })));
+// Inbound lead capture: the Gmail Apps Script POSTs Outbound Labs / Appointlet
+// booking emails here (token-protected); we parse + upsert them into GHL.
+app.post('/hooks/leads', handleLeadHook);
+
 app.post('/contact', async (req, res) => {
   const { name = '', email = '', company = '', message = '', topic = 'general' } = req.body || {};
   const values = { name, email, company, message, topic };
