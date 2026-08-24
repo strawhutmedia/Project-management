@@ -27,6 +27,19 @@ async function sendOne({ to, subject, html }) {
   return res.json();
 }
 
+/** Generic internal email to the owner/team (prep briefings, follow-up drafts).
+ *  Never throws — a failed send must not crash a background job. */
+export async function sendOwnerEmail({ to, subject, html }) {
+  if (!mailConfigured() || !to) return { ok: false, skipped: true };
+  try {
+    await sendOne({ to, subject, html });
+    return { ok: true };
+  } catch (e) {
+    console.error('[mail] owner email failed:', e.message);
+    return { ok: false, error: e.message };
+  }
+}
+
 // Contact-form routing: each topic goes to the right inbox. Order = the order
 // shown in the dropdown; the first entry is the default.
 export const CONTACT_ROUTES = {

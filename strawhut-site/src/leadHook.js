@@ -16,6 +16,7 @@
 //     AI-SDR engagement summary, attached as prep context.
 
 import { upsertContact, ghlConfigured } from './ghl.js';
+import { recordBooking } from './leadOps.js';
 
 const clean = (s) => String(s || '').replace(/ /g, ' ').replace(/[ \t]+/g, ' ').trim();
 const firstEmail = (text) => {
@@ -77,7 +78,7 @@ function parseAppointlet(subject, body) {
     qual === 'unqualified-under-1k' && 'FLAG: under $1k/mo — not qualified per Ryan\'s rule.',
     qual === 'needs-qualification' && 'Spend not detected — verify before the call.',
   ].filter(Boolean).join('\n');
-  return { name, email, company, tags, source: 'Outbound Labs (Appointlet)', message };
+  return { name, email, company, tags, source: 'Outbound Labs (Appointlet)', message, spend, status, goals, qual, callAtText: when };
 }
 
 function parseOutboundLabs(subject, body) {
@@ -95,7 +96,7 @@ function parseOutboundLabs(subject, body) {
     summary && `Engagement summary: ${summary}`,
     'Verify marketing spend + goals from the Appointlet questionnaire to qualify.',
   ].filter(Boolean).join('\n');
-  return { name, email, company, tags, source: 'Outbound Labs', message };
+  return { name, email, company, tags, source: 'Outbound Labs', message, summary, qual: 'needs-qualification' };
 }
 
 // Returns the parsed lead, or null if this email isn't a booking we handle.
@@ -108,7 +109,8 @@ export function parseLeadEmail({ from = '', subject = '', body = '' } = {}) {
 }
 
 // Express handler for POST /hooks/leads?token=… (also accepts X-Lead-Token header).
-export async function handleLeadHook(req, res) {
+// `store` is passed from server.js so the booking can be recorded for prep/follow-up.
+export async function handleLeadHook(req, res, store = null) {
   const expected = (process.env.LEAD_HOOK_TOKEN || '').trim();
   if (!expected) return res.status(503).json({ ok: false, error: 'lead hook disabled (no LEAD_HOOK_TOKEN)' });
   const got = String(req.query.token || req.get('x-lead-token') || '').trim();
@@ -118,6 +120,11 @@ export async function handleLeadHook(req, res) {
   const lead = parseLeadEmail({ from, subject, body });
   if (!lead || !lead.email) {
     return res.json({ ok: true, skipped: true, reason: 'not a recognized booking email' });
+  }
+  // Record the booking for pre-call prep + follow-up (best-effort; never blocks
+  // the CRM write). Only Appointlet emails carry a call time.
+  if (store) {
+    try { await recordBooking(store, lead); } catch (e) { console.error('[leadhook] recordBooking failed:', e.message); }
   }
   if (!ghlConfigured()) {
     return res.json({ ok: true, parsed: { email: lead.email, name: lead.name, tags: lead.tags }, note: 'GHL not configured — parsed only' });

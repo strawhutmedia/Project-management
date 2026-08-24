@@ -30,6 +30,7 @@ import { ghlConfigured, verifyGhl, upsertContact, ghlLastError,
          resolveBookingCalendar, ghlBookingState, probeGhlToken, ghlProbeState } from './ghl.js';
 import { toText as plainText, endsSentence } from './util.js';
 import { handleLeadHook } from './leadHook.js';
+import { startLeadOps } from './leadOps.js';
 import { ATTR_KEYS } from './tracking.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -841,7 +842,7 @@ const canBook = () => Boolean(ghlBookingState().url);
 app.get('/contact', (req, res) => res.send(V.contactPage({ canBook: canBook() })));
 // Inbound lead capture: the Gmail Apps Script POSTs Outbound Labs / Appointlet
 // booking emails here (token-protected); we parse + upsert them into GHL.
-app.post('/hooks/leads', handleLeadHook);
+app.post('/hooks/leads', (req, res) => handleLeadHook(req, res, store));
 
 app.post('/contact', async (req, res) => {
   const { name = '', email = '', company = '', message = '', topic = 'general' } = req.body || {};
@@ -1436,6 +1437,10 @@ app.listen(PORT, async () => {
   // Backfill unique, AI-written SEO meta descriptions for shows that don't have
   // one yet. Runs once per boot in the background, paced to be gentle on the
   // API; no-ops entirely if ANTHROPIC_API_KEY isn't set. Set SHOW_SEO=off to skip.
+  // Pre-call prep + follow-up drafts, driven off booked calls (server-side, so
+  // it runs without any chat session). Inert unless RESEND + ANTHROPIC keys set.
+  startLeadOps(store);
+
   backfillShowTaglines()
     .then(() => backfillShowSeo())
     .then(() => backfillShowBlurbs())
