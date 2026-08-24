@@ -2,6 +2,7 @@ import { Router, type Request } from 'express'
 import { pool } from '../db'
 import { requireOwnerOrService, type SessionUser } from '../auth'
 import { logError } from '../diag'
+import { runCashflowPaymentCheckNow } from '../cashflow_payment_check'
 
 // Cash flow tracker — Ryan's owner-only money log. He records every incoming
 // and outgoing amount; the app keeps a running balance plus a month-by-month
@@ -277,5 +278,19 @@ cashflowRouter.patch('/settings', async (req, res) => {
   } catch (err) {
     logError('cashflow_settings_failed', { err: String(err) })
     res.status(500).json({ error: 'settings_failed' })
+  }
+})
+
+// ── QuickBooks payment check (manual re-run) ──────────────────────────
+// The real check runs automatically once a month (server/cashflow_payment_check.ts).
+// This lets Ryan (or Claude) trigger an on-demand recheck any time — Railway
+// timeout-safe since it's a handful of QuickBooks API calls, not a long job.
+cashflowRouter.post('/payment-check/run', async (_req, res) => {
+  try {
+    const result = await runCashflowPaymentCheckNow()
+    res.json({ ok: true, ...result })
+  } catch (err) {
+    logError('cashflow_payment_check_manual_failed', { err: String(err) })
+    res.status(500).json({ error: 'payment_check_failed' })
   }
 })
