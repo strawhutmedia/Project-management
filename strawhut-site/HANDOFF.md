@@ -1,12 +1,14 @@
 # Straw Hut site — open work, handed off 2026-08-23
 
-Read this at the start of a session that is picking up the subdomain redirects
-or the GoHighLevel token. Delete the file once both are done.
+JOB 1 (subdomain redirects) and JOB 2 (GoHighLevel token) are both DONE as of
+2026-08-23 — see their sections. Only JOB 3 (ad attribution onto the GHL
+contact) is left, and it is now UNBLOCKED. Delete this file once JOB 3 ships.
 
-**Needs from Ryan:** the **Railway** connector enabled for the session, and his
-**GoDaddy API key + secret** pasted in when you ask (GoDaddy → Developer Portal
-→ API Keys → the Production key). The previous session had the GoDaddy key but
-containers are ephemeral, so it does not carry over. Ask for it; don't guess.
+**Needs from Ryan (only if reopening JOB 1/JOB 2):** the **Railway** connector
+enabled for the session; his **GoDaddy API key + secret** for DNS work
+(GoDaddy → Developer Portal → API Keys → Production); and, for GHL, a
+**sub-account Private Integration token** (see JOB 2). Containers are
+ephemeral, so none of these carry over between sessions — ask; don't guess.
 
 ---
 
@@ -31,7 +33,52 @@ Last commit at handoff: `f28c3d4`.
 
 ---
 
-## JOB 1 — Retire two subdomains onto the main site (the blocked one)
+## JOB 1 — Retire two subdomains onto the main site — ✅ DONE 2026-08-23, NOT the way planned below
+
+**Shipped via GoDaddy domain forwarding, not Railway custom domains.** Ryan
+explicitly rejected putting these hostnames on Railway (and the Hobby plan's
+2-custom-domains-per-service limit blocked the third domain anyway). What is
+live now:
+
+- GoDaddy 301 forwards (v2 API, `PERMANENT_REDIRECT`, no masking):
+  - `start.strawhutmedia.com` → `https://www.strawhutmedia.com/podcast-production`
+  - `services.strawhutmedia.com` → `https://www.strawhutmedia.com/services`
+- Both subdomains' A records now point at GoDaddy's forwarding IPs
+  `15.197.225.128` + `3.33.251.168` (same pair as the pre-existing `invest.`
+  and `join.` forwards). The old `72.167.33.245` records are gone.
+- `www`, `slate`, apex, MX and TXT records untouched and verified.
+- GoDaddy provisions the HTTPS cert for a newly forwarded hostname ~20-60 min
+  after DNS flips (if it stalls, delete + recreate the forward once DNS has
+  fully propagated — that re-triggered issuance for `start`). Both verified
+  serving the 301 over https and http.
+- One known limitation vs. the Railway plan: GoDaddy forwarding only redirects
+  the root URL. Deep paths (`start.strawhutmedia.com/anything`) return 404
+  instead of redirecting. Accepted trade-off for retired subdomains.
+
+**Corrections to the notes below (they cost this session real time):**
+
+1. **The forwarding API is NOT dead.** The previous session only tried
+   `/v1/domains/{domain}/forwards`-style paths. The real API is
+   `GET/POST/PUT/DELETE https://api.godaddy.com/v2/customers/{customerId}/domains/forwards/{fqdn}`
+   with body `{"type":"REDIRECT_PERMANENT","url":"..."}`. The `customerId` is
+   a UUID, resolved via
+   `GET /v1/shoppers/{shopperNumber}?includes=customerId` — Ryan's shopper /
+   customer number is `14621307` (it's in old GoDaddy renewal emails, not a
+   secret). `/v1/shoppers/me` does not work; you need the number.
+2. **Leftover to clean up someday (optional):** a `start.strawhutmedia.com`
+   custom-domain entry was briefly added to the STRAW HUT SITE Railway service
+   before Ryan vetoed the Railway approach. The connector cannot delete custom
+   domains, so it is still registered there — inert (no DNS points at it, no
+   cost), removable in the Railway dashboard under the service's Networking
+   settings. There may also be a stale "staged change" in that environment;
+   discard it.
+3. The `LEGACY_SUBDOMAINS` middleware in `src/server.js` is now permanently
+   inert (the subdomains never reach the app). Harmless; leave it as a
+   belt-and-suspenders fallback.
+
+The original plan, kept for context:
+
+### ~~JOB 1 original plan (superseded)~~
 
 Two old GoDaddy-hosted pages are still live on the domain and competing with
 the new site:
@@ -95,7 +142,38 @@ change.
 
 ---
 
-## JOB 2 — The GHL token is the wrong kind, and it's breaking lead capture
+## JOB 2 — GHL token was the wrong kind — ✅ DONE 2026-08-23
+
+Ryan created a new **sub-account Private Integration token** (prefix `pit-…`)
+from inside the Straw Hut Media location, with contacts (view+edit) and
+calendars (view) scopes. It replaced `GHL_API_TOKEN` on the Railway STRAW HUT
+SITE service (set via the Railway connector; auto-redeploy). Verified live:
+
+- `/healthz` flipped from `LIMITED … contacts refused` to **`ok (Straw Hut
+  Media)`**; probe now reads `contacts=ok`, `users=ok` (the old
+  `Token's user type mismatch!` tell is gone), and `booking.source` is
+  **`ghl (confirmed)` v=2021-04-15** — so calendar discovery works now too,
+  not just the committed floor.
+- Full write path proven by direct API (not via the live form, so no email to
+  Ryan): upsert a `CLAUDE TEST — IGNORE` contact → attach a note → read back →
+  **delete** → confirm gone. Nothing left in the CRM.
+
+Useful facts discovered while doing this, for whoever touches GHL next:
+
+- The location id is **`TrsMh89uPvyZdZ6ZrIyy`** (this is the value of
+  `GHL_LOCATION_ID`). A sub-account PIT can't list `/locations/`, but you can
+  read it back off any calendar object: `GET /calendars/{KNOWN_CALENDAR_ID}`
+  (Version `2021-04-15`) returns `locationId`.
+- Quick token-type test WITHOUT the location id: `GET /contacts/?limit=1` with
+  no `locationId`. A good sub-account token → `422 locationId is required`. The
+  bad agency token → `401 … not authorized for this scope`, and `GET /users/`
+  → `Token's user type mismatch!`.
+- There is **no GHL connector** in the Claude session and **no API** to mint a
+  Private Integration — it is a human action in the GHL dashboard. The token
+  must come from Ryan.
+
+### ~~JOB 2 original diagnosis (kept for context)~~
+### The GHL token is the wrong kind, and it's breaking lead capture
 
 `GHL_API_TOKEN` on the Railway service is an **agency/company-level** Private
 Integration. It reads `GET /locations/{id}` fine and is refused on every
