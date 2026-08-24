@@ -31,14 +31,14 @@ function isValidDate(s: string): boolean {
 type EntryRow = {
   id: string; kind: 'in' | 'out'; amount_cents: string | number
   occurred_on: string | Date; category: string; counterparty: string
-  notes: string; created_at: string; updated_at: string
+  notes: string; is_recurring: boolean; created_at: string; updated_at: string
 }
 
 function mapEntry(r: EntryRow) {
   return {
     id: r.id, kind: r.kind, amountCents: Number(r.amount_cents),
     occurredOn: toDateStr(r.occurred_on), category: r.category,
-    counterparty: r.counterparty, notes: r.notes,
+    counterparty: r.counterparty, notes: r.notes, isRecurring: r.is_recurring,
     createdAt: r.created_at, updatedAt: r.updated_at,
   }
 }
@@ -46,7 +46,7 @@ function mapEntry(r: EntryRow) {
 // Validate + normalize an entry payload. Returns null with an error string
 // when the payload can't make a sane entry.
 function parseEntryBody(body: Record<string, unknown>, partial: boolean) {
-  const out: { kind?: 'in' | 'out'; amountCents?: number; occurredOn?: string; category?: string; counterparty?: string; notes?: string } = {}
+  const out: { kind?: 'in' | 'out'; amountCents?: number; occurredOn?: string; category?: string; counterparty?: string; notes?: string; isRecurring?: boolean } = {}
   if (!partial || body.kind !== undefined) {
     const kind = String(body.kind ?? '')
     if (kind !== 'in' && kind !== 'out') return { error: 'kind must be "in" or "out"' }
@@ -65,6 +65,12 @@ function parseEntryBody(body: Record<string, unknown>, partial: boolean) {
   if (!partial || body.category !== undefined) out.category = String(body.category ?? '').slice(0, 120)
   if (!partial || body.counterparty !== undefined) out.counterparty = String(body.counterparty ?? '').slice(0, 200)
   if (!partial || body.notes !== undefined) out.notes = String(body.notes ?? '').slice(0, 2000)
+  // Recurring monthly item (payroll, a retainer client, a subscription) vs a
+  // one-off/lumpy amount (a single project payment, a one-time purchase).
+  // Defaults to true on create — most logged entries are the steady baseline;
+  // a one-time item is the exception and gets flagged false explicitly.
+  if (!partial) out.isRecurring = body.isRecurring === false ? false : true
+  else if (body.isRecurring !== undefined) out.isRecurring = body.isRecurring !== false
   return { value: out }
 }
 
@@ -121,6 +127,22 @@ cashflowRouter.get('/overview', async (_req, res) => {
        GROUP BY 1, 2 ORDER BY total_cents DESC`,
     )
 
+    // Recurring (steady monthly baseline) vs one-time (lumpy/project) split
+    // for the current month — so a single big win doesn't make the month
+    // look more sustainable than it is.
+    const baseline = await pool.query(
+      `SELECT kind, is_recurring, COALESCE(SUM(amount_cents), 0) AS total_cents
+       FROM cashflow_entries
+       WHERE to_char(occurred_on, 'YYYY-MM') = to_char(CURRENT_DATE, 'YYYY-MM')
+       GROUP BY 1, 2`,
+    )
+    const pick = (kind: 'in' | 'out', recurring: boolean) =>
+      Number(baseline.rows.find((r) => r.kind === kind && r.is_recurring === recurring)?.total_cents ?? 0)
+    const recurringInCents = pick('in', true)
+    const recurringOutCents = pick('out', true)
+    const oneTimeInCents = pick('in', false)
+    const oneTimeOutCents = pick('out', false)
+
     res.json({
       settings,
       currentBalanceCents,
@@ -133,6 +155,12 @@ cashflowRouter.get('/overview', async (_req, res) => {
         category: r.category as string,
         totalCents: Number(r.total_cents),
       })),
+      currentMonthBaseline: {
+        recurringInCents, recurringOutCents,
+        recurringNetCents: recurringInCents - recurringOutCents,
+        oneTimeInCents, oneTimeOutCents,
+        oneTimeNetCents: oneTimeInCents - oneTimeOutCents,
+      },
     })
   } catch (err) {
     logError('cashflow_overview_failed', { err: String(err) })
@@ -153,7 +181,7 @@ cashflowRouter.get('/entries', async (req, res) => {
     }
     params.push(limit)
     const { rows } = await pool.query(
-      `SELECT id, kind, amount_cents, occurred_on, category, counterparty, notes, created_at, updated_at
+      `SELECT id, kind, amount_cents, occurred_on, category, counterparty, notes, is_recurring, created_at, updated_at
        FROM cashflow_entries ${where}
        ORDER BY occurred_on DESC, created_at DESC
        LIMIT $${params.length}`,
@@ -173,10 +201,10 @@ cashflowRouter.post('/entries', async (req, res) => {
     const e = parsed.value!
     const user = (req as Request & { user: SessionUser }).user
     const { rows } = await pool.query(
-      `INSERT INTO cashflow_entries (kind, amount_cents, occurred_on, category, counterparty, notes, created_by)
-       VALUES ($1, $2, $3, $4, $5, $6, $7)
-       RETURNING id, kind, amount_cents, occurred_on, category, counterparty, notes, created_at, updated_at`,
-      [e.kind, e.amountCents, e.occurredOn, e.category ?? '', e.counterparty ?? '', e.notes ?? '', user.id],
+      `INSERT INTO cashflow_entries (kind, amount_cents, occurred_on, category, counterparty, notes, is_recurring, created_by)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+       RETURNING id, kind, amount_cents, occurred_on, category, counterparty, notes, is_recurring, created_at, updated_at`,
+      [e.kind, e.amountCents, e.occurredOn, e.category ?? '', e.counterparty ?? '', e.notes ?? '', e.isRecurring ?? true, user.id],
     )
     res.json({ entry: mapEntry(rows[0]) })
   } catch (err) {
@@ -199,12 +227,13 @@ cashflowRouter.patch('/entries/:id', async (req, res) => {
     if (e.category !== undefined) push('category', e.category)
     if (e.counterparty !== undefined) push('counterparty', e.counterparty)
     if (e.notes !== undefined) push('notes', e.notes)
+    if (e.isRecurring !== undefined) push('is_recurring', e.isRecurring)
     if (!sets.length) { res.status(400).json({ error: 'invalid_entry', detail: 'nothing to update' }); return }
     params.push(req.params.id)
     const { rows } = await pool.query(
       `UPDATE cashflow_entries SET ${sets.join(', ')}, updated_at = now()
        WHERE id = $${params.length}
-       RETURNING id, kind, amount_cents, occurred_on, category, counterparty, notes, created_at, updated_at`,
+       RETURNING id, kind, amount_cents, occurred_on, category, counterparty, notes, is_recurring, created_at, updated_at`,
       params,
     )
     if (!rows[0]) { res.status(404).json({ error: 'not_found' }); return }
