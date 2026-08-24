@@ -391,7 +391,7 @@ function footerBlock() {
       </div>
       <div class="footer-col">
         <div class="footer-h">Get started</div>
-        <a href="/book">Book a 15-min fit call</a>
+        <a href="/book">Book a 15-min call</a>
         <a href="/pricing">Packages &amp; pricing</a>
       </div>
     </div>
@@ -576,7 +576,7 @@ export function beforeAfterSection() {
         <div class="ba-after-card">
           <div class="ba-col-head"><span class="ba-tag ba-tag-on">After Straw Hut</span></div>
           <ul class="ba-list"><span class="ba-line" aria-hidden="true"></span>${afterItems}</ul>
-          <a class="btn btn-primary ba-cta" href="/book">Book a 15-min fit call →</a>
+          <a class="btn btn-primary ba-cta" href="/book">Book a 15-min call →</a>
         </div>
       </div>
     </div>
@@ -726,7 +726,7 @@ export function homePage({ shows }) {
       </div>
       <div class="impact-cta">
         <a class="btn btn-primary" href="/podcast-production">Start your podcast →</a>
-        <a class="btn btn-ghost" href="/book">Book a 15-min fit call</a>
+        <a class="btn btn-ghost" href="/book">Book a 15-min call</a>
       </div>
     </div>
   </div></section>
@@ -890,7 +890,7 @@ export function resourcesIndexPage({ posts }) {
     <div class="cta-band" style="margin-top:34px">
       <h2>Ready to make your podcast?</h2>
       <p>We take shows from first idea to chart-topping — production, distribution, and growth under one roof.</p>
-      <a class="btn btn-primary" href="/book">Book a 15-min fit call →</a>
+      <a class="btn btn-primary" href="/book">Book a 15-min call →</a>
     </div>
   </div></section>`;
   return layout({
@@ -935,7 +935,7 @@ export function resourcePostPage({ post, related = [] }) {
       <div class="cta-band">
         <h2>Want this done for you?</h2>
         <p>Straw Hut Media is a full-service podcast production company and network. Book a quick call and we'll map out exactly what your show takes.</p>
-        <a class="btn btn-primary" href="/book">Book a 15-min fit call →</a>
+        <a class="btn btn-primary" href="/book">Book a 15-min call →</a>
       </div>
     </div>
   </article>
@@ -1153,7 +1153,7 @@ export function aboutPage() {
     <h1>Think outside the <span class="accent">pod</span>.</h1>
     <p>We're Straw Hut Media — an award-winning podcast production company and network, founded in Hollywood in 2017 and making podcasts since 2018.</p>
     <p>Anyone can hit record. Turning that into a show people won't stop listening to is the part we've spent years getting very good at.</p>
-    <div style="margin-top:22px"><a class="btn btn-primary" href="/book">Book a 15-min fit call</a> <a class="btn btn-ghost" href="/shows" style="margin-left:8px">Hear our shows</a></div>
+    <div style="margin-top:22px"><a class="btn btn-primary" href="/book">Book a 15-min call</a> <a class="btn btn-ghost" href="/shows" style="margin-left:8px">Hear our shows</a></div>
   </div></section>
 
   <section class="section clients-band" id="clients"><div class="container">
@@ -1166,7 +1166,7 @@ export function aboutPage() {
   <section class="section"><div class="container"><div class="cta-band">
     <h2>Let's make something people love</h2>
     <p>From first idea to chart-topping show — production, distribution, and growth under one roof.</p>
-    <a class="btn btn-primary" href="/book">Book a 15-min fit call →</a>
+    <a class="btn btn-primary" href="/book">Book a 15-min call →</a>
   </div></div></section>`;
   const personLd = TEAM.map((m) =>
     `<script type="application/ld+json">${JSON.stringify({
@@ -1195,7 +1195,7 @@ export function aboutPage() {
   });
 }
 
-// --- Book a call (GoHighLevel-backed 15-min fit call) -----------------------
+// --- Book a call (GoHighLevel-backed 15-min call) -----------------------
 
 export function bookPage({ widgetUrl = '' } = {}) {
   // Scheduling lives in GoHighLevel so every booking is a CRM event that can
@@ -1333,7 +1333,7 @@ export function servicesHubPage() {
     <h1>Everything a podcast needs, <span class="accent">under one roof</span></h1>
     <p>Straw Hut Media is a full-service podcast production company and network based in Hollywood. We build shows from the idea up, distribute them, sell the ads that pay for them, and rent the studio they are recorded in — and you can use any one piece of that on its own.</p>
     <div style="margin-top:22px">
-      <a class="btn btn-primary" href="/book">Book a 15-min fit call →</a>
+      <a class="btn btn-primary" href="/book">Book a 15-min call →</a>
       <a class="btn btn-ghost" href="/pricing" style="margin-left:8px">See packages &amp; pricing</a>
     </div>
   </div></section>
@@ -1366,7 +1366,7 @@ export function servicesHubPage() {
   <section class="section"><div class="container"><div class="cta-band">
     <h2>Not sure which piece you need?</h2>
     <p>That is exactly what the call is for. Fifteen minutes, an honest answer, no obligation.</p>
-    <a class="btn btn-primary" href="/book">Book a 15-min fit call →</a>
+    <a class="btn btn-primary" href="/book">Book a 15-min call →</a>
   </div></div></section>`;
 
   const itemList = `<script type="application/ld+json">${JSON.stringify({

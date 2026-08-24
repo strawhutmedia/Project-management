@@ -445,7 +445,7 @@ ${svc}
 ${servicePages}
 ## How to work with Straw Hut Media
 
-- Book a free 15-minute fit call: ${BASE}/book
+- Book a free 15-minute call: ${BASE}/book
 - See packages or build a custom quote: ${BASE}/pricing
 - Start, produce, or grow a podcast: contact Straw Hut Media at ${BASE}/contact
 - Advertise on our shows: ${BASE}/contact (choose "Get booked"/advertising)
@@ -463,7 +463,7 @@ ${showList}
 
 - [Home](${BASE}/)
 - [About](${BASE}/about)
-- [Book a 15-min fit call](${BASE}/book)
+- [Book a 15-min call](${BASE}/book)
 - [All shows](${BASE}/shows)
 - [Studio booking](${BASE}/studio)
 - [Guides & resources](${BASE}/resources)
