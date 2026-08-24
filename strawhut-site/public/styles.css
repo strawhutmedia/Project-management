@@ -407,12 +407,23 @@ main { overflow-x: clip; }
 }
 .ba-check { background: rgba(0,204,142,0.2); color: var(--accent); }
 .ba-cta { margin-top: 22px; }
-/* Phones: stack, drop the pin, no forced heights, no overflow. */
+/* Phones: KEEP the two-column sticky pin (that's the whole effect Ryan loves),
+   just tuned compact so two cards fit a narrow screen. The "After" card still
+   pins while the taller "Before" column scrolls past it. */
 @media (max-width: 760px) {
-  .ba-grid { grid-template-columns: 1fr; gap: 18px; }
-  .ba-after-card { position: static; top: auto; }
-  .ba-before .ba-list li { min-height: 0; }
-  .ba-list li { padding: 16px; font-size: 1rem; }
+  .ba-grid { grid-template-columns: 1fr 1fr; gap: 10px; }
+  .ba-col-head { margin-bottom: 12px; }
+  .ba-tag { padding: 6px 11px; font-size: 0.66rem; letter-spacing: 0.02em; }
+  .ba-after-card { top: 74px; padding: 14px 12px 16px; border-radius: 16px; }
+  .ba-list { gap: 9px; }
+  .ba-list li {
+    align-items: flex-start; gap: 9px; padding: 12px 11px;
+    font-size: 0.82rem; line-height: 1.32; border-radius: 12px; min-width: 0;
+  }
+  .ba-mark { width: 22px; height: 22px; font-size: 0.72rem; }
+  /* Keep the Before column tall so the pinned After card has room to travel. */
+  .ba-before .ba-list li { min-height: 118px; }
+  .ba-cta { margin-top: 14px; width: 100%; text-align: center; padding: 12px 10px; font-size: 0.82rem; }
 }
 
 /* Service page — hero cover-art collage */

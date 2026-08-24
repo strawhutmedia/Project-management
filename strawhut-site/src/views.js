@@ -545,7 +545,9 @@ const BEFORE_AFTER = {
   before: [
     "Recording in a closet, praying the audio's usable",
     'Editing all weekend instead of running your business',
+    'Guessing at what your audience actually wants',
     'Episodes that drop whenever you finally get to them',
+    'No clue whether any of it is actually working',
     'A show nobody can find',
   ],
   after: [
