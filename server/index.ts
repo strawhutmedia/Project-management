@@ -246,6 +246,9 @@ async function start() {
     void import('./socials_autopilot').then(({ startSocialsAutopilotLoop }) => {
       startSocialsAutopilotLoop()
     })
+    void import('./cashflow_payment_check').then(({ startCashflowPaymentCheckLoop }) => {
+      startCashflowPaymentCheckLoop()
+    })
     void enableDomainOpenTracking()
     // Pick up any breakdown runs that were killed by the previous
     // shutdown (deploy / crash). Producers don't have to click
