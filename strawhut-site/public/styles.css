@@ -421,8 +421,12 @@ main { overflow-x: clip; }
     font-size: 0.82rem; line-height: 1.32; border-radius: 12px; min-width: 0;
   }
   .ba-mark { width: 22px; height: 22px; font-size: 0.72rem; }
-  /* Keep the Before column tall so the pinned After card has room to travel. */
-  .ba-before .ba-list li { min-height: 118px; }
+  /* The pin is only visible for as far as the After card can travel inside its
+     cell (cell height − card height). Keep the Before column much taller than
+     the After card so the card stays locked for most of a screen as you scroll
+     — that long hold is the whole Manychat effect. Centre the text so the tall
+     cards read as deliberate, not padded-out. */
+  .ba-before .ba-list li { min-height: 172px; align-items: center; }
   .ba-cta { margin-top: 14px; width: 100%; text-align: center; padding: 12px 10px; font-size: 0.82rem; }
 }
 
