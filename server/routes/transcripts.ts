@@ -216,6 +216,25 @@ async function runPostTranscriptAutopipeline(args: {
     })
   }
 
+  // Carousel deck — the per-episode Soul&Science-style deck, saved so
+  // the team can review / edit / export (IG ZIP or LinkedIn PDF) from
+  // the episode page. Fire-and-forget like the others.
+  try {
+    const { generateAndSaveCarouselDeck } = await import('./carousel')
+    void generateAndSaveCarouselDeck({
+      songId: args.songId,
+      createdBy: args.createdBy,
+    }).catch((err) => {
+      logError('autopipeline: carousel deck failed', {
+        songId: args.songId, error: err instanceof Error ? err.message : String(err),
+      })
+    })
+  } catch (err) {
+    logError('autopipeline: carousel trigger failed', {
+      songId: args.songId, error: err instanceof Error ? err.message : String(err),
+    })
+  }
+
   // Clip job — Slate's ffmpeg cutter (Claude picks moments, ffmpeg cuts
   // vertical captioned clips). The transcript is done by this point, so
   // clip selection has what it needs.

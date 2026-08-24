@@ -14,6 +14,7 @@ import PodcastRssConfig from '../components/PodcastRssConfig'
 import BrandProfileCard from '../components/BrandProfileCard'
 import BrandAssetsCard from '../components/BrandAssetsCard'
 import SocialStrategySection from '../components/SocialStrategySection'
+import AudienceSection from '../components/AudienceSection'
 import ShowBriefCard from '../components/ShowBriefCard'
 import ShowChatCard from '../components/ShowChatCard'
 import ScriptOverviewCard from '../components/ScriptOverviewCard'
@@ -264,6 +265,7 @@ export default function ProjectPage() {
       {isAdmin && project.kind === 'podcast' && <PodcastRssConfig project={project} onSaved={reload} />}
       {isAdmin && project.kind === 'podcast' && <BrandAssetsCard project={project} onSaved={reload} />}
       {isAdmin && project.kind === 'podcast' && <BrandProfileCard project={project} members={members} onSaved={reload} />}
+      {isAdmin && project.kind === 'podcast' && <AudienceSection projectId={project.id} canWrite={isAdmin} />}
       {isAdmin && project.kind === 'podcast' && <ShowBriefCard projectId={project.id} canWrite={isAdmin} />}
       {isAdmin && project.kind === 'podcast' && <SocialStrategySection projectId={project.id} canWrite={isAdmin} />}
       {isAdmin && project.kind === 'podcast' && <PodcastSocialsConfig project={project} members={members} onSaved={reload} />}
