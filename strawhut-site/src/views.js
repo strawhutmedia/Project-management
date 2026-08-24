@@ -552,7 +552,7 @@ const BEFORE_AFTER = {
   ],
   after: [
     'Show up, talk, walk out — we handle the rest',
-    'Professionally captured video and audio, publish-ready',
+    'Recorded, edited, and polished — publish-ready',
     'Episodes ship on schedule, every time',
     'Distributed, promoted, actually growing',
   ],
