@@ -919,7 +919,11 @@ export function resourcePostPage({ post, related = [] }) {
 
 // --- Per-service landing pages ---------------------------------------------
 
-const STUDIO_SHOTS = ['CA6A0788', 'CA6A0790', 'CA6A0794', 'CA6A0798', 'CA6A0800', 'CA6A0803'].map(
+// Sales-page studio strip — warm, inviting room shots only. The ceiling
+// lighting-rig shot (CA6A0800) reads as a hardware close-up, fine on /studio
+// but off-brand on a service landing page, so it's swapped for the cozy
+// lounge (CA6A0799).
+const STUDIO_SHOTS = ['CA6A0788', 'CA6A0790', 'CA6A0794', 'CA6A0798', 'CA6A0799', 'CA6A0803'].map(
   (n) => `/public/studio/${n}.jpg`
 );
 

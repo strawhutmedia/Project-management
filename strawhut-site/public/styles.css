@@ -1036,13 +1036,20 @@ table.admin-table { width: 100%; border-collapse: collapse; }
 .ph-chrome { display: flex; align-items: center; justify-content: space-between; color: var(--muted); font-size: 0.62rem; padding: 0 2px 2px; }
 .ph-chev { font-size: 0.9rem; line-height: 1; }
 .ph-slides { position: relative; }
-/* Each slide stacks in the same cell so the phone never changes height. */
-.ph-slide { grid-area: 1 / 1; display: flex; flex-direction: column; opacity: 0; transition: opacity 0.6s; }
-.ph-slides { display: grid; }
+/* Each slide stacks in the same cell so the phone never changes height.
+   grid-template-columns: minmax(0,1fr) + min-width:0 keep the stacking column
+   from expanding to fit the nowrap show-title label — without them that label
+   blew the column (and the cover art) past the phone frame, clipping the art
+   on the right. */
+.ph-slide { grid-area: 1 / 1; min-width: 0; display: flex; flex-direction: column; opacity: 0; transition: opacity 0.6s; }
+.ph-slides { display: grid; grid-template-columns: minmax(0, 1fr); }
 .ph-slide.active { opacity: 1; }
 .ph-show { color: var(--muted); font-size: 0.5rem; text-transform: uppercase; letter-spacing: 0.08em;
   text-align: center; margin-bottom: 7px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
-.ph-slide img { width: 100%; aspect-ratio: 1/1; object-fit: cover; border-radius: 8px; }
+/* Never crop cover art. Square covers fill the frame; the few landscape
+   covers letterbox cleanly against the phone's screen colour instead of
+   having their sides sliced off. */
+.ph-slide img { width: 100%; aspect-ratio: 1/1; object-fit: contain; background: #0b0e17; border-radius: 8px; }
 .ph-title { color: #fff; font-size: 0.62rem; font-weight: 700; margin-top: 9px; line-height: 1.2;
   display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 .ph-sub { color: var(--muted); font-size: 0.53rem; margin-top: 2px; }
