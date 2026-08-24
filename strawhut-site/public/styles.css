@@ -407,6 +407,50 @@ main { overflow-x: clip; }
 }
 .ba-check { background: rgba(0,204,142,0.2); color: var(--accent); }
 .ba-cta { margin-top: 22px; }
+
+/* --- Scroll-triggered animation --------------------------------------------
+   A vertical accent line draws down through the green checks, the checks pop
+   in as it passes, each row slides up on a stagger, and the heading underline
+   draws in from the left. All states are gated behind `.ba-anim`, which the
+   section's own script adds only when motion is allowed — so with JS off or
+   reduced-motion on, everything renders fully and statically. */
+.ba-after-card .ba-list { position: relative; }
+.ba-after-card .ba-list li { position: relative; z-index: 1; }
+/* The drawing line — runs through the check-circle centres. */
+.ba-line {
+  position: absolute; z-index: 0; left: 37px; top: 30px; bottom: 30px; width: 2px;
+  border-radius: 2px; background: linear-gradient(180deg, var(--accent), rgba(0,204,142,0.15));
+  transform-origin: top center;   /* base (no JS): fully drawn */
+}
+.ba-anim .ba-line { transform: scaleY(0); transition: transform 1s ease 0.35s; }
+.ba-anim.ba-in .ba-line { transform: scaleY(1); }
+/* Rows rise + fade. */
+.ba-anim .ba-list li { opacity: 0; transform: translateY(16px);
+  transition: opacity 0.5s ease, transform 0.55s cubic-bezier(0.22,0.61,0.36,1); }
+.ba-anim.ba-in .ba-list li { opacity: 1; transform: none; }
+/* Marks pop with a little overshoot. */
+.ba-anim .ba-mark { opacity: 0; transform: scale(0.3);
+  transition: opacity 0.3s ease, transform 0.5s cubic-bezier(0.34,1.56,0.64,1); }
+.ba-anim.ba-in .ba-mark { opacity: 1; transform: scale(1); }
+/* Per-row stagger (applies to the row and its mark together). */
+.ba-anim.ba-in .ba-list li:nth-of-type(1), .ba-anim.ba-in .ba-list li:nth-of-type(1) .ba-mark { transition-delay: 0.05s; }
+.ba-anim.ba-in .ba-list li:nth-of-type(2), .ba-anim.ba-in .ba-list li:nth-of-type(2) .ba-mark { transition-delay: 0.12s; }
+.ba-anim.ba-in .ba-list li:nth-of-type(3), .ba-anim.ba-in .ba-list li:nth-of-type(3) .ba-mark { transition-delay: 0.19s; }
+.ba-anim.ba-in .ba-list li:nth-of-type(4), .ba-anim.ba-in .ba-list li:nth-of-type(4) .ba-mark { transition-delay: 0.26s; }
+.ba-anim.ba-in .ba-list li:nth-of-type(5), .ba-anim.ba-in .ba-list li:nth-of-type(5) .ba-mark { transition-delay: 0.33s; }
+.ba-anim.ba-in .ba-list li:nth-of-type(6), .ba-anim.ba-in .ba-list li:nth-of-type(6) .ba-mark { transition-delay: 0.40s; }
+/* CTA fades up last. */
+.ba-anim .ba-cta { opacity: 0; transform: translateY(10px); transition: opacity 0.4s ease, transform 0.4s ease; }
+.ba-anim.ba-in .ba-cta { opacity: 1; transform: none; transition-delay: 0.5s; }
+/* Heading underline draws in from the left. */
+.ba-anim .section-head h2::after { transform: scaleX(0); transform-origin: left center; transition: transform 0.7s ease 0.1s; }
+.ba-anim.ba-in .section-head h2::after { transform: scaleX(1); }
+@media (prefers-reduced-motion: reduce) {
+  .ba-anim .ba-list li, .ba-anim .ba-mark, .ba-anim .ba-cta { opacity: 1 !important; transform: none !important; }
+  .ba-anim .ba-line { transform: scaleY(1) !important; }
+  .ba-anim .section-head h2::after { transform: scaleX(1) !important; }
+}
+
 /* Phones: KEEP the two-column sticky pin (that's the whole effect Ryan loves),
    just tuned compact so two cards fit a narrow screen. The "After" card still
    pins while the taller "Before" column scrolls past it. */
@@ -421,6 +465,8 @@ main { overflow-x: clip; }
     font-size: 0.82rem; line-height: 1.32; border-radius: 12px; min-width: 0;
   }
   .ba-mark { width: 22px; height: 22px; font-size: 0.72rem; }
+  /* Line runs through the smaller mark centres on phones. */
+  .ba-line { left: 22px; top: 22px; bottom: 22px; }
   /* The pin is only visible for as far as the After card can travel inside its
      cell (cell height − card height). Keep the Before column much taller than
      the After card so the card stays locked for most of a screen as you scroll

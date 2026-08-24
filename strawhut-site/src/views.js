@@ -575,12 +575,24 @@ export function beforeAfterSection() {
       <div class="ba-col ba-after-col">
         <div class="ba-after-card">
           <div class="ba-col-head"><span class="ba-tag ba-tag-on">After Straw Hut</span></div>
-          <ul class="ba-list">${afterItems}</ul>
+          <ul class="ba-list"><span class="ba-line" aria-hidden="true"></span>${afterItems}</ul>
           <a class="btn btn-primary ba-cta" href="/book">Book a 15-min fit call →</a>
         </div>
       </div>
     </div>
-  </div></section>`;
+  </div>
+  <script>(function(){
+    var s=document.getElementById('before-after');if(!s)return;
+    if(window.matchMedia&&window.matchMedia('(prefers-reduced-motion: reduce)').matches)return;
+    s.classList.add('ba-anim');
+    var vh=window.innerHeight||document.documentElement.clientHeight;
+    function go(){s.classList.add('ba-in');}
+    if(s.getBoundingClientRect().top<vh*0.85){go();return;}
+    if(!('IntersectionObserver'in window)){go();return;}
+    var io=new IntersectionObserver(function(en){en.forEach(function(e){if(e.isIntersecting){go();io.disconnect();}});},{threshold:0,rootMargin:'0px 0px -12% 0px'});
+    io.observe(s);
+  })();</script>
+  </section>`;
 }
 
 export function homePage({ shows }) {
