@@ -585,12 +585,33 @@ export function beforeAfterSection() {
     var s=document.getElementById('before-after');if(!s)return;
     if(window.matchMedia&&window.matchMedia('(prefers-reduced-motion: reduce)').matches)return;
     s.classList.add('ba-anim');
-    var vh=window.innerHeight||document.documentElement.clientHeight;
+    var line=s.querySelector('.ba-line');
+    // Reveal the rows/checks/underline once when the section first enters.
     function go(){s.classList.add('ba-in');}
-    if(s.getBoundingClientRect().top<vh*0.85){go();return;}
-    if(!('IntersectionObserver'in window)){go();return;}
-    var io=new IntersectionObserver(function(en){en.forEach(function(e){if(e.isIntersecting){go();io.disconnect();}});},{threshold:0,rootMargin:'0px 0px -12% 0px'});
-    io.observe(s);
+    var vh0=window.innerHeight||document.documentElement.clientHeight;
+    if(s.getBoundingClientRect().top<vh0*0.85){go();}
+    else if('IntersectionObserver'in window){
+      var io=new IntersectionObserver(function(en){en.forEach(function(e){if(e.isIntersecting){go();io.disconnect();}});},{threshold:0,rootMargin:'0px 0px -12% 0px'});
+      io.observe(s);
+    }else{go();}
+    // Scroll-linked draw: fill the line to match how far through the section
+    // we have scrolled, so it moves up and down with the scroll direction.
+    var ticking=false;
+    function update(){
+      ticking=false;
+      if(!line)return;
+      var r=s.getBoundingClientRect();
+      var vh=window.innerHeight||document.documentElement.clientHeight;
+      if(r.bottom<-40||r.top>vh+40)return; /* skip work when far off-screen */
+      var total=r.height-vh;
+      var p=total>0?(-r.top)/total:(vh-r.top)/(vh+r.height);
+      p=p<0?0:(p>1?1:p);
+      line.style.transform='scaleY('+p+')';
+    }
+    function onScroll(){if(!ticking){ticking=true;requestAnimationFrame(update);}}
+    window.addEventListener('scroll',onScroll,{passive:true});
+    window.addEventListener('resize',onScroll,{passive:true});
+    update();
   })();</script>
   </section>`;
 }

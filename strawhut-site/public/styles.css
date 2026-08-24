@@ -445,8 +445,10 @@ main { overflow-x: clip; }
   border-radius: 2px; background: linear-gradient(180deg, var(--accent), rgba(0,204,142,0.15));
   transform-origin: top center;   /* base (no JS): fully drawn */
 }
-.ba-anim .ba-line { transform: scaleY(0); transition: transform 1s ease 0.35s; }
-.ba-anim.ba-in .ba-line { transform: scaleY(1); }
+/* Scroll-linked: JS sets scaleY from the section's scroll progress each frame,
+   so the line fills as you scroll down and retracts as you scroll up. The tiny
+   linear transition just smooths between rAF samples. */
+.ba-anim .ba-line { transform: scaleY(0); transition: transform 0.12s linear; }
 /* Rows rise + fade. */
 .ba-anim .ba-list li { opacity: 0; transform: translateY(16px);
   transition: opacity 0.5s ease, transform 0.55s cubic-bezier(0.22,0.61,0.36,1); }
