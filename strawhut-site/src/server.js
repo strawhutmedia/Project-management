@@ -15,7 +15,7 @@ import * as A from './admin_views.js';
 import { robotsTxt, sitemapXml, llmsTxt } from './seo.js';
 import { sendAnnouncement, mailConfigured, sendContactEmail, sendContactAutoReply, sendTrafficDigest } from './mail.js';
 import { importFromSite } from './importer.js';
-import { writeLandingCopy, generateLandingCopy, fallbackLandingCopy, aiConfigured, generateShowMetaDescription, generateShowBlurb, generateEpisodeEnrichment } from './ai.js';
+import { writeLandingCopy, generateLandingCopy, fallbackLandingCopy, aiConfigured, generateShowMetaDescription, generateShowBlurb, generateShowTagline, generateEpisodeEnrichment } from './ai.js';
 import { POSTS, getPost } from './content/resources.js';
 import { SERVICE_PAGES, getServicePage } from './content/services.js';
 import * as reco from './recommend.js';
@@ -1318,6 +1318,29 @@ async function backfillShowSeo() {
   console.log(`[seo] meta descriptions written for ${done}/${missing.length} shows`);
 }
 
+// Short, non-cheesy taglines shown beside the featured cover art. Featured
+// shows are generated first so the mobile spotlight populates quickly. Paced,
+// once per boot, no-ops without ANTHROPIC_API_KEY. Set SHOW_TAGLINE=off to skip.
+async function backfillShowTaglines() {
+  if (process.env.SHOW_TAGLINE === 'off' || !aiConfigured()) return;
+  const shows = await store.listShows();
+  const missing = shows.filter((s) => !s.tagline);
+  if (!missing.length) return;
+  missing.sort((a, b) => (b.featured ? 1 : 0) - (a.featured ? 1 : 0));
+  console.log(`[tagline] writing taglines for ${missing.length} show(s)…`);
+  let done = 0;
+  for (const show of missing) {
+    try {
+      const text = await generateShowTagline({ show, log: (m) => console.log('[tagline]', m) });
+      if (text) { await store.updateShow(show.id, { tagline: text }); done++; }
+    } catch (e) {
+      console.error('[tagline] show', show.slug, 'failed:', e.message);
+    }
+    await new Promise((r) => setTimeout(r, 900)); // gentle pacing
+  }
+  console.log(`[tagline] taglines written for ${done}/${missing.length} shows`);
+}
+
 app.listen(PORT, async () => {
   console.log(`[strawhut-site] listening on :${PORT}`);
   console.log(`[strawhut-site] admin at /admin (password via ADMIN_PASSWORD env)`);
@@ -1407,7 +1430,8 @@ app.listen(PORT, async () => {
   // Backfill unique, AI-written SEO meta descriptions for shows that don't have
   // one yet. Runs once per boot in the background, paced to be gentle on the
   // API; no-ops entirely if ANTHROPIC_API_KEY isn't set. Set SHOW_SEO=off to skip.
-  backfillShowSeo()
+  backfillShowTaglines()
+    .then(() => backfillShowSeo())
     .then(() => backfillShowBlurbs())
     .then(() => warmEpisodeEnrichment())
     .catch((e) => console.error('[seo] show backfill failed:', e.message));

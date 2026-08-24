@@ -655,11 +655,11 @@ export function homePage({ shows }) {
           s.image_url
             ? `<img class="fb-bg" src="${esc(s.image_url)}" alt="" aria-hidden="true" loading="lazy"><img class="fb-main" src="${esc(s.image_url)}" alt="${esc(s.title)}" loading="lazy">`
             : artOrPlaceholder(s.image_url, s.title)
-        }<div class="fb-kicker" aria-hidden="true">${
-          (s.categories || []).filter(Boolean)[0]
-            ? `<span class="fb-kicker-cat">${esc((s.categories || []).filter(Boolean)[0])}</span>`
+        }${
+          s.tagline
+            ? `<div class="fb-kicker"><span class="fb-kicker-line">${esc(s.tagline)}</span></div>`
             : ''
-        }<span class="fb-kicker-line">Press play.<br>Stay a while.</span></div></div>
+        }</div>
         <div class="fb-info">
           <h3>${esc(s.title)}</h3>
           ${s.author ? `<div class="fb-host">${esc(s.author)}</div>` : ''}

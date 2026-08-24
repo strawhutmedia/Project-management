@@ -242,6 +242,66 @@ export async function generateShowBlurb({ show, max = 165, log = () => {} } = {}
   }
 }
 
+const TAGLINE_SYSTEM = `You write an ultra-short tagline for a podcast show on Straw Hut Media's website — just a few words shown next to the cover art.
+
+You are given the show's real description. Distill what the show actually is into a punchy, honest hook.
+
+Rules:
+- 2 to 6 words. Hard maximum 6. Shorter is better.
+- Capture the SUBSTANCE of THIS show — its topic, angle, or feeling — not a generic call to action.
+- Confident, editorial, human. Title Case or sentence case is fine.
+- NEVER cheesy, salesy, or generic. Banned: "press play", "tune in", "listen now", "your new obsession", "must-listen", "dive in", "stay a while", exclamation marks, ellipses.
+- Invent nothing — no hosts, guests, awards, or numbers not in the source.
+- No trailing punctuation unless a natural question mark. No quotes, hashtags, or emoji.
+- Plain text only. Return ONLY the tagline.`;
+
+/**
+ * A few-word, non-cheesy hook for a show, shown beside the featured cover art.
+ * Distinct from the blurb/description (which appear as body copy). Returns null
+ * if the model can't produce something short and clean — the UI then shows no
+ * tagline rather than filler.
+ */
+export async function generateShowTagline({ show, log = () => {} } = {}) {
+  if (!KEY || !show) return null;
+  const desc = toText(show.description, 700) || toText(show.blurb, 400) || toText(show.seo_description, 400);
+  if (!desc) return null;
+  try {
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), 30000);
+    const res = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: { 'x-api-key': KEY, 'anthropic-version': '2023-06-01', 'content-type': 'application/json' },
+      body: JSON.stringify({
+        model: MODEL,
+        max_tokens: 40,
+        temperature: 0.6,
+        system: TAGLINE_SYSTEM,
+        messages: [
+          {
+            role: 'user',
+            content: `Write the tagline (2-6 words).\n\nSHOW: ${show.title || ''}\nHOST: ${show.author || ''}\nDESCRIPTION: ${desc}`,
+          },
+        ],
+      }),
+      signal: ctrl.signal,
+    });
+    clearTimeout(timer);
+    if (!res.ok) { log(`ai: tagline HTTP ${res.status}`); return null; }
+    const data = await res.json().catch(() => null);
+    let text = data?.content?.map?.((b) => b.text || '').join('').trim() || '';
+    text = text.replace(/^["'\s]+|["'\s]+$/g, '').replace(/\s+/g, ' ').replace(/[.!…]+$/, '');
+    const words = text.split(/\s+/).filter(Boolean);
+    if (!text || words.length > 6 || text.length > 42) { log(`ai: tagline rejected for ${show.slug}: "${text}"`); return null; }
+    if (/press play|tune in|listen now|dive in|your new|must[- ]listen|stay a while/i.test(text)) {
+      log(`ai: tagline cheesy for ${show.slug}: "${text}"`); return null;
+    }
+    return text;
+  } catch (e) {
+    log(`ai: tagline failed — ${e.message}`);
+    return null;
+  }
+}
+
 export async function generateShowMetaDescription({ show, log = () => {} } = {}) {
   if (!KEY || !show) return null;
   const title = show.title || '';
