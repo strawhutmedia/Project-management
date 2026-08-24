@@ -751,6 +751,9 @@ export type ApiCashflowEntry = {
   category: string
   counterparty: string
   notes: string
+  // Steady monthly baseline (payroll, a retainer client, a subscription) vs
+  // a one-off/lumpy amount (a single project payment). Defaults to true.
+  isRecurring: boolean
   createdAt: string
   updatedAt: string
 }
@@ -771,6 +774,10 @@ export type ApiCashflowOverview = {
   entryCount: number
   months: ApiCashflowMonth[]
   currentMonthCategories: { kind: 'in' | 'out'; category: string; totalCents: number }[]
+  currentMonthBaseline: {
+    recurringInCents: number; recurringOutCents: number; recurringNetCents: number
+    oneTimeInCents: number; oneTimeOutCents: number; oneTimeNetCents: number
+  }
 }
 
 // ── Contractor invoicing (admin payroll tool) ──
@@ -928,11 +935,11 @@ export const api = {
   },
   createCashflowEntry: (body: {
     kind: 'in' | 'out'; amountCents: number; occurredOn: string
-    category?: string; counterparty?: string; notes?: string
+    category?: string; counterparty?: string; notes?: string; isRecurring?: boolean
   }) => request<{ entry: ApiCashflowEntry }>('/api/cashflow/entries', { method: 'POST', body: JSON.stringify(body) }),
   updateCashflowEntry: (id: string, body: Partial<{
     kind: 'in' | 'out'; amountCents: number; occurredOn: string
-    category: string; counterparty: string; notes: string
+    category: string; counterparty: string; notes: string; isRecurring: boolean
   }>) => request<{ entry: ApiCashflowEntry }>(`/api/cashflow/entries/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
   deleteCashflowEntry: (id: string) =>
     request<{ ok: true }>(`/api/cashflow/entries/${id}`, { method: 'DELETE' }),
