@@ -965,6 +965,8 @@ app.get('/press', async (req, res) => {
 });
 
 // ---- Resources (guides / blog) --------------------------------------------
+app.get('/case-studies', (req, res) =>
+  res.send(V.caseStudiesIndexPage({ studies: POSTS.filter((p) => p.category === 'Case Study') })));
 app.get('/resources', (req, res) => res.send(V.resourcesIndexPage({ posts: POSTS })));
 app.get('/resources/:slug', (req, res, next) => {
   const post = getPost(req.params.slug);

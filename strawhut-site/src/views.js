@@ -383,6 +383,7 @@ function footerBlock() {
       <div class="footer-col">
         <div class="footer-h">Explore</div>
         <a href="/about">About</a>
+        <a href="/case-studies">Case Studies</a>
         <a href="/shows">All Shows</a>
         <a href="/resources">Guides &amp; Resources</a>
         <a href="/resources#faq">Podcasting FAQ</a>
@@ -907,6 +908,62 @@ export function resourcesIndexPage({ posts }) {
       ]) +
       '\n' +
       faqJsonLd(),
+  });
+}
+
+export function caseStudiesIndexPage({ studies }) {
+  const cards = studies
+    .map(
+      (p) => `<a class="resource-card" href="/resources/${esc(p.slug)}">
+      <span class="resource-cat">Case Study</span>
+      <h3>${esc(p.title.replace(/^Case Study:\s*/i, ''))}</h3>
+      <p>${esc(p.description)}</p>
+      <span class="resource-more">Read the case study <span class="accent">→</span></span>
+    </a>`
+    )
+    .join('');
+  const itemList =
+    '<script type="application/ld+json">' +
+    JSON.stringify({
+      '@context': 'https://schema.org',
+      '@type': 'ItemList',
+      name: 'Straw Hut Media podcast case studies',
+      itemListElement: studies.map((p, i) => ({
+        '@type': 'ListItem',
+        position: i + 1,
+        url: canonical('/resources/' + p.slug),
+        name: p.title,
+      })),
+    }) +
+    '</script>';
+  const body = `
+  <section class="hero" style="padding-bottom:14px"><div class="container">
+    <div class="breadcrumb" style="padding:0 0 14px"><a href="/">Home</a> / Case Studies</div>
+    <h1>Case <span class="accent">studies</span></h1>
+    <p>Real shows we built, and the numbers to prove it — from an 11.7M-reach studio launch, to a film podcast with 12M+ YouTube views, to a marketing show that turns its guests into clients.</p>
+  </div></section>
+  <section class="section" style="padding-top:8px"><div class="container">
+    <div class="resource-grid">${cards}</div>
+    <div class="cta-band" style="margin-top:34px">
+      <h2>Want results like these?</h2>
+      <p>We take shows from first idea to chart-topping — production, distribution, and growth under one roof.</p>
+      <a class="btn btn-primary" href="/book">Book a 15-min call →</a>
+    </div>
+  </div></section>`;
+  return layout({
+    title: 'Podcast Case Studies — Straw Hut Media',
+    description:
+      'Real results from shows Straw Hut Media produced — Wicked: The Official Podcast (11.7M reach in 11 weeks), Seen on the Screen (12M+ YouTube views), and Soul & Science. Proof of full-service podcast production that performs.',
+    body,
+    activeNav: '/case-studies',
+    path: '/case-studies',
+    jsonLd:
+      breadcrumbJsonLd([
+        { name: 'Home', path: '/' },
+        { name: 'Case Studies', path: '/case-studies' },
+      ]) +
+      '\n' +
+      itemList,
   });
 }
 

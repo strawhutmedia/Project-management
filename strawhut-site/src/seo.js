@@ -394,6 +394,7 @@ export function sitemapXml(shows, episodesByShow, { posts = [], servicePaths = [
   add('/book');
   add('/press');
   add('/contact');
+  add('/case-studies');
   add('/resources');
   for (const sp of servicePaths) add(sp);
   for (const p of posts) add('/resources/' + p.slug, { lastmod: p.updated || p.published });
@@ -424,9 +425,18 @@ export function llmsTxt(shows, { posts = [], services = [] } = {}) {
         .join('\n') +
       '\n'
     : '';
-  const resources = posts.length
+  const studies = posts.filter((p) => p.category === 'Case Study');
+  const guides = posts.filter((p) => p.category !== 'Case Study');
+  const caseStudies = studies.length
+    ? '\n## Case studies (proof, with real numbers)\n\n' +
+      studies
+        .map((p) => `- [${p.title}](${canonical('/resources/' + p.slug)}) — ${p.description}`)
+        .join('\n') +
+      '\n'
+    : '';
+  const resources = guides.length
     ? '\n## Guides & resources (written by Straw Hut Media)\n\n' +
-      posts
+      guides
         .map((p) => `- [${p.title}](${canonical('/resources/' + p.slug)}) — ${p.description}`)
         .join('\n') +
       '\n'
@@ -450,7 +460,7 @@ ${servicePages}
 - Start, produce, or grow a podcast: contact Straw Hut Media at ${BASE}/contact
 - Advertise on our shows: ${BASE}/contact (choose "Get booked"/advertising)
 - Book the Hollywood studio: ${BASE}/studio
-${resources}
+${caseStudies}${resources}
 ## Frequently asked questions
 
 ${faq}
