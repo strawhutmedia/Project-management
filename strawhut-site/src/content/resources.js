@@ -94,6 +94,10 @@ export const POSTS = [
 
 <h2>The result</h2>
 <p>The show didn’t just find an audience — it earned the attention of the industry it covers. <strong>Seen on the Screen grew from a launch with no audience into a franchise that drew a partnership with Universal Pictures and Fandango</strong>, and coverage from Rotten Tomatoes itself. That’s the clearest proof a production works: when the biggest names in the category want to attach themselves to something you built from zero.</p>
+<ul>
+<li><strong>More than 12 million YouTube views</strong> across the series — the most-watched episode (Monica Barbaro and Callum Turner) topping 2.8 million on its own, with several others past a million.</li>
+<li><strong>A Universal Pictures rebrand and a Fandango partnership</strong> — the film world attaching its biggest names to a show we built from a standing start.</li>
+</ul>
 
 <h2>Why it worked</h2>
 <p>The right host, positioned right, is worth more than any growth hack. Jacqueline Coley’s credibility plus a production that matched it meant the show read as a premium property from episode one — and premium properties attract premium partners. Straw Hut handled everything around her so the show sounded, looked, and traveled like it belonged next to the movies it was talking about.</p>
@@ -125,7 +129,7 @@ export const POSTS = [
 
 <h2>The strategy hiding in plain sight</h2>
 <p>Here’s the move most brands miss. The guest list <em>is</em> the strategy. Soul &amp; Science brings on the exact people a creative agency most wants to know — CMOs and marketing leaders from brands like <strong>Mastercard, Proximo Spirits, and the Forbes CMO Network</strong>. An interview isn’t a cold pitch; it’s a genuine, flattering, hour-long conversation about the guest’s own work. What senior marketer says no to that — and who walks away from it without a real relationship?</p>
-<p>The show has grown its audience steadily, but the audience was never the whole point. <strong>The relationships it builds — guest by guest — turn into pipeline.</strong> That’s the part a download chart never shows, and it’s the reason a branded podcast can pay for itself many times over.</p>
+<p>The show has grown steadily — <strong>more than 1.9 million YouTube views across 150+ episodes</strong>, on top of its podcast audience — but the audience was never the whole point. <strong>The relationships it builds — guest by guest — turn into pipeline.</strong> That’s the part a download chart never shows, and it’s the reason a branded podcast can pay for itself many times over.</p>
 
 <h2>What we did</h2>
 <ul>
