@@ -84,7 +84,7 @@ export function organizationJsonLd() {
 export const FAQ = [
   [
     'How do I start a podcast?',
-    'You can absolutely start one yourself — a sharp, specific idea, a decent mic in a quiet room, each speaker recorded on their own track, some careful editing for pacing and sound, and a podcast host that pushes your feed out to Apple Podcasts, Spotify, and YouTube. We actually built a free podcasting course that walks you through the whole thing, step by step — grab it here: https://primer.strawhutmedia.com. And if you would rather just have it handled end to end, Straw Hut Media takes you from idea to launch — production, distribution, and growth under one roof.',
+    'It comes down to a handful of steps: 1) Nail a sharp, specific idea — who it is for and what they get from every episode. 2) Pick a format you can actually keep up with. 3) Get decent gear — a good dynamic mic in a quiet, soft-surfaced room, recording each speaker on their own track. 4) Record with clean habits — grab a little room tone and try not to talk over each other. 5) Edit for pacing and sound, then master it so it sounds good everywhere. 6) Publish through a podcast host that pushes your feed to Apple Podcasts, Spotify, and YouTube. 7) Grow it with a steady schedule and short clips for social. Or, for more on exactly how we do it, watch our free podcasting course — it walks through all of it, step by step, at no cost: https://primer.strawhutmedia.com. And if you would rather just have it handled end to end, that is exactly what Straw Hut Media does.',
   ],
   [
     'Who should I hire to produce my podcast?',
