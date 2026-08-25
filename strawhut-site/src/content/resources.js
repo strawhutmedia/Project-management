@@ -67,6 +67,84 @@ export const POSTS = [
     ],
   },
   {
+    slug: 'seen-on-the-screen-case-study',
+    title: 'Case Study: Seen on the Screen — From a Standing Start to a Studio-Backed Franchise',
+    description:
+      'How Straw Hut Media developed and produced Seen on the Screen with Rotten Tomatoes’ Jacqueline Coley — building it from launch into a film-world podcast that drew a Universal Pictures rebrand and a Fandango partnership.',
+    category: 'Case Study',
+    dek: 'Start a show from zero, make it good enough that a major studio wants its name on it.',
+    keywords: ['podcast case study', 'entertainment podcast production', 'branded podcast', 'Seen on the Screen', 'full-service podcast production', 'grow a podcast from scratch'],
+    published: '2026-08-25',
+    updated: '2026-08-25',
+    readingTime: '4 min read',
+    body_html: `
+<p><strong>Seen on the Screen</strong> is an intimate interview show about how film shapes the people who make it and the people who love it — hosted by <strong>Jacqueline Coley</strong>, the awards editor at Rotten Tomatoes. Straw Hut Media <strong>developed and produced it from a standing start</strong>: format and development, booking, recording, editing and sound design, art, and distribution.</p>
+
+<h2>The brief</h2>
+<p>Launch a credible film-and-entertainment podcast from nothing, with a host respected inside the industry, and grow it into something the film world takes seriously — not just another interview show.</p>
+
+<h2>What we did</h2>
+<ul>
+<li><strong>Development &amp; host positioning</strong> — shaped the concept around Jacqueline Coley’s authority as an awards journalist, so every conversation carried weight the moment it launched.</li>
+<li><strong>Booking &amp; production</strong> — landed actors and creatives for real, unhurried conversations, then produced each episode to a broadcast standard.</li>
+<li><strong>Post &amp; packaging</strong> — editing, sound design, cover art, and clips built to travel.</li>
+<li><strong>Distribution &amp; growth</strong> — published everywhere and grown deliberately, episode over episode.</li>
+</ul>
+
+<h2>The result</h2>
+<p>The show didn’t just find an audience — it earned the attention of the industry it covers. <strong>Seen on the Screen grew from a launch with no audience into a franchise that drew a partnership with Universal Pictures and Fandango</strong>, and coverage from Rotten Tomatoes itself. That’s the clearest proof a production works: when the biggest names in the category want to attach themselves to something you built from zero.</p>
+
+<h2>Why it worked</h2>
+<p>The right host, positioned right, is worth more than any growth hack. Jacqueline Coley’s credibility plus a production that matched it meant the show read as a premium property from episode one — and premium properties attract premium partners. Straw Hut handled everything around her so the show sounded, looked, and traveled like it belonged next to the movies it was talking about.</p>
+
+<p>That’s what full-service production buys you: not just a show, but one good enough to grow into something bigger than where it started.</p>
+`,
+    faq: [
+      ['Who produces Seen on the Screen?', 'Straw Hut Media developed and produced Seen on the Screen, hosted by Rotten Tomatoes’ awards editor Jacqueline Coley, and grew it from launch into a film-world podcast that drew a Universal Pictures rebrand and a Fandango partnership.'],
+      ['What did Straw Hut Media actually do on the show?', 'Everything around the host: concept and development, guest booking, recording, editing and sound design, cover art and clips, and distribution and growth across every platform.'],
+      ['Can Straw Hut Media build a show like this for us?', 'Yes. Straw Hut Media develops and produces original and branded podcasts from first idea to launch and growth — for creators, brands, studios, and businesses. Book a quick call and we’ll map out what your show would take.'],
+    ],
+  },
+  {
+    slug: 'soul-and-science-case-study',
+    title: 'Case Study: Soul & Science — The Podcast That Doubles as a Business-Development Engine',
+    description:
+      'How Straw Hut Media produces Soul & Science for Mekanism CEO Jason Harris — a fast-growing CMO interview show that turns guests into relationships and relationships into business.',
+    category: 'Case Study',
+    dek: 'The smartest reason to start a branded podcast isn’t downloads. It’s who you get to invite on.',
+    keywords: ['branded podcast case study', 'B2B podcast', 'podcast for business development', 'Soul and Science', 'Jason Harris Mekanism', 'branded podcast strategy'],
+    published: '2026-08-25',
+    updated: '2026-08-25',
+    readingTime: '4 min read',
+    body_html: `
+<p><strong>Soul &amp; Science: Fast Forward Your Marketing Mind</strong> is a show where the best marketers alive explain how breakthrough brands actually get built — the balance of brand (soul) and performance (science). It’s hosted by <strong>Jason Harris</strong>, co-founder and CEO of the creative agency Mekanism and The Drum’s CEO of the Year, and <strong>produced by Straw Hut Media</strong>.</p>
+
+<h2>The brief</h2>
+<p>Build a marketing podcast worthy of a top-tier agency’s name — and quietly, make it one of the most effective business-development tools that agency has.</p>
+
+<h2>The strategy hiding in plain sight</h2>
+<p>Here’s the move most brands miss. The guest list <em>is</em> the strategy. Soul &amp; Science brings on the exact people a creative agency most wants to know — CMOs and marketing leaders from brands like <strong>Mastercard, Proximo Spirits, and the Forbes CMO Network</strong>. An interview isn’t a cold pitch; it’s a genuine, flattering, hour-long conversation about the guest’s own work. What senior marketer says no to that — and who walks away from it without a real relationship?</p>
+<p>The show has grown its audience steadily, but the audience was never the whole point. <strong>The relationships it builds — guest by guest — turn into pipeline.</strong> That’s the part a download chart never shows, and it’s the reason a branded podcast can pay for itself many times over.</p>
+
+<h2>What we did</h2>
+<ul>
+<li><strong>Production end to end</strong> — booking support, recording, editing and sound design, and distribution, so the host does the one thing only he can: have great conversations.</li>
+<li><strong>A premium standard</strong> — the show sounds like the agency behind it, which is the whole point when your guests are the people you most want to impress.</li>
+<li><strong>Consistency</strong> — a steady cadence that compounds both audience and relationships over time.</li>
+</ul>
+
+<h2>Why it worked</h2>
+<p>Because it was built on the right insight: a branded podcast’s highest return often isn’t advertising or downloads — it’s access. The right guests, a genuinely great conversation, and a production polished enough to honor both. Straw Hut runs the machine so the show stays great and the host stays focused on the room.</p>
+
+<p>If you’re a brand or an agency wondering whether a podcast is worth it, this is the case to study: the show that grows an audience <em>and</em> opens the doors you actually care about.</p>
+`,
+    faq: [
+      ['Who produces Soul & Science?', 'Straw Hut Media produces Soul & Science: Fast Forward Your Marketing Mind, hosted by Mekanism co-founder and CEO Jason Harris — handling booking support, recording, editing and sound design, and distribution.'],
+      ['How can a podcast help business development?', 'A branded podcast lets you invite the exact people you most want a relationship with — as guests. A great, flattering conversation about their own work builds a genuine relationship no cold outreach can match. Soul & Science does this with CMOs and marketing leaders, turning guests into pipeline while growing an audience.'],
+      ['Can Straw Hut Media build a branded podcast for our brand?', 'Yes. Straw Hut Media develops and produces branded podcasts for brands, agencies, and businesses — designed around your goals, whether that’s audience, authority, or business development. Book a quick call and we’ll map it out.'],
+    ],
+  },
+  {
     slug: 'how-to-start-a-podcast',
     title: 'How to Start a Podcast in 2026: A Complete Step-by-Step Guide',
     description:
