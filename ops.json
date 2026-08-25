@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-08-25T17:47:27.359Z",
+  "generatedAt": "2026-08-25T17:52:27.348Z",
   "note": "Read-only operational snapshot. Emails are masked; no full contact list is stored here.",
   "summary": {
     "showsWithOutreach": 1,
@@ -39,7 +39,7 @@
           {
             "name": "Jeremiah Brown",
             "emailMasked": "f***@select.co",
-            "daysSinceFirstEmail": 40,
+            "daysSinceFirstEmail": 41,
             "opened": false,
             "openCount": 0
           },
