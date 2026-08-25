@@ -78,17 +78,18 @@ export const POSTS = [
     updated: '2026-08-25',
     readingTime: '4 min read',
     body_html: `
-<p><strong>Seen on the Screen</strong> is an intimate interview show about how film shapes the people who make it and the people who love it — hosted by <strong>Jacqueline Coley</strong>, the awards editor at Rotten Tomatoes. Straw Hut Media <strong>developed and produced it from a standing start</strong>: format and development, booking, recording, editing and sound design, art, and distribution.</p>
+<p><strong>Seen on the Screen</strong> is an intimate interview show about how film shapes the people who make it and the people who love it — hosted by <strong>Jacqueline Coley</strong>, the awards editor at Rotten Tomatoes. <strong>Straw Hut Media is the production company behind it</strong>, and has been from day one: we build the show flows, prep the guests and talent, shoot the episodes, edit them, and create the marketing deliverables that carry them.</p>
 
 <h2>The brief</h2>
 <p>Launch a credible film-and-entertainment podcast from nothing, with a host respected inside the industry, and grow it into something the film world takes seriously — not just another interview show.</p>
 
-<h2>What we did</h2>
+<h2>What we do</h2>
 <ul>
-<li><strong>Development &amp; host positioning</strong> — shaped the concept around Jacqueline Coley’s authority as an awards journalist, so every conversation carried weight the moment it launched.</li>
-<li><strong>Booking &amp; production</strong> — landed actors and creatives for real, unhurried conversations, then produced each episode to a broadcast standard.</li>
-<li><strong>Post &amp; packaging</strong> — editing, sound design, cover art, and clips built to travel.</li>
-<li><strong>Distribution &amp; growth</strong> — published everywhere and grown deliberately, episode over episode.</li>
+<li><strong>Show flows &amp; development</strong> — we design the arc of every episode around Jacqueline Coley’s authority as an awards journalist, so each conversation carries weight.</li>
+<li><strong>Guest &amp; talent prep</strong> — we prep the guests and the host so the tape is great before a single edit.</li>
+<li><strong>We shoot it</strong> — full video-and-audio capture at a broadcast standard.</li>
+<li><strong>We edit it</strong> — editing, sound design, and packaging on every episode.</li>
+<li><strong>Marketing deliverables</strong> — the clips, art, and assets that give each episode a life beyond the feed — plus distribution everywhere.</li>
 </ul>
 
 <h2>The result</h2>
