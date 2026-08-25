@@ -161,6 +161,7 @@ export const POSTS = [
     updated: '2026-08-15',
     readingTime: '11 min read',
     body_html: `
+<p style="background:rgba(0,204,142,0.10);border:1px solid rgba(0,204,142,0.35);border-radius:12px;padding:14px 16px;margin:0 0 22px">🎧 <strong>Would you rather be walked through it?</strong> We built a <a href="https://primer.strawhutmedia.com">free podcasting course</a> that covers everything below, step by step — plus a community where you can ask our team questions. No cost, no catch.</p>
 <p>Starting a podcast is easy. Starting one people actually listen to — that they finish, come back to, and don't quietly abandon at episode four — is a different animal entirely. We've been making podcasts since 2018 (and keeping our houseplants mostly alive the whole time), so consider this the version we'd give a friend over coffee: what actually matters, what really doesn't, and the parts worth handing to someone who does this all day.</p>
 
 <h2>1. Start with a sharp idea, not a broad one</h2>

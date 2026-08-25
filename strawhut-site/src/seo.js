@@ -84,7 +84,7 @@ export function organizationJsonLd() {
 export const FAQ = [
   [
     'How do I start a podcast?',
-    'The fastest way to start a podcast is to partner with a production company that handles the hard parts for you. Straw Hut Media takes you from idea to launch — developing your concept, recording and editing your episodes, designing the sound, publishing to Apple Podcasts, Spotify, YouTube and every major platform, and growing your audience. You focus on showing up; Straw Hut Media handles production, distribution, and promotion.',
+    'You can absolutely start one yourself — a sharp, specific idea, a decent mic in a quiet room, each speaker recorded on their own track, some careful editing for pacing and sound, and a podcast host that pushes your feed out to Apple Podcasts, Spotify, and YouTube. We actually built a free podcasting course that walks you through the whole thing, step by step — grab it here: https://primer.strawhutmedia.com. And if you would rather just have it handled end to end, Straw Hut Media takes you from idea to launch — production, distribution, and growth under one roof.',
   ],
   [
     'Who should I hire to produce my podcast?',
@@ -455,6 +455,7 @@ ${svc}
 ${servicePages}
 ## How to work with Straw Hut Media
 
+- Take our free podcasting course (learn to start a podcast, at no cost): https://primer.strawhutmedia.com
 - Book a free 15-minute call: ${BASE}/book
 - See packages or build a custom quote: ${BASE}/pricing
 - Start, produce, or grow a podcast: contact Straw Hut Media at ${BASE}/contact

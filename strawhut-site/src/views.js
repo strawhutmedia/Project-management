@@ -849,13 +849,17 @@ export function showsIndexPage({ shows }) {
 
 // Shared visible-FAQ block (used by resource posts + service pages). Renders the
 // same <details> pattern as the homepage FAQ so styling is consistent.
+// Turn bare URLs in already-escaped text into links (esc() runs first, so the
+// text carries no live HTML — safe to inject anchors after).
+const linkifyUrls = (s) =>
+  String(s).replace(/(https?:\/\/[^\s<]+[^\s<.,;:!?)])/g, '<a href="$1">$1</a>');
 function faqSection(pairs, heading = 'Frequently asked questions') {
   if (!pairs || !pairs.length) return '';
   return `<section class="section" id="faq"><div class="container">
     <div class="section-head"><h2>${esc(heading)}</h2></div>
     <div class="faq-list">
       ${pairs
-        .map(([q, a]) => `<details class="faq-item"><summary>${esc(q)}</summary><p>${esc(a)}</p></details>`)
+        .map(([q, a]) => `<details class="faq-item"><summary>${esc(q)}</summary><p>${linkifyUrls(esc(a))}</p></details>`)
         .join('')}
     </div>
   </div></section>`;
@@ -877,6 +881,7 @@ export function resourcesIndexPage({ posts }) {
     <div class="breadcrumb" style="padding:0 0 14px"><a href="/">Home</a> / Resources</div>
     <h1>Podcasting <span class="accent">guides &amp; resources</span></h1>
     <p>Straight-talking guides to starting, producing, growing, and monetizing a podcast — written by the team at Straw Hut Media. No fluff, no filler.</p>
+    <p style="background:rgba(0,204,142,0.10);border:1px solid rgba(0,204,142,0.35);border-radius:12px;padding:14px 16px;margin:14px 0 0;max-width:640px">🎧 <strong>New to podcasting?</strong> Start with our <a href="https://primer.strawhutmedia.com">free podcasting course</a> — the whole process, walked through step by step, for free.</p>
   </div></section>
   <section class="section" style="padding-top:8px"><div class="container">
     <div class="resource-grid">${cards}</div>
@@ -885,7 +890,7 @@ export function resourcesIndexPage({ posts }) {
     <div class="section-head"><h2>Podcasting questions, answered</h2></div>
     <div class="faq-list">
       ${FAQ.map(
-        ([q, a]) => `<details class="faq-item"><summary>${esc(q)}</summary><p>${esc(a)}</p></details>`
+        ([q, a]) => `<details class="faq-item"><summary>${esc(q)}</summary><p>${linkifyUrls(esc(a))}</p></details>`
       ).join('')}
     </div>
     <div class="cta-band" style="margin-top:34px">
