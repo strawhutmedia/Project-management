@@ -23,6 +23,7 @@ import { matchAllShows, matchShowVideos } from './youtube.js';
 import { refreshPress } from './press.js';
 import { applyMonthlyRotation } from './spotlight.js';
 import { applyPopularSpotlight, megaphoneConfigured, wickedStats } from './popularity.js';
+import { wickedYoutubeStats } from './youtube.js';
 import { resolveArtwork, imageWidth, MIN_ACCEPTABLE } from './artwork.js';
 import { inspect as inspectSubmission } from './antispam.js';
 import { verifyTurnstile, turnstileConfigured } from './turnstile.js';
@@ -775,8 +776,11 @@ let _wickedCache = null;
 app.get('/diag/wicked.json', async (req, res) => {
   try {
     if (!_wickedCache || Date.now() - _wickedCache.at > 6 * 3600 * 1000) {
-      const data = await wickedStats({ log: (m) => console.log('[wicked]', m) });
-      _wickedCache = { at: Date.now(), data };
+      const [megaphone, youtube] = await Promise.all([
+        wickedStats({ log: (m) => console.log('[wicked]', m) }),
+        wickedYoutubeStats().catch((e) => ({ configured: true, error: e.message })),
+      ]);
+      _wickedCache = { at: Date.now(), data: { megaphone, youtube } };
     }
     res.json({ ok: true, cachedAt: new Date(_wickedCache.at).toISOString(), ...(_wickedCache.data || {}) });
   } catch (e) {

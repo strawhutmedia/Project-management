@@ -220,3 +220,63 @@ export function matchEpisodesToVideos(episodes, videos) {
   }
   return result;
 }
+
+// ---------------------------------------------------------------------------
+// YouTube Data API v3 — EXACT view counts for a playlist (for the Wicked
+// performance dashboard / case study). The scraper above yields rounded counts
+// ("531K views"); a stats page needs exact figures, so this uses the official
+// API. Inert until YOUTUBE_API_KEY is set — safe to ship before the key exists.
+//   YOUTUBE_API_KEY     (required)  YouTube Data API v3 key (free, Google Cloud).
+//   WICKED_YT_PLAYLIST  (optional)  playlist id; defaults to the Wicked playlist.
+// ---------------------------------------------------------------------------
+const YT_API = 'https://www.googleapis.com/youtube/v3';
+const YT_KEY = (process.env.YOUTUBE_API_KEY || '').trim();
+const WICKED_PLAYLIST = 'PLZEqWHL3T_etL2c1-6P6w4Xhtit2sjCvG';
+
+export function youtubeApiConfigured() {
+  return !!YT_KEY;
+}
+
+async function ytApi(path, params = {}) {
+  const qs = new URLSearchParams({ ...params, key: YT_KEY }).toString();
+  const res = await fetch(`${YT_API}/${path}?${qs}`, { headers: { Accept: 'application/json' } });
+  if (!res.ok) throw new Error(`YouTube ${path} → ${res.status}: ${(await res.text().catch(() => '')).slice(0, 160)}`);
+  return res.json();
+}
+
+/** Exact aggregate view counts for every video in the Wicked playlist. */
+export async function wickedYoutubeStats({ playlistId = process.env.WICKED_YT_PLAYLIST || WICKED_PLAYLIST } = {}) {
+  if (!youtubeApiConfigured()) return { configured: false, reason: 'YOUTUBE_API_KEY not set' };
+  try {
+    const ids = [];
+    let pageToken = '';
+    for (let i = 0; i < 10; i++) {
+      const page = await ytApi('playlistItems', { part: 'contentDetails', maxResults: '50', playlistId, ...(pageToken ? { pageToken } : {}) });
+      for (const item of page.items || []) {
+        const vid = item.contentDetails && item.contentDetails.videoId;
+        if (vid) ids.push(vid);
+      }
+      pageToken = page.nextPageToken || '';
+      if (!pageToken) break;
+    }
+    if (!ids.length) return { configured: true, playlistId, error: 'no videos found in playlist' };
+    const videos = [];
+    for (let i = 0; i < ids.length; i += 50) {
+      const stats = await ytApi('videos', { part: 'statistics,snippet', id: ids.slice(i, i + 50).join(',') });
+      for (const v of stats.items || []) {
+        videos.push({
+          id: v.id,
+          title: (v.snippet && v.snippet.title) || '',
+          views: parseInt((v.statistics && v.statistics.viewCount) || '0', 10),
+          likes: parseInt((v.statistics && v.statistics.likeCount) || '0', 10) || undefined,
+          published: (v.snippet && v.snippet.publishedAt) || '',
+        });
+      }
+    }
+    const totalViews = videos.reduce((s, v) => s + (v.views || 0), 0);
+    videos.sort((a, b) => (a.published || '').localeCompare(b.published || ''));
+    return { configured: true, playlistId, videoCount: videos.length, totalViews, videos };
+  } catch (e) {
+    return { configured: true, error: e.message };
+  }
+}
