@@ -184,46 +184,27 @@ main { overflow-x: clip; }
 /* Producer Selections — an organic, staggered cover-art collage rather than a
    uniform grid. Sizes and vertical offsets vary by position so it reads as a
    curated wall, the way the brand presents its slate. */
+/* One tidy, centred grid of equal square covers at every width — the clean
+   look that already worked on mobile, now used on desktop too. No staggered
+   offsets, no random double-width tiles: a curated wall reads as deliberate
+   only when it's even. flex-wrap + justify-content:center means a short final
+   row centres itself instead of leaving a hole, whatever the show count. */
 .selections {
-  display: grid; grid-template-columns: repeat(8, 1fr); gap: 18px;
-  align-items: center; padding: 6px 0 10px;
-  /* The phone spans 2x2 and would otherwise leave a hole in the flow; dense
-     packing lets later tiles backfill it. */
-  grid-auto-flow: dense;
+  --sel-cols: 6; --sel-gap: 16px;
+  display: flex; flex-wrap: wrap; justify-content: center; align-items: flex-start;
+  gap: var(--sel-gap); padding: 6px 0 10px;
 }
-.sel-item { border-radius: 16px; overflow: hidden; box-shadow: var(--shadow); transition: transform 0.25s, box-shadow 0.25s; }
+.sel-item {
+  flex: 0 0 calc((100% - (var(--sel-cols) - 1) * var(--sel-gap)) / var(--sel-cols) - 0.02px);
+  border-radius: 16px; overflow: hidden; box-shadow: var(--shadow);
+  transition: transform 0.25s, box-shadow 0.25s;
+}
 .sel-item img { width: 100%; aspect-ratio: 1/1; object-fit: cover; display: block; }
 .sel-item:hover { transform: translateY(-8px) scale(1.04); box-shadow: 0 18px 40px rgba(0,0,0,0.5); z-index: 2; }
-/* Stagger: alternate columns ride higher/lower, and a few tiles run larger. */
-.sel-item:nth-child(4n+1) { transform: translateY(26px); }
-.sel-item:nth-child(4n+3) { transform: translateY(-22px); }
-.sel-item:nth-child(6n+2) { grid-column: span 2; }
-.sel-item:nth-child(4n+1):hover,
-.sel-item:nth-child(4n+3):hover { transform: translateY(-8px) scale(1.04); }
-/* Below desktop the staggered wall stops reading as "curated" and just looks
-   broken — mismatched sizes on stacked rows. Drop the offsets AND the
-   double-width tiles so it becomes a tidy, uniform grid of square covers. */
-/* Stacked layouts use flex-wrap rather than a grid: the cover count rarely
-   divides evenly by the column count, and a grid leaves the shortfall as an
-   empty hole on the right of the last row (it reads as missing shows). Wrapping
-   + centring puts the short row in the middle, where it looks deliberate, and
-   it stays correct whatever the show count is. */
-@media (max-width: 900px) {
-  .selections {
-    --sel-cols: 4; --sel-gap: 12px;
-    display: flex; flex-wrap: wrap; justify-content: center;
-    gap: var(--sel-gap); align-items: flex-start;
-  }
-  .sel-item,
-  .sel-item:nth-child(4n+1),
-  .sel-item:nth-child(4n+3) { transform: none; }
-  .sel-item { flex: 0 0 calc((100% - (var(--sel-cols) - 1) * var(--sel-gap)) / var(--sel-cols) - 0.02px); }
-  .ph-wrap { flex: 0 0 100%; }
-}
-@media (max-width: 560px) {
-  .selections { --sel-cols: 3; --sel-gap: 10px; }
-  .sel-item { border-radius: 12px; }
-}
+/* The phone is a centred "now playing" feature band between the rows of covers. */
+.ph-wrap { flex: 0 0 100%; display: flex; align-items: center; justify-content: center; margin: 8px 0; }
+@media (max-width: 900px) { .selections { --sel-cols: 4; --sel-gap: 12px; } }
+@media (max-width: 560px) { .selections { --sel-cols: 3; --sel-gap: 10px; } .sel-item { border-radius: 12px; } }
 /* The wall is a taste of the network, not the catalogue — the full list sits
    directly below it. 24 covers makes a good collage on a desktop but eight rows
    of scrolling on a phone before the visitor reaches anything useful. Two rows
