@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-08-25T19:17:27.405Z",
+  "generatedAt": "2026-08-25T19:22:27.391Z",
   "note": "Read-only operational snapshot. Emails are masked; no full contact list is stored here.",
   "summary": {
     "showsWithOutreach": 1,
@@ -88,7 +88,7 @@
           {
             "name": "Paul George",
             "emailMasked": "p***@podwallentertainment.com",
-            "daysSinceFirstEmail": 40,
+            "daysSinceFirstEmail": 41,
             "opened": false,
             "openCount": 0
           },
