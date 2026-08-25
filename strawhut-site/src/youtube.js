@@ -222,60 +222,82 @@ export function matchEpisodesToVideos(episodes, videos) {
 }
 
 // ---------------------------------------------------------------------------
-// YouTube Data API v3 — EXACT view counts for a playlist (for the Wicked
-// performance dashboard / case study). The scraper above yields rounded counts
-// ("531K views"); a stats page needs exact figures, so this uses the official
-// API. Inert until YOUTUBE_API_KEY is set — safe to ship before the key exists.
-//   YOUTUBE_API_KEY     (required)  YouTube Data API v3 key (free, Google Cloud).
+// EXACT public view counts for a playlist — KEYLESS (for the Wicked performance
+// dashboard / case study). View counts are PUBLIC, and each watch page embeds
+// the exact integer (e.g. "163,006 views") in its initial data — so no API key
+// and no channel access is needed; this reads the same public number a visitor
+// sees, just precisely and in bulk. YouTube serves a lighter page variant on
+// some hits, so each video is retried until the count is found.
 //   WICKED_YT_PLAYLIST  (optional)  playlist id; defaults to the Wicked playlist.
 // ---------------------------------------------------------------------------
-const YT_API = 'https://www.googleapis.com/youtube/v3';
-const YT_KEY = (process.env.YOUTUBE_API_KEY || '').trim();
 const WICKED_PLAYLIST = 'PLZEqWHL3T_etL2c1-6P6w4Xhtit2sjCvG';
+const VIEW_PATTERNS = [
+  /"videoViewCountRenderer":\{"viewCount":\{"simpleText":"([\d,]+) views"/,
+  /itemprop="interactionCount"\s+content="(\d+)"/,
+  /"viewCount":\{"simpleText":"([\d,]+) views"/,
+  /"videoDetails":\{[\s\S]*?"viewCount":"(\d+)"/,
+  /"viewCount":"(\d+)"/,
+];
 
-export function youtubeApiConfigured() {
-  return !!YT_KEY;
+async function ytPage(url) {
+  const res = await fetch(url, { headers: { 'User-Agent': UA, 'Accept-Language': 'en-US', Cookie: 'CONSENT=YES+1' } });
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  return res.text();
 }
 
-async function ytApi(path, params = {}) {
-  const qs = new URLSearchParams({ ...params, key: YT_KEY }).toString();
-  const res = await fetch(`${YT_API}/${path}?${qs}`, { headers: { Accept: 'application/json' } });
-  if (!res.ok) throw new Error(`YouTube ${path} → ${res.status}: ${(await res.text().catch(() => '')).slice(0, 160)}`);
-  return res.json();
+async function playlistVideoIds(playlistId) {
+  const html = await ytPage(`https://www.youtube.com/playlist?list=${encodeURIComponent(playlistId)}`);
+  const ids = [];
+  for (const m of html.matchAll(/"videoId":"([A-Za-z0-9_-]{11})"/g)) {
+    if (!ids.includes(m[1])) ids.push(m[1]);
+  }
+  return ids;
 }
 
-/** Exact aggregate view counts for every video in the Wicked playlist. */
-export async function wickedYoutubeStats({ playlistId = process.env.WICKED_YT_PLAYLIST || WICKED_PLAYLIST } = {}) {
-  if (!youtubeApiConfigured()) return { configured: false, reason: 'YOUTUBE_API_KEY not set' };
-  try {
-    const ids = [];
-    let pageToken = '';
-    for (let i = 0; i < 10; i++) {
-      const page = await ytApi('playlistItems', { part: 'contentDetails', maxResults: '50', playlistId, ...(pageToken ? { pageToken } : {}) });
-      for (const item of page.items || []) {
-        const vid = item.contentDetails && item.contentDetails.videoId;
-        if (vid) ids.push(vid);
+// Exact views + title for one video, retried across YouTube's page variants.
+async function videoStats(id, { retries = 5 } = {}) {
+  for (let attempt = 0; attempt < retries; attempt++) {
+    try {
+      const html = await ytPage(`https://www.youtube.com/watch?v=${id}`);
+      let views = null;
+      for (const p of VIEW_PATTERNS) {
+        const m = html.match(p);
+        if (m) { views = parseInt(m[1].replace(/,/g, ''), 10); break; }
       }
-      pageToken = page.nextPageToken || '';
-      if (!pageToken) break;
-    }
+      if (views != null) {
+        const tm = html.match(/<meta name="title" content="([^"]+)"/);
+        return { id, views, title: tm ? tm[1] : '' };
+      }
+    } catch {}
+    await sleep(1000);
+  }
+  return { id, views: null, title: '' };
+}
+
+/**
+ * Exact aggregate view counts for every video in the Wicked playlist — keyless.
+ * Read-only public data. Returns per-video and total views.
+ */
+export async function wickedYoutubeStats({ playlistId = process.env.WICKED_YT_PLAYLIST || WICKED_PLAYLIST } = {}) {
+  try {
+    const ids = await playlistVideoIds(playlistId);
     if (!ids.length) return { configured: true, playlistId, error: 'no videos found in playlist' };
     const videos = [];
-    for (let i = 0; i < ids.length; i += 50) {
-      const stats = await ytApi('videos', { part: 'statistics,snippet', id: ids.slice(i, i + 50).join(',') });
-      for (const v of stats.items || []) {
-        videos.push({
-          id: v.id,
-          title: (v.snippet && v.snippet.title) || '',
-          views: parseInt((v.statistics && v.statistics.viewCount) || '0', 10),
-          likes: parseInt((v.statistics && v.statistics.likeCount) || '0', 10) || undefined,
-          published: (v.snippet && v.snippet.publishedAt) || '',
-        });
-      }
+    for (const id of ids) {
+      videos.push(await videoStats(id)); // sequential: rapid-fire hits get throttled
+      await sleep(300);
     }
-    const totalViews = videos.reduce((s, v) => s + (v.views || 0), 0);
-    videos.sort((a, b) => (a.published || '').localeCompare(b.published || ''));
-    return { configured: true, playlistId, videoCount: videos.length, totalViews, videos };
+    const found = videos.filter((v) => typeof v.views === 'number');
+    const totalViews = found.reduce((s, v) => s + v.views, 0);
+    return {
+      configured: true,
+      playlistId,
+      videoCount: videos.length,
+      resolved: found.length,
+      totalViews,
+      complete: found.length === videos.length,
+      videos,
+    };
   } catch (e) {
     return { configured: true, error: e.message };
   }
