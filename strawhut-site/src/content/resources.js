@@ -15,6 +15,58 @@
 
 export const POSTS = [
   {
+    slug: 'wicked-official-podcast-case-study',
+    title: 'Case Study: Wicked — The Official Podcast, Built to 11.7M in 11 Weeks',
+    description:
+      'How Straw Hut Media wrote, produced, edited, and distributed Wicked: The Official Podcast — reaching 11.7 million across platforms in its first 11 weeks with zero paid promotion, a 4.9-star Spotify rating (top 2% of all shows), and watch-through rates that doubled the industry norm.',
+    category: 'Case Study',
+    dek: 'A full-service companion podcast for one of the biggest films of the year — built from the ground up, and the numbers to show for it.',
+    keywords: ['branded podcast case study', 'official companion podcast', 'podcast production case study', 'Wicked podcast', 'full-service podcast production', 'branded podcast results'],
+    published: '2026-08-25',
+    updated: '2026-08-25',
+    readingTime: '4 min read',
+    body_html: `
+<p>When a film reaches the scale of <strong>Wicked</strong>, the companion podcast can't be an afterthought — it has to feel like part of the event. <strong>Straw Hut Media produced <em>Wicked: The Official Podcast</em> end to end</strong>: we developed it, wrote and scripted it, ran the recordings, handled all of post-production, built the key art, and distributed it across every major platform. Hosted by <em>Vanity Fair</em>'s Chris Murphy, the series took listeners behind the curtain of Jon M. Chu's <em>Wicked: For Good</em> with the people who made it — Cynthia Erivo, Ariana Grande, director Jon M. Chu, producer Marc Platt, and composer Stephen Schwartz among them.</p>
+
+<h2>The brief</h2>
+<p>Launch an official companion podcast from zero, timed to a global theatrical release, at a level of polish worthy of the franchise — and do it fast enough to ride the film's release window, when attention is at its absolute peak.</p>
+
+<h2>What we did</h2>
+<p>This is what "full-service" actually means in practice:</p>
+<ul>
+<li><strong>Development &amp; writing</strong> — the concept, the episode arc, and the scripts that gave each conversation shape.</li>
+<li><strong>Recording</strong> — remote sessions with the cast and creative team, directed and captured at broadcast quality.</li>
+<li><strong>Full post-production</strong> — editing, sound design, mix, and master on all eight episodes.</li>
+<li><strong>Key art &amp; assets</strong> — cover art, episode thumbnails, and a run of short-form clips for social.</li>
+<li><strong>Distribution</strong> — published across Apple, Spotify, YouTube, and every major platform, then promoted through clips built to travel.</li>
+</ul>
+
+<h2>The results — first 11 weeks, zero paid promotion</h2>
+<p>Every number below is organic. Nothing here was bought.</p>
+<ul>
+<li><strong>11.7M+ combined reach</strong> across podcast, YouTube, Instagram, and TikTok — in just 11 weeks.</li>
+<li><strong>717,404 plays on the show itself</strong> — 186,193 podcast downloads plus 531,211 YouTube views.</li>
+<li><strong>5.6M Instagram + 5.4M TikTok views</strong> on the clips we cut from each episode.</li>
+<li><strong>1.46M average views per episode</strong> across platforms.</li>
+<li><strong>4.9 / 5.0 on Spotify</strong> — the top 2% of all shows — and <strong>4.6 / 5.0 on Apple</strong>.</li>
+<li><strong>57% average watch-through on Spotify video</strong>, peaking at <strong>81%</strong> — against an industry norm of 35–45%.</li>
+<li><strong>20+ minutes average listen time</strong> per episode, on 40–50 minute shows.</li>
+<li><strong>97% of listeners</strong> landed squarely in the film's core 18–54 demographic.</li>
+</ul>
+
+<h2>Why it worked</h2>
+<p>Three things, in order. <strong>Quality</strong> — the show sounded and felt like a premium production because it was one, and audiences reward that with the kind of watch-through most podcasts never see. <strong>Full-service speed</strong> — because one team handled development through distribution, we moved fast enough to launch inside the release window instead of missing it. And <strong>fandom</strong> — scripts and clips built for how <em>Wicked</em> fans actually watch and share turned a companion podcast into a destination of its own.</p>
+
+<p>That's the whole idea of full-service production: you hand us the vision, and we return a finished show — and the audience to go with it.</p>
+`,
+    faq: [
+      ['Did Straw Hut Media produce Wicked: The Official Podcast?', 'Yes. Straw Hut Media produced Wicked: The Official Podcast end to end — development, writing and scripting, recording, full post-production (edit, sound design, mix, and master), key art, and distribution across every major platform.'],
+      ['How big did the podcast get?', 'In its first 11 weeks, with zero paid promotion, the series reached more than 11.7 million across podcast, YouTube, Instagram, and TikTok — including 717,404 plays on the show itself (186,193 podcast downloads and 531,211 YouTube views), a 4.9 out of 5 rating on Spotify (top 2% of all shows), and a 57% average watch-through that peaked at 81%.'],
+      ['What does full-service podcast production include?', 'Full-service means one team handles everything: concept and development, writing, recording and direction, editing and sound design, mixing and mastering, cover art and thumbnails, short-form social clips, and distribution and optimization across every platform — so the host or brand just shows up and does the part only they can do.'],
+      ['Can Straw Hut Media build a companion or branded podcast for us?', 'Yes. Straw Hut Media builds official companion podcasts and branded shows for films, studios, brands, and businesses — from first idea to launch and growth. Book a quick call and we will map out exactly what your show would take.'],
+    ],
+  },
+  {
     slug: 'how-to-start-a-podcast',
     title: 'How to Start a Podcast in 2026: A Complete Step-by-Step Guide',
     description:
