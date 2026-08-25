@@ -174,20 +174,22 @@ export async function downloadsBySlug(store, { log = () => {} } = {}) {
  * no PII — the same numbers we publish in the public case study. Cached by the
  * caller; safe to expose as read-only JSON.
  */
-export async function wickedStats({ log = () => {} } = {}) {
+export async function showMegaphoneStats({ match = 'wicked', log = () => {} } = {}) {
   if (!megaphoneConfigured()) return { configured: false, reason: 'Megaphone API not configured' };
   const pods = await listPodcasts();
-  const wicked = pods.find((p) => norm(p.title).includes('wicked'));
-  if (!wicked) return { configured: true, found: false, networkPodcasts: pods.length };
-  const id = wicked.id || wicked.uid;
+  const needle = norm(match);
+  const show = pods.find((p) => norm(p.title).includes(needle));
+  if (!show) return { configured: true, found: false, match, networkPodcasts: pods.length };
+  const id = show.id || show.uid;
   const out = {
     configured: true,
     found: true,
-    title: wicked.title,
+    title: show.title,
     id,
     podcastFields: {},
-    extractedDownloads: extractDownloads(wicked),
+    extractedDownloads: extractDownloads(show),
   };
+  const wicked = show; // reuse below without renaming every reference
   for (const f of DL_FIELDS) if (wicked[f] != null) out.podcastFields[f] = wicked[f];
   // Per-podcast analytics (often a rolling window, not lifetime — we surface it raw).
   try {
@@ -213,6 +215,11 @@ export async function wickedStats({ log = () => {} } = {}) {
     }
   } catch (e) { out.s3Error = e.message; }
   return out;
+}
+
+/** Back-compat wrapper: the Wicked-specific stats endpoint. */
+export async function wickedStats(opts = {}) {
+  return showMegaphoneStats({ ...opts, match: 'wicked' });
 }
 
 /** Rank shows by real Megaphone downloads (S3 export) and feature the top N. */

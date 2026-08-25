@@ -22,7 +22,7 @@ import * as reco from './recommend.js';
 import { matchAllShows, matchShowVideos } from './youtube.js';
 import { refreshPress } from './press.js';
 import { applyMonthlyRotation } from './spotlight.js';
-import { applyPopularSpotlight, megaphoneConfigured, wickedStats } from './popularity.js';
+import { applyPopularSpotlight, megaphoneConfigured, wickedStats, showMegaphoneStats } from './popularity.js';
 import { wickedYoutubeStats } from './youtube.js';
 import { resolveArtwork, imageWidth, MIN_ACCEPTABLE } from './artwork.js';
 import { inspect as inspectSubmission } from './antispam.js';
@@ -783,6 +783,35 @@ app.get('/diag/wicked.json', async (req, res) => {
       _wickedCache = { at: Date.now(), data: { megaphone, youtube } };
     }
     res.json({ ok: true, cachedAt: new Date(_wickedCache.at).toISOString(), ...(_wickedCache.data || {}) });
+  } catch (e) {
+    res.status(500).json({ ok: false, error: e.message });
+  }
+});
+
+// Generalized version of /diag/wicked.json for ANY show — used to pull real
+// numbers for the case studies (Seen on the Screen, Soul & Science, …).
+//   ?show=<substring of the Megaphone podcast title>   (required)
+//   ?playlist=<youtube playlist id>                     (optional, adds YT views)
+// Aggregate, read-only, cached 6h per query.
+const _showStatsCache = new Map();
+app.get('/diag/showstats.json', async (req, res) => {
+  const show = String(req.query.show || '').trim();
+  const playlist = String(req.query.playlist || '').trim();
+  if (!show) return res.status(400).json({ ok: false, error: 'pass ?show=<title substring>' });
+  const key = `${show}::${playlist}`;
+  try {
+    const cached = _showStatsCache.get(key);
+    if (!cached || Date.now() - cached.at > 6 * 3600 * 1000) {
+      const [megaphone, youtube] = await Promise.all([
+        showMegaphoneStats({ match: show, log: (m) => console.log('[showstats]', m) }),
+        playlist
+          ? wickedYoutubeStats({ playlistId: playlist }).catch((e) => ({ configured: true, error: e.message }))
+          : Promise.resolve({ skipped: 'no ?playlist provided' }),
+      ]);
+      _showStatsCache.set(key, { at: Date.now(), data: { show, playlist: playlist || null, megaphone, youtube } });
+    }
+    const hit = _showStatsCache.get(key);
+    res.json({ ok: true, cachedAt: new Date(hit.at).toISOString(), ...hit.data });
   } catch (e) {
     res.status(500).json({ ok: false, error: e.message });
   }
