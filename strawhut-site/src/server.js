@@ -22,7 +22,7 @@ import * as reco from './recommend.js';
 import { matchAllShows, matchShowVideos } from './youtube.js';
 import { refreshPress } from './press.js';
 import { applyMonthlyRotation } from './spotlight.js';
-import { applyPopularSpotlight, megaphoneConfigured } from './popularity.js';
+import { applyPopularSpotlight, megaphoneConfigured, wickedStats } from './popularity.js';
 import { resolveArtwork, imageWidth, MIN_ACCEPTABLE } from './artwork.js';
 import { inspect as inspectSubmission } from './antispam.js';
 import { verifyTurnstile, turnstileConfigured } from './turnstile.js';
@@ -764,6 +764,24 @@ app.get('/healthz', async (req, res) => {
     lastEnrichError: _lastEnrichError,
     spotlight: { source: sp.source, shows: titles },
   });
+});
+
+// Read-only Wicked download numbers pulled straight from Megaphone, server-side
+// (so the API token never leaves the server). Feeds the standalone Wicked
+// performance dashboard so it can be refreshed with real figures instead of
+// hardcoded ones. Aggregate numbers only — the same figures we publish in the
+// public case study. Cached 6h so it can't be used to hammer the Megaphone API.
+let _wickedCache = null;
+app.get('/diag/wicked.json', async (req, res) => {
+  try {
+    if (!_wickedCache || Date.now() - _wickedCache.at > 6 * 3600 * 1000) {
+      const data = await wickedStats({ log: (m) => console.log('[wicked]', m) });
+      _wickedCache = { at: Date.now(), data };
+    }
+    res.json({ ok: true, cachedAt: new Date(_wickedCache.at).toISOString(), ...(_wickedCache.data || {}) });
+  } catch (e) {
+    res.status(500).json({ ok: false, error: e.message });
+  }
 });
 
 // Which shows exist here — used by Podbooster to decide whether to offer the
