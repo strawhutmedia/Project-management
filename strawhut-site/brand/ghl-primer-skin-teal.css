@@ -1,55 +1,56 @@
 /* ============================================================
-   STRAW HUT MEDIA — brand skin for the Podcast Primer funnel
-   Paste into GHL: Funnel/Website Settings → Custom CSS
-   Uses Poppins (already loaded) + the strawhutmedia.com palette.
+   STRAW HUT MEDIA — TEAL-PRIMARY brand skin (Podcast Primer course)
+   Paste into GHL → Funnel/Site Settings → Custom CSS.
+   Teal is the dominant color; gold + white are the accents.
+   Poppins (already loaded) throughout.
    ============================================================ */
 :root{
-  --shm-navy:#12182f; --shm-navy-2:#1a2140; --shm-card:#1c2340; --shm-card-2:#232c4e;
-  --shm-border:#3a456c; --shm-text:#f2f3f8; --shm-muted:#9aa2c0;
-  --shm-teal:#00cc8e; --shm-teal-2:#00b57e; --shm-gold:#d59b1e; --shm-ink:#023324;
-  /* re-point GHL's own font tokens to the brand font */
+  --shm-teal:#00cc8e; --shm-teal-br:#00e6a0;
+  --teal-bg1:#064a3b; --teal-bg2:#022a21;      /* deep teal canvas */
+  --teal-card:#0a5344; --teal-card-2:#0d6252;  /* teal cards */
+  --teal-border:#1c7d68;
+  --shm-text:#f1fbf7; --shm-muted:#a9dccf;
+  --shm-gold:#e7b23f; --shm-ink:#022018; --shm-white:#ffffff;
   --headlinefont:'Poppins',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
   --contentfont:'Poppins',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
-  --hover-fill-color:#00b57e; --hover-border-color:#00b57e;
+  --hover-fill-color:#ffffff; --hover-border-color:#ffffff;
 }
 
-/* ---- page canvas: brand navy gradient everywhere ---- */
-html,body{ background:var(--shm-navy)!important; }
-body{ background:linear-gradient(180deg,var(--shm-navy) 0%,var(--shm-navy-2) 100%)!important;
+/* ---- canvas: deep-teal gradient everywhere ---- */
+html,body{ background:var(--teal-bg1)!important; }
+body{ background:linear-gradient(180deg,var(--teal-bg1) 0%,var(--teal-bg2) 100%)!important;
       background-attachment:fixed!important; color:var(--shm-text)!important; }
-
-/* sections/rows: let the navy show through; neutralize white blocks */
 .c-section, .c-section > .inner, .c-row, .c-column, .row-bg, .bgCover{ background-color:transparent!important; }
 [style*="background-color:var(--white)"], [style*="background-color:#fff"],
 [style*="background-color: #fff"], [style*="background-color:#ffffff"],
 [style*="background-color: rgb(255, 255, 255)"], [style*="background:#fff"]{
-  background-color:var(--shm-card)!important; background:var(--shm-card)!important;
+  background-color:var(--teal-card)!important; background:var(--teal-card)!important;
 }
 
-/* ---- typography ---- */
+/* ---- typography: white headings, GOLD eyebrows/sub-heads ---- */
 .c-heading, .c-heading *{ font-family:var(--headlinefont)!important; color:var(--shm-text)!important; }
-.c-sub-heading, .c-sub-heading *{ font-family:var(--headlinefont)!important; color:var(--shm-teal)!important;
-  letter-spacing:.04em; text-transform:none; }
+.c-sub-heading, .c-sub-heading *{ font-family:var(--headlinefont)!important; color:var(--shm-gold)!important;
+  letter-spacing:.05em; }
 p, li, span, .item-text, .c-text, .c-wrapper{ font-family:var(--contentfont)!important; }
 p, li, .item-text{ color:var(--shm-text)!important; }
 
-/* ---- PRIMARY CTA buttons (Get Course Now) → solid teal pill ---- */
+/* ---- PRIMARY CTA (Get Course Now) → white pill, teal ink ---- */
 .c-button [class*="cbutton-"].buttonRocking, a[class*="cbutton-"].buttonRocking{
-  background:var(--shm-teal)!important; background-image:none!important;
+  background:var(--shm-white)!important; background-image:none!important;
   border:none!important; border-radius:999px!important;
-  box-shadow:0 12px 26px rgba(0,204,142,.30)!important;
+  box-shadow:0 14px 30px rgba(0,0,0,.28)!important;
   transition:transform .15s ease, box-shadow .15s ease, background .15s ease!important;
 }
 .buttonRocking .main-heading-button, .buttonRocking .sub-heading-button,
 .c-button [class*="cbutton-"].buttonRocking *{
-  color:var(--shm-ink)!important; font-family:var(--headlinefont)!important; font-weight:700!important;
+  color:#046b4d!important; font-family:var(--headlinefont)!important; font-weight:700!important;
 }
 .c-button [class*="cbutton-"].buttonRocking:hover, a[class*="cbutton-"].buttonRocking:hover{
-  background:var(--shm-teal-2)!important; transform:translateY(-1px)!important;
-  box-shadow:0 16px 32px rgba(0,204,142,.38)!important;
+  background:#eafff8!important; transform:translateY(-1px)!important;
+  box-shadow:0 18px 38px rgba(0,0,0,.34)!important;
 }
 
-/* ---- utility "buttons" (No Thanks link, footer contact rows) → quiet text ---- */
+/* ---- utility "buttons" (No Thanks link, footer contact rows) → quiet ---- */
 .c-button [class*="cbutton-"]:not(.buttonRocking){
   background:transparent!important; background-image:none!important;
   box-shadow:none!important; border:none!important;
@@ -58,14 +59,14 @@ p, li, .item-text{ color:var(--shm-text)!important; }
 .c-button [class*="cbutton-"]:not(.buttonRocking) .sub-heading-button{
   color:var(--shm-muted)!important; font-family:var(--contentfont)!important; font-weight:500!important;
 }
-.c-button [class*="cbutton-"]:not(.buttonRocking):hover .main-heading-button{ color:var(--shm-text)!important; }
+.c-button [class*="cbutton-"]:not(.buttonRocking):hover .main-heading-button{ color:var(--shm-white)!important; }
 
 /* ---- PRIVACY: hide the personal cell number in the footer ---- */
 [aria-label*="807-7138"]{ display:none!important; }
 
-/* ---- FAQ accordion → brand cards ---- */
+/* ---- FAQ accordion → teal cards ---- */
 .faq-separated-child.hl-faq-child, .hl-faq-child{
-  background:var(--shm-card)!important; border:1px solid var(--shm-border)!important;
+  background:var(--teal-card)!important; border:1px solid var(--teal-border)!important;
   border-radius:14px!important; margin-bottom:12px!important; overflow:hidden!important;
 }
 .hl-faq-child-heading, .hl-faq-child-heading-text, .hl-faq-child-head{
@@ -74,8 +75,8 @@ p, li, .item-text{ color:var(--shm-text)!important; }
 .hl-faq-child-item-text, .hl-faq-child-panel, .hl-faq-child-panel *{
   color:var(--shm-muted)!important; font-family:var(--contentfont)!important;
 }
-.hl-faq-child-heading-icon{ color:var(--shm-teal)!important; }
+.hl-faq-child-heading-icon{ color:var(--shm-gold)!important; }
 
-/* ---- links + misc accents ---- */
-a{ color:var(--shm-teal); }
-.enable-sound-button{ background:rgba(2,51,36,.7)!important; border-radius:999px!important; }
+/* ---- links + misc ---- */
+a{ color:var(--shm-gold); }
+.enable-sound-button{ background:rgba(2,32,24,.7)!important; border-radius:999px!important; }
