@@ -393,7 +393,7 @@ function footerBlock() {
       <div class="footer-col">
         <div class="footer-h">Get started</div>
         <a href="/book">Book a 15-min call</a>
-        <a href="/pricing">Packages &amp; pricing</a>
+        <a href="/podcast-primer">Free podcasting course</a>
       </div>
     </div>
     ${recentList}
@@ -1396,7 +1396,6 @@ export function servicesHubPage() {
     <p>Straw Hut Media is a full-service podcast production company and network based in Hollywood. We build shows from the idea up, distribute them, sell the ads that pay for them, and rent the studio they are recorded in — and you can use any one piece of that on its own.</p>
     <div style="margin-top:22px">
       <a class="btn btn-primary" href="/book">Book a 15-min call →</a>
-      <a class="btn btn-ghost" href="/pricing" style="margin-left:8px">See packages &amp; pricing</a>
     </div>
   </div></section>
 
