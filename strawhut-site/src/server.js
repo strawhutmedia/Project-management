@@ -28,7 +28,7 @@ import { resolveArtwork, imageWidth, MIN_ACCEPTABLE } from './artwork.js';
 import { inspect as inspectSubmission } from './antispam.js';
 import { verifyTurnstile, turnstileConfigured } from './turnstile.js';
 import { ghlConfigured, verifyGhl, upsertContact, ghlLastError,
-         resolveBookingCalendar, ghlBookingState, probeGhlToken, ghlProbeState, diagFunnelsCourses } from './ghl.js';
+         resolveBookingCalendar, ghlBookingState, probeGhlToken, ghlProbeState } from './ghl.js';
 import { toText as plainText, endsSentence } from './util.js';
 import { handleLeadHook } from './leadHook.js';
 import { startLeadOps } from './leadOps.js';
@@ -812,17 +812,6 @@ app.get('/diag/showstats.json', async (req, res) => {
     }
     const hit = _showStatsCache.get(key);
     res.json({ ok: true, cachedAt: new Date(hit.at).toISOString(), ...hit.data });
-  } catch (e) {
-    res.status(500).json({ ok: false, error: e.message });
-  }
-});
-
-// TEMP: read-only GHL funnel/course map, token-gated. Delete after setup.
-app.get('/diag/ghl-map/:token', async (req, res) => {
-  if (req.params.token !== 'shm-primer-map-9x27') return res.status(404).end();
-  try {
-    const data = await diagFunnelsCourses();
-    res.json({ ok: true, ...data });
   } catch (e) {
     res.status(500).json({ ok: false, error: e.message });
   }
