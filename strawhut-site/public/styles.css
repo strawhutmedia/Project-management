@@ -1040,21 +1040,38 @@ table.admin-table { width: 100%; border-collapse: collapse; }
   .nav {
     position: absolute; top: 100%; left: 0; right: 0;
     flex-direction: column; align-items: stretch; gap: 0;
-    background: rgba(18, 24, 47, 0.98); /* opaque; no backdrop-filter (scroll perf) */
+    /* Distinct elevated panel: lighter than the page navy, with a teal accent
+       line and a drop shadow so the open menu clearly floats above the content
+       instead of blending into the background. Opaque — no backdrop-filter,
+       which hurts scroll performance. */
+    background: linear-gradient(180deg, #232c4e 0%, #1a2140 100%);
+    border-top: 2px solid var(--accent);
     border-bottom: 1px solid var(--border);
+    box-shadow: 0 26px 44px rgba(0, 0, 0, 0.5);
     max-height: 0; overflow: hidden; transition: max-height 0.28s ease;
   }
-  .nav.open { max-height: 60vh; }
-  .nav a { padding: 15px 6vw; border-top: 1px solid var(--border); font-size: 1.02rem; }
+  .nav.open { max-height: 75vh; }
+  .nav a {
+    padding: 16px 6vw; border-top: 1px solid rgba(255, 255, 255, 0.07);
+    font-size: 1.05rem; position: relative;
+    transition: background 0.15s, color 0.15s, box-shadow 0.15s;
+  }
   .nav a:first-child { border-top: none; }
+  .nav a:hover, .nav a:active, .nav a.active {
+    background: rgba(0, 204, 142, 0.12); color: var(--text);
+    box-shadow: inset 4px 0 0 var(--accent);
+  }
   /* On mobile the Promote CTA reads as a normal nav row like the rest, not a
      standout green button (which was easy to miss). */
   .nav a.nav-cta {
     background: transparent; color: var(--muted); font-weight: 500;
-    margin: 0; padding: 15px 6vw; border-radius: 0; border-top: 1px solid var(--border);
-    text-align: left; font-size: 1.02rem;
+    margin: 0; padding: 16px 6vw; border-radius: 0; border-top: 1px solid rgba(255, 255, 255, 0.07);
+    text-align: left; font-size: 1.05rem;
   }
-  .nav a.nav-cta:hover, .nav a.nav-cta:active { background: transparent; color: var(--text); transform: none; }
+  .nav a.nav-cta:hover, .nav a.nav-cta:active {
+    background: rgba(0, 204, 142, 0.12); color: var(--text); transform: none;
+    box-shadow: inset 4px 0 0 var(--accent);
+  }
   /* 2-up cover art on mobile instead of one giant image per row */
   .grid { grid-template-columns: repeat(2, 1fr); gap: 12px; }
   .show-card h3 { font-size: 0.92rem; }
