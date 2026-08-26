@@ -881,7 +881,7 @@ export function resourcesIndexPage({ posts }) {
     <div class="breadcrumb" style="padding:0 0 14px"><a href="/">Home</a> / Resources</div>
     <h1>Podcasting <span class="accent">guides &amp; resources</span></h1>
     <p>Straight-talking guides to starting, producing, growing, and monetizing a podcast — written by the team at Straw Hut Media. No fluff, no filler.</p>
-    <p style="background:rgba(0,204,142,0.10);border:1px solid rgba(0,204,142,0.35);border-radius:12px;padding:14px 16px;margin:14px 0 0;max-width:640px">🎧 <strong>New to podcasting?</strong> Start with our <a href="https://primer.strawhutmedia.com">free podcasting course</a> — the whole process, walked through step by step, for free.</p>
+    <p style="background:rgba(0,204,142,0.10);border:1px solid rgba(0,204,142,0.35);border-radius:12px;padding:14px 16px;margin:14px 0 0;max-width:640px">🎧 <strong>New to podcasting?</strong> Start with our <a href="/podcast-primer" style="color:var(--accent);font-weight:700;text-decoration:underline">free podcasting course</a> — the whole process, walked through step by step. <a href="/podcast-primer" style="color:var(--accent);font-weight:700;text-decoration:none;white-space:nowrap">See the course →</a></p>
   </div></section>
   <section class="section" style="padding-top:8px"><div class="container">
     <div class="resource-grid">${cards}</div>

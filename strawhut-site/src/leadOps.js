@@ -18,7 +18,7 @@ import { sendOwnerEmail, sendLeadEmail, mailConfigured } from './mail.js';
 
 // Free podcasting course (GHL) — what we send unqualified leads instead of
 // spending a sales cycle on them. Casual, genuinely helpful, soft door left open.
-const COURSE_URL = 'https://primer.strawhutmedia.com';
+const COURSE_URL = 'https://www.strawhutmedia.com/podcast-primer';
 function courseEmailToLead(b) {
   const first = String(b.name || '').trim().split(/\s+/)[0] || 'there';
   const subject = 'Looking forward to your call — plus a free head start';
