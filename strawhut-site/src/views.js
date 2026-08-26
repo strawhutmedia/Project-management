@@ -2156,10 +2156,13 @@ export function episodePage({ show, episode, moreFromShow = [], related = [], ad
 }
 
 // --- Podcast Primer course (sales page on our own site) --------------------
-// A site-quality landing page for the "Podcast Primer Pro" course. The CTAs
-// hand off to the existing GHL/course checkout (payments + delivery unchanged);
-// everything visible here is our own components so it matches strawhutmedia.com.
-const COURSE_OFFER_URL = 'https://course.strawhutmedia.com/offers/888909af-7dc5-4cfa-8e85-fe7c6f8813df';
+// A site-quality landing page for the "Podcast Primer Pro" course.
+// NOTE: the old checkout (course.strawhutmedia.com/offers/888909af-...) is dead
+// — that whole domain 404s, so the old GHL page's button was broken too. Until
+// the real enrollment URL is confirmed, CTAs route to /book so nobody hits a
+// 404 and every click still reaches the CRM. Swap COURSE_OFFER_URL back to the
+// live checkout link once we have it.
+const COURSE_OFFER_URL = '/book';
 
 export function coursePage() {
   const included = [
@@ -2217,8 +2220,8 @@ export function coursePage() {
       <h1>Done-with-you podcast creation — taught by the team behind the shows</h1>
       <p>Learn to plan, record, edit, publish, and grow your podcast, with Straw Hut Media's CEO Ryan Tillotson walking you through every step — plus your first month of social content written and posted for you.</p>
       <div class="hero-cta">
-        <a class="btn btn-primary" href="${esc(COURSE_OFFER_URL)}" data-shm="course_cta_hero">Get the course</a>
-        <a class="btn btn-ghost" href="/book">Talk to us first</a>
+        <a class="btn btn-primary" href="${esc(COURSE_OFFER_URL)}" data-shm="course_cta_hero">Get started</a>
+        <a class="btn btn-ghost" href="/shows">Hear our shows</a>
       </div>
     </div>
     <div class="course-hero-media"><img src="/public/img/primer-poster.webp" alt="Ryan Tillotson recording a podcast in the Straw Hut Media studio" width="1200" height="675" loading="eager"></div>
@@ -2235,13 +2238,13 @@ export function coursePage() {
   <section class="section"><div class="container"><div class="cta-band">
     <h2>Automate your content. Free up your time.</h2>
     <p>Let us take care of your social media schedule, so you can focus on growing your business — and your show.</p>
-    <a class="btn btn-primary" href="${esc(COURSE_OFFER_URL)}" data-shm="course_cta_mid">Get the course →</a>
+    <a class="btn btn-primary" href="${esc(COURSE_OFFER_URL)}" data-shm="course_cta_mid">Get started →</a>
   </div></div></section>
   ${faqSection(faq)}
   <section class="section"><div class="container"><div class="cta-band">
     <h2>Ready to start your podcast?</h2>
     <p>Get the full Podcast Primer Pro course, the done-with-you support, and the community — and launch a show you're proud of.</p>
-    <a class="btn btn-primary" href="${esc(COURSE_OFFER_URL)}" data-shm="course_cta_footer">Get the course →</a>
+    <a class="btn btn-primary" href="${esc(COURSE_OFFER_URL)}" data-shm="course_cta_footer">Get started →</a>
   </div></div></section>
   ${audienceEvent('view_course', { course: 'podcast-primer-pro' })}`;
 
