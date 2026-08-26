@@ -1,22 +1,22 @@
 /* ============================================================
    STRAW HUT MEDIA — TEAL-PRIMARY brand skin (Podcast Primer course)
    Paste into GHL → Funnel/Site Settings → Custom CSS.
-   Teal is the dominant color; gold + white are the accents.
+   Bright teal is the dominant color; gold + white are the accents.
    Poppins (already loaded) throughout.
    ============================================================ */
 :root{
-  --shm-teal:#00cc8e; --shm-teal-br:#00e6a0;
-  --teal-bg1:#064a3b; --teal-bg2:#022a21;      /* deep teal canvas */
-  --teal-card:#0a5344; --teal-card-2:#0d6252;  /* teal cards */
-  --teal-border:#1c7d68;
-  --shm-text:#f1fbf7; --shm-muted:#a9dccf;
-  --shm-gold:#e7b23f; --shm-ink:#022018; --shm-white:#ffffff;
+  --shm-teal:#00cc8e; --shm-teal-br:#1fe7a6;
+  --teal-bg1:#0a9370; --teal-bg2:#06674f;       /* brighter, vivid teal canvas */
+  --teal-card:#07543f; --teal-card-2:#0a6b52;   /* darker teal cards for depth */
+  --teal-border:#1f9377;
+  --shm-text:#f4fdfa; --shm-muted:#cdeee3;
+  --shm-gold:#ffce5a; --shm-ink:#022018; --shm-white:#ffffff;
   --headlinefont:'Poppins',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
   --contentfont:'Poppins',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
   --hover-fill-color:#ffffff; --hover-border-color:#ffffff;
 }
 
-/* ---- canvas: deep-teal gradient everywhere ---- */
+/* ---- canvas: bright vivid-teal gradient everywhere ---- */
 html,body{ background:var(--teal-bg1)!important; }
 body{ background:linear-gradient(180deg,var(--teal-bg1) 0%,var(--teal-bg2) 100%)!important;
       background-attachment:fixed!important; color:var(--shm-text)!important; }
@@ -38,16 +38,16 @@ p, li, .item-text{ color:var(--shm-text)!important; }
 .c-button [class*="cbutton-"].buttonRocking, a[class*="cbutton-"].buttonRocking{
   background:var(--shm-white)!important; background-image:none!important;
   border:none!important; border-radius:999px!important;
-  box-shadow:0 14px 30px rgba(0,0,0,.28)!important;
+  box-shadow:0 14px 30px rgba(0,0,0,.30)!important;
   transition:transform .15s ease, box-shadow .15s ease, background .15s ease!important;
 }
 .buttonRocking .main-heading-button, .buttonRocking .sub-heading-button,
 .c-button [class*="cbutton-"].buttonRocking *{
-  color:#046b4d!important; font-family:var(--headlinefont)!important; font-weight:700!important;
+  color:#066b4d!important; font-family:var(--headlinefont)!important; font-weight:700!important;
 }
 .c-button [class*="cbutton-"].buttonRocking:hover, a[class*="cbutton-"].buttonRocking:hover{
   background:#eafff8!important; transform:translateY(-1px)!important;
-  box-shadow:0 18px 38px rgba(0,0,0,.34)!important;
+  box-shadow:0 18px 40px rgba(0,0,0,.36)!important;
 }
 
 /* ---- utility "buttons" (No Thanks link, footer contact rows) → quiet ---- */
@@ -61,8 +61,15 @@ p, li, .item-text{ color:var(--shm-text)!important; }
 }
 .c-button [class*="cbutton-"]:not(.buttonRocking):hover .main-heading-button{ color:var(--shm-white)!important; }
 
-/* ---- PRIVACY: hide the personal cell number in the footer ---- */
-[aria-label*="807-7138"]{ display:none!important; }
+/* ---- PRIVACY: replace the personal cell with the public number ----
+   The old element's tap-to-call still dials the cell, so we disable its
+   click and overwrite the visible text with the public line.            */
+[aria-label*="807-7138"]{ pointer-events:none!important; }
+[aria-label*="807-7138"] .main-heading-button{ font-size:0!important; line-height:0!important; }
+[aria-label*="807-7138"] .main-heading-button::after{
+  content:"Phone : (323) 553-5305"; font-size:16px; line-height:1.5;
+  color:var(--shm-muted); font-family:var(--contentfont);
+}
 
 /* ---- FAQ accordion → teal cards ---- */
 .faq-separated-child.hl-faq-child, .hl-faq-child{
