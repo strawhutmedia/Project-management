@@ -1,81 +1,90 @@
 /* ============================================================
-   STRAW HUT MEDIA — brand skin for the Podcast Primer funnel
-   Paste into GHL: Funnel/Website Settings → Custom CSS
-   Uses Poppins (already loaded) + the strawhutmedia.com palette.
+   STRAW HUT MEDIA — course skin that MATCHES strawhutmedia.com
+   Exact site tokens: navy gradient bg, WHITE text, Poppins,
+   teal buttons with black text (the site's .btn-primary).
+   Paste into GHL → page Custom CSS (or funnel head code).
    ============================================================ */
 :root{
-  --shm-navy:#12182f; --shm-navy-2:#1a2140; --shm-card:#1c2340; --shm-card-2:#232c4e;
-  --shm-border:#3a456c; --shm-text:#f2f3f8; --shm-muted:#9aa2c0;
-  --shm-teal:#00cc8e; --shm-teal-2:#00b57e; --shm-gold:#d59b1e; --shm-ink:#023324;
-  /* re-point GHL's own font tokens to the brand font */
-  --headlinefont:'Poppins',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
-  --contentfont:'Poppins',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
-  --hover-fill-color:#00b57e; --hover-border-color:#00b57e;
+  --bg:#12182f; --card:#1c2340; --card-2:#232c4e; --border:#3a456c;
+  --text:#f2f3f8; --muted:#9aa2c0; --accent:#00cc8e; --accent-hi:#00e6a0; --accent-ink:#000;
+  --headlinefont:'Poppins',system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;
+  --contentfont:'Poppins',system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;
+  --hover-fill-color:#00e6a0; --hover-border-color:#00e6a0;
 }
 
-/* ---- page canvas: brand navy gradient everywhere ---- */
-html,body{ background:var(--shm-navy)!important; }
-body{ background:linear-gradient(180deg,var(--shm-navy) 0%,var(--shm-navy-2) 100%)!important;
-      background-attachment:fixed!important; color:var(--shm-text)!important; }
-
-/* sections/rows: let the navy show through; neutralize white blocks */
+/* ---- canvas: the site's exact navy gradient ---- */
+html,body{ background:#12182f!important; }
+body{ background:#12182f linear-gradient(135deg,#12182f 0%,#1c2134 45%,#232c4e 100%) fixed!important;
+      color:var(--text)!important; }
 .c-section, .c-section > .inner, .c-row, .c-column, .row-bg, .bgCover{ background-color:transparent!important; }
 [style*="background-color:var(--white)"], [style*="background-color:#fff"],
 [style*="background-color: #fff"], [style*="background-color:#ffffff"],
 [style*="background-color: rgb(255, 255, 255)"], [style*="background:#fff"]{
-  background-color:var(--shm-card)!important; background:var(--shm-card)!important;
+  background-color:var(--card)!important; background:var(--card)!important;
 }
 
-/* ---- typography ---- */
-.c-heading, .c-heading *{ font-family:var(--headlinefont)!important; color:var(--shm-text)!important; }
-.c-sub-heading, .c-sub-heading *{ font-family:var(--headlinefont)!important; color:var(--shm-teal)!important;
-  letter-spacing:.04em; text-transform:none; }
+/* ---- typography: ALL text white (like the site) ---- */
+.c-heading, .c-heading *,
+.c-sub-heading, .c-sub-heading *{
+  font-family:var(--headlinefont)!important;
+  color:var(--text)!important; -webkit-text-fill-color:var(--text)!important;
+}
 p, li, span, .item-text, .c-text, .c-wrapper{ font-family:var(--contentfont)!important; }
-p, li, .item-text{ color:var(--shm-text)!important; }
+p, li, .item-text{ color:var(--text)!important; -webkit-text-fill-color:var(--text)!important; }
 
-/* ---- PRIMARY CTA buttons (Get Course Now) → solid teal pill ---- */
+/* ---- PRIMARY CTA = the site's .btn-primary: teal pill, BLACK text ---- */
 .c-button [class*="cbutton-"].buttonRocking, a[class*="cbutton-"].buttonRocking{
-  background:var(--shm-teal)!important; background-image:none!important;
-  border:none!important; border-radius:999px!important;
-  box-shadow:0 12px 26px rgba(0,204,142,.30)!important;
-  transition:transform .15s ease, box-shadow .15s ease, background .15s ease!important;
+  background:var(--accent)!important; background-image:none!important;
+  border:none!important; border-radius:999px!important; font-weight:600!important;
+  box-shadow:0 10px 30px rgba(0,0,0,.35)!important;
+  transition:transform .12s ease, background .15s ease!important;
 }
 .buttonRocking .main-heading-button, .buttonRocking .sub-heading-button,
 .c-button [class*="cbutton-"].buttonRocking *{
-  color:var(--shm-ink)!important; font-family:var(--headlinefont)!important; font-weight:700!important;
+  color:var(--accent-ink)!important; -webkit-text-fill-color:var(--accent-ink)!important;
+  font-family:var(--headlinefont)!important; font-weight:600!important;
 }
 .c-button [class*="cbutton-"].buttonRocking:hover, a[class*="cbutton-"].buttonRocking:hover{
-  background:var(--shm-teal-2)!important; transform:translateY(-1px)!important;
-  box-shadow:0 16px 32px rgba(0,204,142,.38)!important;
+  background:var(--accent-hi)!important; transform:translateY(-1px)!important;
 }
 
-/* ---- utility "buttons" (No Thanks link, footer contact rows) → quiet text ---- */
+/* ---- utility "buttons" (No Thanks link, footer rows) → quiet white ---- */
 .c-button [class*="cbutton-"]:not(.buttonRocking){
   background:transparent!important; background-image:none!important;
   box-shadow:none!important; border:none!important;
 }
 .c-button [class*="cbutton-"]:not(.buttonRocking) .main-heading-button,
 .c-button [class*="cbutton-"]:not(.buttonRocking) .sub-heading-button{
-  color:var(--shm-muted)!important; font-family:var(--contentfont)!important; font-weight:500!important;
+  color:var(--muted)!important; -webkit-text-fill-color:var(--muted)!important;
+  font-family:var(--contentfont)!important; font-weight:500!important;
 }
-.c-button [class*="cbutton-"]:not(.buttonRocking):hover .main-heading-button{ color:var(--shm-text)!important; }
+.c-button [class*="cbutton-"]:not(.buttonRocking):hover .main-heading-button{
+  color:var(--text)!important; -webkit-text-fill-color:var(--text)!important;
+}
 
-/* ---- PRIVACY: hide the personal cell number in the footer ---- */
-[aria-label*="807-7138"]{ display:none!important; }
+/* ---- PRIVACY: replace personal cell with the public number ---- */
+[aria-label*="807-7138"]{ pointer-events:none!important; }
+[aria-label*="807-7138"] .main-heading-button{ font-size:0!important; line-height:0!important; }
+[aria-label*="807-7138"] .main-heading-button::after{
+  content:"Phone : (323) 553-5305"; font-size:16px; line-height:1.5;
+  color:var(--muted); -webkit-text-fill-color:var(--muted); font-family:var(--contentfont);
+}
 
-/* ---- FAQ accordion → brand cards ---- */
+/* ---- FAQ accordion = site card style (navy card, teal-ish border) ---- */
 .faq-separated-child.hl-faq-child, .hl-faq-child{
-  background:var(--shm-card)!important; border:1px solid var(--shm-border)!important;
-  border-radius:14px!important; margin-bottom:12px!important; overflow:hidden!important;
+  background:var(--card)!important; border:1px solid var(--border)!important;
+  border-radius:16px!important; margin-bottom:12px!important; overflow:hidden!important;
 }
 .hl-faq-child-heading, .hl-faq-child-heading-text, .hl-faq-child-head{
-  color:var(--shm-text)!important; font-family:var(--headlinefont)!important; background:transparent!important;
+  color:var(--text)!important; -webkit-text-fill-color:var(--text)!important;
+  font-family:var(--headlinefont)!important; background:transparent!important;
 }
 .hl-faq-child-item-text, .hl-faq-child-panel, .hl-faq-child-panel *{
-  color:var(--shm-muted)!important; font-family:var(--contentfont)!important;
+  color:var(--muted)!important; -webkit-text-fill-color:var(--muted)!important;
+  font-family:var(--contentfont)!important;
 }
-.hl-faq-child-heading-icon{ color:var(--shm-teal)!important; }
+.hl-faq-child-heading-icon{ color:var(--accent)!important; -webkit-text-fill-color:var(--accent)!important; }
 
-/* ---- links + misc accents ---- */
-a{ color:var(--shm-teal); }
-.enable-sound-button{ background:rgba(2,51,36,.7)!important; border-radius:999px!important; }
+/* ---- links + misc ---- */
+a{ color:var(--accent); }
+.enable-sound-button{ background:rgba(0,0,0,.55)!important; color:#fff!important; border-radius:999px!important; }

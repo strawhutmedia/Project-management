@@ -1,27 +1,22 @@
 <style id="shm-brand-skin">
 /* ============================================================
-   STRAW HUT MEDIA — BRIGHT-TEAL brand skin (Podcast Primer course)
+   STRAW HUT MEDIA — course skin that MATCHES strawhutmedia.com
+   Exact site tokens: navy gradient bg, WHITE text, Poppins,
+   teal buttons with black text (the site's .btn-primary).
    Paste into GHL → page Custom CSS (or funnel head code).
-   Background = brand mint teal (#00cc8e, the "Start your podcast"
-   button color). Navy is the accent (dark text + navy CTAs), so it
-   reads as the inverse of strawhutmedia.com. Poppins throughout.
    ============================================================ */
 :root{
-  --teal-bg1:#00cc8e; --teal-bg2:#00b57e;      /* bright brand-teal canvas */
-  --ink:#06291d;                                /* dark text on teal */
-  --ink-soft:rgba(6,41,29,.72);
-  --navy:#12182f; --navy-2:#1b2242;             /* accent + CTAs */
-  --card:#ffffff; --card-border:rgba(6,41,29,.12);
-  --white:#ffffff;
-  --headlinefont:'Poppins',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
-  --contentfont:'Poppins',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
-  --hover-fill-color:#12182f; --hover-border-color:#12182f;
+  --bg:#12182f; --card:#1c2340; --card-2:#232c4e; --border:#3a456c;
+  --text:#f2f3f8; --muted:#9aa2c0; --accent:#00cc8e; --accent-hi:#00e6a0; --accent-ink:#000;
+  --headlinefont:'Poppins',system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;
+  --contentfont:'Poppins',system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;
+  --hover-fill-color:#00e6a0; --hover-border-color:#00e6a0;
 }
 
-/* ---- canvas: bright teal everywhere ---- */
-html,body{ background:var(--teal-bg1)!important; }
-body{ background:linear-gradient(180deg,var(--teal-bg1) 0%,var(--teal-bg2) 100%)!important;
-      background-attachment:fixed!important; color:var(--ink)!important; }
+/* ---- canvas: the site's exact navy gradient ---- */
+html,body{ background:#12182f!important; }
+body{ background:#12182f linear-gradient(135deg,#12182f 0%,#1c2134 45%,#232c4e 100%) fixed!important;
+      color:var(--text)!important; }
 .c-section, .c-section > .inner, .c-row, .c-column, .row-bg, .bgCover{ background-color:transparent!important; }
 [style*="background-color:var(--white)"], [style*="background-color:#fff"],
 [style*="background-color: #fff"], [style*="background-color:#ffffff"],
@@ -29,63 +24,69 @@ body{ background:linear-gradient(180deg,var(--teal-bg1) 0%,var(--teal-bg2) 100%)
   background-color:var(--card)!important; background:var(--card)!important;
 }
 
-/* ---- typography: dark ink headings, NAVY eyebrows/names ---- */
-.c-heading, .c-heading *{ font-family:var(--headlinefont)!important; color:var(--ink)!important; -webkit-text-fill-color:var(--ink)!important; }
-.c-sub-heading, .c-sub-heading *{ font-family:var(--headlinefont)!important; color:var(--navy)!important;
-  -webkit-text-fill-color:var(--navy)!important; letter-spacing:.04em; }
+/* ---- typography: ALL text white (like the site) ---- */
+.c-heading, .c-heading *,
+.c-sub-heading, .c-sub-heading *{
+  font-family:var(--headlinefont)!important;
+  color:var(--text)!important; -webkit-text-fill-color:var(--text)!important;
+}
 p, li, span, .item-text, .c-text, .c-wrapper{ font-family:var(--contentfont)!important; }
-p, li, .item-text{ color:var(--ink)!important; -webkit-text-fill-color:var(--ink)!important; }
+p, li, .item-text{ color:var(--text)!important; -webkit-text-fill-color:var(--text)!important; }
 
-/* ---- PRIMARY CTA (Get Course Now) → NAVY pill, white text ---- */
+/* ---- PRIMARY CTA = the site's .btn-primary: teal pill, BLACK text ---- */
 .c-button [class*="cbutton-"].buttonRocking, a[class*="cbutton-"].buttonRocking{
-  background:var(--navy)!important; background-image:none!important;
-  border:none!important; border-radius:999px!important;
-  box-shadow:0 14px 30px rgba(6,41,29,.28)!important;
-  transition:transform .15s ease, box-shadow .15s ease, background .15s ease!important;
+  background:var(--accent)!important; background-image:none!important;
+  border:none!important; border-radius:999px!important; font-weight:600!important;
+  box-shadow:0 10px 30px rgba(0,0,0,.35)!important;
+  transition:transform .12s ease, background .15s ease!important;
 }
 .buttonRocking .main-heading-button, .buttonRocking .sub-heading-button,
 .c-button [class*="cbutton-"].buttonRocking *{
-  color:var(--white)!important; -webkit-text-fill-color:var(--white)!important; font-family:var(--headlinefont)!important; font-weight:700!important;
+  color:var(--accent-ink)!important; -webkit-text-fill-color:var(--accent-ink)!important;
+  font-family:var(--headlinefont)!important; font-weight:600!important;
 }
 .c-button [class*="cbutton-"].buttonRocking:hover, a[class*="cbutton-"].buttonRocking:hover{
-  background:var(--navy-2)!important; transform:translateY(-1px)!important;
-  box-shadow:0 18px 40px rgba(6,41,29,.34)!important;
+  background:var(--accent-hi)!important; transform:translateY(-1px)!important;
 }
 
-/* ---- utility "buttons" (No Thanks link, footer contact rows) → quiet ---- */
+/* ---- utility "buttons" (No Thanks link, footer rows) → quiet white ---- */
 .c-button [class*="cbutton-"]:not(.buttonRocking){
   background:transparent!important; background-image:none!important;
   box-shadow:none!important; border:none!important;
 }
 .c-button [class*="cbutton-"]:not(.buttonRocking) .main-heading-button,
 .c-button [class*="cbutton-"]:not(.buttonRocking) .sub-heading-button{
-  color:var(--ink-soft)!important; font-family:var(--contentfont)!important; font-weight:600!important;
+  color:var(--muted)!important; -webkit-text-fill-color:var(--muted)!important;
+  font-family:var(--contentfont)!important; font-weight:500!important;
 }
-.c-button [class*="cbutton-"]:not(.buttonRocking):hover .main-heading-button{ color:var(--ink)!important; }
+.c-button [class*="cbutton-"]:not(.buttonRocking):hover .main-heading-button{
+  color:var(--text)!important; -webkit-text-fill-color:var(--text)!important;
+}
 
-/* ---- PRIVACY: replace the personal cell with the public number ---- */
+/* ---- PRIVACY: replace personal cell with the public number ---- */
 [aria-label*="807-7138"]{ pointer-events:none!important; }
 [aria-label*="807-7138"] .main-heading-button{ font-size:0!important; line-height:0!important; }
 [aria-label*="807-7138"] .main-heading-button::after{
   content:"Phone : (323) 553-5305"; font-size:16px; line-height:1.5;
-  color:var(--ink-soft); font-family:var(--contentfont);
+  color:var(--muted); -webkit-text-fill-color:var(--muted); font-family:var(--contentfont);
 }
 
-/* ---- FAQ accordion → clean white cards on teal ---- */
+/* ---- FAQ accordion = site card style (navy card, teal-ish border) ---- */
 .faq-separated-child.hl-faq-child, .hl-faq-child{
-  background:var(--card)!important; border:1px solid var(--card-border)!important;
-  border-radius:14px!important; margin-bottom:12px!important; overflow:hidden!important;
-  box-shadow:0 8px 20px rgba(6,41,29,.10)!important;
+  background:var(--card)!important; border:1px solid var(--border)!important;
+  border-radius:16px!important; margin-bottom:12px!important; overflow:hidden!important;
 }
 .hl-faq-child-heading, .hl-faq-child-heading-text, .hl-faq-child-head{
-  color:var(--ink)!important; font-family:var(--headlinefont)!important; background:transparent!important;
+  color:var(--text)!important; -webkit-text-fill-color:var(--text)!important;
+  font-family:var(--headlinefont)!important; background:transparent!important;
 }
 .hl-faq-child-item-text, .hl-faq-child-panel, .hl-faq-child-panel *{
-  color:var(--ink-soft)!important; font-family:var(--contentfont)!important;
+  color:var(--muted)!important; -webkit-text-fill-color:var(--muted)!important;
+  font-family:var(--contentfont)!important;
 }
-.hl-faq-child-heading-icon{ color:var(--navy)!important; }
+.hl-faq-child-heading-icon{ color:var(--accent)!important; -webkit-text-fill-color:var(--accent)!important; }
 
 /* ---- links + misc ---- */
-a{ color:var(--navy); }
-.enable-sound-button{ background:rgba(6,41,29,.75)!important; color:#fff!important; border-radius:999px!important; }
+a{ color:var(--accent); }
+.enable-sound-button{ background:rgba(0,0,0,.55)!important; color:#fff!important; border-radius:999px!important; }
 </style>
