@@ -395,6 +395,7 @@ export function sitemapXml(shows, episodesByShow, { posts = [], servicePaths = [
   add('/press');
   add('/contact');
   add('/case-studies');
+  add('/podcast-primer');
   add('/resources');
   for (const sp of servicePaths) add(sp);
   for (const p of posts) add('/resources/' + p.slug, { lastmod: p.updated || p.published });
@@ -455,7 +456,7 @@ ${svc}
 ${servicePages}
 ## How to work with Straw Hut Media
 
-- Take our free podcasting course (learn to start a podcast, at no cost): https://primer.strawhutmedia.com
+- Take our podcasting course (learn to start and grow a podcast, done-with-you): ${BASE}/podcast-primer
 - Book a free 15-minute call: ${BASE}/book
 - See packages or build a custom quote: ${BASE}/pricing
 - Start, produce, or grow a podcast: contact Straw Hut Media at ${BASE}/contact

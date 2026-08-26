@@ -2155,6 +2155,131 @@ export function episodePage({ show, episode, moreFromShow = [], related = [], ad
   });
 }
 
+// --- Podcast Primer course (sales page on our own site) --------------------
+// A site-quality landing page for the "Podcast Primer Pro" course. The CTAs
+// hand off to the existing GHL/course checkout (payments + delivery unchanged);
+// everything visible here is our own components so it matches strawhutmedia.com.
+const COURSE_OFFER_URL = 'https://course.strawhutmedia.com/offers/888909af-7dc5-4cfa-8e85-fe7c6f8813df';
+
+export function coursePage() {
+  const included = [
+    { name: 'Recording & gear', text: 'Exactly what equipment to use and how to sound professional from day one — all covered in the course.' },
+    { name: 'Editing & engineering', text: 'Edit, mix, and master so every episode sounds clean and polished.' },
+    { name: 'Publish everywhere', text: 'Get live on Apple Podcasts, Spotify, and every major platform, the right way.' },
+    { name: 'Video podcasting', text: 'Film and publish the video version of your show, not just the audio.' },
+    { name: 'A month of social — done for you', text: 'We write and post a full month of your social content so your launch has momentum.' },
+    { name: 'Community & the Straw Hut team', text: 'Direct access to our team in a private community while you build your show.' },
+  ];
+  const testimonials = [
+    { name: 'Jason Harris', role: 'CEO, Mekanism', quote: 'Attracted new partnerships, drove exponential business growth, and became an industry leader in marketing strategy — through podcasting.' },
+    { name: 'Lisane Basquiat', role: 'CEO, Shaping Freedom · King Pleasure', quote: 'Launched her podcast and attracted thousands of loyal listeners within two weeks.' },
+    { name: 'Phil Rosenthal', role: 'Creator, Everybody Loves Raymond · Host, Somebody Feed Phil', quote: 'Used podcasting to connect intimately with fans and deepen his position in entertainment.' },
+    { name: 'Brandi Glanville', role: 'The Real Housewives of Beverly Hills', quote: 'Expanded her reach far beyond the Bravo universe and engaged her fans on a whole new level.' },
+  ];
+  const faq = [
+    ['Do you go over video podcasts?', 'Yes — video podcasting is fully covered, from filming your show to publishing the video version alongside the audio.'],
+    ['Will I learn how to publish a podcast?', 'Yes. We walk you through publishing to all the major platforms — Apple Podcasts, Spotify, and the rest.'],
+    ['What kind of things does the course cover?', 'All of it: scheduling and booking, writing, engineering, recording, choosing the right equipment, editing, distribution, and even marketing.'],
+    ['What is the best equipment to use?', "That's all covered inside the course — the exact gear and how to use it."],
+    ['Is there a community?', 'Yes. The course comes with access to a private community where you can talk directly with the Straw Hut team.'],
+  ];
+
+  // Trusted-by strip — reuse the same client marks as the rest of the site.
+  const trusted = CLIENTS.filter((c) => c.logo);
+  const trustedStrip = trusted.length
+    ? `<section class="section clients-band"><div class="container">
+      <p class="trusted-eyebrow" style="color:#5a6270">Trusted by the teams behind</p>
+      <div class="logo-wall">${trusted
+        .map((c) => `<span class="logo-item${c.tall ? ' tall' : ''}${c.mid ? ' mid' : ''}"><img src="${esc(c.logo)}" alt="${esc(c.name)}" loading="lazy"></span>`)
+        .join('')}</div>
+    </div></section>`
+    : '';
+
+  const includedHtml = included
+    .map((h) => `<div class="inc-item"><span class="inc-check">✓</span><div><h3>${esc(h.name)}</h3><p>${esc(h.text)}</p></div></div>`)
+    .join('');
+
+  const testimonialsHtml = testimonials
+    .map(
+      (t) => `<figure class="tcard">
+        <div class="tmark" aria-hidden="true">&ldquo;</div>
+        <blockquote class="tquote">${esc(t.quote)}</blockquote>
+        <figcaption class="twho"><span class="tname">${esc(t.name)}</span><span class="trole">${esc(t.role)}</span></figcaption>
+      </figure>`
+    )
+    .join('');
+
+  const body = `
+  <section class="hero"><div class="container hero-inner">
+    <div class="hero-copy">
+      <div class="breadcrumb" style="padding:0 0 12px"><a href="/">Home</a> / Podcast Primer</div>
+      <div class="eyebrow">Podcast Primer Pro</div>
+      <h1>Done-with-you podcast creation — taught by the team behind the shows</h1>
+      <p>Learn to plan, record, edit, publish, and grow your podcast, with Straw Hut Media's CEO Ryan Tillotson walking you through every step — plus your first month of social content written and posted for you.</p>
+      <div class="hero-cta">
+        <a class="btn btn-primary" href="${esc(COURSE_OFFER_URL)}" data-shm="course_cta_hero">Get the course</a>
+        <a class="btn btn-ghost" href="/book">Talk to us first</a>
+      </div>
+    </div>
+    <div class="course-hero-media"><img src="/public/img/primer-poster.webp" alt="Ryan Tillotson recording a podcast in the Straw Hut Media studio" width="1200" height="675" loading="eager"></div>
+  </div></section>
+  ${trustedStrip}
+  <section class="section"><div class="container">
+    <div class="section-head"><h2>What's inside the course</h2></div>
+    <div class="inc-grid">${includedHtml}</div>
+  </div></section>
+  <section class="section"><div class="container">
+    <div class="section-head"><h2>The results speak for themselves</h2></div>
+    <div class="tgrid">${testimonialsHtml}</div>
+  </div></section>
+  <section class="section"><div class="container"><div class="cta-band">
+    <h2>Automate your content. Free up your time.</h2>
+    <p>Let us take care of your social media schedule, so you can focus on growing your business — and your show.</p>
+    <a class="btn btn-primary" href="${esc(COURSE_OFFER_URL)}" data-shm="course_cta_mid">Get the course →</a>
+  </div></div></section>
+  ${faqSection(faq)}
+  <section class="section"><div class="container"><div class="cta-band">
+    <h2>Ready to start your podcast?</h2>
+    <p>Get the full Podcast Primer Pro course, the done-with-you support, and the community — and launch a show you're proud of.</p>
+    <a class="btn btn-primary" href="${esc(COURSE_OFFER_URL)}" data-shm="course_cta_footer">Get the course →</a>
+  </div></div></section>
+  ${audienceEvent('view_course', { course: 'podcast-primer-pro' })}`;
+
+  const courseJsonLd = `<script type="application/ld+json">${JSON.stringify({
+    '@context': 'https://schema.org',
+    '@type': 'Course',
+    name: 'Podcast Primer Pro',
+    description:
+      'A done-with-you podcasting course from Straw Hut Media: plan, record, edit, publish, and grow your show — taught by CEO Ryan Tillotson, with a month of social content written and posted for you and access to the Straw Hut team.',
+    url: canonical('/podcast-primer'),
+    provider: { '@type': 'Organization', name: 'Straw Hut Media', sameAs: 'https://www.strawhutmedia.com' },
+    hasCourseInstance: {
+      '@type': 'CourseInstance',
+      courseMode: 'online',
+      courseWorkload: 'PT10H',
+    },
+  })}</script>`;
+
+  return layout({
+    title: 'Podcast Primer Pro — the done-with-you podcasting course | Straw Hut Media',
+    description:
+      'Learn to launch and grow your podcast with Straw Hut Media. Recording, editing, publishing, video, and a month of social content done for you — taught by CEO Ryan Tillotson.',
+    image: canonical('/public/img/primer-poster.webp'),
+    body,
+    activeNav: '',
+    path: '/podcast-primer',
+    jsonLd:
+      courseJsonLd +
+      '\n' +
+      faqJsonLdFrom(faq) +
+      '\n' +
+      breadcrumbJsonLd([
+        { name: 'Home', path: '/' },
+        { name: 'Podcast Primer', path: '/podcast-primer' },
+      ]),
+  });
+}
+
 export function privacyPage() {
   const updated = 'August 2026';
   const body = `

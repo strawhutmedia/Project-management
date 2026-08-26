@@ -1021,6 +1021,23 @@ table.admin-table { width: 100%; border-collapse: collapse; }
 .cta-band p { margin: 0 auto 18px; color: var(--muted); max-width: 520px; line-height: 1.55; }
 .svc-card:hover { border-color: var(--accent); }
 
+/* Eyebrow kicker (course + landing heros) */
+.eyebrow { color: var(--accent); font-weight: 700; letter-spacing: 0.09em; text-transform: uppercase; font-size: 0.78rem; margin-bottom: 12px; }
+
+/* Course hero media (the poster/video frame) */
+.course-hero-media { border-radius: 18px; overflow: hidden; border: 1px solid var(--border); box-shadow: var(--shadow); background: var(--card); align-self: center; min-width: 0; }
+.course-hero-media img { display: block; width: 100%; height: auto; }
+
+/* Testimonial cards */
+.tgrid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px; }
+.tcard { background: var(--card); border: 1px solid var(--border); border-radius: 16px; padding: 24px 24px 20px; box-shadow: var(--shadow); display: flex; flex-direction: column; min-width: 0; }
+.tcard .tmark { color: var(--accent); font-size: 2.2rem; line-height: 0.6; font-weight: 800; margin-bottom: 8px; }
+.tcard .tquote { margin: 0 0 16px; font-size: 1.02rem; line-height: 1.6; color: var(--text); }
+.tcard .twho { display: flex; flex-direction: column; gap: 2px; margin-top: auto; }
+.tcard .tname { font-weight: 700; }
+.tcard .trole { color: var(--muted); font-size: 0.88rem; line-height: 1.4; }
+@media (max-width: 760px) { .tgrid { grid-template-columns: 1fr; } }
+
 /* Footer columns */
 .footer-cols { display: grid; grid-template-columns: repeat(3, 1fr); gap: 30px; margin-bottom: 26px; }
 .footer-col { display: flex; flex-direction: column; gap: 9px; }

@@ -873,6 +873,7 @@ app.get('/studio', (req, res) => res.send(V.studioPage()));
 // We have one studio — the old LA landing page is consolidated into /studio.
 app.get('/podcast-studio-los-angeles', (req, res) => res.redirect(301, '/studio'));
 app.get('/services', (req, res) => res.send(V.servicesHubPage()));
+app.get('/podcast-primer', (req, res) => res.send(V.coursePage()));
 // The old static page lived at /services/ with the quote quiz at
 // /services/embed.html. Both are gone. Express's non-strict routing already
 // serves /services/ from the route above; the embed page needs a redirect.
