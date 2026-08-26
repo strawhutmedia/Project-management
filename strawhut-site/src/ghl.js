@@ -377,7 +377,7 @@ export async function diagFunnelsCourses() {
     for (const f of funnels.slice(0, 15)) {
       const fid = f._id || f.id;
       const key = `${f.name || '(unnamed)'} [${fid}]`;
-      const r = await call(`/funnels/page?locationId=${encodeURIComponent(id)}&funnelId=${encodeURIComponent(fid)}&limit=50`, { version: '2021-07-28' });
+      const r = await call(`/funnels/page?locationId=${encodeURIComponent(id)}&funnelId=${encodeURIComponent(fid)}&limit=20&offset=0`, { version: '2021-07-28' });
       out.pages[key] = r.ok
         ? (r.data?.pages || r.data || []).map((p) => ({ name: p.name, stepId: p.stepId, url: p.url, id: p._id || p.id }))
         : `err ${r.status || ''} ${String(r.error || '').slice(0, 80)}`;
