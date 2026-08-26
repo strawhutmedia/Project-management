@@ -40,6 +40,28 @@ export async function sendOwnerEmail({ to, subject, html }) {
   }
 }
 
+/** Lead-facing email (e.g. auto-sending the free course to an unqualified lead).
+ *  Sets reply-to so replies reach the team. Never throws. */
+export async function sendLeadEmail({ to, subject, html, text, replyTo = 'hello@strawhutmedia.com' }) {
+  if (!mailConfigured() || !to) return { ok: false, skipped: true };
+  try {
+    const res = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${process.env.RESEND_API_KEY}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ from: FROM, to, subject, html, text, reply_to: replyTo }),
+    });
+    if (!res.ok) {
+      const b = await res.text().catch(() => '');
+      console.error('[mail] lead email failed:', res.status, b.slice(0, 160));
+      return { ok: false, error: `HTTP ${res.status}` };
+    }
+    return { ok: true };
+  } catch (e) {
+    console.error('[mail] lead email error:', e.message);
+    return { ok: false, error: e.message };
+  }
+}
+
 // Contact-form routing: each topic goes to the right inbox. Order = the order
 // shown in the dropdown; the first entry is the default.
 export const CONTACT_ROUTES = {

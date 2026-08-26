@@ -237,8 +237,6 @@ function layout({
       .join('') +
     // "Promote" — cross-sell to The Podbooster (our promotion product), external.
     `<a href="https://thepodbooster.com/?utm_source=strawhutmedia&utm_medium=nav&utm_campaign=promote" target="_blank" rel="noopener" onclick="window.shmTrack&&shmTrack('promote_click',{destination:'thepodbooster.com'})">Promote</a>` +
-    // Free course — always-visible, casual entry point to our free GHL course.
-    `<a href="https://primer.strawhutmedia.com" target="_blank" rel="noopener" onclick="window.shmTrack&&shmTrack('course_click',{destination:'primer.strawhutmedia.com'})">Free Course</a>` +
     // Primary CTA: Start Your Podcast → our production page.
     `<a class="nav-cta" href="/podcast-production"${activeNav === '/podcast-production' ? ' aria-current="page"' : ''}>Start Your Podcast</a>`;
   return `<!doctype html>

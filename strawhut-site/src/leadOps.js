@@ -4,13 +4,43 @@
 //      points of confusion, and a few sharp questions to ask.
 //   2. FOLLOW-UP — ~90 min after a call, email Ryan a short follow-up DRAFT in
 //      his own voice to review and send (he/Caroline send it, never the server).
+//      EXCEPTION: leads who reported <= $1k/mo marketing spend are unqualified by
+//      Ryan's rule — instead of a sales draft, the server AUTOMATICALLY emails
+//      them our free podcasting course (a real head start + a clean deflection),
+//      once, and copies Ryan. This is the one lead-facing auto-send.
 //
 // Bookings are recorded from the /hooks/leads webhook (Appointlet carries the
 // call time + questionnaire). State lives in the app_state KV blob 'lead_bookings'
 // keyed by email, so there's no schema change. Everything is inert unless both
 // RESEND_API_KEY and ANTHROPIC_API_KEY are set; LEAD_OPS=off disables it.
 
-import { sendOwnerEmail, mailConfigured } from './mail.js';
+import { sendOwnerEmail, sendLeadEmail, mailConfigured } from './mail.js';
+
+// Free podcasting course (GHL) — what we send unqualified leads instead of
+// spending a sales cycle on them. Casual, genuinely helpful, soft door left open.
+const COURSE_URL = 'https://primer.strawhutmedia.com';
+function courseEmailToLead(b) {
+  const first = String(b.name || '').trim().split(/\s+/)[0] || 'there';
+  const subject = 'A free head start on your podcast';
+  const html = `<div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;font-size:16px;line-height:1.6;color:#1a1a1a;max-width:520px">
+    <p>Hey ${esc(first)},</p>
+    <p>Thanks for reaching out! Based on where you're at right now, the best thing I can point you to first is our <strong>free podcasting course</strong> — it walks you through the whole thing, start to finish, at your own pace:</p>
+    <p><a href="${COURSE_URL}" style="display:inline-block;background:#00cc8e;color:#023324;font-weight:700;text-decoration:none;padding:12px 26px;border-radius:999px">Start the free course →</a></p>
+    <p>Go through it, get your show off the ground — and if you reach a point where you'd rather have a team take it the rest of the way, we're right here.</p>
+    <p>— Ryan<br><span style="font-size:13px;color:#888">Straw Hut Media · strawhutmedia.com</span></p>
+  </div>`;
+  const text = `Hey ${first},
+
+Thanks for reaching out! Based on where you're at right now, the best thing I can point you to first is our free podcasting course — it walks you through the whole thing, start to finish, at your own pace:
+
+${COURSE_URL}
+
+Go through it, get your show off the ground — and if you reach a point where you'd rather have a team take it the rest of the way, we're right here.
+
+— Ryan
+Straw Hut Media`;
+  return { subject, html, text };
+}
 
 const KEY = (process.env.ANTHROPIC_API_KEY || '').trim();
 const MODEL = (process.env.LEAD_OPS_MODEL || process.env.LANDING_COPY_MODEL || 'claude-sonnet-4-6').trim();
@@ -173,6 +203,24 @@ async function runSweeps(store) {
         </div>`;
         const r = await sendOwnerEmail({ to: OWNER, subject: `Follow-up draft — ${b.name || 'lead'}${b.company ? ` (${b.company})` : ''}`, html });
         if (r.ok) { b.followupSentAt = new Date().toISOString(); changed = true; console.log('[leadops] follow-up draft sent for', b.email); }
+      }
+    }
+
+    // UNQUALIFIED (<= $1k/mo marketing): auto-send them the free course — a real
+    // head start that also deflects a low-fit lead off the sales track. Sent once,
+    // straight to the lead (Ryan gets a heads-up copy). Fires on the next sweep
+    // after we record them — no need to wait for the call.
+    if (b.qual === 'unqualified-under-1k' && !b.courseSentAt) {
+      const r = await sendLeadEmail({ to: b.email, ...courseEmailToLead(b) });
+      if (r.ok) {
+        b.courseSentAt = new Date().toISOString();
+        changed = true;
+        console.log('[leadops] free course auto-sent to unqualified lead', b.email);
+        await sendOwnerEmail({
+          to: OWNER,
+          subject: `Auto-sent free course → ${b.name || 'lead'}${b.company ? ` (${b.company})` : ''} · under $1k`,
+          html: `<div style="font-family:-apple-system,Segoe UI,Roboto,sans-serif;font-size:15px;line-height:1.6;color:#12182f"><p>Heads up — this lead reported <strong>≤ $1k/mo marketing spend</strong> (unqualified by your rule), so the system automatically emailed them our free podcasting course instead of a sales follow-up.</p><p style="margin:0"><strong>${esc(b.name || 'lead')}</strong> · ${esc(b.email)}${b.company ? ` · ${esc(b.company)}` : ''}<br>Spend: ${esc(b.spend || '?')} · Goals: ${esc(b.goals || '?')}</p><p style="font-size:13px;color:#888;margin-top:12px">Straw Hut lead ops · sent them ${COURSE_URL}</p></div>`,
+        });
       }
     }
   }
