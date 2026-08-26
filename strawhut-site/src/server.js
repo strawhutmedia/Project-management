@@ -14,6 +14,7 @@ import * as V from './views.js';
 import * as A from './admin_views.js';
 import { robotsTxt, sitemapXml, llmsTxt } from './seo.js';
 import { sendAnnouncement, mailConfigured, sendContactEmail, sendContactAutoReply, sendTrafficDigest } from './mail.js';
+import { buildIssue, sendToSubscribers, sendTestToOwner, maybeSendNewsletterDraft } from './newsletter.js';
 import { importFromSite } from './importer.js';
 import { writeLandingCopy, generateLandingCopy, fallbackLandingCopy, aiConfigured, generateShowMetaDescription, generateShowBlurb, generateShowTagline, generateEpisodeEnrichment } from './ai.js';
 import { POSTS, getPost } from './content/resources.js';
@@ -322,6 +323,44 @@ app.get('/admin/analytics', requireAdmin, async (req, res) => {
   const days = Math.min(90, Math.max(1, parseInt(req.query.days || '7', 10)));
   const stats = await store.viewStats(days);
   res.send(A.analyticsPage({ stats, days }));
+});
+
+// --- Newsletter (biweekly) — draft/preview + owner-triggered send ----------
+app.get('/admin/newsletter', requireAdmin, async (req, res) => {
+  const issue = await buildIssue(store).catch(() => null);
+  const subs = await store.listSubscribers();
+  res.send(
+    A.newsletterPage({
+      issue,
+      subscriberCount: subs.length,
+      lastSentAt: await store.getState('newsletter_sent_at'),
+      lastDraftAt: await store.getState('newsletter_draft_at'),
+      mail: mailConfigured(),
+      flash: readFlash(req, res),
+    })
+  );
+});
+// Live HTML preview of the current issue (rendered in an iframe on the admin page).
+app.get('/admin/newsletter/preview', requireAdmin, async (req, res) => {
+  const issue = await buildIssue(store).catch(() => null);
+  res.type('html').send(
+    issue ? issue.html.replace(/\{\{unsubscribe\}\}/g, '#') : '<p style="font-family:sans-serif;padding:24px">No episodes to feature yet.</p>'
+  );
+});
+app.post('/admin/newsletter/test', requireAdmin, async (req, res) => {
+  const r = await sendTestToOwner(store);
+  setFlash(res, r.ok ? { type: 'ok', msg: `Test sent to ${process.env.ADMIN_EMAIL || 'the admin inbox'}.` } : { type: 'err', msg: `Not sent: ${r.reason || r.error || 'unknown'}` });
+  res.redirect('/admin/newsletter');
+});
+app.post('/admin/newsletter/send', requireAdmin, async (req, res) => {
+  // Guard: require an explicit typed confirmation so a stray click can't blast the list.
+  if ((req.body.confirm || '').trim().toUpperCase() !== 'SEND') {
+    setFlash(res, { type: 'err', msg: 'Type SEND to confirm before sending to subscribers.' });
+    return res.redirect('/admin/newsletter');
+  }
+  const r = await sendToSubscribers(store);
+  setFlash(res, r.ok ? { type: 'ok', msg: `Newsletter sent to ${r.sent} subscriber(s).` } : { type: 'err', msg: `Not sent: ${r.reason || 'unknown'}` });
+  res.redirect('/admin/newsletter');
 });
 
 app.get('/admin/shows', requireAdmin, async (req, res) => {
@@ -1487,6 +1526,11 @@ app.listen(PORT, async () => {
   // Weekly traffic digest — checked hourly, sends once every 7 days.
   setInterval(() => maybeSendTrafficDigest().catch(() => {}), 60 * 60 * 1000);
   maybeSendTrafficDigest().catch(() => {});
+
+  // Biweekly newsletter — checked every 6h, emails the OWNER a fresh draft on
+  // the cadence (never subscribers). Owner reviews + sends from /admin/newsletter.
+  setInterval(() => maybeSendNewsletterDraft(store).catch(() => {}), 6 * 60 * 60 * 1000);
+  maybeSendNewsletterDraft(store).catch((e) => console.error('[newsletter]', e.message));
 
   // Backfill unique, AI-written SEO meta descriptions for shows that don't have
   // one yet. Runs once per boot in the background, paced to be gentle on the

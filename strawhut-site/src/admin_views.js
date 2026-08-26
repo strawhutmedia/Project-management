@@ -16,6 +16,7 @@ function adminLayout({ title, active, body, stats }) {
     ['/admin/press', '📰 Press'],
     ['/admin/landing', '🎯 Landing Pages'],
     ['/admin/members', '👥 Members'],
+    ['/admin/newsletter', '✉️ Newsletter'],
   ]
     .map(
       ([href, label]) =>
@@ -367,6 +368,46 @@ export function membersPage({ subscribers, flash }) {
       <tbody>${rows || '<tr><td colspan="4" style="color:var(--muted)">No members yet. The signup form on the homepage will collect them.</td></tr>'}</tbody></table>
     </div>`;
   return adminLayout({ title: 'Members', active: '/admin/members', body });
+}
+
+/** Newsletter: biweekly digest — preview the current draft, send a test, or
+ *  (with a typed confirmation) send to the full subscriber list. */
+export function newsletterPage({ issue, subscriberCount, lastSentAt, lastDraftAt, mail, flash }) {
+  const body = `
+    <h1>Newsletter</h1>
+    ${flash ? `<div class="flash ${flash.type}">${esc(flash.msg)}</div>` : ''}
+    ${!mail ? `<div class="flash err">Email isn't configured (no RESEND_API_KEY) — sending is disabled.</div>` : ''}
+    <p style="color:var(--muted);max-width:640px;line-height:1.6">
+      A biweekly digest of new episodes across the network, with soft calls to book a call or take the course.
+      A fresh <strong>draft is emailed to you every two weeks</strong> for review — it is <strong>never</strong> sent to subscribers
+      automatically. Review it below, send yourself a test, then send to the list when you're happy.
+    </p>
+    <div class="panel" style="margin-bottom:16px">
+      <div style="display:flex;gap:26px;flex-wrap:wrap;font-size:0.92rem">
+        <div><div style="color:var(--muted)">Subscribers</div><div style="font-size:1.4rem;font-weight:700">${subscriberCount}</div></div>
+        <div><div style="color:var(--muted)">Episodes in this issue</div><div style="font-size:1.4rem;font-weight:700">${issue ? issue.count : 0}</div></div>
+        <div><div style="color:var(--muted)">Last draft to you</div><div style="font-weight:600">${lastDraftAt ? esc(formatDate(lastDraftAt)) : '—'}</div></div>
+        <div><div style="color:var(--muted)">Last sent to list</div><div style="font-weight:600">${lastSentAt ? esc(formatDate(lastSentAt)) : 'never'}</div></div>
+      </div>
+    </div>
+    ${
+      issue
+        ? `<div style="display:flex;gap:12px;flex-wrap:wrap;align-items:center;margin-bottom:16px">
+             <form method="post" action="/admin/newsletter/test"><button class="btn btn-sm">✉️ Send a test to me</button></form>
+             <form method="post" action="/admin/newsletter/send" style="display:flex;gap:8px;align-items:center"
+                   onsubmit="return confirm('Send this newsletter to all ${subscriberCount} subscriber(s)?')">
+               <input name="confirm" placeholder="Type SEND" autocomplete="off"
+                 style="padding:8px 12px;border:1px solid var(--border);border-radius:8px;background:var(--card-2,#232c4e);color:var(--text)">
+               <button class="btn btn-sm btn-primary"${subscriberCount ? '' : ' disabled title="No subscribers yet"'}>Send to ${subscriberCount} subscriber(s)</button>
+             </form>
+           </div>
+           <div class="panel" style="padding:0;overflow:hidden">
+             <div style="padding:10px 14px;color:var(--muted);font-size:0.85rem;border-bottom:1px solid var(--border)">Live preview — subject: <strong style="color:var(--text)">${esc(issue.subject)}</strong></div>
+             <iframe src="/admin/newsletter/preview" title="Newsletter preview" style="width:100%;height:820px;border:0;background:#fff"></iframe>
+           </div>`
+        : `<div class="panel"><p style="color:var(--muted)">No episodes are available to feature yet, so there's nothing to preview. Once shows and episodes are imported, the draft will appear here automatically.</p></div>`
+    }`;
+  return adminLayout({ title: 'Newsletter', active: '/admin/newsletter', body });
 }
 
 /** Traffic dashboard: totals, week-over-week change, and the most-visited pages. */

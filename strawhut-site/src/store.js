@@ -615,7 +615,7 @@ class PgStore {
   }
   async recentEpisodes(limit = 6) {
     const { rows } = await this.pool.query(
-      `SELECT e.id, e.show_id, e.slug, e.title, e.image_url, e.duration, e.published_at, e.youtube_id,
+      `SELECT e.id, e.show_id, e.slug, e.title, e.description, e.image_url, e.duration, e.published_at, e.youtube_id,
               s.slug AS show_slug, s.title AS show_title, s.image_url AS show_image
          FROM episodes e JOIN shows s ON s.id = e.show_id
         WHERE e.published_at IS NOT NULL
