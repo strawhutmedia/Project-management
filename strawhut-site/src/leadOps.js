@@ -21,21 +21,24 @@ import { sendOwnerEmail, sendLeadEmail, mailConfigured } from './mail.js';
 const COURSE_URL = 'https://primer.strawhutmedia.com';
 function courseEmailToLead(b) {
   const first = String(b.name || '').trim().split(/\s+/)[0] || 'there';
-  const subject = 'A free head start on your podcast';
+  const subject = 'Looking forward to your call — plus a free head start';
   const html = `<div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;font-size:16px;line-height:1.6;color:#1a1a1a;max-width:520px">
     <p>Hey ${esc(first)},</p>
-    <p>Thanks for reaching out! Based on where you're at right now, the best thing I can point you to first is our <strong>free podcasting course</strong> — it walks you through the whole thing, start to finish, at your own pace:</p>
+    <p>Thanks for reaching out — we're looking forward to our call and talking through your podcast.</p>
+    <p>In the meantime, one thing worth flagging: if full-service production isn't something that fits your budget right now, and you'd rather get the guidance to do this yourself (or set your team up to run it), we built a <strong>free course</strong> that walks you through exactly how to get started:</p>
     <p><a href="${COURSE_URL}" style="display:inline-block;background:#00cc8e;color:#023324;font-weight:700;text-decoration:none;padding:12px 26px;border-radius:999px">Start the free course →</a></p>
-    <p>Go through it, get your show off the ground — and if you reach a point where you'd rather have a team take it the rest of the way, we're right here.</p>
+    <p>Either way, we're glad you found us. Go through it at your own pace, get your show off the ground — and if you decide you'd rather have a team take it the rest of the way, that's exactly what we do.</p>
     <p>— Ryan<br><span style="font-size:13px;color:#888">Straw Hut Media · strawhutmedia.com</span></p>
   </div>`;
   const text = `Hey ${first},
 
-Thanks for reaching out! Based on where you're at right now, the best thing I can point you to first is our free podcasting course — it walks you through the whole thing, start to finish, at your own pace:
+Thanks for reaching out — we're looking forward to our call and talking through your podcast.
+
+In the meantime, one thing worth flagging: if full-service production isn't something that fits your budget right now, and you'd rather get the guidance to do this yourself (or set your team up to run it), we built a free course that walks you through exactly how to get started:
 
 ${COURSE_URL}
 
-Go through it, get your show off the ground — and if you reach a point where you'd rather have a team take it the rest of the way, we're right here.
+Either way, we're glad you found us. Go through it at your own pace, get your show off the ground — and if you decide you'd rather have a team take it the rest of the way, that's exactly what we do.
 
 — Ryan
 Straw Hut Media`;

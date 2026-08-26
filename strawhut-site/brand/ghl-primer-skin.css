@@ -1,0 +1,78 @@
+/* ============================================================
+   STRAW HUT MEDIA — brand skin for the Podcast Primer funnel
+   Paste into GHL: Funnel/Website Settings → Custom CSS
+   Uses Poppins (already loaded) + the strawhutmedia.com palette.
+   ============================================================ */
+:root{
+  --shm-navy:#12182f; --shm-navy-2:#1a2140; --shm-card:#1c2340; --shm-card-2:#232c4e;
+  --shm-border:#3a456c; --shm-text:#f2f3f8; --shm-muted:#9aa2c0;
+  --shm-teal:#00cc8e; --shm-teal-2:#00b57e; --shm-gold:#d59b1e; --shm-ink:#023324;
+  /* re-point GHL's own font tokens to the brand font */
+  --headlinefont:'Poppins',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+  --contentfont:'Poppins',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+  --hover-fill-color:#00b57e; --hover-border-color:#00b57e;
+}
+
+/* ---- page canvas: brand navy gradient everywhere ---- */
+html,body{ background:var(--shm-navy)!important; }
+body{ background:linear-gradient(180deg,var(--shm-navy) 0%,var(--shm-navy-2) 100%)!important;
+      background-attachment:fixed!important; color:var(--shm-text)!important; }
+
+/* sections/rows: let the navy show through; neutralize white blocks */
+.c-section, .c-section > .inner, .c-row, .c-column, .row-bg, .bgCover{ background-color:transparent!important; }
+[style*="background-color:var(--white)"], [style*="background-color:#fff"],
+[style*="background-color: #fff"], [style*="background-color:#ffffff"],
+[style*="background-color: rgb(255, 255, 255)"], [style*="background:#fff"]{
+  background-color:var(--shm-card)!important; background:var(--shm-card)!important;
+}
+
+/* ---- typography ---- */
+.c-heading, .c-heading *{ font-family:var(--headlinefont)!important; color:var(--shm-text)!important; }
+.c-sub-heading, .c-sub-heading *{ font-family:var(--headlinefont)!important; color:var(--shm-teal)!important;
+  letter-spacing:.04em; text-transform:none; }
+p, li, span, .item-text, .c-text, .c-wrapper{ font-family:var(--contentfont)!important; }
+p, li, .item-text{ color:var(--shm-text)!important; }
+
+/* ---- PRIMARY CTA buttons (Get Course Now) → solid teal pill ---- */
+.c-button [class*="cbutton-"].buttonRocking, a[class*="cbutton-"].buttonRocking{
+  background:var(--shm-teal)!important; background-image:none!important;
+  border:none!important; border-radius:999px!important;
+  box-shadow:0 12px 26px rgba(0,204,142,.30)!important;
+  transition:transform .15s ease, box-shadow .15s ease, background .15s ease!important;
+}
+.buttonRocking .main-heading-button, .buttonRocking .sub-heading-button,
+.c-button [class*="cbutton-"].buttonRocking *{
+  color:var(--shm-ink)!important; font-family:var(--headlinefont)!important; font-weight:700!important;
+}
+.c-button [class*="cbutton-"].buttonRocking:hover, a[class*="cbutton-"].buttonRocking:hover{
+  background:var(--shm-teal-2)!important; transform:translateY(-1px)!important;
+  box-shadow:0 16px 32px rgba(0,204,142,.38)!important;
+}
+
+/* ---- utility "buttons" (No Thanks link, footer contact rows) → quiet text ---- */
+.c-button [class*="cbutton-"]:not(.buttonRocking){
+  background:transparent!important; background-image:none!important;
+  box-shadow:none!important; border:none!important;
+}
+.c-button [class*="cbutton-"]:not(.buttonRocking) .main-heading-button,
+.c-button [class*="cbutton-"]:not(.buttonRocking) .sub-heading-button{
+  color:var(--shm-muted)!important; font-family:var(--contentfont)!important; font-weight:500!important;
+}
+.c-button [class*="cbutton-"]:not(.buttonRocking):hover .main-heading-button{ color:var(--shm-text)!important; }
+
+/* ---- FAQ accordion → brand cards ---- */
+.faq-separated-child.hl-faq-child, .hl-faq-child{
+  background:var(--shm-card)!important; border:1px solid var(--shm-border)!important;
+  border-radius:14px!important; margin-bottom:12px!important; overflow:hidden!important;
+}
+.hl-faq-child-heading, .hl-faq-child-heading-text, .hl-faq-child-head{
+  color:var(--shm-text)!important; font-family:var(--headlinefont)!important; background:transparent!important;
+}
+.hl-faq-child-item-text, .hl-faq-child-panel, .hl-faq-child-panel *{
+  color:var(--shm-muted)!important; font-family:var(--contentfont)!important;
+}
+.hl-faq-child-heading-icon{ color:var(--shm-teal)!important; }
+
+/* ---- links + misc accents ---- */
+a{ color:var(--shm-teal); }
+.enable-sound-button{ background:rgba(2,51,36,.7)!important; border-radius:999px!important; }
