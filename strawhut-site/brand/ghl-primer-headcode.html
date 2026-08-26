@@ -1,54 +1,55 @@
 <style id="shm-brand-skin">
 /* ============================================================
-   STRAW HUT MEDIA — TEAL-PRIMARY brand skin (Podcast Primer course)
-   Paste into GHL → Funnel/Site Settings → Custom CSS.
-   Bright teal is the dominant color; gold + white are the accents.
-   Poppins (already loaded) throughout.
+   STRAW HUT MEDIA — BRIGHT-TEAL brand skin (Podcast Primer course)
+   Paste into GHL → page Custom CSS (or funnel head code).
+   Background = brand mint teal (#00cc8e, the "Start your podcast"
+   button color). Navy is the accent (dark text + navy CTAs), so it
+   reads as the inverse of strawhutmedia.com. Poppins throughout.
    ============================================================ */
 :root{
-  --shm-teal:#00cc8e; --shm-teal-br:#1fe7a6;
-  --teal-bg1:#0a9370; --teal-bg2:#06674f;       /* brighter, vivid teal canvas */
-  --teal-card:#07543f; --teal-card-2:#0a6b52;   /* darker teal cards for depth */
-  --teal-border:#1f9377;
-  --shm-text:#f4fdfa; --shm-muted:#cdeee3;
-  --shm-gold:#ffce5a; --shm-ink:#022018; --shm-white:#ffffff;
+  --teal-bg1:#00cc8e; --teal-bg2:#00b57e;      /* bright brand-teal canvas */
+  --ink:#06291d;                                /* dark text on teal */
+  --ink-soft:rgba(6,41,29,.72);
+  --navy:#12182f; --navy-2:#1b2242;             /* accent + CTAs */
+  --card:#ffffff; --card-border:rgba(6,41,29,.12);
+  --white:#ffffff;
   --headlinefont:'Poppins',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
   --contentfont:'Poppins',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
-  --hover-fill-color:#ffffff; --hover-border-color:#ffffff;
+  --hover-fill-color:#12182f; --hover-border-color:#12182f;
 }
 
-/* ---- canvas: bright vivid-teal gradient everywhere ---- */
+/* ---- canvas: bright teal everywhere ---- */
 html,body{ background:var(--teal-bg1)!important; }
 body{ background:linear-gradient(180deg,var(--teal-bg1) 0%,var(--teal-bg2) 100%)!important;
-      background-attachment:fixed!important; color:var(--shm-text)!important; }
+      background-attachment:fixed!important; color:var(--ink)!important; }
 .c-section, .c-section > .inner, .c-row, .c-column, .row-bg, .bgCover{ background-color:transparent!important; }
 [style*="background-color:var(--white)"], [style*="background-color:#fff"],
 [style*="background-color: #fff"], [style*="background-color:#ffffff"],
 [style*="background-color: rgb(255, 255, 255)"], [style*="background:#fff"]{
-  background-color:var(--teal-card)!important; background:var(--teal-card)!important;
+  background-color:var(--card)!important; background:var(--card)!important;
 }
 
-/* ---- typography: white headings, GOLD eyebrows/sub-heads ---- */
-.c-heading, .c-heading *{ font-family:var(--headlinefont)!important; color:var(--shm-text)!important; }
-.c-sub-heading, .c-sub-heading *{ font-family:var(--headlinefont)!important; color:var(--shm-gold)!important;
-  letter-spacing:.05em; }
+/* ---- typography: dark ink headings, NAVY eyebrows/names ---- */
+.c-heading, .c-heading *{ font-family:var(--headlinefont)!important; color:var(--ink)!important; -webkit-text-fill-color:var(--ink)!important; }
+.c-sub-heading, .c-sub-heading *{ font-family:var(--headlinefont)!important; color:var(--navy)!important;
+  -webkit-text-fill-color:var(--navy)!important; letter-spacing:.04em; }
 p, li, span, .item-text, .c-text, .c-wrapper{ font-family:var(--contentfont)!important; }
-p, li, .item-text{ color:var(--shm-text)!important; }
+p, li, .item-text{ color:var(--ink)!important; -webkit-text-fill-color:var(--ink)!important; }
 
-/* ---- PRIMARY CTA (Get Course Now) → white pill, teal ink ---- */
+/* ---- PRIMARY CTA (Get Course Now) → NAVY pill, white text ---- */
 .c-button [class*="cbutton-"].buttonRocking, a[class*="cbutton-"].buttonRocking{
-  background:var(--shm-white)!important; background-image:none!important;
+  background:var(--navy)!important; background-image:none!important;
   border:none!important; border-radius:999px!important;
-  box-shadow:0 14px 30px rgba(0,0,0,.30)!important;
+  box-shadow:0 14px 30px rgba(6,41,29,.28)!important;
   transition:transform .15s ease, box-shadow .15s ease, background .15s ease!important;
 }
 .buttonRocking .main-heading-button, .buttonRocking .sub-heading-button,
 .c-button [class*="cbutton-"].buttonRocking *{
-  color:#066b4d!important; font-family:var(--headlinefont)!important; font-weight:700!important;
+  color:var(--white)!important; -webkit-text-fill-color:var(--white)!important; font-family:var(--headlinefont)!important; font-weight:700!important;
 }
 .c-button [class*="cbutton-"].buttonRocking:hover, a[class*="cbutton-"].buttonRocking:hover{
-  background:#eafff8!important; transform:translateY(-1px)!important;
-  box-shadow:0 18px 40px rgba(0,0,0,.36)!important;
+  background:var(--navy-2)!important; transform:translateY(-1px)!important;
+  box-shadow:0 18px 40px rgba(6,41,29,.34)!important;
 }
 
 /* ---- utility "buttons" (No Thanks link, footer contact rows) → quiet ---- */
@@ -58,34 +59,33 @@ p, li, .item-text{ color:var(--shm-text)!important; }
 }
 .c-button [class*="cbutton-"]:not(.buttonRocking) .main-heading-button,
 .c-button [class*="cbutton-"]:not(.buttonRocking) .sub-heading-button{
-  color:var(--shm-muted)!important; font-family:var(--contentfont)!important; font-weight:500!important;
+  color:var(--ink-soft)!important; font-family:var(--contentfont)!important; font-weight:600!important;
 }
-.c-button [class*="cbutton-"]:not(.buttonRocking):hover .main-heading-button{ color:var(--shm-white)!important; }
+.c-button [class*="cbutton-"]:not(.buttonRocking):hover .main-heading-button{ color:var(--ink)!important; }
 
-/* ---- PRIVACY: replace the personal cell with the public number ----
-   The old element's tap-to-call still dials the cell, so we disable its
-   click and overwrite the visible text with the public line.            */
+/* ---- PRIVACY: replace the personal cell with the public number ---- */
 [aria-label*="807-7138"]{ pointer-events:none!important; }
 [aria-label*="807-7138"] .main-heading-button{ font-size:0!important; line-height:0!important; }
 [aria-label*="807-7138"] .main-heading-button::after{
   content:"Phone : (323) 553-5305"; font-size:16px; line-height:1.5;
-  color:var(--shm-muted); font-family:var(--contentfont);
+  color:var(--ink-soft); font-family:var(--contentfont);
 }
 
-/* ---- FAQ accordion → teal cards ---- */
+/* ---- FAQ accordion → clean white cards on teal ---- */
 .faq-separated-child.hl-faq-child, .hl-faq-child{
-  background:var(--teal-card)!important; border:1px solid var(--teal-border)!important;
+  background:var(--card)!important; border:1px solid var(--card-border)!important;
   border-radius:14px!important; margin-bottom:12px!important; overflow:hidden!important;
+  box-shadow:0 8px 20px rgba(6,41,29,.10)!important;
 }
 .hl-faq-child-heading, .hl-faq-child-heading-text, .hl-faq-child-head{
-  color:var(--shm-text)!important; font-family:var(--headlinefont)!important; background:transparent!important;
+  color:var(--ink)!important; font-family:var(--headlinefont)!important; background:transparent!important;
 }
 .hl-faq-child-item-text, .hl-faq-child-panel, .hl-faq-child-panel *{
-  color:var(--shm-muted)!important; font-family:var(--contentfont)!important;
+  color:var(--ink-soft)!important; font-family:var(--contentfont)!important;
 }
-.hl-faq-child-heading-icon{ color:var(--shm-gold)!important; }
+.hl-faq-child-heading-icon{ color:var(--navy)!important; }
 
 /* ---- links + misc ---- */
-a{ color:var(--shm-gold); }
-.enable-sound-button{ background:rgba(2,32,24,.7)!important; border-radius:999px!important; }
+a{ color:var(--navy); }
+.enable-sound-button{ background:rgba(6,41,29,.75)!important; color:#fff!important; border-radius:999px!important; }
 </style>
