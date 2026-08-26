@@ -351,3 +351,37 @@ export async function probeGhlToken() {
   console.log('[ghl] token probe:', JSON.stringify(out));
   return _probe;
 }
+
+// ---- TEMP diagnostic: enumerate funnels/pages/courses (read-only) ----------
+// Used once to map the GHL account so setup directions can name exact assets.
+// Safe to delete after use. Creates/updates/deletes nothing.
+export async function diagFunnelsCourses() {
+  if (!ghlConfigured()) return { state: 'unconfigured' };
+  const id = LOCATION_ID;
+  const out = { tried: {} };
+  const attempts = [
+    ['funnels',   `/funnels/funnel/list?locationId=${encodeURIComponent(id)}&limit=50`, '2021-07-28'],
+    ['courses',   `/courses/courses?locationId=${encodeURIComponent(id)}&limit=50`, '2021-07-28'],
+    ['products',  `/products/?locationId=${encodeURIComponent(id)}&limit=50`, '2021-07-28'],
+    ['memberships', `/memberships/?locationId=${encodeURIComponent(id)}`, '2021-07-28'],
+  ];
+  for (const [label, path, version] of attempts) {
+    const r = await call(path, { version });
+    out.tried[label] = r.ok ? 'ok' : `${r.status || '-'} ${String(r.error || '').slice(0, 90)}`;
+    if (r.ok) out[label] = r.data;
+  }
+  // If funnels listed, pull each funnel's pages so we can name the steps.
+  const funnels = out.funnels?.funnels || out.funnels?.data || [];
+  if (Array.isArray(funnels) && funnels.length) {
+    out.pages = {};
+    for (const f of funnels.slice(0, 15)) {
+      const fid = f._id || f.id;
+      const key = `${f.name || '(unnamed)'} [${fid}]`;
+      const r = await call(`/funnels/page?locationId=${encodeURIComponent(id)}&funnelId=${encodeURIComponent(fid)}&limit=50`, { version: '2021-07-28' });
+      out.pages[key] = r.ok
+        ? (r.data?.pages || r.data || []).map((p) => ({ name: p.name, stepId: p.stepId, url: p.url, id: p._id || p.id }))
+        : `err ${r.status || ''} ${String(r.error || '').slice(0, 80)}`;
+    }
+  }
+  return out;
+}
