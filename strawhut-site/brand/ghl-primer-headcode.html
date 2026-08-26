@@ -89,4 +89,10 @@ p, li, .item-text{ color:var(--text)!important; -webkit-text-fill-color:var(--te
 /* ---- links + misc ---- */
 a{ color:var(--accent); }
 .enable-sound-button{ background:rgba(0,0,0,.55)!important; color:#fff!important; border-radius:999px!important; }
+
+/* ---- keep content off the screen edges (site holds text to 92vw) ---- */
+.c-section .c-row{ box-sizing:border-box!important; }
+@media (max-width:820px){
+  .c-section .c-row{ padding-left:22px!important; padding-right:22px!important; }
+}
 </style>
