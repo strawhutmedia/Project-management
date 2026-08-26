@@ -2156,12 +2156,12 @@ export function episodePage({ show, episode, moreFromShow = [], related = [], ad
 
 // --- Podcast Primer course (sales page on our own site) --------------------
 // A site-quality landing page for the "Podcast Primer Pro" course.
-// NOTE: the old checkout (course.strawhutmedia.com/offers/888909af-...) is dead
-// — that whole domain 404s, so the old GHL page's button was broken too. Until
-// the real enrollment URL is confirmed, CTAs route to /book so nobody hits a
-// 404 and every click still reaches the CRM. Swap COURSE_OFFER_URL back to the
-// live checkout link once we have it.
-const COURSE_OFFER_URL = '/book';
+// Enrollment link = the GHL client-portal offer on its WORKING default domain
+// (podcastprimer.app.clientclub.net). The pretty course.strawhutmedia.com is
+// not connected as a custom domain in GHL yet, so it 404s; the clientclub.net
+// default serves the same offer. Swap to course.strawhutmedia.com/offers/... if
+// the custom domain is later connected in GHL's Client Portal settings.
+const COURSE_OFFER_URL = 'https://podcastprimer.app.clientclub.net/offers/888909af-7dc5-4cfa-8e85-fe7c6f8813df';
 
 export function coursePage() {
   const included = [
@@ -2219,7 +2219,7 @@ export function coursePage() {
       <h1>Done-with-you podcast creation — taught by the team behind the shows</h1>
       <p>Learn to plan, record, edit, publish, and grow your podcast, with Straw Hut Media's CEO Ryan Tillotson walking you through every step — plus your first month of social content written and posted for you.</p>
       <div class="hero-cta">
-        <a class="btn btn-primary" href="${esc(COURSE_OFFER_URL)}" data-shm="course_cta_hero">Get started</a>
+        <a class="btn btn-primary" href="${esc(COURSE_OFFER_URL)}" data-shm="course_cta_hero">Get the free course</a>
         <a class="btn btn-ghost" href="/shows">Hear our shows</a>
       </div>
     </div>
@@ -2237,13 +2237,13 @@ export function coursePage() {
   <section class="section"><div class="container"><div class="cta-band">
     <h2>Automate your content. Free up your time.</h2>
     <p>Let us take care of your social media schedule, so you can focus on growing your business — and your show.</p>
-    <a class="btn btn-primary" href="${esc(COURSE_OFFER_URL)}" data-shm="course_cta_mid">Get started →</a>
+    <a class="btn btn-primary" href="${esc(COURSE_OFFER_URL)}" data-shm="course_cta_mid">Get the free course →</a>
   </div></div></section>
   ${faqSection(faq)}
   <section class="section"><div class="container"><div class="cta-band">
     <h2>Ready to start your podcast?</h2>
     <p>Get the full Podcast Primer Pro course, the done-with-you support, and the community — and launch a show you're proud of.</p>
-    <a class="btn btn-primary" href="${esc(COURSE_OFFER_URL)}" data-shm="course_cta_footer">Get started →</a>
+    <a class="btn btn-primary" href="${esc(COURSE_OFFER_URL)}" data-shm="course_cta_footer">Get the free course →</a>
   </div></div></section>
   ${audienceEvent('view_course', { course: 'podcast-primer-pro' })}`;
 
