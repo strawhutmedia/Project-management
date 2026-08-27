@@ -16,12 +16,21 @@
 
 import { Router } from 'express'
 import crypto from 'crypto'
+import { Resend } from 'resend'
 import { pool } from '../db'
 import { requireUser, type SessionUser } from '../auth'
 import { assertWriter } from '../permissions'
 import { logError, logInfo } from '../diag'
 import { sendAdminAlert } from '../email'
+import { hasAnthropicKey, generateLeadFollowup } from '../anthropic'
 import { syncContactToResend, resyncProject } from '../audience_resend'
+
+const resendApiKey = process.env.RESEND_API_KEY
+const resend = resendApiKey ? new Resend(resendApiKey) : null
+
+function escapeHtml(s: string): string {
+  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
+}
 
 export const audienceRouter = Router()
 
@@ -249,6 +258,194 @@ audienceRouter.post('/projects/:projectId/lead-alerts', async (req, res) => {
   )
   if ((rowCount ?? 0) === 0) { res.status(404).json({ error: 'not_found' }); return }
   res.json({ ok: true, enabled })
+})
+
+// ─────────────────────────────────────────────────────────────────────
+// Lead follow-up drafts — Claude drafts, a human edits and sends.
+// Restricted to lists flagged as sales pipelines (audience_lead_alerts)
+// — never a fan list. Slate never emails fans (see CLAUDE.md); this is
+// the one place Slate sends real email on a human's behalf, and it is
+// gated hard on that flag, not just hidden in the UI.
+// ─────────────────────────────────────────────────────────────────────
+
+async function assertLeadList(projectId: string): Promise<{ ok: true; name: string } | { ok: false }> {
+  const { rows } = await pool.query<{ name: string; audience_lead_alerts: boolean }>(
+    `SELECT name, audience_lead_alerts FROM projects WHERE id = $1`, [projectId],
+  )
+  if (rows.length === 0 || rows[0].audience_lead_alerts !== true) return { ok: false }
+  return { ok: true, name: rows[0].name }
+}
+
+// GET leads needing attention (status != sent), most recent first.
+audienceRouter.get('/projects/:projectId/followups', async (req, res) => {
+  const user = (req as typeof req & { user: SessionUser }).user
+  const projectId = req.params.projectId
+  if (!(await assertProjectAccess(user.id, user.role, projectId))) {
+    res.status(403).json({ error: 'forbidden' }); return
+  }
+  const { rows } = await pool.query(
+    `SELECT id, email, name, handle, source, trigger_word, created_at,
+            followup_notes, followup_draft_subject, followup_draft_body,
+            followup_status, followup_drafted_at, followup_sent_at
+       FROM audience_contacts
+      WHERE project_id = $1 AND unsubscribed_at IS NULL AND followup_status <> 'sent'
+      ORDER BY created_at DESC
+      LIMIT 100`,
+    [projectId],
+  )
+  const proj = await pool.query<{ leads_booking_url: string | null }>(
+    `SELECT leads_booking_url FROM projects WHERE id = $1`, [projectId],
+  )
+  res.json({ leads: rows, bookingUrl: proj.rows[0]?.leads_booking_url ?? null })
+})
+
+// Save the optional booking link used in drafts — writer.
+audienceRouter.put('/projects/:projectId/booking-url', async (req, res) => {
+  const user = (req as typeof req & { user: SessionUser }).user
+  const projectId = req.params.projectId
+  if (!await assertWriter(user, projectId, res)) return
+  const url = cleanStr(req.body?.url, 500)
+  await pool.query(`UPDATE projects SET leads_booking_url = $2 WHERE id = $1`, [projectId, url])
+  res.json({ ok: true })
+})
+
+// Save Caroline's context notes before drafting (or any time) — writer.
+audienceRouter.put('/contacts/:contactId/followup-notes', async (req, res) => {
+  const user = (req as typeof req & { user: SessionUser }).user
+  const contactId = req.params.contactId
+  const c = await pool.query<{ project_id: string }>(
+    `SELECT project_id FROM audience_contacts WHERE id = $1`, [contactId],
+  )
+  if (c.rows.length === 0) { res.status(404).json({ error: 'not_found' }); return }
+  if (!await assertWriter(user, c.rows[0].project_id, res)) return
+  const notes = cleanStr(req.body?.notes, 4000)
+  await pool.query(`UPDATE audience_contacts SET followup_notes = $2 WHERE id = $1`, [contactId, notes])
+  res.json({ ok: true })
+})
+
+// Draft (or redraft) a follow-up — writer, lead lists only.
+audienceRouter.post('/contacts/:contactId/followup/draft', async (req, res) => {
+  const user = (req as typeof req & { user: SessionUser }).user
+  const contactId = req.params.contactId
+  if (!hasAnthropicKey()) { res.status(503).json({ error: 'anthropic_key_missing' }); return }
+  const c = await pool.query<{
+    project_id: string; email: string; name: string | null; handle: string | null
+    source: string; trigger_word: string | null; created_at: string; followup_notes: string | null
+  }>(
+    `SELECT project_id, email, name, handle, source, trigger_word, created_at, followup_notes
+       FROM audience_contacts WHERE id = $1`,
+    [contactId],
+  )
+  if (c.rows.length === 0) { res.status(404).json({ error: 'not_found' }); return }
+  const lead = c.rows[0]
+  if (!await assertWriter(user, lead.project_id, res)) return
+  const list = await assertLeadList(lead.project_id)
+  if (!list.ok) { res.status(400).json({ error: 'not_a_lead_list', detail: 'Turn on Instant lead alerts for this list before drafting follow-ups.' }); return }
+
+  const proj = await pool.query<{ leads_booking_url: string | null }>(
+    `SELECT leads_booking_url FROM projects WHERE id = $1`, [lead.project_id],
+  )
+
+  try {
+    const result = await generateLeadFollowup({
+      leadName: lead.name, leadEmail: lead.email, leadHandle: lead.handle,
+      triggerWord: lead.trigger_word, source: lead.source, capturedAt: lead.created_at,
+      notes: lead.followup_notes, bookingUrl: proj.rows[0]?.leads_booking_url ?? null,
+      senderName: user.display_name || user.name, projectName: list.name,
+    })
+    await pool.query(
+      `UPDATE audience_contacts
+          SET followup_draft_subject = $2, followup_draft_body = $3,
+              followup_status = 'drafted', followup_drafted_at = now()
+        WHERE id = $1`,
+      [contactId, result.subject, result.body],
+    )
+    logInfo('lead followup: drafted', { contactId, projectId: lead.project_id })
+    res.json({ ok: true, subject: result.subject, body: result.body })
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err)
+    logError('lead followup: draft failed', { contactId, error: msg })
+    res.status(500).json({ error: 'draft_failed', detail: msg.slice(0, 400) })
+  }
+})
+
+// Hand-edit the draft before sending — writer.
+audienceRouter.patch('/contacts/:contactId/followup', async (req, res) => {
+  const user = (req as typeof req & { user: SessionUser }).user
+  const contactId = req.params.contactId
+  const c = await pool.query<{ project_id: string }>(
+    `SELECT project_id FROM audience_contacts WHERE id = $1`, [contactId],
+  )
+  if (c.rows.length === 0) { res.status(404).json({ error: 'not_found' }); return }
+  if (!await assertWriter(user, c.rows[0].project_id, res)) return
+  const subject = cleanStr(req.body?.subject, 300)
+  const body = cleanStr(req.body?.body, 8000)
+  if (!subject || !body) { res.status(400).json({ error: 'subject_and_body_required' }); return }
+  await pool.query(
+    `UPDATE audience_contacts
+        SET followup_draft_subject = $2, followup_draft_body = $3,
+            followup_status = CASE WHEN followup_status = 'none' THEN 'drafted' ELSE followup_status END
+      WHERE id = $1`,
+    [contactId, subject, body],
+  )
+  res.json({ ok: true })
+})
+
+// Send — writer, lead lists only. Sends from the verified system
+// domain but with a human display name and Reply-To set to the
+// sender's own inbox, so a reply lands with the actual person, not
+// Slate. Never batched, never scheduled — one deliberate click.
+audienceRouter.post('/contacts/:contactId/followup/send', async (req, res) => {
+  const user = (req as typeof req & { user: SessionUser }).user
+  const contactId = req.params.contactId
+  if (!resend) { res.status(503).json({ error: 'resend_not_configured' }); return }
+  const c = await pool.query<{
+    project_id: string; email: string; followup_draft_subject: string | null; followup_draft_body: string | null
+  }>(
+    `SELECT project_id, email, followup_draft_subject, followup_draft_body
+       FROM audience_contacts WHERE id = $1`,
+    [contactId],
+  )
+  if (c.rows.length === 0) { res.status(404).json({ error: 'not_found' }); return }
+  const lead = c.rows[0]
+  if (!await assertWriter(user, lead.project_id, res)) return
+  const list = await assertLeadList(lead.project_id)
+  if (!list.ok) { res.status(400).json({ error: 'not_a_lead_list' }); return }
+  if (!lead.followup_draft_subject?.trim() || !lead.followup_draft_body?.trim()) {
+    res.status(400).json({ error: 'no_draft', detail: 'Draft (or write) the email before sending.' })
+    return
+  }
+  if (!user.email) { res.status(400).json({ error: 'sender_email_required', detail: 'Your Slate account needs an email so replies can reach you.' }); return }
+
+  // strawhutmedia.net is the only domain verified in this Resend
+  // account today (see CLAUDE.md). A human display name + Reply-To
+  // keeps this from reading like the slate@ system sender even though
+  // it shares the domain.
+  const senderName = user.display_name || user.name || 'Straw Hut Media'
+  const LEADS_FROM_DOMAIN = process.env.LEADS_MAIL_DOMAIN || 'strawhutmedia.net'
+  try {
+    const result = await resend.emails.send({
+      from: `${senderName} at Straw Hut Media <hello@${LEADS_FROM_DOMAIN}>`,
+      replyTo: user.email,
+      to: lead.email,
+      subject: lead.followup_draft_subject,
+      text: lead.followup_draft_body,
+      html: `<div style="font-family:system-ui,sans-serif;font-size:15px;line-height:1.6;color:#0b0d12;white-space:pre-wrap">${escapeHtml(lead.followup_draft_body)}</div>`,
+    })
+    if (result.error) throw new Error(result.error.message || 'send_failed')
+    await pool.query(
+      `UPDATE audience_contacts
+          SET followup_status = 'sent', followup_sent_at = now(), followup_sent_by = $2
+        WHERE id = $1`,
+      [contactId, user.id],
+    )
+    logInfo('lead followup: sent', { contactId, projectId: lead.project_id, by: user.id })
+    res.json({ ok: true })
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err)
+    logError('lead followup: send failed', { contactId, error: msg })
+    res.status(500).json({ error: 'send_failed', detail: msg.slice(0, 400) })
+  }
 })
 
 // Rotate the capture token — admin only (invalidates the old URL in
