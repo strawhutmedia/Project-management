@@ -1033,6 +1033,37 @@ export const api = {
     }),
   audienceResync: (projectId: string) =>
     request<{ ok: true; pushed: number }>(`/api/audience/projects/${projectId}/resync`, { method: 'POST' }),
+  // Lead follow-up drafts (sales-pipeline lists only)
+  audienceFollowups: (projectId: string) =>
+    request<{
+      leads: Array<{
+        id: string; email: string; name: string | null; handle: string | null
+        source: string; trigger_word: string | null; created_at: string
+        followup_notes: string | null
+        followup_draft_subject: string | null; followup_draft_body: string | null
+        followup_status: 'none' | 'drafted' | 'sent'
+        followup_drafted_at: string | null; followup_sent_at: string | null
+      }>
+      bookingUrl: string | null
+    }>(`/api/audience/projects/${projectId}/followups`),
+  audienceSetBookingUrl: (projectId: string, url: string) =>
+    request<{ ok: true }>(`/api/audience/projects/${projectId}/booking-url`, {
+      method: 'PUT', body: JSON.stringify({ url }),
+    }),
+  audienceSetFollowupNotes: (contactId: string, notes: string) =>
+    request<{ ok: true }>(`/api/audience/contacts/${contactId}/followup-notes`, {
+      method: 'PUT', body: JSON.stringify({ notes }),
+    }),
+  audienceDraftFollowup: (contactId: string) =>
+    request<{ ok: true; subject: string; body: string }>(`/api/audience/contacts/${contactId}/followup/draft`, {
+      method: 'POST',
+    }),
+  audienceEditFollowup: (contactId: string, subject: string, body: string) =>
+    request<{ ok: true }>(`/api/audience/contacts/${contactId}/followup`, {
+      method: 'PATCH', body: JSON.stringify({ subject, body }),
+    }),
+  audienceSendFollowup: (contactId: string) =>
+    request<{ ok: true }>(`/api/audience/contacts/${contactId}/followup/send`, { method: 'POST' }),
   // Socials autopilot
   runSocialsAutopilot: (projectId: string, force = false) =>
     request<{ ok: true; skipped: string | null; itemCount: number }>(
