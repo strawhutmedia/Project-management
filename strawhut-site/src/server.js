@@ -152,6 +152,23 @@ app.use(async (req, res, next) => {
   }
 });
 
+// ---- Canonical lowercase redirect ------------------------------------------
+// Every real URL on this site is lowercase (slugs run through slugify()). But
+// Express routing is case-insensitive, so /Press is served with a 200 just like
+// /press — which splits our traffic counts across two paths AND hands crawlers
+// duplicate-content URLs. 301 any GET page path that carries an uppercase
+// letter to its lowercase form. Skip file paths (dots) so static asset
+// filenames keep their case; tokens ride in the query string, never the path,
+// and the query is preserved verbatim.
+app.use((req, res, next) => {
+  if (req.method === 'GET' && /[A-Z]/.test(req.path) && !req.path.includes('.')) {
+    const qi = req.originalUrl.indexOf('?');
+    const qs = qi === -1 ? '' : req.originalUrl.slice(qi);
+    return res.redirect(301, req.path.toLowerCase() + qs);
+  }
+  next();
+});
+
 // ---- First-party traffic counting -----------------------------------------
 // Counts real page requests per path, per day, straight into our own Postgres.
 // Aggregate only — no IP, no user agent stored, no cookie — so it needs no
