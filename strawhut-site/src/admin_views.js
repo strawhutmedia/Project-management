@@ -15,6 +15,7 @@ function adminLayout({ title, active, body, stats }) {
     ['/admin/announcements', '📣 Announcements'],
     ['/admin/press', '📰 Press'],
     ['/admin/landing', '🎯 Landing Pages'],
+    ['/admin/pitches', '🎬 Pitches'],
     ['/admin/members', '👥 Members'],
     ['/admin/newsletter', '✉️ Newsletter'],
   ]
@@ -342,6 +343,169 @@ export function landingFormPage({ flash, values = {}, isEdit = false, actionId }
       </form>
     </div>`;
   return adminLayout({ title: isEdit ? 'Edit Landing Page' : 'New Landing Page', active: '/admin/landing', body });
+}
+
+export function pitchesAdminPage({ pitches, flash }) {
+  const rows = pitches
+    .map(
+      (p) => `<tr>
+      <td>${esc(p.title)}${p.working_title ? ' <span class="pill">Working title</span>' : ''}
+        <div style="color:var(--muted);font-size:0.82rem;margin-top:3px">${esc(formatDate(p.updated_at || p.created_at))}</div></td>
+      <td><a href="/pitch/${esc(p.slug)}" target="_blank">/pitch/${esc(p.slug)}</a></td>
+      <td class="actions">
+        <a class="btn btn-sm" href="/pitch/${esc(p.slug)}" target="_blank">View</a>
+        <a class="btn btn-sm" href="/admin/pitches/${esc(p.id)}/edit">Edit</a>
+        <form method="post" action="/admin/pitches/${esc(p.id)}/delete" style="display:inline" onsubmit="return confirm('Delete the pitch ${esc(p.title)}?')"><button class="btn btn-sm btn-danger">Delete</button></form>
+      </td>
+    </tr>`
+    )
+    .join('');
+  const body = `
+    <h1>Pitches</h1>
+    ${flash ? `<div class="flash ${flash.type}">${esc(flash.msg)}</div>` : ''}
+    <p style="color:var(--muted);max-width:660px;margin-top:-8px">Development pitch documents — polished, confidential pages you send to buyers
+    (streamers, networks, brand partners). Each lives at an unlisted <strong>/pitch/&lt;slug&gt;</strong> URL, hidden from
+    search engines and never linked from the site. Share the link directly.</p>
+    <div style="margin:14px 0"><a class="btn btn-primary" href="/admin/pitches/new">➕ New pitch</a></div>
+    <div class="panel" style="overflow-x:auto">
+      <table class="admin-table"><thead><tr><th>Pitch</th><th>URL</th><th></th></tr></thead>
+      <tbody>${rows || '<tr><td colspan="3" style="color:var(--muted)">No pitches yet.</td></tr>'}</tbody></table>
+    </div>`;
+  return adminLayout({ title: 'Pitches', active: '/admin/pitches', body });
+}
+
+export function pitchFormPage({ flash, values = {}, kinds, isEdit = false, actionId } = {}) {
+  const v = values;
+  const sections = Array.isArray(v.sections) ? v.sections : [];
+  // JSON payloads for the section editor. <-escape so a literal </script>
+  // inside pitch copy can't terminate the script block.
+  const initialJson = JSON.stringify(sections).replace(/</g, '\\u003c');
+  const kindsJson = JSON.stringify(kinds).replace(/</g, '\\u003c');
+  const body = `
+    <h1>${isEdit ? 'Edit' : 'New'} pitch</h1>
+    ${flash ? `<div class="flash ${flash.type}">${esc(flash.msg)}</div>` : ''}
+    <div class="panel">
+      <form method="post" action="${isEdit ? '/admin/pitches/' + esc(actionId) : '/admin/pitches'}" id="pitch-form">
+        <div class="field"><label>Title *</label><input type="text" name="title" value="${esc(v.title || '')}" required placeholder="e.g. Born Explorers"></div>
+        <div class="field checkbox"><input type="checkbox" name="working_title" id="wt" ${v.working_title ? 'checked' : ''}><label for="wt" style="margin:0">Mark as working title</label></div>
+        <div class="field"><label>URL slug</label><input type="text" name="slug" value="${esc(v.slug || '')}" placeholder="auto from title if blank — page will be /pitch/your-slug"></div>
+        <div class="field"><label>Eyebrow (the line above the title)</label><input type="text" name="eyebrow" value="${esc(v.eyebrow || '')}" placeholder="e.g. Straw Hut Media × Bruce Poon Tip · A limited docuseries"></div>
+        <div class="field"><label>Logline</label><textarea name="logline" rows="2" class="pitch-ta">${esc(v.logline || '')}</textarea></div>
+        <div class="field"><label>Format pills (comma-separated)</label><input type="text" name="meta_tags" value="${esc(v.meta_tags || '')}" placeholder="e.g. 8 × 45–60 min, Premium documentary, Hosted by Bruce Poon Tip"></div>
+
+        <h2 style="font-size:1.05rem;margin:26px 0 4px">Sections</h2>
+        <p style="color:var(--muted);font-size:0.88rem;margin:0 0 12px">The document body, in order. Each section has an optional small eyebrow label, an optional heading, and content whose format depends on the section type.</p>
+        <div id="secs"></div>
+        <div style="margin:10px 0 22px"><button type="button" class="btn btn-sm" id="add-sec">➕ Add section</button></div>
+        <input type="hidden" name="sections_json" id="sections-json">
+
+        <h2 style="font-size:1.05rem;margin:26px 0 10px">Contact block</h2>
+        <div class="field"><label>Contact name</label><input type="text" name="contact_name" value="${esc(v.contact_name || '')}"></div>
+        <div class="field"><label>Company line</label><input type="text" name="contact_company" value="${esc(v.contact_company || '')}" placeholder="e.g. Straw Hut Media · Los Angeles"></div>
+        <div class="field"><label>Email</label><input type="email" name="contact_email" value="${esc(v.contact_email || '')}"></div>
+        <div class="field"><label>Phone</label><input type="text" name="contact_phone" value="${esc(v.contact_phone || '')}"></div>
+        <div class="field"><label>Footer note</label><input type="text" name="footer_note" value="${esc(v.footer_note || '')}" placeholder="e.g. Confidential — prepared for development discussion purposes."></div>
+        <button class="btn btn-primary" type="submit">${isEdit ? 'Save changes' : 'Create pitch'}</button>
+      </form>
+    </div>
+    <style>
+      .pitch-ta{width:100%;padding:12px 14px;border-radius:10px;border:1px solid var(--border);background:var(--bg-2);color:var(--text);font-family:inherit;font-size:0.95rem}
+      .sec{border:1px solid var(--border);border-radius:12px;padding:14px;margin-bottom:12px;background:var(--bg-2)}
+      .sec .sec-head{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:10px}
+      .sec select{padding:8px 10px;border-radius:8px;border:1px solid var(--border);background:var(--bg-2);color:var(--text)}
+      .sec .hint{color:var(--muted);font-size:0.82rem;margin:6px 0 0;line-height:1.5}
+      .sec .grow{flex:1;min-width:0}
+      .sec input,.sec textarea{width:100%;padding:10px 12px;border-radius:8px;border:1px solid var(--border);background:var(--bg-1,transparent);color:var(--text);font-family:inherit;font-size:0.92rem}
+      .sec .row{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px}
+      .sec .row > div{flex:1;min-width:180px}
+      .sec label{display:block;font-size:0.8rem;color:var(--muted);margin-bottom:4px}
+    </style>
+    <script>
+    (function () {
+      var KINDS = ${kindsJson};
+      var initial = ${initialJson};
+      var secs = document.getElementById('secs');
+
+      function el(tag, cls, html) {
+        var e = document.createElement(tag);
+        if (cls) e.className = cls;
+        if (html != null) e.innerHTML = html;
+        return e;
+      }
+
+      function addSection(data) {
+        data = data || { kind: 'text', eyebrow: '', heading: '', body: '' };
+        var sec = el('div', 'sec');
+        var head = el('div', 'sec-head');
+        var select = document.createElement('select');
+        Object.keys(KINDS).forEach(function (k) {
+          var o = document.createElement('option');
+          o.value = k;
+          o.textContent = KINDS[k].label;
+          if (k === data.kind) o.selected = true;
+          select.appendChild(o);
+        });
+        head.appendChild(select);
+        var spacer = el('div', 'grow');
+        head.appendChild(spacer);
+        ['↑', '↓', '✕'].forEach(function (sym) {
+          var b = el('button', 'btn btn-sm', sym);
+          b.type = 'button';
+          b.addEventListener('click', function () {
+            if (sym === '✕') { sec.remove(); return; }
+            var sib = sym === '↑' ? sec.previousElementSibling : sec.nextElementSibling;
+            if (!sib) return;
+            if (sym === '↑') secs.insertBefore(sec, sib); else secs.insertBefore(sib, sec);
+          });
+          head.appendChild(b);
+        });
+        sec.appendChild(head);
+
+        var row = el('div', 'row');
+        var d1 = el('div', '', '<label>Eyebrow (small label above the heading)</label>');
+        var eyebrow = document.createElement('input');
+        eyebrow.type = 'text'; eyebrow.value = data.eyebrow || '';
+        d1.appendChild(eyebrow);
+        var d2 = el('div', '', '<label>Heading</label>');
+        var heading = document.createElement('input');
+        heading.type = 'text'; heading.value = data.heading || '';
+        d2.appendChild(heading);
+        row.appendChild(d1); row.appendChild(d2);
+        sec.appendChild(row);
+
+        var bodyWrap = el('div', '', '<label>Content</label>');
+        var ta = document.createElement('textarea');
+        ta.rows = 6; ta.value = data.body || '';
+        bodyWrap.appendChild(ta);
+        sec.appendChild(bodyWrap);
+
+        var hint = el('div', 'hint');
+        function refreshHint() { hint.textContent = (KINDS[select.value] || {}).hint || ''; }
+        select.addEventListener('change', refreshHint);
+        refreshHint();
+        sec.appendChild(hint);
+
+        sec._read = function () {
+          return { kind: select.value, eyebrow: eyebrow.value.trim(), heading: heading.value.trim(), body: ta.value };
+        };
+        secs.appendChild(sec);
+      }
+
+      initial.forEach(addSection);
+      if (!initial.length) addSection();
+      document.getElementById('add-sec').addEventListener('click', function () { addSection(); });
+      document.getElementById('pitch-form').addEventListener('submit', function () {
+        var out = [];
+        Array.prototype.forEach.call(secs.children, function (s) {
+          if (!s._read) return;
+          var v = s._read();
+          if (v.eyebrow || v.heading || v.body.trim()) out.push(v);
+        });
+        document.getElementById('sections-json').value = JSON.stringify(out);
+      });
+    })();
+    </script>`;
+  return adminLayout({ title: isEdit ? 'Edit Pitch' : 'New Pitch', active: '/admin/pitches', body });
 }
 
 export function membersPage({ subscribers, flash }) {

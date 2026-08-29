@@ -287,6 +287,26 @@ destinations. **Do not widen it to organic traffic** without asking him again.
   export, `src/megaphoneS3.js` + `src/popularity.js`), top 3 featured,
   refreshed automatically.
 
+## Pitches (`/admin/pitches` → `/pitch/<slug>`)
+
+Development pitch documents — polished, confidential pages Ryan sends to
+buyers (streamers, networks, brand partners). Composed in the admin from typed
+sections (text / stat tiles / episode guide / cards / chips — see
+`PITCH_SECTION_KINDS` in `src/pitch_views.js`), stored via `store.js`
+(`pitches` table / JSON key), rendered by `pitchPage()`.
+
+- **Deliberately outside `layout()`, the sitemap, and `llms.txt`** — a pitch is
+  a private document with its own editorial identity (Marcellus/Source Serif,
+  expedition-paper palette), not a marketing page. It ships
+  `noindex, nofollow` + an `X-Robots-Tag` header, same posture as `/onboarding`
+  and ad landing pages. Don't "fix" this by adding it to the SEO checklist.
+- The URL is the share mechanism: unlisted slug, no auth. Don't link pitches
+  from any public page.
+- First pitch (**Born Explorers**, the Bruce Poon Tip history-of-travel
+  docuseries) is seeded at boot from `src/content/pitch_seed.js` only when the
+  store has no pitches at all; after that the admin's edits are the source of
+  truth. `SEED_PITCH=off` skips it.
+
 ## SEO features shipped
 
 - **Resources / guides** (`/resources`, `/resources/:slug`) — hand-written

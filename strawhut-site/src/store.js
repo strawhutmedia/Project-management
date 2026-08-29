@@ -23,7 +23,7 @@ function newId() {
 // ---------------------------------------------------------------------------
 class JsonStore {
   constructor() {
-    this.db = { shows: {}, episodes: {}, subscribers: {}, announcements: {}, press_items: {}, landing_pages: {} };
+    this.db = { shows: {}, episodes: {}, subscribers: {}, announcements: {}, press_items: {}, landing_pages: {}, pitches: {} };
   }
   async init() {
     try {
@@ -35,6 +35,7 @@ class JsonStore {
         this.db.announcements ||= {};
         this.db.press_items ||= {};
         this.db.landing_pages ||= {};
+        this.db.pitches ||= {};
       } else {
         fs.mkdirSync(DATA_DIR, { recursive: true });
         this._flush();
@@ -298,6 +299,36 @@ class JsonStore {
     delete this.db.landing_pages[id];
     this._flush();
   }
+
+  // --- pitches (development pitch documents, served at /pitch/<slug>) ---
+  async createPitch(p) {
+    const id = p.id || newId();
+    const now = new Date().toISOString();
+    this.db.pitches[id] = { id, created_at: now, updated_at: now, ...p };
+    this._flush();
+    return this.db.pitches[id];
+  }
+  async listPitches() {
+    return Object.values(this.db.pitches).sort(
+      (a, b) => new Date(b.created_at) - new Date(a.created_at)
+    );
+  }
+  async getPitchBySlug(slug) {
+    return Object.values(this.db.pitches).find((p) => p.slug === slug) || null;
+  }
+  async getPitchById(id) {
+    return this.db.pitches[id] || null;
+  }
+  async updatePitch(id, patch) {
+    if (!this.db.pitches[id]) return null;
+    this.db.pitches[id] = { ...this.db.pitches[id], ...patch, id, updated_at: new Date().toISOString() };
+    this._flush();
+    return this.db.pitches[id];
+  }
+  async deletePitch(id) {
+    delete this.db.pitches[id];
+    this._flush();
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -410,6 +441,23 @@ class PgStore {
         indexable     BOOLEAN DEFAULT FALSE,
         gtag_id       TEXT,
         created_at    TIMESTAMPTZ DEFAULT now()
+      );
+      CREATE TABLE IF NOT EXISTS pitches (
+        id              TEXT PRIMARY KEY,
+        slug            TEXT UNIQUE NOT NULL,
+        title           TEXT NOT NULL,
+        working_title   BOOLEAN DEFAULT FALSE,
+        eyebrow         TEXT,
+        logline         TEXT,
+        meta_tags       TEXT,
+        sections        TEXT,
+        contact_name    TEXT,
+        contact_company TEXT,
+        contact_email   TEXT,
+        contact_phone   TEXT,
+        footer_note     TEXT,
+        created_at      TIMESTAMPTZ DEFAULT now(),
+        updated_at      TIMESTAMPTZ DEFAULT now()
       );
     `);
     // Lightweight migrations: CREATE TABLE IF NOT EXISTS won't add columns to
@@ -752,6 +800,56 @@ class PgStore {
   }
   async deleteLanding(id) {
     await this.pool.query(`DELETE FROM landing_pages WHERE id=$1`, [id]);
+  }
+
+  // --- pitches (development pitch documents, served at /pitch/<slug>) ---
+  _rowToPitch(r) {
+    if (!r) return null;
+    let sections = [];
+    if (r.sections) { try { sections = JSON.parse(r.sections); } catch { sections = []; } }
+    return { ...r, sections };
+  }
+  async createPitch(p) {
+    const id = p.id || newId();
+    await this.pool.query(
+      `INSERT INTO pitches (id, slug, title, working_title, eyebrow, logline, meta_tags, sections,
+                            contact_name, contact_company, contact_email, contact_phone, footer_note)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)`,
+      [id, p.slug, p.title, !!p.working_title, p.eyebrow || '', p.logline || '', p.meta_tags || '',
+       JSON.stringify(p.sections || []), p.contact_name || '', p.contact_company || '',
+       p.contact_email || '', p.contact_phone || '', p.footer_note || '']
+    );
+    return this.getPitchById(id);
+  }
+  async listPitches() {
+    const { rows } = await this.pool.query(`SELECT * FROM pitches ORDER BY created_at DESC`);
+    return rows.map((r) => this._rowToPitch(r));
+  }
+  async getPitchBySlug(slug) {
+    const { rows } = await this.pool.query(`SELECT * FROM pitches WHERE slug=$1`, [slug]);
+    return this._rowToPitch(rows[0]);
+  }
+  async getPitchById(id) {
+    const { rows } = await this.pool.query(`SELECT * FROM pitches WHERE id=$1`, [id]);
+    return this._rowToPitch(rows[0]);
+  }
+  async updatePitch(id, patch) {
+    const existing = await this.getPitchById(id);
+    if (!existing) return null;
+    const m = { ...existing, ...patch, id };
+    await this.pool.query(
+      `UPDATE pitches SET slug=$2, title=$3, working_title=$4, eyebrow=$5, logline=$6, meta_tags=$7,
+         sections=$8, contact_name=$9, contact_company=$10, contact_email=$11, contact_phone=$12,
+         footer_note=$13, updated_at=now()
+       WHERE id=$1`,
+      [id, m.slug, m.title, !!m.working_title, m.eyebrow || '', m.logline || '', m.meta_tags || '',
+       JSON.stringify(m.sections || []), m.contact_name || '', m.contact_company || '',
+       m.contact_email || '', m.contact_phone || '', m.footer_note || '']
+    );
+    return this.getPitchById(id);
+  }
+  async deletePitch(id) {
+    await this.pool.query(`DELETE FROM pitches WHERE id=$1`, [id]);
   }
 }
 

@@ -12,6 +12,8 @@ import { createStore } from './store.js';
 import { addShowFromFeed, syncShow, syncAll, startScheduler } from './sync.js';
 import * as V from './views.js';
 import * as A from './admin_views.js';
+import { pitchPage, PITCH_SECTION_KINDS } from './pitch_views.js';
+import { BORN_EXPLORERS_PITCH } from './content/pitch_seed.js';
 import { robotsTxt, sitemapXml, llmsTxt } from './seo.js';
 import { sendAnnouncement, mailConfigured, sendContactEmail, sendContactAutoReply, sendTrafficDigest } from './mail.js';
 import { buildIssue, sendToSubscribers, sendTestToOwner, maybeSendNewsletterDraft } from './newsletter.js';
@@ -729,6 +731,83 @@ app.post('/admin/landing/:id/delete', requireAdmin, async (req, res) => {
   res.redirect('/admin/landing');
 });
 
+// ---- Admin: pitches (development pitch documents at /pitch/<slug>) ----
+
+function pitchFromBody(body, existing = {}) {
+  let sections = existing.sections || [];
+  if (body.sections_json) {
+    try {
+      const parsed = JSON.parse(body.sections_json);
+      if (Array.isArray(parsed)) {
+        sections = parsed
+          .filter((s) => s && typeof s === 'object')
+          .map((s) => ({
+            kind: PITCH_SECTION_KINDS[s.kind] ? s.kind : 'text',
+            eyebrow: String(s.eyebrow || '').trim(),
+            heading: String(s.heading || '').trim(),
+            body: String(s.body || ''),
+          }));
+      }
+    } catch { /* keep the existing sections if the payload is malformed */ }
+  }
+  return {
+    title: (body.title || '').trim(),
+    working_title: !!body.working_title,
+    eyebrow: (body.eyebrow || '').trim(),
+    logline: (body.logline || '').trim(),
+    meta_tags: (body.meta_tags || '').trim(),
+    sections,
+    contact_name: (body.contact_name || '').trim(),
+    contact_company: (body.contact_company || '').trim(),
+    contact_email: (body.contact_email || '').trim(),
+    contact_phone: (body.contact_phone || '').trim(),
+    footer_note: (body.footer_note || '').trim(),
+  };
+}
+
+app.get('/admin/pitches', requireAdmin, async (req, res) => {
+  const pitches = await store.listPitches();
+  res.send(A.pitchesAdminPage({ pitches, flash: readFlash(req, res) }));
+});
+app.get('/admin/pitches/new', requireAdmin, (req, res) =>
+  res.send(A.pitchFormPage({ kinds: PITCH_SECTION_KINDS, flash: readFlash(req, res) }))
+);
+app.post('/admin/pitches', requireAdmin, async (req, res) => {
+  if (!(req.body.title || '').trim()) {
+    return res.send(A.pitchFormPage({ kinds: PITCH_SECTION_KINDS, flash: { type: 'err', msg: 'Title is required.' }, values: pitchFromBody(req.body) }));
+  }
+  const taken = new Set((await store.listPitches()).map((p) => p.slug));
+  const slug = uniqueSlug(slugify(req.body.slug || req.body.title, 'pitch'), taken);
+  const created = await store.createPitch({ ...pitchFromBody(req.body), slug });
+  setFlash(res, { type: 'ok', msg: `Pitch created — share it at /pitch/${created.slug}` });
+  res.redirect('/admin/pitches');
+});
+app.get('/admin/pitches/:id/edit', requireAdmin, async (req, res) => {
+  const p = await store.getPitchById(req.params.id);
+  if (!p) return res.redirect('/admin/pitches');
+  res.send(A.pitchFormPage({ values: p, kinds: PITCH_SECTION_KINDS, isEdit: true, actionId: p.id, flash: readFlash(req, res) }));
+});
+app.post('/admin/pitches/:id', requireAdmin, async (req, res) => {
+  const existing = await store.getPitchById(req.params.id);
+  if (!existing) return res.redirect('/admin/pitches');
+  // Keep the slug stable unless deliberately changed — the link may already
+  // be in a buyer's inbox.
+  const requested = slugify(req.body.slug || existing.slug, 'pitch');
+  let slug = existing.slug;
+  if (requested !== existing.slug) {
+    const taken = new Set((await store.listPitches()).filter((p) => p.id !== existing.id).map((p) => p.slug));
+    slug = uniqueSlug(requested, taken);
+  }
+  await store.updatePitch(existing.id, { ...pitchFromBody(req.body, existing), slug });
+  setFlash(res, { type: 'ok', msg: 'Pitch saved.' });
+  res.redirect('/admin/pitches');
+});
+app.post('/admin/pitches/:id/delete', requireAdmin, async (req, res) => {
+  await store.deletePitch(req.params.id);
+  setFlash(res, { type: 'ok', msg: 'Pitch deleted.' });
+  res.redirect('/admin/pitches');
+});
+
 // ---- Admin: members ----
 app.get('/admin/members', requireAdmin, async (req, res) => {
   const subscribers = await store.listSubscribers();
@@ -1022,6 +1101,16 @@ for (const svc of SERVICE_PAGES) {
     res.send(V.servicePage(svc, { shows }));
   });
 }
+
+// Pitch documents — unlisted, confidential development pitches. Deliberately
+// outside layout()/sitemap/llms.txt (same posture as landing pages and
+// /onboarding): the URL is shared privately with buyers, never crawled.
+app.get('/pitch/:slug', async (req, res, next) => {
+  const pitch = await store.getPitchBySlug(req.params.slug);
+  if (!pitch) return next();
+  res.set('X-Robots-Tag', 'noindex, nofollow');
+  res.send(pitchPage({ pitch }));
+});
 
 app.get('/lp/:slug', async (req, res, next) => {
   const landing = await store.getLandingBySlug(req.params.slug);
@@ -1469,6 +1558,25 @@ app.listen(PORT, async () => {
     }
   } catch (e) {
     console.error('[import] auto-import failed:', e.message);
+  }
+
+  // Seed the first pitch document (Born Explorers — the Bruce Poon Tip
+  // history-of-travel docuseries) so it's editable in /admin/pitches and
+  // shareable at /pitch/born-explorers from the first boot. Idempotent: if a
+  // pitch with that slug exists (even edited or renamed via id), it is left
+  // exactly as the admin last saved it. Set SEED_PITCH=off to skip.
+  try {
+    if (process.env.SEED_PITCH !== 'off') {
+      // Only when the store has no pitches at all — so deleting it once other
+      // pitches exist doesn't resurrect it on the next deploy.
+      const pitches = await store.listPitches();
+      if (!pitches.length) {
+        await store.createPitch(BORN_EXPLORERS_PITCH);
+        console.log('[seed] created pitch /pitch/' + BORN_EXPLORERS_PITCH.slug);
+      }
+    }
+  } catch (e) {
+    console.error('[seed] pitch seed failed:', e.message);
   }
 
   // Seed a demo Google-Ads landing page for review (Seen on the Screen).
