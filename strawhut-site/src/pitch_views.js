@@ -182,6 +182,9 @@ export function pitchPage({ pitch }) {
   .eyebrow{font-family:Archivo,system-ui,sans-serif;font-weight:600;font-size:12px;letter-spacing:.18em;text-transform:uppercase;color:var(--brass);margin:0 0 14px}
   p{margin:0 0 1em}
   p.big{font-size:19px}
+  .prose ul{margin:0 0 1em;padding-left:2px;list-style:none;display:grid;gap:10px}
+  .prose ul li{padding-left:26px;position:relative}
+  .prose ul li::before{content:"";position:absolute;left:2px;top:.62em;width:12px;height:2px;background:var(--brass)}
   section{padding:64px 0;border-top:1px solid var(--line-soft)}
   section > :last-child{margin-bottom:0}
 
