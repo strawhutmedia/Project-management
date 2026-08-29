@@ -9,7 +9,7 @@ export const BORN_EXPLORERS_PITCH = {
   working_title: true,
   eyebrow: 'Straw Hut Media × Bruce Poon Tip · A limited docuseries',
   logline: 'How the human urge to see the world became the largest industry on Earth.',
-  meta_tags: '8 × 45–60 min, Premium documentary, Hosted by Bruce Poon Tip',
+  meta_tags: '8 × 45–60 min, Premium documentary, Featuring Bruce Poon Tip',
   contact_name: 'Ryan Tillotson',
   contact_company: 'Straw Hut Media · Los Angeles',
   contact_email: 'ryan@strawhutmedia.com',
@@ -21,7 +21,7 @@ export const BORN_EXPLORERS_PITCH = {
       eyebrow: 'The series',
       heading: 'The biggest industry on Earth has never had its origin story told.',
       body: `<p class="big">Tourism is bigger than oil, agriculture, or automobiles — and almost nobody knows where it came from. <em>Born Explorers</em> tells that story for the first time: from the explorers and empires that mapped the world to a phone in 1.4 billion pockets.</p>
-<p>Our guide is <strong>Bruce Poon Tip</strong> — founder of G&nbsp;Adventures and the most credentialed voice in world travel — asking one question: <em>we were born explorers. How did we become tourists, and what do we become next?</em></p>`,
+<p>At its heart is <strong>Bruce Poon Tip</strong> — founder of G&nbsp;Adventures and the most credentialed voice in world travel — and his question: <em>we were born explorers. How did we become tourists, and what do we become next?</em></p>`,
     },
     {
       kind: 'stats',
@@ -46,8 +46,8 @@ export const BORN_EXPLORERS_PITCH = {
     },
     {
       kind: 'text',
-      eyebrow: 'The guide',
-      heading: 'Bruce Poon Tip — host & executive producer',
+      eyebrow: 'The anchor voice',
+      heading: 'Bruce Poon Tip — executive producer & anchor voice',
       body: `<p class="big">Founded <strong>G&nbsp;Adventures</strong> at 22 on two maxed-out credit cards; built it into the world's largest independent adventure travel company, on all seven continents.</p>
 <ul>
 <li><strong>Officer of the Order of Canada</strong> (2023) — the travel industry's first in 34 years</li>
@@ -55,7 +55,8 @@ export const BORN_EXPLORERS_PITCH = {
 <li>NYT-bestselling author of <strong><em>Looptail</em></strong> — foreword by the Dalai Lama</li>
 <li>Founder of <strong>Planeterra</strong>, the community-tourism nonprofit</li>
 <li>His interview list: the founders and CEOs of the world's biggest travel brands</li>
-</ul>`,
+</ul>
+<p>The on-camera host is open — a casting opportunity for the platform.</p>`,
     },
     {
       kind: 'episodes',
@@ -98,7 +99,7 @@ Interviews: the disruptor founders; the mayors on the front line.
 
 The Next Explorers
 Now · What travel becomes
-AI, climate, and a new movement ask the founding question again: what is travel for? Bruce makes the case for what comes next.
+AI, climate, and a new movement ask the founding question again: what is travel for? Bruce and the people building the next era make their case.
 Interviews: the CEOs betting on the future; the communities building it.`,
     },
     {
@@ -125,10 +126,10 @@ The living legends of the first boom, and the communities tourism happens to.`,
 A century of postcards, steamship brochures, and Pan Am promos — never before mined for series TV.
 
 Then/now locations
-Bruce walks the real places: the grand hotels, Cancún's hotel zone, Venice at dawn.
+The series walks the real places: the grand hotels, Cancún's hotel zone, Venice at dawn.
 
 Skin in the game
-An insider interrogating his own industry — wonder and reckoning, both earned.`,
+Insiders interrogating their own industry — wonder and reckoning, both earned.`,
     },
     {
       kind: 'cards',
@@ -140,7 +141,7 @@ Bruce's proof of concept — this series at ten times the scale.
 
 The Reluctant Traveler
 ~Apple TV+
-One magnetic guide can carry a platform brand.
+Proof premium travel formats carry a platform brand.
 
 Stanley Tucci: Searching for Italy
 ~CNN / Nat Geo
@@ -159,7 +160,7 @@ Sustainable-travel curiosity at mainstream scale.`,
       eyebrow: 'The studio',
       heading: 'Straw Hut Media',
       body: `<p>The LA studio behind the official <strong><em>Only Murders in the Building</em></strong> podcast with Disney/Hulu — now in its sixth season — plus a slate of celebrity-led and studio-partner shows.</p>
-<p><em>Born Explorers</em> arrives as a package: host and EP attached, interview access in hand, and a companion podcast and social engine built in.</p>`,
+<p><em>Born Explorers</em> arrives as a package: EP and anchor voice attached, interview access in hand, and a companion podcast and social engine built in.</p>`,
     },
     {
       kind: 'chips',
