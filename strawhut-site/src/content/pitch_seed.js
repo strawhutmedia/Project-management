@@ -8,8 +8,8 @@ export const BORN_EXPLORERS_PITCH = {
   title: 'Born Explorers',
   working_title: true,
   eyebrow: 'Straw Hut Media × Bruce Poon Tip · A limited docuseries',
-  logline: 'How the human urge to see the world became the largest industry on Earth.',
-  meta_tags: '8 × 45–60 min, Premium documentary, Featuring Bruce Poon Tip',
+  logline: 'A journey through the cities that taught the world to travel — one harbor, one market, one plate at a time.',
+  meta_tags: '8 × 45–60 min, Premium travel series, Featuring Bruce Poon Tip',
   contact_name: 'Ryan Tillotson',
   contact_company: 'Straw Hut Media · Los Angeles',
   contact_email: 'ryan@strawhutmedia.com',
@@ -20,8 +20,8 @@ export const BORN_EXPLORERS_PITCH = {
       kind: 'text',
       eyebrow: 'The series',
       heading: 'The biggest industry on Earth has never had its origin story told.',
-      body: `<p class="big">Tourism is bigger than oil, agriculture, or automobiles — and almost nobody knows where it came from. <em>Born Explorers</em> tells that story for the first time: from the explorers and empires that mapped the world to a phone in 1.4 billion pockets.</p>
-<p>At its heart is <strong>Bruce Poon Tip</strong> — founder of G&nbsp;Adventures and the most credentialed voice in world travel — and his question: <em>we were born explorers. How did we become tourists, and what do we become next?</em></p>`,
+      body: `<p class="big"><em>Born Explorers</em> is a travel show — markets, kitchens, harbors, streets — through the eight cities that taught the world to travel. The history hides in plain sight: saffron on a Seville plate, empire in a London teacup, the buffet behind Cancún's resort wall.</p>
+<p>Spices, wars, and empires moved along the same routes tourists follow today — and tourism grew bigger than oil or automobiles without anyone ever telling its story. At its heart is <strong>Bruce Poon Tip</strong> — founder of G&nbsp;Adventures and the most credentialed voice in world travel — and his question: <em>we were born explorers. How did we become tourists, and what do we become next?</em></p>`,
     },
     {
       kind: 'stats',
@@ -66,43 +66,43 @@ export const BORN_EXPLORERS_PITCH = {
 
 Seville
 1519 · The age of exploration
-Magellan's fleet sails from Seville to prove the world has no edge. The age of exploration turns the human urge to roam into an enterprise — and draws the map every traveler still follows.
-Interviews: historians of exploration; the archivists of the Archivo de Indias.
+Tapas under orange trees, on a river that once ran with treasure fleets — Magellan sailed from here to prove the world has no edge. The saffron and paprika on every plate are souvenirs of the age of exploration, when Europe's appetite first met the map.
+Interviews: Sevillano chefs and market vendors; historians of exploration; the Archivo de Indias.
 
 Venice
 1700s · The Grand Tour
-Europe's young aristocracy invents the idea that travel finishes a person, and Venice becomes the world's first must-see. The tourist is born — three centuries before the word.
-Interviews: Grand Tour historians; Venetian families who have hosted travelers for generations.
+Cicchetti and spritz on canals the spice trade built — pepper and cinnamon made Venice rich centuries before beauty did. Then Europe's young aristocracy arrives on the Grand Tour, and the tourist is born.
+Interviews: bacaro owners and gondolier families; Grand Tour historians.
 
 London
 1841 · The package tour
-Thomas Cook charters a train to a temperance meeting — and accidentally invents mass tourism. From London, the machinery goes global: package tours, guidebooks, agents, traveler's cheques.
-Interviews: Cook biographers; the archivists holding the original ledgers.
+Afternoon tea — the most British ritual there is — is China and India in a cup, empire served on porcelain. From here, Thomas Cook charters a train in 1841 and accidentally invents mass tourism.
+Interviews: tea masters and hoteliers; Cook biographers; historians of empire.
 
 Paris
 1900 – 1950 · Glamour and steel
-Grand hotels, the Orient Express, the world's fairs — Paris makes travel the ultimate status symbol, until two world wars stop it cold and paid vacation makes leisure a right.
-Interviews: golden-age historians; the grand hotel dynasties.
+Dinner at the Ritz, a berth on the Orient Express — Paris invents travel as glamour, and the world's fairs sell the planet as spectacle. Then two world wars stop it cold, and paid vacation hands leisure to everyone.
+Interviews: the grand hotel dynasties; chefs of the palace kitchens; golden-age historians.
 
 Honolulu
 1959 – 1980 · The jet age
-Statehood, Pan Am, and the 747 turn a distant kingdom into everyone's paradise — remaking Waikiki, and the middle-class vacation, in a single generation.
-Interviews: the surviving pioneers of the first boom; Native Hawaiian voices on what paradise cost.
+Poke, plate lunch, and mai tais — a menu written by plantation workers from Japan, China, Portugal, and the Philippines. Then statehood and the 747 turn the kingdom they built into everyone's paradise, in a single generation.
+Interviews: Native Hawaiian voices; the cooks behind the plate lunch; the surviving pioneers of the jet-age boom.
 
 Cancún
 1974 – 2005 · Paradise, Inc.
-A computer picks a sandbar, and Mexico builds a resort city from nothing. Mass tourism becomes an industrial product — and the money leaves paradise as fast as the tourists arrive.
-Interviews: the planners who built it; cruise and hotel CEOs; the communities beyond the resort wall.
+At the swim-up bar the buffet never ends; beyond the resort wall, cochinita pibil is still cooked in the ground, the way it was before a government computer picked this sandbar in 1974. Mass tourism becomes an industrial product — and the money leaves paradise as fast as the tourists arrive.
+Interviews: Yucatecan cooks and hotel workers; the planners who built it; cruise and hotel CEOs.
 
 Barcelona
 2008 – today · The algorithm
-Budget airlines, Airbnb, and Instagram flood the city until "tourists go home" is painted on its walls — the first great revolt against the industry travel built.
-Interviews: the disruptor founders; city hall; overtourism activists.
+La Boqueria is so jammed with day-trippers that locals can't buy dinner in their own market. Budget airlines, Airbnb, and Instagram flood the city until "tourists go home" is painted on the walls — the first great revolt against the industry travel built.
+Interviews: market vendors and residents; the disruptor founders; city hall.
 
 Orlando
 Now · The manufactured horizon
-The most-visited place in America is a paradise built entirely on purpose — where tourism's final form is being prototyped, and where the next era gets decided. Bruce and the people building what's next make their case.
-Interviews: the CEOs betting on the future; the communities building it.
+You can eat the whole world in one evening here — a paradise built entirely on purpose, and the most-visited place in America. Tourism's final form is being prototyped in Orlando, and Bruce and the people building the next era make their case.
+Interviews: the designers of manufactured paradise; the CEOs betting on the future.
 
 NOTE: Tightens to six by folding Venice into Seville and Barcelona into Orlando.`,
     },
@@ -110,30 +110,30 @@ NOTE: Tightens to six by folding Venice into Seville and Barcelona into Orlando.
       kind: 'cards',
       eyebrow: 'The voices',
       heading: 'Three kinds of witness in every episode.',
-      body: `The Historians
-~How it happened
-The scholars who own this story — historians of exploration, empire, and leisure.
+      body: `The Locals
+~Every episode eats first
+Chefs, market vendors, hoteliers, and families — the city as the people who feed it live it.
+
+The Historians
+~The story under the streets
+Historians of exploration, empire, the spice routes, and leisure — surfacing the past inside the present.
 
 The Titans
-~Who runs it now
-Bruce's peer group: the founders and CEOs of the biggest travel brands, speaking founder-to-founder.
-
-The Pioneers & the Hosts
-~Who built it — and who receives it
-The living legends of the first boom, and the communities tourism happens to.`,
+~Who runs travel now
+Bruce's peer group — the founders and CEOs of the biggest travel brands — plus the surviving pioneers of the first boom.`,
     },
     {
       kind: 'cards',
-      eyebrow: 'The look',
-      heading: 'Prestige history, shot like a travelogue.',
-      body: `Archive as spectacle
-A century of postcards, steamship brochures, and Pan Am promos — never before mined for series TV.
+      eyebrow: 'The feel',
+      heading: 'A trip, not a lecture.',
+      body: `Open on the senses
+Every episode starts in the present tense — a market at dawn, a kitchen mid-service, a harbor at golden hour. The history arrives through the food, not a chalkboard.
 
-One city per episode
-Every city is both the chapter and the destination — Venice at dawn, Cancún's hotel zone. The then/now is built into the format.
+History you can taste
+Follow the ingredients — saffron, pepper, tea, sugar, chili — and they trace the spice routes, wars, and colonizations that carried them.
 
-Skin in the game
-Insiders interrogating their own industry — wonder and reckoning, both earned.`,
+Archive as spectacle
+A century of postcards, steamship brochures, and Pan Am promos — never before mined for series TV.`,
     },
     {
       kind: 'cards',
@@ -143,21 +143,21 @@ Insiders interrogating their own industry — wonder and reckoning, both earned.
 ~Feature doc · 2022
 Bruce's proof of concept — this series at ten times the scale.
 
-The Reluctant Traveler
-~Apple TV+
-Proof premium travel formats carry a platform brand.
+Parts Unknown
+~CNN
+The gold standard: a travel show that smuggled in history and politics.
 
 Stanley Tucci: Searching for Italy
 ~CNN / Nat Geo
-Culture-through-travel — awards, ratings, and a bidding war.
+Culture through food and place — awards, ratings, and a bidding war.
 
-Explained / Dirty Money
+Somebody Feed Phil
 ~Netflix
-The hidden machinery of an industry, made binge-able.
+Joyful food-travel at mainstream scale.
 
-Down to Earth with Zac Efron
-~Netflix
-Sustainable-travel curiosity at mainstream scale.`,
+The Reluctant Traveler
+~Apple TV+
+Proof premium travel formats carry a platform brand.`,
     },
     {
       kind: 'text',
