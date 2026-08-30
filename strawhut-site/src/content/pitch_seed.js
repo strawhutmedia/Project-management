@@ -60,47 +60,51 @@ export const BORN_EXPLORERS_PITCH = {
     },
     {
       kind: 'episodes',
-      eyebrow: 'The journey — eight episodes',
-      heading: 'From the first explorers to the last tourist.',
-      body: `Born Explorers
-Antiquity – 1400s · The urge
-Pilgrimage roads, the Silk Road, Ibn Battuta, Marco Polo — why humans are the only species that travels just to see.
-Interviews: historians of exploration; anthropologists on why we roam.
+      eyebrow: 'The route — one city per episode',
+      heading: 'Eight cities, five hundred years.',
+      body: `INTRO: Each episode is one city — a chapter of the timeline, in order, and a living destination today. The history and the present tense are always in the same frame.
 
-The Age of "Discovery"
-1500s – 1800s · Empire draws the map
-Exploration becomes colonization, and the Grand Tour invents the idea that travel finishes a person. Modern tourism still runs on the routes empire built.
-Interviews: colonial historians; scholars from the destinations themselves.
+Seville
+1519 · The age of exploration
+Magellan's fleet sails from Seville to prove the world has no edge. The age of exploration turns the human urge to roam into an enterprise — and draws the map every traveler still follows.
+Interviews: historians of exploration; the archivists of the Archivo de Indias.
 
-The Man Who Invented the Tourist
-1841 – 1900 · The package tour
-Thomas Cook charters a train to a temperance meeting — and accidentally invents mass tourism: package tours, guidebooks, travel agents, traveler's cheques.
+Venice
+1700s · The Grand Tour
+Europe's young aristocracy invents the idea that travel finishes a person, and Venice becomes the world's first must-see. The tourist is born — three centuries before the word.
+Interviews: Grand Tour historians; Venetian families who have hosted travelers for generations.
+
+London
+1841 · The package tour
+Thomas Cook charters a train to a temperance meeting — and accidentally invents mass tourism. From London, the machinery goes global: package tours, guidebooks, agents, traveler's cheques.
 Interviews: Cook biographers; the archivists holding the original ledgers.
 
-First Class
+Paris
 1900 – 1950 · Glamour and steel
-Ocean liners, grand hotels, the Orient Express — travel becomes the ultimate status symbol, until two world wars stop it cold and paid vacation makes leisure a right.
+Grand hotels, the Orient Express, the world's fairs — Paris makes travel the ultimate status symbol, until two world wars stop it cold and paid vacation makes leisure a right.
 Interviews: golden-age historians; the grand hotel dynasties.
 
-The Jet Age
-1950 – 1980 · The world shrinks
-Pan Am and the 747 put the middle class in the sky — and Spain, Hawaii, and the Caribbean are remade in a single generation.
-Interviews: the surviving pioneers of the first boom — some on camera for the last time.
+Honolulu
+1959 – 1980 · The jet age
+Statehood, Pan Am, and the 747 turn a distant kingdom into everyone's paradise — remaking Waikiki, and the middle-class vacation, in a single generation.
+Interviews: the surviving pioneers of the first boom; Native Hawaiian voices on what paradise cost.
 
-Paradise, Inc.
-1980 – 2005 · Mass tourism
-Cancún is conjured from a sandbar, cruise ships become floating cities, and the all-inclusive perfects the art of visiting a country without entering it.
-Interviews: cruise, hotel, and airline CEOs — and the communities beyond the resort wall.
+Cancún
+1974 – 2005 · Paradise, Inc.
+A computer picks a sandbar, and Mexico builds a resort city from nothing. Mass tourism becomes an industrial product — and the money leaves paradise as fast as the tourists arrive.
+Interviews: the planners who built it; cruise and hotel CEOs; the communities beyond the resort wall.
 
-The World in Your Pocket
-2005 – 2024 · The algorithm takes over
-Budget airlines, Airbnb, and Instagram blow up the old industry. Venice revolts, a pandemic stops travel for the first time in history — and it comes back bigger than ever.
-Interviews: the disruptor founders; the mayors on the front line.
+Barcelona
+2008 – today · The algorithm
+Budget airlines, Airbnb, and Instagram flood the city until "tourists go home" is painted on its walls — the first great revolt against the industry travel built.
+Interviews: the disruptor founders; city hall; overtourism activists.
 
-The Next Explorers
-Now · What travel becomes
-AI, climate, and a new movement ask the founding question again: what is travel for? Bruce and the people building the next era make their case.
-Interviews: the CEOs betting on the future; the communities building it.`,
+Orlando
+Now · The manufactured horizon
+The most-visited place in America is a paradise built entirely on purpose — where tourism's final form is being prototyped, and where the next era gets decided. Bruce and the people building what's next make their case.
+Interviews: the CEOs betting on the future; the communities building it.
+
+NOTE: Tightens to six by folding Venice into Seville and Barcelona into Orlando.`,
     },
     {
       kind: 'cards',
@@ -125,8 +129,8 @@ The living legends of the first boom, and the communities tourism happens to.`,
       body: `Archive as spectacle
 A century of postcards, steamship brochures, and Pan Am promos — never before mined for series TV.
 
-Then/now locations
-The series walks the real places: the grand hotels, Cancún's hotel zone, Venice at dawn.
+One city per episode
+Every city is both the chapter and the destination — Venice at dawn, Cancún's hotel zone. The then/now is built into the format.
 
 Skin in the game
 Insiders interrogating their own industry — wonder and reckoning, both earned.`,
@@ -177,7 +181,7 @@ The Tourist Age`,
       kind: 'text',
       eyebrow: 'The ask',
       heading: 'A development conversation.',
-      body: `An 8-part premium documentary limited series (flexes 6–10). Sizzle, full treatment, and interview commitments available on request.`,
+      body: `A premium documentary limited series — built as eight cities, tightens to six. Sizzle, full treatment, and interview commitments available on request.`,
     },
   ],
 };

@@ -22,7 +22,7 @@ export const PITCH_SECTION_KINDS = {
   },
   episodes: {
     label: 'Episode guide',
-    hint: 'One episode per block, blocks separated by a blank line. Line 1: title. Line 2: era/kicker. Rest: synopsis. A line starting with "Interviews:" is styled as the interview slate.',
+    hint: 'One episode per block, blocks separated by a blank line. Line 1: title. Line 2: era/kicker. Rest: synopsis. A line starting with "Interviews:" is styled as the interview slate. A block starting with "INTRO:" renders as a paragraph above the list; one starting with "NOTE:" as a small note below it.',
   },
   cards: {
     label: 'Cards',
@@ -72,7 +72,11 @@ function renderStats(s) {
 }
 
 function renderEpisodes(s) {
-  const stops = blocksOf(s.body)
+  const all = blocksOf(s.body);
+  const intro = all.filter((b) => b.startsWith('INTRO:')).map((b) => b.slice(6).trim());
+  const notes = all.filter((b) => b.startsWith('NOTE:')).map((b) => b.slice(5).trim());
+  const stops = all
+    .filter((b) => !b.startsWith('INTRO:') && !b.startsWith('NOTE:'))
     .map((block, i) => {
       const lines = block.split('\n').map((l) => l.trim()).filter(Boolean);
       const title = lines.shift() || '';
@@ -88,7 +92,9 @@ function renderEpisodes(s) {
       </li>`;
     })
     .join('');
-  return `<ol class="route-list">${stops}</ol>`;
+  return `${intro.length ? `<div class="prose">${intro.map((t) => `<p>${esc(t)}</p>`).join('')}</div>` : ''}
+<ol class="route-list">${stops}</ol>
+${notes.map((t) => `<p class="route-note">${esc(t)}</p>`).join('')}`;
 }
 
 function renderCards(s) {
@@ -212,6 +218,7 @@ export function pitchPage({ pitch }) {
   .stop .era{font-family:Archivo,system-ui,sans-serif;font-size:11.5px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:var(--brass);margin:3px 0 10px}
   .stop p{max-width:640px;margin-bottom:.4em}
   .stop .gets{font-size:15px;color:var(--ink-soft);font-style:italic}
+  .route-note{margin:30px 0 0;font-size:15px;color:var(--ink-soft);font-style:italic}
 
   .tiers{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:18px;margin-top:34px}
   .tier{background:var(--card);border:1px solid var(--card-border);padding:24px 22px;min-width:0}
