@@ -38,6 +38,20 @@ function vaultPick() {
   return VAULT_PICKS[week % VAULT_PICKS.length];
 }
 
+// A short, fun editor's note ("The Hut Note") opens every issue so it reads like
+// a newsletter, not an auto-digest. Rotated by week; when hand-building an issue
+// you can swap in one tailored to that week's lineup.
+const HUT_NOTES = [
+  'Podcasts are just friends you haven’t annoyed yet. Here are a few worth the risk.',
+  'We make a lot of shows. These are the ones we couldn’t stop talking about this week.',
+  'Big names, weird tangents, real conversations. A normal week at the Hut.',
+  'Your ears asked for something good — we delivered. Press play.',
+  'From the studio on Melrose to your headphones: this week’s best.',
+];
+function hutNote() {
+  return HUT_NOTES[Math.floor(Date.now() / (7 * 864e5)) % HUT_NOTES.length];
+}
+
 function clip(s, n) {
   const t = String(s || '').replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
   return t.length > n ? t.slice(0, n - 1).trimEnd() + '…' : t;
@@ -52,6 +66,7 @@ export async function buildIssue(store, { count = 6 } = {}) {
   if (!eps.length) return null;
   const featured = eps[0];
   const vault = vaultPick();
+  const note = hutNote();
 
   const epCards = eps
     .map((e) => {
@@ -104,6 +119,7 @@ export async function buildIssue(store, { count = 6 } = {}) {
       <tr><td style="padding:26px 30px 6px">
         <h1 style="margin:0 0 8px;color:#12182f;font-size:22px;line-height:1.3">Fresh from across the network</h1>
         <p style="margin:0;color:#5a6270;font-size:15px;line-height:1.6">Here's what's new from the Straw Hut Media shows — hit play on anything that catches your eye.</p>
+        <div style="margin-top:12px;background:#f4f7fb;border-left:3px solid #00cc8e;border-radius:6px;padding:10px 14px;color:#3a4256;font-size:13px;line-height:1.5;font-style:italic"><strong style="color:#00996b;font-style:normal">The Hut Note:</strong> ${esc(note)}</div>
       </td></tr>
       <!-- episodes -->
       <tr><td style="padding:22px 30px 4px">
@@ -137,6 +153,7 @@ export async function buildIssue(store, { count = 6 } = {}) {
   </body></html>`;
 
   const text =
+    `The Hut Note: ${note}\n\n` +
     `Fresh from across the Straw Hut Media network:\n\n` +
     eps.map((e) => `• ${e.show_title || 'Straw Hut Media'} — ${clip(e.title, 90)}\n  ${e.show_slug && e.slug ? `${BASE}/${e.show_slug}/${e.slug}` : BASE}`).join('\n\n') +
     (vault ? `\n\nFrom the Vault — ${vault.show_title}: ${vault.title}\n  ${vaultUrl}` : '') +
