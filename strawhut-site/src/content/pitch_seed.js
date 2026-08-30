@@ -52,7 +52,7 @@ export const BORN_EXPLORERS_PITCH = {
 
 Seville
 1519 · The age of exploration
-Tapas under orange trees, on a river that once ran with treasure fleets — Magellan sailed from here to prove the world has no edge. The saffron and paprika on every plate are souvenirs of the age of exploration, when Europe's appetite first met the map.
+Tapas under orange trees, in the port that licensed every ship to the New World — Columbus is buried in the cathedral, and Magellan sailed from these docks to prove the world has no edge. The exchange went both ways: tomatoes, chili, and chocolate entered Europe here, and no cuisine on Earth was ever the same.
 Interviews: Sevillano chefs and market vendors; historians of exploration; the Archivo de Indias.
 
 Venice
