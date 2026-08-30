@@ -175,3 +175,102 @@ The Tourist Age`,
     },
   ],
 };
+
+// Second pitch document: MEDIA ARTS PROGRAM — the vocational podcast-training
+// track proposed to the Los Angeles LGBT Center, modeled on their Culinary
+// Arts program (12 weeks, three modules).
+export const MEDIA_ARTS_PITCH = {
+  slug: 'media-arts-program',
+  title: 'Media Arts Program',
+  working_title: false,
+  eyebrow: 'Proposal — prepared for the Los Angeles LGBT Center',
+  logline:
+    'A 12-week vocational track in podcast and media production — the same length as your Culinary Arts program, and pitched by the studio that would run it.',
+  meta_tags: '12-week track, Three modules, Podcast & media production',
+  contact_name: 'Ryan Tillotson',
+  contact_company: 'Straw Hut Media · Los Angeles',
+  contact_email: 'ryan@strawhutmedia.com',
+  contact_phone: '760.807.7138',
+  footer_note: 'Prepared by Straw Hut Media for the Los Angeles LGBT Center — August 2026.',
+  sections: [
+    {
+      kind: 'text',
+      eyebrow: 'Why this, why now',
+      heading: "You've already proven the model.",
+      body: `<p class="big">Your Culinary Arts program takes people with no professional kitchen experience and puts them into paid restaurant jobs, in a fixed number of weeks, funded by grants that trust the structure because the structure works.</p>
+<p>Podcasting and media production are hiring right now — editors, audio producers, ad ops coordinators, social/video cutters — and almost none of it requires a degree. It requires exactly what your model is built to deliver: real hours on real equipment, a real production to point to, and a warm handoff into paid work. We'd like to build that program with you, run the instruction, and hand your team a Media Arts track that sits next to Culinary Arts on your list of vocational programs.</p>`,
+    },
+    {
+      kind: 'stats',
+      eyebrow: 'The model we’re building on',
+      heading: '',
+      body: `12 | Weeks — same as Culinary Arts
+3 | Modules — same shape as Culinary Arts
+300 | Training hours
+3 | Cohorts fundable per year`,
+    },
+    {
+      kind: 'episodes',
+      eyebrow: 'The program',
+      heading: 'Twelve weeks, three modules, one cohort at a time.',
+      body: `INTRO: Prep before production, production before promotion — the order students actually need to make something real and get it in front of an audience.
+
+Planning, Strategizing & Prep
+Weeks 1–5 · Module 1
+Show concept, format, and audience strategy; interview prep and story structure; mic technique and studio workflow. No prior experience assumed. By week 5: a fully developed show concept and pilot outline, ready to record.
+
+Production & Editing
+Weeks 6–9 · Module 2
+Recording real episodes on studio equipment, then the full editing workflow — cutting, sound, pacing — through to a finished mix. This is the "cook real meals" module. By week 9: a finished, edited episode with the student's name in the credits.
+
+Marketing & Distribution
+Weeks 10–12 · Module 3
+Publishing and RSS, audience growth, the basics of ad operations, and social/video clipping — then a portfolio review and a conversation about next steps. By week 12: a published episode, a real portfolio, and a placement conversation.`,
+    },
+    {
+      kind: 'cards',
+      eyebrow: 'Who’s teaching it',
+      heading: 'Working producers, not guest speakers.',
+      body: `Strategy & growth
+Show concept, interviewing, and distribution — taught by senior Straw Hut staff who record, edit, and grow shows for entertainment and streaming clients every week, confirmed for each cohort.
+
+Production & editing
+Our working post-production team, teaching the craft they practice weekly and reviewing every student's cut personally.`,
+    },
+    {
+      kind: 'text',
+      eyebrow: 'Where it leads',
+      heading: 'A real next step, not a certificate.',
+      body: `<ul>
+<li>A finished portfolio: a solo piece, a published episode, and production credits.</li>
+<li>A placement conversation in week 12, backed by real production credits — not a classroom exercise.</li>
+<li>Direct pathways into editor, producer, and ad-ops roles across the podcast industry — an industry that's hiring, and rarely asks for a degree.</li>
+</ul>`,
+    },
+    {
+      kind: 'cards',
+      eyebrow: 'Investment',
+      heading: 'Priced to sit next to Culinary Arts on a grant application.',
+      body: `Studio Build-Out
+~$25,000 · one-time
+Recording stations, editing lab, video kit, and flexible furniture — a space that can actually run the program.
+
+Media Arts Program
+~$28,000–$35,000 · per cohort
+The full 12-week track for one cohort, instruction and curriculum included. $84–105K if run as three cohorts a year.
+
+Year one, all-in
+~≈ $53,000–60,000
+Build-out plus a first cohort — well inside the $100,000 grant range that funded Culinary Arts, with the space already paid for every year after.`,
+    },
+    {
+      kind: 'text',
+      eyebrow: 'Next step',
+      heading: "Let's see if this fits.",
+      body: `Happy to walk your vocational programs team through this in person, adjust the structure to whatever's realistic for your space and students, and talk timeline.`,
+    },
+  ],
+};
+
+// Everything the boot seed installs when the store has no pitches yet.
+export const PITCH_SEEDS = [BORN_EXPLORERS_PITCH, MEDIA_ARTS_PITCH];

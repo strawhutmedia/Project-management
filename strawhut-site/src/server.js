@@ -13,7 +13,7 @@ import { addShowFromFeed, syncShow, syncAll, startScheduler } from './sync.js';
 import * as V from './views.js';
 import * as A from './admin_views.js';
 import { pitchPage, PITCH_SECTION_KINDS } from './pitch_views.js';
-import { BORN_EXPLORERS_PITCH } from './content/pitch_seed.js';
+import { PITCH_SEEDS } from './content/pitch_seed.js';
 import { robotsTxt, sitemapXml, llmsTxt } from './seo.js';
 import { sendAnnouncement, mailConfigured, sendContactEmail, sendContactAutoReply, sendTrafficDigest } from './mail.js';
 import { buildIssue, sendToSubscribers, sendTestToOwner, maybeSendNewsletterDraft } from './newsletter.js';
@@ -1560,19 +1560,19 @@ app.listen(PORT, async () => {
     console.error('[import] auto-import failed:', e.message);
   }
 
-  // Seed the first pitch document (Born Explorers — the Bruce Poon Tip
-  // history-of-travel docuseries) so it's editable in /admin/pitches and
-  // shareable at /pitch/born-explorers from the first boot. Idempotent: if a
-  // pitch with that slug exists (even edited or renamed via id), it is left
-  // exactly as the admin last saved it. Set SEED_PITCH=off to skip.
+  // Seed the initial pitch documents (Born Explorers + Media Arts Program) so
+  // they're editable in /admin/pitches and shareable at /pitch/<slug> from the
+  // first boot. Idempotent: only when the store has no pitches at all — after
+  // that the admin's edits (and deletions) are the source of truth, and
+  // nothing gets resurrected on redeploy. Set SEED_PITCH=off to skip.
   try {
     if (process.env.SEED_PITCH !== 'off') {
-      // Only when the store has no pitches at all — so deleting it once other
-      // pitches exist doesn't resurrect it on the next deploy.
       const pitches = await store.listPitches();
       if (!pitches.length) {
-        await store.createPitch(BORN_EXPLORERS_PITCH);
-        console.log('[seed] created pitch /pitch/' + BORN_EXPLORERS_PITCH.slug);
+        for (const seed of PITCH_SEEDS) {
+          await store.createPitch(seed);
+          console.log('[seed] created pitch /pitch/' + seed.slug);
+        }
       }
     }
   } catch (e) {
