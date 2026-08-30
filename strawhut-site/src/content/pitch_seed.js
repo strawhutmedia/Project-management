@@ -129,6 +129,10 @@ A century of postcards, steamship brochures, and Pan Am promos — never before 
 ~Feature doc · 2022
 Bruce's proof of concept — this series at ten times the scale.
 
+Salt Fat Acid Heat
+~Netflix
+The structural blueprint: one idea, one place per episode, told through ingredients.
+
 Parts Unknown
 ~CNN
 The gold standard: a travel show that smuggled in history and politics.
