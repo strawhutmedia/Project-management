@@ -2,6 +2,7 @@
 // (dashboard counts, manage shows, add show) but feed-driven and simpler.
 
 import { esc, formatDate } from './util.js';
+import { PITCH_THEMES } from './pitch_views.js';
 
 const FONT =
   '<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">';
@@ -388,6 +389,12 @@ export function pitchFormPage({ flash, values = {}, kinds, isEdit = false, actio
       <form method="post" action="${isEdit ? '/admin/pitches/' + esc(actionId) : '/admin/pitches'}" id="pitch-form">
         <div class="field"><label>Title *</label><input type="text" name="title" value="${esc(v.title || '')}" required placeholder="e.g. Born Explorers"></div>
         <div class="field checkbox"><input type="checkbox" name="working_title" id="wt" ${v.working_title ? 'checked' : ''}><label for="wt" style="margin:0">Mark as working title</label></div>
+        <div class="field"><label>Look &amp; feel</label>
+          <select name="theme" style="padding:10px 12px;border-radius:10px;border:1px solid var(--border);background:var(--bg-2);color:var(--text);font-family:inherit;font-size:0.95rem">
+            ${Object.entries(PITCH_THEMES).map(([key, t]) => `<option value="${esc(key)}"${(v.theme || 'expedition') === key ? ' selected' : ''}>${esc(t.label)}</option>`).join('')}
+          </select>
+          <div class="hint">Each pitch gets its own visual identity — palette, typography, and cover mark.</div>
+        </div>
         <div class="field"><label>URL slug</label><input type="text" name="slug" value="${esc(v.slug || '')}" placeholder="auto from title if blank — page will be /pitch/your-slug"></div>
         <div class="field"><label>Eyebrow (the line above the title)</label><input type="text" name="eyebrow" value="${esc(v.eyebrow || '')}" placeholder="e.g. Straw Hut Media × Bruce Poon Tip · A limited docuseries"></div>
         <div class="field"><label>Logline</label><textarea name="logline" rows="2" class="pitch-ta">${esc(v.logline || '')}</textarea></div>

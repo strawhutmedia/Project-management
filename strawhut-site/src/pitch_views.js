@@ -34,6 +34,58 @@ export const PITCH_SECTION_KINDS = {
   },
 };
 
+// Per-pitch visual identities. Every pitch picks one ("Look & feel" in the
+// admin form); the structural components are shared, but palette, typography,
+// and the cover mark change so two pitches never read as the same document.
+export const PITCH_THEMES = {
+  expedition: {
+    label: 'Expedition (classic serif, brass & pine)',
+    fontsHref:
+      'https://fonts.googleapis.com/css2?family=Marcellus&family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;1,8..60,400&family=Archivo:wght@500;600;700&display=swap',
+    fontDisplay: 'Marcellus,Georgia,serif',
+    fontBody: '"Source Serif 4",Georgia,"Times New Roman",serif',
+    fontLabel: 'Archivo,system-ui,sans-serif',
+    displayWeight: '400',
+    displayTracking: '.04em',
+    mark: 'compass',
+    light: {
+      paper: '#EFEDE3', 'paper-raised': '#F6F4EC', ink: '#1F2A25', 'ink-soft': '#4A554F',
+      pine: '#2E5B4B', 'pine-deep': '#1E3D33', brass: '#A07526',
+      line: '#CFCBBA', 'line-soft': '#DEDACB', route: '#B8B29C',
+      card: '#F6F4EC', 'card-border': '#D8D4C4', 'tag-bg': '#E4E1D2',
+    },
+    dark: {
+      paper: '#111B16', 'paper-raised': '#16231D', ink: '#EAE5D3', 'ink-soft': '#A8AFA3',
+      pine: '#8FB8A5', 'pine-deep': '#A8CCBB', brass: '#D9A544',
+      line: '#2C3A32', 'line-soft': '#243128', route: '#3E5045',
+      card: '#16231D', 'card-border': '#2C3A32', 'tag-bg': '#1E2D25',
+    },
+  },
+  studio: {
+    label: 'Studio (bold modern, olive & amber)',
+    fontsHref:
+      'https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@600;700;800&family=Public+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap',
+    fontDisplay: '"Big Shoulders Display",Impact,system-ui,sans-serif',
+    fontBody: '"Public Sans",system-ui,-apple-system,"Segoe UI",sans-serif',
+    fontLabel: '"IBM Plex Mono",ui-monospace,SFMono-Regular,monospace',
+    displayWeight: '700',
+    displayTracking: '.015em',
+    mark: 'waveform',
+    light: {
+      paper: '#EEF0E7', 'paper-raised': '#F8F9F3', ink: '#1B1E19', 'ink-soft': '#5B6058',
+      pine: '#3F6B7A', 'pine-deep': '#2E525F', brass: '#C9791E',
+      line: '#D9DACD', 'line-soft': '#E2E3D7', route: '#C2C4B2',
+      card: '#F8F9F3', 'card-border': '#D9DACD', 'tag-bg': '#E9D3AC',
+    },
+    dark: {
+      paper: '#14181A', 'paper-raised': '#1B2022', ink: '#ECE9E0', 'ink-soft': '#9AA098',
+      pine: '#7FB0BF', 'pine-deep': '#9CC4D0', brass: '#F0A94A',
+      line: '#2C3234', 'line-soft': '#262C2E', route: '#3A4245',
+      card: '#1B2022', 'card-border': '#2C3234', 'tag-bg': '#4A3A22',
+    },
+  },
+};
+
 const ROMAN = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X', 'XI', 'XII'];
 
 const blocksOf = (body) =>
@@ -143,7 +195,28 @@ function renderSection(s) {
   </section>`;
 }
 
+const tokenBlock = (vars) =>
+  Object.entries(vars).map(([k, v]) => `--${k}:${v};`).join('');
+
+function coverMark(kind) {
+  if (kind === 'waveform') {
+    const heights = [16, 30, 22, 40, 28, 44, 34, 24, 38, 18, 42, 26, 36, 20];
+    const bars = heights
+      .map((h, i) => `<rect x="${i * 6}" y="${46 - h}" width="4" height="${h}" rx="1" fill="${i % 3 === 0 ? 'var(--brass)' : 'var(--pine)'}"/>`)
+      .join('');
+    return `<svg class="mark" viewBox="0 0 82 46" role="img" aria-label="Audio waveform">${bars}</svg>`;
+  }
+  return `<svg class="mark" viewBox="0 0 80 80" role="img" aria-label="Compass rose">
+    <circle cx="40" cy="40" r="37" fill="none" stroke="var(--brass)" stroke-width="1.5"/>
+    <circle cx="40" cy="40" r="30" fill="none" stroke="var(--route)" stroke-width="1" stroke-dasharray="2 4"/>
+    <polygon points="40,8 45,40 40,48 35,40" fill="var(--pine)"/>
+    <polygon points="40,72 35,40 40,32 45,40" fill="var(--brass)"/>
+    <circle cx="40" cy="40" r="3.5" fill="var(--ink)"/>
+  </svg>`;
+}
+
 export function pitchPage({ pitch }) {
+  const theme = PITCH_THEMES[pitch.theme] || PITCH_THEMES.expedition;
   const metaPills = String(pitch.meta_tags || '')
     .split(',')
     .map((t) => t.trim())
@@ -162,30 +235,27 @@ export function pitchPage({ pitch }) {
 <meta property="og:title" content="${esc(pitch.title)}">
 <meta property="og:description" content="${esc(description)}">
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Marcellus&family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;1,8..60,400&family=Archivo:wght@500;600;700&display=swap">
+<link rel="stylesheet" href="${theme.fontsHref}">
 <style>
   :root{
-    --paper:#EFEDE3; --paper-raised:#F6F4EC; --ink:#1F2A25; --ink-soft:#4A554F;
-    --pine:#2E5B4B; --pine-deep:#1E3D33; --brass:#A07526;
-    --line:#CFCBBA; --line-soft:#DEDACB; --route:#B8B29C;
-    --card:#F6F4EC; --card-border:#D8D4C4; --tag-bg:#E4E1D2;
+    ${tokenBlock(theme.light)}
+    --font-display:${theme.fontDisplay};
+    --font-body:${theme.fontBody};
+    --font-label:${theme.fontLabel};
+    --display-weight:${theme.displayWeight};
+    --display-tracking:${theme.displayTracking};
   }
   @media (prefers-color-scheme: dark){
-    :root{
-      --paper:#111B16; --paper-raised:#16231D; --ink:#EAE5D3; --ink-soft:#A8AFA3;
-      --pine:#8FB8A5; --pine-deep:#A8CCBB; --brass:#D9A544;
-      --line:#2C3A32; --line-soft:#243128; --route:#3E5045;
-      --card:#16231D; --card-border:#2C3A32; --tag-bg:#1E2D25;
-    }
+    :root{ ${tokenBlock(theme.dark)} }
   }
   *{box-sizing:border-box}
-  body{background:var(--paper);color:var(--ink);font-family:"Source Serif 4",Georgia,'Times New Roman',serif;font-size:17px;line-height:1.65;margin:0}
+  body{background:var(--paper);color:var(--ink);font-family:var(--font-body);font-size:17px;line-height:1.65;margin:0}
   .wrap{max-width:920px;margin:0 auto;padding:0 22px}
   .prose{max-width:680px}
   .prose > *{min-width:0}
-  h1,h2,h3{font-family:Marcellus,Georgia,serif;font-weight:400;line-height:1.12;text-wrap:balance;margin:0}
+  h1,h2,h3{font-family:var(--font-display);font-weight:var(--display-weight);line-height:1.12;text-wrap:balance;margin:0}
   h2{font-size:clamp(26px,4.4vw,38px);margin-bottom:22px}
-  .eyebrow{font-family:Archivo,system-ui,sans-serif;font-weight:600;font-size:12px;letter-spacing:.18em;text-transform:uppercase;color:var(--brass);margin:0 0 14px}
+  .eyebrow{font-family:var(--font-label);font-weight:600;font-size:12px;letter-spacing:.18em;text-transform:uppercase;color:var(--brass);margin:0 0 14px}
   p{margin:0 0 1em}
   p.big{font-size:19px}
   .prose ul{margin:0 0 1em;padding-left:2px;list-style:none;display:grid;gap:10px}
@@ -195,27 +265,27 @@ export function pitchPage({ pitch }) {
   section > :last-child{margin-bottom:0}
 
   .cover{padding:84px 0 72px;text-align:center}
-  .cover .studio{font-family:Archivo,system-ui,sans-serif;font-weight:600;font-size:12px;letter-spacing:.2em;text-transform:uppercase;color:var(--ink-soft);margin:0 0 34px}
-  .compass{width:70px;height:70px;margin:0 auto 28px;display:block}
-  .cover h1{font-size:clamp(44px,9vw,92px);letter-spacing:.04em}
-  .cover .wt{font-family:Archivo,system-ui,sans-serif;font-weight:600;font-size:11px;letter-spacing:.24em;text-transform:uppercase;color:var(--ink-soft);margin:10px 0 28px}
+  .cover .studio{font-family:var(--font-label);font-weight:600;font-size:12px;letter-spacing:.2em;text-transform:uppercase;color:var(--ink-soft);margin:0 0 34px}
+  .mark{width:70px;height:auto;max-height:70px;margin:0 auto 28px;display:block}
+  .cover h1{font-size:clamp(44px,9vw,92px);letter-spacing:var(--display-tracking)}
+  .cover .wt{font-family:var(--font-label);font-weight:600;font-size:11px;letter-spacing:.24em;text-transform:uppercase;color:var(--ink-soft);margin:10px 0 28px}
   .cover .logline{font-size:20px;line-height:1.55;max-width:620px;margin:0 auto;font-style:italic}
-  .cover .meta{display:flex;justify-content:center;gap:12px;flex-wrap:wrap;margin-top:34px;font-family:Archivo,system-ui,sans-serif;font-size:12.5px;font-weight:600;letter-spacing:.06em;text-transform:uppercase}
+  .cover .meta{display:flex;justify-content:center;gap:12px;flex-wrap:wrap;margin-top:34px;font-family:var(--font-label);font-size:12.5px;font-weight:600;letter-spacing:.06em;text-transform:uppercase}
   .cover .meta span{border:1px solid var(--card-border);border-radius:999px;padding:8px 16px;background:var(--card);color:var(--ink-soft)}
   .rule{width:56px;height:2px;background:var(--brass);border:none;margin:32px auto 0}
 
   .stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:1px;background:var(--line);border:1px solid var(--line);margin-top:34px}
   .stat{background:var(--paper-raised);padding:20px 18px;min-width:0}
-  .stat .n{font-family:Marcellus,Georgia,serif;font-size:32px;color:var(--pine-deep);font-variant-numeric:tabular-nums;line-height:1.1}
-  .stat .l{font-family:Archivo,system-ui,sans-serif;font-size:12.5px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;color:var(--ink-soft);margin-top:8px;line-height:1.45}
+  .stat .n{font-family:var(--font-display);font-weight:var(--display-weight);font-size:32px;color:var(--pine-deep);font-variant-numeric:tabular-nums;line-height:1.1}
+  .stat .l{font-family:var(--font-label);font-size:12.5px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;color:var(--ink-soft);margin-top:8px;line-height:1.45}
 
   .route-list{list-style:none;margin:40px 0 0;padding:0;position:relative}
   .route-list::before{content:"";position:absolute;left:21px;top:24px;bottom:24px;width:0;border-left:2px dotted var(--route)}
   .stop{position:relative;padding:0 0 32px 64px;min-width:0}
   .stop:last-child{padding-bottom:0}
-  .stop .marker{position:absolute;left:0;top:0;width:44px;height:44px;border-radius:50%;background:var(--paper);border:2px solid var(--pine);color:var(--pine-deep);display:flex;align-items:center;justify-content:center;font-family:Marcellus,Georgia,serif;font-size:17px}
+  .stop .marker{position:absolute;left:0;top:0;width:44px;height:44px;border-radius:50%;background:var(--paper);border:2px solid var(--pine);color:var(--pine-deep);display:flex;align-items:center;justify-content:center;font-family:var(--font-display);font-weight:var(--display-weight);font-size:17px}
   .stop h3{font-size:22px}
-  .stop .era{font-family:Archivo,system-ui,sans-serif;font-size:11.5px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:var(--brass);margin:3px 0 10px}
+  .stop .era{font-family:var(--font-label);font-size:11.5px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:var(--brass);margin:3px 0 10px}
   .stop p{max-width:640px;margin-bottom:.4em}
   .stop .gets{font-size:15px;color:var(--ink-soft);font-style:italic}
   .route-note{margin:30px 0 0;font-size:15px;color:var(--ink-soft);font-style:italic}
@@ -223,31 +293,25 @@ export function pitchPage({ pitch }) {
   .tiers{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:18px;margin-top:34px}
   .tier{background:var(--card);border:1px solid var(--card-border);padding:24px 22px;min-width:0}
   .tier h3{font-size:20px;margin-bottom:6px}
-  .tier .sub{font-family:Archivo,system-ui,sans-serif;font-size:12px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--brass);margin-bottom:12px}
+  .tier .sub{font-family:var(--font-label);font-size:12px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--brass);margin-bottom:12px}
   .tier p{font-size:15.5px;color:var(--ink-soft);margin-bottom:0}
 
   .alt-titles{display:flex;flex-wrap:wrap;gap:10px;margin-top:6px}
-  .alt-titles span{font-family:Marcellus,Georgia,serif;font-size:16px;border:1px solid var(--card-border);background:var(--tag-bg);padding:8px 18px;border-radius:999px}
+  .alt-titles span{font-family:var(--font-display);font-weight:var(--display-weight);font-size:16px;border:1px solid var(--card-border);background:var(--tag-bg);padding:8px 18px;border-radius:999px}
 
   .close{padding:72px 0 40px;text-align:center;border-top:1px solid var(--line-soft)}
   .close .contact{margin:0 auto;max-width:520px;background:var(--card);border:1px solid var(--card-border);padding:26px 26px}
-  .close .who{font-family:Marcellus,Georgia,serif;font-size:22px}
-  .close .co{font-family:Archivo,system-ui,sans-serif;font-size:12px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:var(--brass);margin:4px 0 14px}
+  .close .who{font-family:var(--font-display);font-weight:var(--display-weight);font-size:22px}
+  .close .co{font-family:var(--font-label);font-size:12px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:var(--brass);margin:4px 0 14px}
   .close .lines{font-size:16px;color:var(--ink-soft);overflow-wrap:anywhere}
   .close a{color:var(--pine-deep);text-decoration:none;border-bottom:1px solid var(--route)}
   .close a:focus-visible{outline:2px solid var(--brass);outline-offset:2px}
-  .footnote{text-align:center;font-family:Archivo,system-ui,sans-serif;font-size:11.5px;letter-spacing:.06em;color:var(--ink-soft);padding:26px 22px 40px}
+  .footnote{text-align:center;font-family:var(--font-label);font-size:11.5px;letter-spacing:.06em;color:var(--ink-soft);padding:26px 22px 40px}
 </style>
 </head><body>
 <header class="cover wrap">
   ${pitch.eyebrow ? `<p class="studio">${esc(pitch.eyebrow)}</p>` : ''}
-  <svg class="compass" viewBox="0 0 80 80" role="img" aria-label="Compass rose">
-    <circle cx="40" cy="40" r="37" fill="none" stroke="var(--brass)" stroke-width="1.5"/>
-    <circle cx="40" cy="40" r="30" fill="none" stroke="var(--route)" stroke-width="1" stroke-dasharray="2 4"/>
-    <polygon points="40,8 45,40 40,48 35,40" fill="var(--pine)"/>
-    <polygon points="40,72 35,40 40,32 45,40" fill="var(--brass)"/>
-    <circle cx="40" cy="40" r="3.5" fill="var(--ink)"/>
-  </svg>
+  ${coverMark(theme.mark)}
   <h1>${esc(pitch.title)}</h1>
   ${pitch.working_title ? '<p class="wt">Working title</p>' : ''}
   ${pitch.logline ? `<p class="logline">${esc(pitch.logline)}</p>` : ''}

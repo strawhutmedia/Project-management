@@ -293,7 +293,10 @@ Development pitch documents — polished, confidential pages Ryan sends to
 buyers (streamers, networks, brand partners). Composed in the admin from typed
 sections (text / stat tiles / episode guide / cards / chips — see
 `PITCH_SECTION_KINDS` in `src/pitch_views.js`), stored via `store.js`
-(`pitches` table / JSON key), rendered by `pitchPage()`.
+(`pitches` table / JSON key), rendered by `pitchPage()`. Each pitch picks a
+**Look & feel** theme (`PITCH_THEMES`: `expedition` serif vs `studio` bold
+modern) so two pitches never read as the same document — add new identities
+there, never by forking the renderer.
 
 - **Deliberately outside `layout()`, the sitemap, and `llms.txt`** — a pitch is
   a private document with its own editorial identity (Marcellus/Source Serif,

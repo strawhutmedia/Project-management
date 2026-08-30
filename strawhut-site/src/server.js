@@ -12,7 +12,7 @@ import { createStore } from './store.js';
 import { addShowFromFeed, syncShow, syncAll, startScheduler } from './sync.js';
 import * as V from './views.js';
 import * as A from './admin_views.js';
-import { pitchPage, PITCH_SECTION_KINDS } from './pitch_views.js';
+import { pitchPage, PITCH_SECTION_KINDS, PITCH_THEMES } from './pitch_views.js';
 import { PITCH_SEEDS } from './content/pitch_seed.js';
 import { robotsTxt, sitemapXml, llmsTxt } from './seo.js';
 import { sendAnnouncement, mailConfigured, sendContactEmail, sendContactAutoReply, sendTrafficDigest } from './mail.js';
@@ -753,6 +753,7 @@ function pitchFromBody(body, existing = {}) {
   return {
     title: (body.title || '').trim(),
     working_title: !!body.working_title,
+    theme: PITCH_THEMES[body.theme] ? body.theme : (existing.theme || 'expedition'),
     eyebrow: (body.eyebrow || '').trim(),
     logline: (body.logline || '').trim(),
     meta_tags: (body.meta_tags || '').trim(),

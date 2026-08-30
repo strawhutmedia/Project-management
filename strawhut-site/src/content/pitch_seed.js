@@ -7,6 +7,7 @@ export const BORN_EXPLORERS_PITCH = {
   slug: 'born-explorers',
   title: 'Born Explorers',
   working_title: true,
+  theme: 'expedition',
   eyebrow: 'A Straw Hut Media limited series',
   logline: 'A journey through the cities that taught the world to travel — one harbor, one market, one plate at a time.',
   meta_tags: '8 × 45–60 min, Premium travel series, One city per episode',
@@ -183,6 +184,7 @@ export const MEDIA_ARTS_PITCH = {
   slug: 'media-arts-program',
   title: 'Media Arts Program',
   working_title: false,
+  theme: 'studio',
   eyebrow: 'Proposal — prepared for the Los Angeles LGBT Center',
   logline:
     'A 12-week vocational track in podcast and media production — the same length as your Culinary Arts program, and pitched by the studio that would run it.',
