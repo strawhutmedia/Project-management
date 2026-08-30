@@ -174,7 +174,16 @@ app.use((req, res, next) => {
 // Aggregate only — no IP, no user agent stored, no cookie — so it needs no
 // consent banner and can't be blocked by tracker blockers. Bots are filtered
 // best-effort so the numbers reflect people.
-const BOT_RE = /bot|crawl|spider|slurp|bingpreview|facebookexternalhit|headless|lighthouse|pingdom|uptime|curl|wget|python-requests|node-fetch|axios|monitor/i;
+//
+// Two layers: (1) a broad deny-list of known crawler / library / automation
+// UA tokens — including AI crawlers, SEO bots, and headless tooling; (2) a
+// positive gate requiring a real browser UA ("Mozilla/"). Every mainstream
+// browser (Chrome, Safari, Firefox, Edge, Samsung, mobile) sends "Mozilla/5.0",
+// while script libraries (Go-http-client, okhttp, urllib, scrapy, empty UAs)
+// do not — so this drops the datacenter scrapers that were inflating counts,
+// without dropping people. NOTE: this is a plain server-side regex literal, not
+// inside a template-literal <script>, so single-backslash escapes are correct.
+const BOT_RE = /bot|crawl|spider|slurp|bingpreview|facebookexternalhit|headless|lighthouse|pingdom|uptime|curl|wget|python-requests|node-fetch|axios|monitor|perplexity|google-extended|externalagent|externalfetcher|dataforseo|scrapy|okhttp|go-http-client|java\/|libwww|httpclient|urllib|httpx|aiohttp|guzzle|webdriver|selenium|puppeteer|playwright|phantomjs|archive\.org|ia_archiver|feedfetcher|feedly|zgrab|masscan|censys|expanse|semrush|ahrefs|petalbot|yandex|baiduspider|sogou/i;
 app.use((req, res, next) => {
   next(); // never delay the response
   try {
@@ -183,7 +192,8 @@ app.use((req, res, next) => {
     if (p.includes('.') || p.startsWith('/admin') || p.startsWith('/public') ||
         p.startsWith('/api') || p === '/healthz' || p === '/robots.txt' ||
         p === '/sitemap.xml' || p === '/llms.txt') return;
-    if (BOT_RE.test(req.headers['user-agent'] || '')) return;
+    const ua = req.headers['user-agent'] || '';
+    if (!/Mozilla\//.test(ua) || BOT_RE.test(ua)) return; // real browsers only
     res.on('finish', () => {
       if (res.statusCode !== 200) return; // only count pages actually served
       store.recordView(p.length > 200 ? p.slice(0, 200) : p).catch(() => {});
