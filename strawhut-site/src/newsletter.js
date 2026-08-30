@@ -14,6 +14,30 @@ const BASE = (process.env.APP_BASE_URL || 'https://www.strawhutmedia.com').repla
 const OWNER = process.env.ADMIN_EMAIL || 'ryan@strawhutmedia.com';
 const EVERY_MS = 14 * 24 * 60 * 60 * 1000; // biweekly
 
+// Shows we no longer manage — never feature them in the newsletter.
+// (String & Tell: Straw Hut stopped managing it as of Sept 2026.)
+const EXCLUDED_SHOW_SLUGS = new Set(['string-and-tell']);
+
+// "From the Vault" — evergreen older episodes worth resurfacing. One is featured
+// each issue (rotated by week) beneath the fresh episodes. Legacy shows like
+// WICKED keep pulling listeners long after release, so we spotlight one every
+// time. Add entries as favorites emerge; slugs must match the live URL
+// (BASE/<show_slug>/<slug>).
+const VAULT_PICKS = [
+  {
+    show_slug: 'wicked-the-official-podcast',
+    slug: 'building-the-world-of-wicked',
+    show_title: 'WICKED: The Official Podcast',
+    title: 'Building the World of Wicked',
+    blurb: 'Go behind the curtain on how Oz was built for the screen — an evergreen favorite fans keep finding.',
+  },
+];
+function vaultPick() {
+  if (!VAULT_PICKS.length) return null;
+  const week = Math.floor(Date.now() / (7 * 864e5));
+  return VAULT_PICKS[week % VAULT_PICKS.length];
+}
+
 function clip(s, n) {
   const t = String(s || '').replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
   return t.length > n ? t.slice(0, n - 1).trimEnd() + '…' : t;
@@ -22,9 +46,12 @@ function clip(s, n) {
 // Build the issue content from real store data. Returns null if there's nothing
 // worth sending (no episodes yet).
 export async function buildIssue(store, { count = 6 } = {}) {
-  const eps = (await store.recentEpisodes(count)) || [];
+  // Pull a wider pool so excluding a show still leaves a full issue.
+  const pool = (await store.recentEpisodes(count * 3)) || [];
+  const eps = pool.filter((e) => !EXCLUDED_SHOW_SLUGS.has(e.show_slug)).slice(0, count);
   if (!eps.length) return null;
   const featured = eps[0];
+  const vault = vaultPick();
 
   const epCards = eps
     .map((e) => {
@@ -49,6 +76,20 @@ export async function buildIssue(store, { count = 6 } = {}) {
     })
     .join('');
 
+  const vaultUrl = vault ? `${BASE}/${esc(vault.show_slug)}/${esc(vault.slug)}` : '';
+  const vaultBlock = vault
+    ? `<tr><td style="padding:2px 30px 4px">
+        <div style="font-size:12px;letter-spacing:.04em;text-transform:uppercase;color:#b07d10;font-weight:700;border-top:1px solid #e2e7f0;padding-top:16px">&#127902; From the Vault</div>
+        <div style="color:#9aa2c0;font-size:12px;margin-top:2px">An older episode still pulling listeners — worth a (re)listen.</div>
+        <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="background:#fff8e8;border:1px solid #e7cf90;border-radius:14px;margin-top:10px"><tr><td style="padding:18px 20px">
+          <div style="font-size:12px;letter-spacing:.04em;text-transform:uppercase;color:#b07d10;font-weight:700">${esc(vault.show_title)}</div>
+          <a href="${vaultUrl}" style="color:#12182f;font-weight:700;font-size:16px;text-decoration:none;line-height:1.35">${esc(vault.title)}</a>
+          <div style="color:#7a6a3f;font-size:14px;line-height:1.5;margin-top:4px">${esc(vault.blurb)}</div>
+          <a href="${vaultUrl}" style="display:inline-block;margin-top:8px;color:#b07d10;font-weight:600;font-size:14px;text-decoration:none">Listen →</a>
+        </td></tr></table>
+      </td></tr>`
+    : '';
+
   const html = `<!doctype html><html><body style="margin:0;background:#eef1f6;padding:0">
   <div style="display:none;max-height:0;overflow:hidden;opacity:0">New episodes across the Straw Hut Media network.</div>
   <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="background:#eef1f6;padding:24px 0">
@@ -68,6 +109,7 @@ export async function buildIssue(store, { count = 6 } = {}) {
       <tr><td style="padding:22px 30px 4px">
         <table role="presentation" cellpadding="0" cellspacing="0" width="100%">${epCards}</table>
       </td></tr>
+      ${vaultBlock}
       <!-- CTA band -->
       <tr><td style="padding:8px 30px 30px">
         <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="background:#f4f7fb;border:1px solid #e2e7f0;border-radius:14px">
@@ -97,6 +139,7 @@ export async function buildIssue(store, { count = 6 } = {}) {
   const text =
     `Fresh from across the Straw Hut Media network:\n\n` +
     eps.map((e) => `• ${e.show_title || 'Straw Hut Media'} — ${clip(e.title, 90)}\n  ${e.show_slug && e.slug ? `${BASE}/${e.show_slug}/${e.slug}` : BASE}`).join('\n\n') +
+    (vault ? `\n\nFrom the Vault — ${vault.show_title}: ${vault.title}\n  ${vaultUrl}` : '') +
     `\n\nThinking about your own show? Book a 15-min call: ${BASE}/book\nTake the course: ${BASE}/podcast-primer\n\nUnsubscribe: {{unsubscribe}}`;
 
   const subject = `Straw Hut Media — new from ${clip(featured.show_title || 'the network', 40)}${eps.length > 1 ? ` + ${eps.length - 1} more` : ''}`;
