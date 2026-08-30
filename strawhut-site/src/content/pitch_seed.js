@@ -200,7 +200,8 @@ export const MEDIA_ARTS_PITCH = {
       eyebrow: 'Why this, why now',
       heading: "You've already proven the model.",
       body: `<p class="big">Your Culinary Arts program takes people with no professional kitchen experience and puts them into paid restaurant jobs, in a fixed number of weeks, funded by grants that trust the structure because the structure works.</p>
-<p>Podcasting and media production are hiring right now — editors, audio producers, ad ops coordinators, social/video cutters — and almost none of it requires a degree. It requires exactly what your model is built to deliver: real hours on real equipment, a real production to point to, and a warm handoff into paid work. We'd like to build that program with you, run the instruction, and hand your team a Media Arts track that sits next to Culinary Arts on your list of vocational programs.</p>`,
+<p>Podcasting and media production are hiring right now — editors, audio producers, ad ops coordinators, social/video cutters — and almost none of it requires a degree. It requires exactly what your model is built to deliver: real hours on real equipment, a real production to point to, and a warm handoff into paid work. We'd like to build that program with you, run the instruction, and hand your team a Media Arts track that sits next to Culinary Arts on your list of vocational programs.</p>
+<p style="font-size:14px;color:var(--ink-soft)">Model source: Culinary Arts, Los Angeles LGBT Center — lalgbtcenter.org/programs/vocational-programs/culinary-arts</p>`,
     },
     {
       kind: 'stats',
