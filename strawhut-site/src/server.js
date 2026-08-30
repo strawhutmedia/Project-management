@@ -13,7 +13,8 @@ import { addShowFromFeed, syncShow, syncAll, startScheduler } from './sync.js';
 import * as V from './views.js';
 import * as A from './admin_views.js';
 import { robotsTxt, sitemapXml, llmsTxt } from './seo.js';
-import { sendAnnouncement, mailConfigured, sendContactEmail, sendContactAutoReply, sendTrafficDigest } from './mail.js';
+import { sendAnnouncement, mailConfigured, bulkMailConfigured, sendContactEmail, sendContactAutoReply, sendTrafficDigest } from './mail.js';
+import { sesConfigured } from './mailSes.js';
 import { buildIssue, sendToSubscribers, sendTestToOwner, maybeSendNewsletterDraft } from './newsletter.js';
 import { importFromSite } from './importer.js';
 import { writeLandingCopy, generateLandingCopy, fallbackLandingCopy, aiConfigured, generateShowMetaDescription, generateShowBlurb, generateShowTagline, generateEpisodeEnrichment } from './ai.js';
@@ -388,6 +389,71 @@ app.post('/admin/newsletter/send', requireAdmin, async (req, res) => {
   const r = await sendToSubscribers(store);
   setFlash(res, r.ok ? { type: 'ok', msg: `Newsletter sent to ${r.sent} subscriber(s).` } : { type: 'err', msg: `Not sent: ${r.reason || 'unknown'}` });
   res.redirect('/admin/newsletter');
+});
+
+// --- Newsletter service API (token-gated) ----------------------------------
+// Lets the newsletter be run headlessly (list import, one-off issue, scheduled
+// send) without a browser admin session — the automation surface. Auth is a
+// shared secret in NEWSLETTER_SERVICE_TOKEN, sent as `X-Newsletter-Token` or
+// `Authorization: Bearer <token>`. Unset = the whole API is disabled (404-ish).
+function newsletterToken(req, res, next) {
+  const want = process.env.NEWSLETTER_SERVICE_TOKEN || '';
+  if (!want) return res.status(503).json({ ok: false, error: 'newsletter API disabled (no NEWSLETTER_SERVICE_TOKEN)' });
+  const got = (req.get('x-newsletter-token') || (req.get('authorization') || '').replace(/^Bearer\s+/i, '')).trim();
+  const a = Buffer.from(got);
+  const b = Buffer.from(want);
+  if (a.length !== b.length || !crypto.timingSafeEqual(a, b)) {
+    return res.status(401).json({ ok: false, error: 'bad token' });
+  }
+  next();
+}
+
+// Health/inventory — confirm transport + list size before dispatching.
+app.get('/api/newsletter/status', newsletterToken, async (req, res) => {
+  const subs = await store.listSubscribers();
+  res.json({
+    ok: true,
+    subscribers: subs.length,
+    transport: sesConfigured() ? 'ses' : mailConfigured() ? 'resend' : 'none',
+    lastSentAt: await store.getState('newsletter_sent_at'),
+  });
+});
+
+// Bulk-import subscribers. Body: { contacts: [{email, name?}] }. Idempotent —
+// addSubscriber upserts by email. Returns how many are on the list afterward.
+app.post('/api/newsletter/import', newsletterToken, async (req, res) => {
+  const contacts = Array.isArray(req.body?.contacts) ? req.body.contacts : [];
+  if (!contacts.length) return res.status(400).json({ ok: false, error: 'no contacts' });
+  let imported = 0, skipped = 0;
+  for (const c of contacts) {
+    const email = String(c?.email || '').trim().toLowerCase();
+    if (!email || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) { skipped++; continue; }
+    try { await store.addSubscriber(email, String(c?.name || c?.first_name || '').trim()); imported++; }
+    catch { skipped++; }
+  }
+  const subs = await store.listSubscribers();
+  res.json({ ok: true, imported, skipped, total: subs.length });
+});
+
+// Send an issue to the whole list. Body: { subject, html, text?, key }.
+// `key` makes it idempotent — a retry (or a double-fired schedule) with the same
+// key never sends twice. This is the endpoint the scheduled send hits.
+app.post('/api/newsletter/dispatch', newsletterToken, async (req, res) => {
+  const { subject, html, text, key } = req.body || {};
+  if (!subject || !html) return res.status(400).json({ ok: false, error: 'subject and html required' });
+  if (!bulkMailConfigured()) return res.status(503).json({ ok: false, error: 'no bulk transport (set SES_FROM + AWS creds)' });
+  const dedupeKey = String(key || '').trim();
+  if (dedupeKey) {
+    const prior = await store.getState(`nl_dispatch_${dedupeKey}`);
+    if (prior) return res.json({ ok: true, alreadySent: true, at: prior });
+  }
+  const subs = await store.listSubscribers();
+  if (!subs.length) return res.status(400).json({ ok: false, error: 'no subscribers' });
+  // Mark BEFORE sending so a slow send that overlaps a retry can't double-blast.
+  if (dedupeKey) await store.setState(`nl_dispatch_${dedupeKey}`, new Date().toISOString());
+  const r = await sendAnnouncement(subs, { subject, html, text });
+  await store.setState('newsletter_sent_at', new Date().toISOString());
+  res.json({ ok: true, recipients: subs.length, ...r });
 });
 
 app.get('/admin/shows', requireAdmin, async (req, res) => {

@@ -7,7 +7,7 @@
 // only when the owner clicks "Send to subscribers" in /admin/newsletter. The
 // per-recipient unsubscribe link is injected by sendAnnouncement().
 
-import { sendAnnouncement, sendOwnerEmail, mailConfigured } from './mail.js';
+import { sendAnnouncement, sendOwnerEmail, mailConfigured, bulkMailConfigured } from './mail.js';
 import { esc } from './util.js';
 
 const BASE = (process.env.APP_BASE_URL || 'https://www.strawhutmedia.com').replace(/\/+$/, '');
@@ -181,12 +181,12 @@ export async function sendDraftToOwner(store) {
 
 // Actually send to the subscriber list (owner-triggered only).
 export async function sendToSubscribers(store) {
-  if (!mailConfigured()) return { ok: false, sent: 0, reason: 'no RESEND_API_KEY' };
+  if (!bulkMailConfigured()) return { ok: false, sent: 0, reason: 'no bulk email transport (set SES_FROM + AWS creds, or RESEND_API_KEY)' };
   const issue = await buildIssue(store);
   if (!issue) return { ok: false, sent: 0, reason: 'no episodes to feature yet' };
   const subs = await store.listSubscribers();
   if (!subs.length) return { ok: false, sent: 0, reason: 'no subscribers yet' };
-  const r = await sendAnnouncement(subs, { subject: issue.subject, html: issue.html });
+  const r = await sendAnnouncement(subs, { subject: issue.subject, html: issue.html, text: issue.text });
   await store.setState('newsletter_sent_at', new Date().toISOString());
   return { ok: true, ...r, subject: issue.subject };
 }

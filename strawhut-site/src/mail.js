@@ -1,5 +1,12 @@
 // Email sending via Resend's HTTP API (same provider as Slate / Pod Booster).
 // No SDK dependency — just fetch. Requires RESEND_API_KEY at runtime.
+//
+// BULK newsletter/announcements go through Amazon SES when it's configured
+// (see mailSes.js) — the site owns its own list + sending, no third-party
+// contact quota. Transactional mail (contact form, lead, auto-reply, digest)
+// stays on Resend. sendAnnouncement() below picks the transport automatically.
+
+import { sesConfigured, sesSendOne } from './mailSes.js';
 
 // Sender must be a Resend-verified domain. strawhutmedia.com is NOT verified in
 // this account; strawhut.media IS (and reads as "Straw Hut Media"). Mail is
@@ -9,6 +16,11 @@ const FROM = process.env.FROM_EMAIL || 'Straw Hut Media <hello@strawhut.media>';
 
 export function mailConfigured() {
   return !!process.env.RESEND_API_KEY;
+}
+
+/** Can we send a BULK newsletter/announcement? SES (preferred) or Resend. */
+export function bulkMailConfigured() {
+  return sesConfigured() || mailConfigured();
 }
 
 async function sendOne({ to, subject, html }) {
@@ -169,27 +181,49 @@ export async function sendContactEmail({ name, email, company, message, topic, f
  * recipient only sees their own address.
  * @returns {{ sent: number, failed: number, errors: string[] }}
  */
-export async function sendAnnouncement(subscribers, { subject, html }) {
-  if (!mailConfigured()) {
-    throw new Error('RESEND_API_KEY is not set — cannot send email. Set it on the server first.');
+export async function sendAnnouncement(subscribers, { subject, html, text }) {
+  const useSes = sesConfigured();
+  if (!useSes && !mailConfigured()) {
+    throw new Error('No bulk email transport configured — set SES_FROM (+ AWS creds) or RESEND_API_KEY first.');
   }
+  const base = (process.env.APP_BASE_URL || '').replace(/\/+$/, '');
   let sent = 0;
   let failed = 0;
   const errors = [];
-  for (const sub of subscribers) {
-    try {
-      const personalized = html.replace(
-        /\{\{unsubscribe\}\}/g,
-        `${(process.env.APP_BASE_URL || '').replace(/\/+$/, '')}/unsubscribe?e=${encodeURIComponent(sub.email)}`
-      );
-      await sendOne({ to: sub.email, subject, html: personalized });
-      sent++;
-    } catch (e) {
-      failed++;
-      if (errors.length < 5) errors.push(`${sub.email}: ${e.message}`);
+  // Small concurrency so a 1k+ send doesn't take forever, without tripping the
+  // SES per-second send-rate limit. Tune with NEWSLETTER_CONCURRENCY.
+  const CONCURRENCY = Math.max(1, Math.min(14, parseInt(process.env.NEWSLETTER_CONCURRENCY || '5', 10)));
+  const list = subscribers.slice();
+
+  async function worker() {
+    while (list.length) {
+      const sub = list.shift();
+      const unsubUrl = `${base}/unsubscribe?e=${encodeURIComponent(sub.email)}`;
+      const firstName = String(sub.name || '').trim().split(/\s+/)[0] || 'there';
+      const fill = (s) => s.replace(/\{\{unsubscribe\}\}/g, unsubUrl).replace(/\{\{first_name\}\}/g, firstName);
+      const personalized = fill(html);
+      const personalizedText = text ? fill(text) : undefined;
+      try {
+        if (useSes) {
+          // One-click unsubscribe (RFC 8058) — big deliverability win on a bulk send.
+          const headers = [
+            { Name: 'List-Unsubscribe', Value: `<${unsubUrl}>` },
+            { Name: 'List-Unsubscribe-Post', Value: 'List-Unsubscribe=One-Click' },
+          ];
+          const r = await sesSendOne({ to: sub.email, subject, html: personalized, text: personalizedText, headers });
+          if (!r.ok) throw new Error(r.error);
+        } else {
+          await sendOne({ to: sub.email, subject, html: personalized });
+        }
+        sent++;
+      } catch (e) {
+        failed++;
+        if (errors.length < 8) errors.push(`${sub.email}: ${e.message}`);
+      }
     }
   }
-  return { sent, failed, errors };
+  await Promise.all(Array.from({ length: CONCURRENCY }, worker));
+  return { sent, failed, errors, transport: useSes ? 'ses' : 'resend' };
 }
 
 /** Weekly traffic digest to the owner. Plain, scannable, no tracking pixels. */
