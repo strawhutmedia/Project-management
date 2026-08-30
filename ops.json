@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-08-30T18:09:47.765Z",
+  "generatedAt": "2026-08-30T18:14:47.767Z",
   "note": "Read-only operational snapshot. Emails are masked; no full contact list is stored here.",
   "summary": {
     "showsWithOutreach": 1,
@@ -46,7 +46,7 @@
           {
             "name": "Bryce Dettloff",
             "emailMasked": "i***@brycealakai.com",
-            "daysSinceFirstEmail": 45,
+            "daysSinceFirstEmail": 46,
             "opened": false,
             "openCount": 0
           },
