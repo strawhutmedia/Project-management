@@ -61,6 +61,47 @@ export const PITCH_THEMES = {
       card: '#16231D', 'card-border': '#2C3A32', 'tag-bg': '#1E2D25',
     },
   },
+  pride: {
+    label: 'Pride (Rainbow Media Co — pink, sky blue & rainbow)',
+    fontsHref:
+      'https://fonts.googleapis.com/css2?family=Montserrat:wght@600;700;800&family=Epilogue:ital,wght@0,400;0,500;0,600;0,700;1,400&display=swap',
+    fontDisplay: 'Montserrat,system-ui,-apple-system,sans-serif',
+    fontBody: 'Epilogue,system-ui,-apple-system,"Segoe UI",sans-serif',
+    fontLabel: 'Montserrat,system-ui,-apple-system,sans-serif',
+    displayWeight: '800',
+    displayTracking: '-.01em',
+    mark: 'rainbow',
+    light: {
+      paper: '#FFFFFF', 'paper-raised': '#F8F7F9', ink: '#16181D', 'ink-soft': '#5A5F66',
+      pine: '#4DB2EC', 'pine-deep': '#B71B53', brass: '#D62264',
+      line: '#E3E2E7', 'line-soft': '#EDECF0', route: '#CBCDD5',
+      card: '#F8F7F9', 'card-border': '#E3E2E7', 'tag-bg': '#FBE3ED',
+    },
+    dark: {
+      paper: '#131118', 'paper-raised': '#1B1922', ink: '#F2F0EA', 'ink-soft': '#A8A5B0',
+      pine: '#64C2F5', 'pine-deep': '#FF7FA8', brass: '#FF5C93',
+      line: '#2C2935', 'line-soft': '#242130', route: '#443F52',
+      card: '#1B1922', 'card-border': '#2C2935', 'tag-bg': '#3A2230',
+    },
+    // The rainbow itself: a pride ribbon across the top, a rainbow rule on the
+    // cover, and stat numbers / list markers cycling through the six stripes.
+    extraCss: `
+  body::before{content:"";display:block;height:6px;background:linear-gradient(90deg,#FF4338,#FF6B00,#E5A81B,#2FB673,#4DB2EC,#B44FD6)}
+  .rule{width:96px;height:4px;border-radius:2px;background:linear-gradient(90deg,#FF4338,#FF6B00,#E5A81B,#2FB673,#4DB2EC,#B44FD6)}
+  .stat:nth-child(6n+1) .n{color:#FF4338}
+  .stat:nth-child(6n+2) .n{color:#FF6B00}
+  .stat:nth-child(6n+3) .n{color:#CE9310}
+  .stat:nth-child(6n+4) .n{color:#22995F}
+  .stat:nth-child(6n+5) .n{color:#2492D6}
+  .stat:nth-child(6n+6) .n{color:#B44FD6}
+  .stop:nth-child(6n+1) .marker{border-color:#FF4338;color:#FF4338}
+  .stop:nth-child(6n+2) .marker{border-color:#FF6B00;color:#FF6B00}
+  .stop:nth-child(6n+3) .marker{border-color:#CE9310;color:#CE9310}
+  .stop:nth-child(6n+4) .marker{border-color:#22995F;color:#22995F}
+  .stop:nth-child(6n+5) .marker{border-color:#2492D6;color:#2492D6}
+  .stop:nth-child(6n+6) .marker{border-color:#B44FD6;color:#B44FD6}
+    `,
+  },
   studio: {
     label: 'Studio (bold modern, olive & amber)',
     fontsHref:
@@ -199,6 +240,16 @@ const tokenBlock = (vars) =>
   Object.entries(vars).map(([k, v]) => `--${k}:${v};`).join('');
 
 function coverMark(kind) {
+  if (kind === 'rainbow') {
+    const stripes = ['#FF4338', '#FF6B00', '#E5A81B', '#2FB673', '#4DB2EC', '#B44FD6'];
+    const arcs = stripes
+      .map((c, i) => {
+        const r = 44 - i * 6;
+        return `<path d="M ${50 - r} 52 A ${r} ${r} 0 0 1 ${50 + r} 52" fill="none" stroke="${c}" stroke-width="6" stroke-linecap="round"/>`;
+      })
+      .join('');
+    return `<svg class="mark" viewBox="0 0 100 56" role="img" aria-label="Rainbow">${arcs}</svg>`;
+  }
   if (kind === 'waveform') {
     const heights = [16, 30, 22, 40, 28, 44, 34, 24, 38, 18, 42, 26, 36, 20];
     const bars = heights
@@ -307,6 +358,7 @@ export function pitchPage({ pitch }) {
   .close a{color:var(--pine-deep);text-decoration:none;border-bottom:1px solid var(--route)}
   .close a:focus-visible{outline:2px solid var(--brass);outline-offset:2px}
   .footnote{text-align:center;font-family:var(--font-label);font-size:11.5px;letter-spacing:.06em;color:var(--ink-soft);padding:26px 22px 40px}
+${theme.extraCss || ''}
 </style>
 </head><body>
 <header class="cover wrap">

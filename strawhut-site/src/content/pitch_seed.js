@@ -184,7 +184,7 @@ export const MEDIA_ARTS_PITCH = {
   slug: 'media-arts-program',
   title: 'Media Arts Program',
   working_title: false,
-  theme: 'studio',
+  theme: 'pride',
   eyebrow: 'Proposal — prepared for the Los Angeles LGBT Center',
   logline:
     'A 12-week vocational track in podcast and media production — the same length as your Culinary Arts program, and pitched by the studio that would run it.',
