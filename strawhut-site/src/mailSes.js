@@ -9,11 +9,15 @@
 //
 // CONFIG (Railway env on the strawhut-site service):
 //   SES_FROM              e.g. "Straw Hut Media <newsletter@strawhutmedia.com>"
-//   AWS_REGION            e.g. "us-east-1" (region the SES identity lives in)
-//   AWS_ACCESS_KEY_ID     IAM user with ses:SendEmail
-//   AWS_SECRET_ACCESS_KEY  "
+//   SES_REGION            region the SES identity lives in (falls back to AWS_REGION)
+//   SES_ACCESS_KEY_ID     dedicated SES IAM key (falls back to AWS_ACCESS_KEY_ID)
+//   SES_SECRET_ACCESS_KEY  "         (falls back to AWS_SECRET_ACCESS_KEY)
 //   SES_REPLY_TO          optional, defaults to hello@strawhutmedia.com
 //   SES_CONFIG_SET        optional SES configuration set name (bounce/complaint tracking)
+//
+// SES creds are kept SEPARATE from the AWS_* keys the Megaphone S3 export uses,
+// so a newsletter key can't affect (or be affected by) the analytics pipeline —
+// but they fall back to AWS_* if the dedicated ones aren't set.
 //
 // The sending domain (strawhutmedia.com) must be verified in SES and the
 // account moved OUT of the SES sandbox (one-time AWS approval) before mail to
@@ -23,17 +27,30 @@ import { SESv2Client, SendEmailCommand } from '@aws-sdk/client-sesv2';
 
 const REPLY_TO = process.env.SES_REPLY_TO || 'hello@strawhutmedia.com';
 
+function sesKeyId() {
+  return process.env.SES_ACCESS_KEY_ID || process.env.AWS_ACCESS_KEY_ID;
+}
+function sesSecret() {
+  return process.env.SES_SECRET_ACCESS_KEY || process.env.AWS_SECRET_ACCESS_KEY;
+}
+
 let _client = null;
 function client() {
   if (_client) return _client;
-  _client = new SESv2Client({ region: process.env.AWS_REGION || 'us-east-1' });
+  const region = process.env.SES_REGION || process.env.AWS_REGION || 'us-east-1';
+  // Only pass explicit dedicated creds; if unset, let the SDK use the ambient
+  // AWS_* env so nothing changes for existing single-key setups.
+  const credentials =
+    process.env.SES_ACCESS_KEY_ID && process.env.SES_SECRET_ACCESS_KEY
+      ? { accessKeyId: process.env.SES_ACCESS_KEY_ID, secretAccessKey: process.env.SES_SECRET_ACCESS_KEY }
+      : undefined;
+  _client = new SESv2Client({ region, ...(credentials ? { credentials } : {}) });
   return _client;
 }
 
-/** True when SES is configured enough to send. Creds are read from the standard
- *  AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY env by the SDK. */
+/** True when SES is configured enough to send. */
 export function sesConfigured() {
-  return !!(process.env.SES_FROM && process.env.AWS_ACCESS_KEY_ID && process.env.AWS_SECRET_ACCESS_KEY);
+  return !!(process.env.SES_FROM && sesKeyId() && sesSecret());
 }
 
 export function sesFrom() {
