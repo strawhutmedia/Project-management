@@ -193,11 +193,23 @@ export async function sendAnnouncement(subscribers, { subject, html, text }) {
   // Small concurrency so a 1k+ send doesn't take forever, without tripping the
   // SES per-second send-rate limit. Tune with NEWSLETTER_CONCURRENCY.
   const CONCURRENCY = Math.max(1, Math.min(14, parseInt(process.env.NEWSLETTER_CONCURRENCY || '5', 10)));
+  // Pace send starts to a target rate/sec so a bulk blast can't exceed the SES
+  // account's MaxSendRate (which throttles). Shared across workers.
+  const RATE = Math.max(0.5, parseFloat(process.env.NEWSLETTER_RATE_PER_SEC || '10'));
+  const gapMs = 1000 / RATE;
+  let nextAt = Date.now();
+  const pace = async () => {
+    const now = Date.now();
+    const t = Math.max(now, nextAt);
+    nextAt = t + gapMs;
+    if (t > now) await new Promise((r) => setTimeout(r, t - now));
+  };
   const list = subscribers.slice();
 
   async function worker() {
     while (list.length) {
       const sub = list.shift();
+      if (useSes) await pace();
       const unsubUrl = `${base}/unsubscribe?e=${encodeURIComponent(sub.email)}`;
       const firstName = String(sub.name || '').trim().split(/\s+/)[0] || 'there';
       const fill = (s) => s.replace(/\{\{unsubscribe\}\}/g, unsubUrl).replace(/\{\{first_name\}\}/g, firstName);

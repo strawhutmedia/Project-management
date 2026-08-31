@@ -64,6 +64,16 @@ export function sesFrom() {
  * @returns {{ ok: boolean, id?: string, error?: string }}
  */
 export async function sesSendOne({ to, subject, html, text, headers = [], replyTo = REPLY_TO }) {
+  for (let attempt = 0; ; attempt++) {
+    const r = await sesSendOnce({ to, subject, html, text, headers, replyTo });
+    if (r.ok || !r.throttled || attempt >= 4) return r;
+    // Exponential backoff on rate-limit: 0.5s, 1s, 2s, 4s.
+    await new Promise((res) => setTimeout(res, 500 * 2 ** attempt));
+  }
+}
+
+async function sesSendOnce({ to, subject, html, text, headers, replyTo }) {
+  const THROTTLES = new Set(['ThrottlingException', 'TooManyRequestsException', 'Throttling', 'LimitExceededException']);
   try {
     const cmd = new SendEmailCommand({
       FromEmailAddress: sesFrom(),
@@ -84,6 +94,6 @@ export async function sesSendOne({ to, subject, html, text, headers = [], replyT
     const out = await client().send(cmd);
     return { ok: true, id: out.MessageId };
   } catch (e) {
-    return { ok: false, error: e.message || String(e) };
+    return { ok: false, error: e.message || String(e), throttled: THROTTLES.has(e.name) };
   }
 }
