@@ -13,10 +13,16 @@ Owner: Ryan (ryan@strawhutmedia.com). Money rules are non-negotiable — see §9
 
 ## 0. The two jobs are different — don't confuse them
 
-- **Podbooster** drives *podcast downloads* (Google Display → landing page →
-  counted IAB download). Purpose-built, keep it as-is.
-- **This tool** drives *awareness and purchases* for the network, shows, and the
-  **movie** — video-first, on Meta (FB+IG), TikTok, and YouTube.
+- **Podcast downloads** (Google Display → landing page → counted IAB download)
+  is the job Podbooster was purpose-built for. Keep that engine as-is.
+- **Awareness and purchases** for the network, shows and the **movie** is a
+  different job — video-first, on Meta (FB+IG), TikTok and YouTube.
+
+Both jobs are **built in Podbooster**. The split is by capability, not by
+subject: Podbooster is the paid-media engine for everything Straw Hut
+advertises; Slate is project management and planning. Slate plans, Podbooster
+spends. See `MOVIE_PROMOTION.md` in this folder, and `MOVIES.md` in the
+Podbooster repo.
 
 A movie is **not** a download. The goal is trailer views → warm audience →
 purchase/rent (or ticket / stream). Everything below serves that funnel.
@@ -32,6 +38,14 @@ purchase/rent (or ticket / stream). Everything below serves that funnel.
    hard way on Podbooster (campaigns got zero impressions when a dimension was
    left in targeting-only mode). Let the algorithm find buyers inside a broad
    pool that your signals *point at*.
+
+   **Caveat — this needs a per-platform translation, not one setting.** Google's
+   observation mode is `targetingSetting.targetRestrictions`, a *Display*
+   construct. **Demand Gen has no observation mode**, so audiences there
+   genuinely restrict; and Video campaigns cannot be created through the Google
+   Ads API at all. Meta's Advantage+ Audience is the closest true equivalent to
+   what this principle describes. See `MOVIES.md` in Podbooster for the verified
+   constraints.
 2. **The creative is the targeting.** Especially on TikTok and Meta Advantage+,
    the algorithm reads who engages with a creative and finds more of them. A
    great hook out-targets any manual audience. Budget for **many creatives**,
@@ -186,7 +200,10 @@ want to shave friction for — and even then, a page usually still wins.
   YouTube) are parallel campaigns at the same budget.
 - One **Launch** action → creates the campaigns simultaneously, all pointed at
   the same landing page + creative set, with the audiences built per §2–6.
-- Lives in **Slate** as the "Marketing / Ads" module (internal ops hub), reused
-  for both self-promotion and the movie. Podbooster stays download-only.
+- Lives in **Podbooster** as the paid-promotion engine, reused for both
+  self-promotion and the movie, alongside the existing download campaigns.
+  Slate stays planning-only. (Earlier drafts of this playbook placed the tool in
+  Slate; that was reversed — the ad machinery, spend caps and learned negatives
+  already live in Podbooster and should not be duplicated.)
 - Requires connected Meta Business + TikTok Business (+ Google Ads) ad accounts
   and their Marketing-API app approvals — flag these to Ryan before building.
