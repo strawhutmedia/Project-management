@@ -15,6 +15,7 @@ import * as A from './admin_views.js';
 import { robotsTxt, sitemapXml, llmsTxt } from './seo.js';
 import { sendAnnouncement, mailConfigured, bulkMailConfigured, sendContactEmail, sendContactAutoReply, sendTrafficDigest } from './mail.js';
 import { sesConfigured, sesAccountStatus } from './mailSes.js';
+import { handleSnsMessage, deliverabilityStats } from './sesEvents.js';
 import { buildIssue, sendToSubscribers, sendTestToOwner, maybeSendNewsletterDraft, setSchedule, getSchedule, runScheduledSend } from './newsletter.js';
 import { importFromSite } from './importer.js';
 import { writeLandingCopy, generateLandingCopy, fallbackLandingCopy, aiConfigured, generateShowMetaDescription, generateShowBlurb, generateShowTagline, generateEpisodeEnrichment } from './ai.js';
@@ -409,16 +410,28 @@ function newsletterToken(req, res, next) {
   next();
 }
 
-// Health/inventory — confirm transport + list size before dispatching.
+// SES → SNS bounce/complaint webhook (public — SNS calls it, not a browser).
+// Raw text body: SNS posts Content-Type text/plain, so parse it ourselves.
+app.post('/api/ses/notify', express.text({ type: '*/*', limit: '512kb' }), async (req, res) => {
+  try { await handleSnsMessage(store, req.body); } catch (e) { console.error('[ses] webhook error:', e.message); }
+  res.status(200).end(); // always 200 so SNS doesn't retry-storm
+});
+
+// Health/inventory — confirm transport + list size + live deliverability.
 app.get('/api/newsletter/status', newsletterToken, async (req, res) => {
   const subs = await store.listSubscribers();
   const ses = sesConfigured() ? await sesAccountStatus() : null;
+  let paused = null;
+  try { paused = JSON.parse((await store.getState('newsletter_send_paused')) || 'null'); } catch {}
   res.json({
     ok: true,
     subscribers: subs.length,
     transport: sesConfigured() ? 'ses' : mailConfigured() ? 'resend' : 'none',
     sesProductionAccess: ses ? ses.productionAccessEnabled : null,
     sesSendingEnabled: ses ? ses.sendingEnabled : null,
+    sesConfigSet: process.env.SES_CONFIG_SET || null,
+    deliverability: await deliverabilityStats(store),
+    sendPaused: paused,
     lastSentAt: await store.getState('newsletter_sent_at'),
   });
 });

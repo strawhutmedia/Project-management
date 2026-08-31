@@ -248,15 +248,63 @@ export async function runScheduledSend(store) {
   if (!subs.length) return { ok: false, reason: 'no subscribers' };
   // Mark BEFORE sending so an overlapping tick can't double-blast.
   await store.setState(`nl_dispatch_${key}`, new Date().toISOString());
-  const r = await sendAnnouncement(subs, { subject: sch.subject, html, text: sch.text || undefined });
+
+  // Reset live deliverability counters for this run (fed by SES → SNS webhook).
+  for (const k of ['ses_send_total', 'ses_bounces', 'ses_soft_bounces', 'ses_complaints', 'ses_deliveries']) {
+    await store.setState(k, '0');
+  }
+  await store.setState('newsletter_send_paused', '');
+
+  // Send in batches, pausing between them to let SES bounce feedback land, so a
+  // bad list can't blast all at once. Auto-pause if the bounce/complaint rate
+  // crosses a threshold (protects SES sender reputation).
+  const BATCH = Math.max(20, parseInt(process.env.NEWSLETTER_BATCH || '120', 10));
+  const DWELL = Math.max(0, parseInt(process.env.NEWSLETTER_BATCH_DWELL_MS || '45000', 10));
+  const BOUNCE_LIMIT = parseFloat(process.env.NEWSLETTER_BOUNCE_LIMIT || '0.06');
+  const COMPLAINT_LIMIT = parseFloat(process.env.NEWSLETTER_COMPLAINT_LIMIT || '0.008');
+  const MIN_SAMPLE = Math.max(50, parseInt(process.env.NEWSLETTER_MIN_SAMPLE || '100', 10));
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+  let sent = 0, failed = 0; const errors = []; let transport = 'ses';
+  for (let i = 0; i < subs.length; i += BATCH) {
+    const batch = subs.slice(i, i + BATCH);
+    const r = await sendAnnouncement(batch, { subject: sch.subject, html, text: sch.text || undefined });
+    transport = r.transport || transport;
+    sent += r.sent; failed += r.failed;
+    for (const e of r.errors || []) if (errors.length < 10) errors.push(e);
+    await store.setState('ses_send_total', String(sent));
+
+    const last = i + BATCH >= subs.length;
+    if (!last && DWELL) await sleep(DWELL);
+
+    // Check reputation after we have a meaningful sample.
+    const b = parseInt((await store.getState('ses_bounces')) || '0', 10) || 0;
+    const c = parseInt((await store.getState('ses_complaints')) || '0', 10) || 0;
+    if (sent >= MIN_SAMPLE && (b / sent > BOUNCE_LIMIT || c / sent > COMPLAINT_LIMIT)) {
+      await store.setState('newsletter_send_paused', JSON.stringify({
+        at: new Date().toISOString(), sent, bounces: b, complaints: c,
+        bounceRate: +(b / sent).toFixed(4), complaintRate: +(c / sent).toFixed(4),
+        remaining: subs.length - sent,
+      }));
+      await sendOwnerEmail({
+        to: OWNER,
+        subject: `[Newsletter PAUSED — high bounce rate] ${sch.subject}`,
+        html: `<p><strong>Auto-paused</strong> to protect your sending reputation.</p>
+          <p>Sent so far: <strong>${sent}</strong> · Hard bounces: <strong>${b}</strong> (${(b / sent * 100).toFixed(1)}%) · Complaints: <strong>${c}</strong>.</p>
+          <p>The remaining <strong>${subs.length - sent}</strong> were NOT sent. Bounced addresses have been removed from the list. Investigate before resuming.</p>`,
+      }).catch(() => {});
+      return { ok: false, paused: true, recipients: sent, sent, failed, bounces: b, complaints: c, transport };
+    }
+  }
+
   await store.setState('newsletter_sent_at', new Date().toISOString());
   await store.setState('newsletter_schedule', ''); // consumed
   await sendOwnerEmail({
     to: OWNER,
     subject: `[Newsletter sent] ${sch.subject}`,
-    html: `<p>Your newsletter just went out to <strong>${subs.length}</strong> subscriber(s) via ${r.transport}.<br>Delivered: ${r.sent} · Failed: ${r.failed}.</p>`,
+    html: `<p>Your newsletter went out to <strong>${sent}</strong> subscriber(s) via ${transport}.<br>Accepted: ${sent} · Immediate failures: ${failed}.<br>Live bounce/complaint tracking is on — check /api/newsletter/status.</p>`,
   }).catch(() => {});
-  return { ok: true, recipients: subs.length, ...r };
+  return { ok: true, recipients: sent, sent, failed, errors, transport };
 }
 
 // Scheduler: on the biweekly cadence, email the owner a fresh draft. Never
