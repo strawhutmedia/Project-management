@@ -34,6 +34,7 @@ import { ghlConfigured, verifyGhl, upsertContact, ghlLastError,
 import { toText as plainText, endsSentence } from './util.js';
 import { handleLeadHook } from './leadHook.js';
 import { startLeadOps } from './leadOps.js';
+import { startSubscriberSync, syncFromSheet } from './subscribers.js';
 import { ATTR_KEYS } from './tracking.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -433,6 +434,13 @@ app.post('/api/newsletter/import', newsletterToken, async (req, res) => {
   }
   const subs = await store.listSubscribers();
   res.json({ ok: true, imported, skipped, total: subs.length });
+});
+
+// Trigger a Google-Sheet → list sync on demand (also runs hourly on its own).
+app.post('/api/newsletter/sync-sheet', newsletterToken, async (req, res) => {
+  const r = await syncFromSheet(store, req.body?.url);
+  const subs = await store.listSubscribers();
+  res.status(r.ok ? 200 : 400).json({ ...r, total: subs.length });
 });
 
 // Send an issue to the whole list. Body: { subject, html, text?, key }.
@@ -1631,6 +1639,10 @@ app.listen(PORT, async () => {
   // Pre-call prep + follow-up drafts, driven off booked calls (server-side, so
   // it runs without any chat session). Inert unless RESEND + ANTHROPIC keys set.
   startLeadOps(store);
+
+  // Keep the newsletter list current from the owner's Google Sheet (published
+  // as CSV) — hourly upsert, never deletes. Inert without NEWSLETTER_SHEET_CSV_URL.
+  startSubscriberSync(store);
 
   backfillShowTaglines()
     .then(() => backfillShowSeo())
