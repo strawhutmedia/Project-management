@@ -14,7 +14,7 @@ import * as V from './views.js';
 import * as A from './admin_views.js';
 import { robotsTxt, sitemapXml, llmsTxt } from './seo.js';
 import { sendAnnouncement, mailConfigured, bulkMailConfigured, sendContactEmail, sendContactAutoReply, sendTrafficDigest } from './mail.js';
-import { sesConfigured } from './mailSes.js';
+import { sesConfigured, sesAccountStatus } from './mailSes.js';
 import { buildIssue, sendToSubscribers, sendTestToOwner, maybeSendNewsletterDraft } from './newsletter.js';
 import { importFromSite } from './importer.js';
 import { writeLandingCopy, generateLandingCopy, fallbackLandingCopy, aiConfigured, generateShowMetaDescription, generateShowBlurb, generateShowTagline, generateEpisodeEnrichment } from './ai.js';
@@ -412,10 +412,13 @@ function newsletterToken(req, res, next) {
 // Health/inventory — confirm transport + list size before dispatching.
 app.get('/api/newsletter/status', newsletterToken, async (req, res) => {
   const subs = await store.listSubscribers();
+  const ses = sesConfigured() ? await sesAccountStatus() : null;
   res.json({
     ok: true,
     subscribers: subs.length,
     transport: sesConfigured() ? 'ses' : mailConfigured() ? 'resend' : 'none',
+    sesProductionAccess: ses ? ses.productionAccessEnabled : null,
+    sesSendingEnabled: ses ? ses.sendingEnabled : null,
     lastSentAt: await store.getState('newsletter_sent_at'),
   });
 });
@@ -457,6 +460,15 @@ app.post('/api/newsletter/dispatch', newsletterToken, async (req, res) => {
   }
   const subs = await store.listSubscribers();
   if (!subs.length) return res.status(400).json({ ok: false, error: 'no subscribers' });
+  // Refuse a real blast while SES is still sandboxed — it would only reach
+  // verified addresses and silently drop everyone else. Caller should retry
+  // once production access is granted. `?allowSandbox=1` overrides for testing.
+  if (sesConfigured() && req.query.allowSandbox !== '1') {
+    const st = await sesAccountStatus();
+    if (st.ok && !st.productionAccessEnabled) {
+      return res.status(409).json({ ok: false, sandbox: true, error: 'SES still in sandbox — production access not yet granted' });
+    }
+  }
   // Mark BEFORE sending so a slow send that overlaps a retry can't double-blast.
   if (dedupeKey) await store.setState(`nl_dispatch_${dedupeKey}`, new Date().toISOString());
   const r = await sendAnnouncement(subs, { subject, html, text });

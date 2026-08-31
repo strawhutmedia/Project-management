@@ -23,7 +23,7 @@
 // account moved OUT of the SES sandbox (one-time AWS approval) before mail to
 // unverified recipients is delivered. Until then SES only mails verified addrs.
 
-import { SESv2Client, SendEmailCommand } from '@aws-sdk/client-sesv2';
+import { SESv2Client, SendEmailCommand, GetAccountCommand } from '@aws-sdk/client-sesv2';
 
 const REPLY_TO = process.env.SES_REPLY_TO || 'hello@strawhutmedia.com';
 
@@ -51,6 +51,18 @@ function client() {
 /** True when SES is configured enough to send. */
 export function sesConfigured() {
   return !!(process.env.SES_FROM && sesKeyId() && sesSecret());
+}
+
+/** SES account status — used to refuse a bulk send while still sandboxed
+ *  (sandbox only delivers to verified addresses, so a real blast would silently
+ *  reach almost nobody). @returns {{ ok, productionAccessEnabled?, sendingEnabled?, error? }} */
+export async function sesAccountStatus() {
+  try {
+    const a = await client().send(new GetAccountCommand({}));
+    return { ok: true, productionAccessEnabled: !!a.ProductionAccessEnabled, sendingEnabled: !!a.SendingEnabled };
+  } catch (e) {
+    return { ok: false, error: e.message || String(e) };
+  }
 }
 
 export function sesFrom() {
