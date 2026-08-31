@@ -450,6 +450,21 @@ app.get('/api/newsletter/schedule', newsletterToken, async (req, res) => {
   res.json({ ok: true, schedule: await getSchedule(store) });
 });
 
+// Remove addresses from the list (list hygiene — junk/bot/typo cleanup).
+// Body: { emails: [..] }. Returns how many were removed + new total.
+app.post('/api/newsletter/prune', newsletterToken, async (req, res) => {
+  const emails = (Array.isArray(req.body?.emails) ? req.body.emails : []).map((e) => String(e).trim().toLowerCase()).filter(Boolean);
+  if (!emails.length) return res.status(400).json({ ok: false, error: 'no emails' });
+  const set = new Set(emails);
+  const subs = await store.listSubscribers();
+  let removed = 0;
+  for (const s of subs) {
+    if (set.has(String(s.email).toLowerCase())) { await store.removeSubscriber(s.id); removed++; }
+  }
+  const after = await store.listSubscribers();
+  res.json({ ok: true, removed, total: after.length });
+});
+
 // Trigger a Google-Sheet → list sync on demand (also runs hourly on its own).
 app.post('/api/newsletter/sync-sheet', newsletterToken, async (req, res) => {
   const r = await syncFromSheet(store, req.body?.url);
