@@ -15,7 +15,7 @@ import * as A from './admin_views.js';
 import { robotsTxt, sitemapXml, llmsTxt } from './seo.js';
 import { sendAnnouncement, mailConfigured, bulkMailConfigured, sendContactEmail, sendContactAutoReply, sendTrafficDigest } from './mail.js';
 import { sesConfigured, sesAccountStatus } from './mailSes.js';
-import { buildIssue, sendToSubscribers, sendTestToOwner, maybeSendNewsletterDraft } from './newsletter.js';
+import { buildIssue, sendToSubscribers, sendTestToOwner, maybeSendNewsletterDraft, setSchedule, getSchedule, runScheduledSend } from './newsletter.js';
 import { importFromSite } from './importer.js';
 import { writeLandingCopy, generateLandingCopy, fallbackLandingCopy, aiConfigured, generateShowMetaDescription, generateShowBlurb, generateShowTagline, generateEpisodeEnrichment } from './ai.js';
 import { POSTS, getPost } from './content/resources.js';
@@ -437,6 +437,17 @@ app.post('/api/newsletter/import', newsletterToken, async (req, res) => {
   }
   const subs = await store.listSubscribers();
   res.json({ ok: true, imported, skipped, total: subs.length });
+});
+
+// Queue a hand-approved issue to send at a set time. Body:
+// { sendAt (ISO), subject, issueFile (name in /newsletter-issues), key?, text? }.
+app.post('/api/newsletter/schedule', newsletterToken, async (req, res) => {
+  const { sendAt, subject, issueFile, key, text } = req.body || {};
+  const r = await setSchedule(store, { sendAt, subject, issueFile, key, text });
+  res.status(r.ok ? 200 : 400).json(r);
+});
+app.get('/api/newsletter/schedule', newsletterToken, async (req, res) => {
+  res.json({ ok: true, schedule: await getSchedule(store) });
 });
 
 // Trigger a Google-Sheet → list sync on demand (also runs hourly on its own).
@@ -1644,6 +1655,15 @@ app.listen(PORT, async () => {
   // the cadence (never subscribers). Owner reviews + sends from /admin/newsletter.
   setInterval(() => maybeSendNewsletterDraft(store).catch(() => {}), 6 * 60 * 60 * 1000);
   maybeSendNewsletterDraft(store).catch((e) => console.error('[newsletter]', e.message));
+
+  // Fire any queued scheduled issue when due (every 3 min). Self-guards on time,
+  // dedupe key, and SES production access; holds quietly until all are satisfied.
+  const tickScheduled = () =>
+    runScheduledSend(store)
+      .then((r) => { if (r.ok) console.log(`[newsletter] scheduled send: ${r.sent} sent, ${r.failed} failed via ${r.transport}`); })
+      .catch((e) => console.error('[newsletter] scheduled send error:', e.message));
+  setInterval(tickScheduled, 3 * 60 * 1000);
+  setTimeout(tickScheduled, 20 * 1000);
 
   // Backfill unique, AI-written SEO meta descriptions for shows that don't have
   // one yet. Runs once per boot in the background, paced to be gentle on the

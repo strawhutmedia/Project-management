@@ -8,7 +8,13 @@
 // per-recipient unsubscribe link is injected by sendAnnouncement().
 
 import { sendAnnouncement, sendOwnerEmail, mailConfigured, bulkMailConfigured } from './mail.js';
+import { sesConfigured, sesAccountStatus } from './mailSes.js';
 import { esc } from './util.js';
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const ISSUES_DIR = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'newsletter-issues');
 
 const BASE = (process.env.APP_BASE_URL || 'https://www.strawhutmedia.com').replace(/\/+$/, '');
 const OWNER = process.env.ADMIN_EMAIL || 'ryan@strawhutmedia.com';
@@ -198,6 +204,59 @@ export async function sendTestToOwner(store) {
   if (!issue) return { ok: false, reason: 'no episodes to feature yet' };
   const html = issue.html.replace(/\{\{unsubscribe\}\}/g, `${BASE}/unsubscribe?e=${encodeURIComponent(OWNER)}`);
   return sendOwnerEmail({ to: OWNER, subject: `[TEST] ${issue.subject}`, html });
+}
+
+// ── Scheduled one-off send ────────────────────────────────────────────────
+// A specific, hand-approved issue can be queued to go out at a set time. The
+// queue lives in app_state ('newsletter_schedule' = {sendAt, subject, issueFile,
+// key, text?}); a server interval calls runScheduledSend() every few minutes.
+// The issue HTML is a committed file in /newsletter-issues (read at send time),
+// so the send survives restarts and never depends on a chat session being awake.
+// Guards: won't fire before sendAt, won't double-send (idempotent on key), and
+// won't blast while SES is still sandboxed.
+export async function setSchedule(store, { sendAt, subject, issueFile, key, text }) {
+  if (!sendAt || !subject || !issueFile) return { ok: false, reason: 'sendAt, subject, issueFile required' };
+  const file = path.join(ISSUES_DIR, path.basename(issueFile));
+  if (!fs.existsSync(file)) return { ok: false, reason: `issue file not found: ${path.basename(issueFile)}` };
+  const rec = { sendAt, subject, issueFile: path.basename(issueFile), key: key || `sched-${sendAt}`, text: text || '' };
+  await store.setState('newsletter_schedule', JSON.stringify(rec));
+  return { ok: true, scheduled: rec };
+}
+
+export async function getSchedule(store) {
+  const raw = await store.getState('newsletter_schedule');
+  if (!raw) return null;
+  try { return JSON.parse(raw); } catch { return null; }
+}
+
+export async function runScheduledSend(store) {
+  const sch = await getSchedule(store);
+  if (!sch) return { ok: false, reason: 'none' };
+  if (Date.now() < new Date(sch.sendAt).getTime()) return { ok: false, reason: 'not due' };
+  const key = sch.key || `sched-${sch.sendAt}`;
+  if (await store.getState(`nl_dispatch_${key}`)) { await store.setState('newsletter_schedule', ''); return { ok: false, reason: 'already sent' }; }
+  if (!bulkMailConfigured()) return { ok: false, reason: 'no transport' };
+  // Hold (don't clear) while SES is still in sandbox — retry on the next tick.
+  if (sesConfigured()) {
+    const st = await sesAccountStatus();
+    if (st.ok && !st.productionAccessEnabled) return { ok: false, reason: 'ses sandbox — waiting for production access' };
+  }
+  const file = path.join(ISSUES_DIR, path.basename(sch.issueFile));
+  let html;
+  try { html = fs.readFileSync(file, 'utf8'); } catch (e) { return { ok: false, reason: `issue file missing: ${e.message}` }; }
+  const subs = await store.listSubscribers();
+  if (!subs.length) return { ok: false, reason: 'no subscribers' };
+  // Mark BEFORE sending so an overlapping tick can't double-blast.
+  await store.setState(`nl_dispatch_${key}`, new Date().toISOString());
+  const r = await sendAnnouncement(subs, { subject: sch.subject, html, text: sch.text || undefined });
+  await store.setState('newsletter_sent_at', new Date().toISOString());
+  await store.setState('newsletter_schedule', ''); // consumed
+  await sendOwnerEmail({
+    to: OWNER,
+    subject: `[Newsletter sent] ${sch.subject}`,
+    html: `<p>Your newsletter just went out to <strong>${subs.length}</strong> subscriber(s) via ${r.transport}.<br>Delivered: ${r.sent} · Failed: ${r.failed}.</p>`,
+  }).catch(() => {});
+  return { ok: true, recipients: subs.length, ...r };
 }
 
 // Scheduler: on the biweekly cadence, email the owner a fresh draft. Never
