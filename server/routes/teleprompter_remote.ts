@@ -20,7 +20,7 @@ import { requireUser } from '../auth'
 
 // No ambiguous characters (0/O, 1/I) — easy to read off a screen and type.
 const ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'
-const ACTIONS = new Set(['playpause', 'faster', 'slower', 'bigger', 'smaller', 'restart', 'exit', 'start'])
+const ACTIONS = new Set(['playpause', 'faster', 'slower', 'bigger', 'smaller', 'restart', 'exit', 'start', 'back', 'fwd'])
 
 type Channel = { code: string; res: Response; createdAt: number; announced: boolean }
 const channels = new Map<string, Channel>()
