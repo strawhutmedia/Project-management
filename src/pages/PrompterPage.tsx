@@ -201,7 +201,13 @@ export default function PrompterPage() {
   // --- phone-as-remote (this device HOSTS a control channel) ---------------
   const [remoteOpen, setRemoteOpen] = useState(false) // pairing overlay visible
   const [remoteCode, setRemoteCode] = useState<string | null>(null)
-  const [remotePhoneSeen, setRemotePhoneSeen] = useState(false)
+  // 'waiting': nobody has loaded /r on this code yet.
+  // 'joined':  a phone opened /r and polled status — reachable, but no
+  //            button pressed yet (this is the state most pairings sit
+  //            in — it used to look identical to 'waiting').
+  // 'pressed': a button press round-tripped — fully proven working.
+  const [remoteConn, setRemoteConn] = useState<'waiting' | 'joined' | 'pressed'>('waiting')
+  const [remoteLostConn, setRemoteLostConn] = useState(false)
   // A monotonically-bumped signal so the Runner reacts to run-control presses
   // (play/pause, restart, exit) even when the same button is pressed twice.
   const [runnerCmd, setRunnerCmd] = useState<{ action: string; n: number }>({ action: '', n: 0 })
@@ -237,7 +243,7 @@ export default function PrompterPage() {
   // Apply a button press coming from a paired phone. Settings-level presses
   // (speed / size) are handled here; run controls are forwarded to the Runner.
   const handleRemoteAction = useCallback((action: string) => {
-    setRemotePhoneSeen(true)
+    setRemoteConn('pressed')
     switch (action) {
       case 'faster':
         setSettingsState((s) => ({ ...s, speed: Math.min(100, s.speed + 2) }))
@@ -288,11 +294,21 @@ export default function PrompterPage() {
     es.addEventListener('code', (e) => {
       try {
         const { code } = JSON.parse((e as MessageEvent).data)
-        if (code) setRemoteCode(code)
+        if (code) {
+          // A fresh code means a brand-new channel (first connect, or a
+          // reconnect after the server dropped us — e.g. a deploy). Either
+          // way any old pairing state is void: a phone that already scanned
+          // the previous QR is now pointed at a dead code and needs to
+          // rescan, so don't leave the UI reading "connected".
+          setRemoteCode(code)
+          setRemoteConn('waiting')
+          setRemoteLostConn(false)
+        }
       } catch {
         /* ignore */
       }
     })
+    es.addEventListener('joined', () => setRemoteConn((c) => (c === 'pressed' ? c : 'joined')))
     es.addEventListener('cmd', (e) => {
       try {
         const { action } = JSON.parse((e as MessageEvent).data)
@@ -301,6 +317,10 @@ export default function PrompterPage() {
         /* ignore */
       }
     })
+    // The browser retries automatically, but silently — without this the
+    // overlay would keep showing a code that's already dead server-side
+    // (e.g. mid-deploy) with no indication anything's wrong.
+    es.onerror = () => setRemoteLostConn(true)
   }, [handleRemoteAction])
 
   // Tear down the channel when leaving the prompter entirely.
@@ -487,7 +507,8 @@ export default function PrompterPage() {
   const remoteOverlay = remoteOpen ? (
     <RemoteOverlay
       code={remoteCode}
-      phoneSeen={remotePhoneSeen}
+      conn={remoteConn}
+      lostConn={remoteLostConn}
       onClose={() => setRemoteOpen(false)}
     />
   ) : null
@@ -542,11 +563,13 @@ export default function PrompterPage() {
 
 function RemoteOverlay({
   code,
-  phoneSeen,
+  conn,
+  lostConn,
   onClose,
 }: {
   code: string | null
-  phoneSeen: boolean
+  conn: 'waiting' | 'joined' | 'pressed'
+  lostConn: boolean
   onClose: () => void
 }) {
   const [qr, setQr] = useState<string>('')
@@ -577,9 +600,27 @@ function RemoteOverlay({
             <p className="text-text font-mono text-sm mb-3">{window.location.host}/r</p>
             <p className="text-xs text-muted mb-1">and enter code</p>
             <p className="font-display text-4xl tracking-[0.3em] text-rainbow mb-4">{code}</p>
-            <div className="flex items-center justify-center gap-2 mb-4">
-              <span className={`h-2.5 w-2.5 rounded-full ${phoneSeen ? 'bg-emerald-400' : 'bg-amber-400'}`} />
-              <span className="text-xs text-muted">{phoneSeen ? 'Phone connected — you can close this' : 'Waiting for a phone…'}</span>
+            <div className="mb-4">
+              <div className="flex items-center justify-center gap-2">
+                <span className={`h-2.5 w-2.5 rounded-full ${
+                  lostConn ? 'bg-urgent animate-pulse'
+                    : conn === 'pressed' ? 'bg-emerald-400'
+                    : conn === 'joined' ? 'bg-sky-400'
+                    : 'bg-amber-400'
+                }`} />
+                <span className="text-xs text-muted">
+                  {lostConn ? 'Reconnecting… if this sticks, close and reopen phone remote'
+                    : conn === 'pressed' ? 'Working — you can close this'
+                    : conn === 'joined' ? 'Phone connected — press a button to confirm'
+                    : 'Waiting for a phone…'}
+                </span>
+              </div>
+              {conn === 'joined' && !lostConn && (
+                <p className="text-[11px] text-muted/70 mt-1">
+                  Your phone reached the prompter. Tap ▶/❚❚ on it now — this dot turns green once a
+                  button actually controls the prompter.
+                </p>
+              )}
             </div>
           </>
         ) : (
