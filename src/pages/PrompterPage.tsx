@@ -1471,7 +1471,13 @@ function Runner({
           togglePlay()
           revealControls()
         }}
-        onMouseMove={revealControls}
+        onMouseMove={() => {
+          // In full screen, any stray cursor twitch was popping the whole
+          // bar up mid-take. Full screen means recording — a deliberate
+          // tap (still reveals it, above) is the only trigger there;
+          // windowed/setup mode keeps the old hover-to-peek behavior.
+          if (!isFs) revealControls()
+        }}
       >
         <div
           className="mx-auto"
@@ -1516,40 +1522,48 @@ function Runner({
       </div>
 
       <div className={`absolute inset-x-0 bottom-0 transition-opacity duration-300 ${showControls ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
-        <div className="mx-auto max-w-3xl m-3 rounded-2xl bg-black/80 backdrop-blur border border-white/10 px-3 py-2.5 text-white">
+        <div className={`mx-auto rounded-2xl bg-black/80 backdrop-blur border border-white/10 text-white transition-[max-width,margin,padding] ${
+          isFs ? 'max-w-md m-2 px-2 py-1.5' : 'max-w-3xl m-3 px-3 py-2.5'
+        }`}>
           <div className="flex items-center justify-between gap-2">
-            <button onClick={handleExit} className="text-xs sm:text-sm text-white/70 hover:text-white px-2 py-2">
+            <button onClick={handleExit} className={`text-white/70 hover:text-white ${isFs ? 'text-[11px] px-1.5 py-1.5' : 'text-xs sm:text-sm px-2 py-2'}`}>
               ✕ Exit
             </button>
 
-            <div className="flex items-center gap-1.5 sm:gap-2">
-              <CtrlBtn onClick={() => setSettings({ speed: Math.max(1, settings.speed - 2) })} label="Slower">
+            <div className={`flex items-center ${isFs ? 'gap-1' : 'gap-1.5 sm:gap-2'}`}>
+              <CtrlBtn compact={isFs} onClick={() => setSettings({ speed: Math.max(1, settings.speed - 2) })} label="Slower">
                 −
               </CtrlBtn>
-              <div className="text-center min-w-[52px]">
-                <div className="text-[9px] uppercase tracking-wider text-white/40">Speed</div>
-                <div className="text-sm tabular-nums">{settings.speed}</div>
-              </div>
-              <CtrlBtn onClick={() => setSettings({ speed: Math.min(100, settings.speed + 2) })} label="Faster">
+              {!isFs && (
+                <div className="text-center min-w-[52px]">
+                  <div className="text-[9px] uppercase tracking-wider text-white/40">Speed</div>
+                  <div className="text-sm tabular-nums">{settings.speed}</div>
+                </div>
+              )}
+              <CtrlBtn compact={isFs} onClick={() => setSettings({ speed: Math.min(100, settings.speed + 2) })} label="Faster">
                 +
               </CtrlBtn>
 
               <button
                 onClick={togglePlay}
-                className="mx-1 sm:mx-2 h-14 w-14 rounded-full bg-gradient-to-r from-stage-producing to-stage-mastering text-white text-2xl grid place-items-center shadow-lg"
+                className={`rounded-full bg-gradient-to-r from-stage-producing to-stage-mastering text-white grid place-items-center shadow-lg ${
+                  isFs ? 'mx-1 h-9 w-9 text-base' : 'mx-1 sm:mx-2 h-14 w-14 text-2xl'
+                }`}
                 aria-label={playing ? 'Pause' : 'Play'}
               >
                 {playing ? '❚❚' : '▶'}
               </button>
 
-              <CtrlBtn onClick={() => setSettings({ fontSize: Math.max(20, settings.fontSize - 4) })} label="Smaller">
+              <CtrlBtn compact={isFs} onClick={() => setSettings({ fontSize: Math.max(20, settings.fontSize - 4) })} label="Smaller">
                 A−
               </CtrlBtn>
-              <div className="text-center min-w-[52px]">
-                <div className="text-[9px] uppercase tracking-wider text-white/40">Size</div>
-                <div className="text-sm tabular-nums">{settings.fontSize}</div>
-              </div>
-              <CtrlBtn onClick={() => setSettings({ fontSize: Math.min(160, settings.fontSize + 4) })} label="Bigger">
+              {!isFs && (
+                <div className="text-center min-w-[52px]">
+                  <div className="text-[9px] uppercase tracking-wider text-white/40">Size</div>
+                  <div className="text-sm tabular-nums">{settings.fontSize}</div>
+                </div>
+              )}
+              <CtrlBtn compact={isFs} onClick={() => setSettings({ fontSize: Math.min(160, settings.fontSize + 4) })} label="Bigger">
                 A+
               </CtrlBtn>
             </div>
@@ -1557,7 +1571,7 @@ function Runner({
             <div className="flex items-center gap-1">
               <button
                 onClick={() => jump(-nudgeAmount)}
-                className="text-xs sm:text-sm text-white/70 hover:text-white px-2 py-2"
+                className={`text-white/70 hover:text-white ${isFs ? 'text-[11px] px-1.5 py-1.5' : 'text-xs sm:text-sm px-2 py-2'}`}
                 title="Back a touch — keeps reading, doesn't stop"
                 aria-label="Back a touch"
               >
@@ -1565,50 +1579,59 @@ function Runner({
               </button>
               <button
                 onClick={() => jump(nudgeAmount)}
-                className="text-xs sm:text-sm text-white/70 hover:text-white px-2 py-2"
+                className={`text-white/70 hover:text-white ${isFs ? 'text-[11px] px-1.5 py-1.5' : 'text-xs sm:text-sm px-2 py-2'}`}
                 title="Forward a touch — keeps reading, doesn't stop"
                 aria-label="Forward a touch"
               >
                 fwd ›
               </button>
-              <button onClick={restart} className="text-xs sm:text-sm text-white/70 hover:text-white px-2 py-2" title="Restart">
+              <button onClick={restart} className={`text-white/70 hover:text-white ${isFs ? 'text-[11px] px-1.5 py-1.5' : 'text-xs sm:text-sm px-2 py-2'}`} title="Restart">
                 ↺
               </button>
             </div>
           </div>
 
-          <div className="flex items-center justify-center gap-2 mt-2 flex-wrap">
-            <MiniToggle on={settings.background === 'white'} onClick={() => setSettings({ background: settings.background === 'white' ? 'black' : 'white' })}>
-              {settings.background === 'white' ? '○ White' : '● Black'}
-            </MiniToggle>
-            <MiniToggle on={settings.mirrorX} onClick={() => setSettings({ mirrorX: !settings.mirrorX })}>
-              Mirror ↔
-            </MiniToggle>
-            <MiniToggle on={settings.flipY} onClick={() => setSettings({ flipY: !settings.flipY })}>
-              Flip ↕
-            </MiniToggle>
+          {/* Setup-time toggles — not needed mid-take, hidden in full screen
+              to keep the bar out of the way. Full-screen toggle stays (you
+              still need a way out) alongside the remaining-time clock. */}
+          <div className={`flex items-center justify-center gap-2 flex-wrap ${isFs ? 'mt-1' : 'mt-2'}`}>
+            {!isFs && (
+              <>
+                <MiniToggle on={settings.background === 'white'} onClick={() => setSettings({ background: settings.background === 'white' ? 'black' : 'white' })}>
+                  {settings.background === 'white' ? '○ White' : '● Black'}
+                </MiniToggle>
+                <MiniToggle on={settings.mirrorX} onClick={() => setSettings({ mirrorX: !settings.mirrorX })}>
+                  Mirror ↔
+                </MiniToggle>
+                <MiniToggle on={settings.flipY} onClick={() => setSettings({ flipY: !settings.flipY })}>
+                  Flip ↕
+                </MiniToggle>
+              </>
+            )}
             <button
               onClick={toggleFullscreen}
-              className={`text-[11px] rounded-lg px-2.5 py-1.5 border transition ${
+              className={`rounded-lg border transition ${isFs ? 'text-[10px] px-2 py-1' : 'text-[11px] px-2.5 py-1.5'} ${
                 isFs ? 'border-stage-mastering bg-stage-mastering/20 text-white' : 'border-white/15 text-white/70 hover:text-white'
               }`}
               title="Hide the Mac dock and menu bar"
             >
               {isFs ? '⤢ Exit full screen' : '⤢ Full screen'}
             </button>
-            <button
-              onClick={onOpenRemote}
-              className={`text-[11px] rounded-lg px-2.5 py-1.5 border transition ${
-                remoteActive ? 'border-stage-mastering bg-stage-mastering/20 text-white' : 'border-white/15 text-white/70 hover:text-white'
-              }`}
-              title="Control from a phone"
-            >
-              📱 Phone
-            </button>
-            <span className="text-[11px] text-white/40 tabular-nums px-1">{formatClock(remaining)} left</span>
+            {!isFs && (
+              <button
+                onClick={onOpenRemote}
+                className={`text-[11px] rounded-lg px-2.5 py-1.5 border transition ${
+                  remoteActive ? 'border-stage-mastering bg-stage-mastering/20 text-white' : 'border-white/15 text-white/70 hover:text-white'
+                }`}
+                title="Control from a phone"
+              >
+                📱 Phone
+              </button>
+            )}
+            <span className={`text-white/40 tabular-nums px-1 ${isFs ? 'text-[10px]' : 'text-[11px]'}`}>{formatClock(remaining)} left</span>
           </div>
 
-          {!isTouch && showControls && (
+          {!isTouch && showControls && !isFs && (
             <p className="text-center text-[10px] text-white/30 mt-1.5">
               Space play/pause · ↑↓ speed · ←→ size · M mirror · R restart · F fullscreen · Esc exit
             </p>
@@ -1619,12 +1642,14 @@ function Runner({
   )
 }
 
-function CtrlBtn({ children, onClick, label }: { children: React.ReactNode; onClick: () => void; label: string }) {
+function CtrlBtn({ children, onClick, label, compact }: { children: React.ReactNode; onClick: () => void; label: string; compact?: boolean }) {
   return (
     <button
       onClick={onClick}
       aria-label={label}
-      className="h-11 w-11 rounded-xl bg-white/10 hover:bg-white/20 text-lg grid place-items-center active:scale-95 transition"
+      className={`rounded-xl bg-white/10 hover:bg-white/20 grid place-items-center active:scale-95 transition ${
+        compact ? 'h-8 w-8 text-sm' : 'h-11 w-11 text-lg'
+      }`}
     >
       {children}
     </button>
