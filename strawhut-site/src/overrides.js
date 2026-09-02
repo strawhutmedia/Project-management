@@ -124,7 +124,7 @@ export function pressPurgeExisting(text, publishedAt) {
 // Override via the FROZEN_SHOWS env var (comma-separated slugs).
 export const FROZEN_SHOWS = (process.env.FROZEN_SHOWS
   ? process.env.FROZEN_SHOWS.split(',')
-  : ['brandi-glanville-unfiltered']
+  : ['brandi-glanville-unfiltered', 'string-and-tell']
 ).map((s) => s.trim().toLowerCase()).filter(Boolean);
 
 export const isFrozenShow = (slug) => {

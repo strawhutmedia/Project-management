@@ -2796,3 +2796,117 @@ export async function trackVerticalCrop(frames: Buffer[]): Promise<VerticalTrack
     return { path: [], confident: false }
   }
 }
+
+// ─────────────────────────────────────────────────────────────────────
+// Lead follow-up drafts (Straw Hut Media services sales pipeline)
+// ─────────────────────────────────────────────────────────────────────
+//
+// Drafts ONE personal follow-up email for a captured sales lead. Human
+// reviews/edits in Slate and sends it themselves — this is never
+// auto-sent, and never used on fan lists (server route enforces
+// audience_lead_alerts = true before this is even reachable).
+//
+// House style baked into the system prompt, matching how Straw Hut
+// actually sells (established directly with Ryan):
+//   - Goal of every lead relationship is a monthly retainer, not an
+//     hourly quote. Never lead with or anchor on the studio's hourly
+//     rate.
+//   - Never say "AI" — describe capability as "our team" / "our
+//     process" / "our system."
+//   - The client owns their show — never imply Straw Hut owns their
+//     content; Straw Hut runs/handles/leads the production.
+//   - Warm, specific, short. Reference the actual thing the lead
+//     showed interest in — never generic filler.
+
+const LEAD_FOLLOWUP_SYSTEM = `You write ONE follow-up email to a warm inbound lead for Straw Hut Media,
+an award-winning full-service podcast production company and network (Hollywood,
+founded 2017; partners include Universal, Disney, and Hulu).
+
+This is a REPLY to someone who already showed interest — not a cold pitch. Sound
+like a real person who read their message, not a template.
+
+House rules — follow all of them:
+  - The goal of every lead relationship is a monthly retainer (production, or for
+    studio/network-tier leads, a creative-services engagement) — never quote or
+    anchor on the hourly studio rate. If pricing comes up, describe it as a range
+    scoped to their show, never a fixed number, and offer to scope it on a call.
+  - NEVER use the word "AI" anywhere in the email. If you reference how Straw Hut
+    delivers extras like social content, call it "our in-house production system"
+    or "our team" — never name the underlying technology.
+  - The lead OWNS their show, always. Never write "we own," "we'll own your
+    show," or anything implying Straw Hut takes possession of their content.
+    Straw Hut "runs," "handles," "leads," or "produces" — never "owns" — the
+    client's work.
+  - Reference the SPECIFIC thing this lead is interested in (their trigger word,
+    their notes, what they asked about) — no generic "thanks for your interest in
+    podcasting" filler. If the notes are thin, keep the email short rather than
+    padding with generic claims.
+  - One clear call to action: if a booking link is provided, invite them to grab
+    time directly; if not, ask them to reply with a couple of times that work.
+  - Warm but concise — 120-180 words in the body. Sign off with just a first
+    name (use the sender's name if given, otherwise "The Straw Hut Media team").
+  - No em-dashes if avoidable. Write like a person emailing from their own inbox,
+    not a marketing department.
+
+Output STRICT JSON matching the schema. subject: short, specific, no "Re:" prefix
+unless the notes indicate this is a reply thread. body: plain text with \\n\\n
+between paragraphs, no HTML, no signature block beyond the sign-off name.`
+
+const LEAD_FOLLOWUP_SCHEMA = {
+  type: 'object',
+  additionalProperties: false,
+  required: ['subject', 'body'],
+  properties: {
+    subject: { type: 'string' },
+    body: { type: 'string' },
+  },
+}
+
+export type LeadFollowupInput = {
+  leadName: string | null
+  leadEmail: string
+  leadHandle: string | null
+  triggerWord: string | null
+  source: string
+  capturedAt: string
+  notes: string | null          // free-form context the sender typed in
+  bookingUrl: string | null
+  senderName: string | null     // the Slate user sending this, for sign-off
+  projectName: string           // which list/show this lead came in on
+}
+
+export type LeadFollowupResult = {
+  subject: string
+  body: string
+  usage: { inputTokens: number; outputTokens: number }
+}
+
+export async function generateLeadFollowup(input: LeadFollowupInput): Promise<LeadFollowupResult> {
+  const lines: string[] = []
+  lines.push(`LEAD: ${input.leadName ?? '(name unknown)'} <${input.leadEmail}>`)
+  if (input.leadHandle) lines.push(`Social handle: ${input.leadHandle}`)
+  lines.push(`Came in via: ${input.source}${input.triggerWord ? ` (trigger word: "${input.triggerWord}")` : ''}`)
+  lines.push(`On list: ${input.projectName}`)
+  lines.push(`Captured: ${input.capturedAt}`)
+  if (input.notes?.trim()) lines.push(`\nCONTEXT FROM OUR TEAM (use this — it's the most important input):\n${input.notes.trim()}`)
+  else lines.push(`\nNo additional context was provided — write from the trigger word / source alone, and keep it short.`)
+  if (input.bookingUrl) lines.push(`\nBooking link to offer: ${input.bookingUrl}`)
+  if (input.senderName) lines.push(`\nSign the email from: ${input.senderName}`)
+  lines.push('\nWrite the follow-up email now.')
+
+  const response = await client.messages.create({
+    model: MODEL,
+    max_tokens: 1200,
+    system: LEAD_FOLLOWUP_SYSTEM,
+    messages: [{ role: 'user', content: lines.join('\n') }],
+    output_config: { format: { type: 'json_schema', schema: LEAD_FOLLOWUP_SCHEMA } },
+  })
+  const block = response.content.find((b) => b.type === 'text')
+  if (!block || block.type !== 'text') throw new Error('lead_followup: claude returned no text block')
+  const parsed = JSON.parse(block.text) as { subject: string; body: string }
+  return {
+    subject: parsed.subject,
+    body: parsed.body,
+    usage: { inputTokens: response.usage.input_tokens, outputTokens: response.usage.output_tokens },
+  }
+}

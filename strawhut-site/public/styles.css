@@ -16,7 +16,8 @@
 }
 
 * { box-sizing: border-box; }
-html { scroll-behavior: smooth; }
+/* No global smooth-scroll: it makes trackpad scrolling feel glitchy on long,
+   heavy pages. Removed for scroll performance. */
 body {
   margin: 0;
   font-family: 'Poppins', system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
@@ -39,8 +40,10 @@ main { overflow-x: clip; }
 /* Header */
 .site-header {
   position: sticky; top: 0; z-index: 50;
-  background: rgba(18, 24, 47, 0.82);
-  backdrop-filter: blur(12px);
+  /* Was rgba(...,0.82) + backdrop-filter: blur(12px). The blur re-composited
+     every scroll frame (jank). Dropped the blur and raised opacity so the bar
+     reads the same without the per-frame repaint. */
+  background: rgba(18, 24, 47, 0.95);
   border-bottom: 1px solid var(--border);
 }
 .site-header .container {
@@ -131,7 +134,7 @@ main { overflow-x: clip; }
 
 /* Moving cover-art marquee */
 .marquee { overflow: hidden; padding: 14px 0 6px; -webkit-mask-image: linear-gradient(90deg, transparent, #000 6%, #000 94%, transparent); mask-image: linear-gradient(90deg, transparent, #000 6%, #000 94%, transparent); }
-.marquee-track { display: flex; gap: 18px; width: max-content; animation: marquee-scroll 150s linear infinite; }
+.marquee-track { display: flex; gap: 18px; width: max-content; animation: marquee-scroll 150s linear infinite; will-change: transform; }
 /* Second row scrolls the opposite way — its own keyframe so nothing in the
    `animation` shorthand can reset the direction. */
 .marquee-track.reverse { animation-name: marquee-scroll-rev; }
@@ -181,46 +184,27 @@ main { overflow-x: clip; }
 /* Producer Selections — an organic, staggered cover-art collage rather than a
    uniform grid. Sizes and vertical offsets vary by position so it reads as a
    curated wall, the way the brand presents its slate. */
+/* One tidy, centred grid of equal square covers at every width — the clean
+   look that already worked on mobile, now used on desktop too. No staggered
+   offsets, no random double-width tiles: a curated wall reads as deliberate
+   only when it's even. flex-wrap + justify-content:center means a short final
+   row centres itself instead of leaving a hole, whatever the show count. */
 .selections {
-  display: grid; grid-template-columns: repeat(8, 1fr); gap: 18px;
-  align-items: center; padding: 6px 0 10px;
-  /* The phone spans 2x2 and would otherwise leave a hole in the flow; dense
-     packing lets later tiles backfill it. */
-  grid-auto-flow: dense;
+  --sel-cols: 6; --sel-gap: 16px;
+  display: flex; flex-wrap: wrap; justify-content: center; align-items: flex-start;
+  gap: var(--sel-gap); padding: 6px 0 10px;
 }
-.sel-item { border-radius: 16px; overflow: hidden; box-shadow: var(--shadow); transition: transform 0.25s, box-shadow 0.25s; }
+.sel-item {
+  flex: 0 0 calc((100% - (var(--sel-cols) - 1) * var(--sel-gap)) / var(--sel-cols) - 0.02px);
+  border-radius: 16px; overflow: hidden; box-shadow: var(--shadow);
+  transition: transform 0.25s, box-shadow 0.25s;
+}
 .sel-item img { width: 100%; aspect-ratio: 1/1; object-fit: cover; display: block; }
 .sel-item:hover { transform: translateY(-8px) scale(1.04); box-shadow: 0 18px 40px rgba(0,0,0,0.5); z-index: 2; }
-/* Stagger: alternate columns ride higher/lower, and a few tiles run larger. */
-.sel-item:nth-child(4n+1) { transform: translateY(26px); }
-.sel-item:nth-child(4n+3) { transform: translateY(-22px); }
-.sel-item:nth-child(6n+2) { grid-column: span 2; }
-.sel-item:nth-child(4n+1):hover,
-.sel-item:nth-child(4n+3):hover { transform: translateY(-8px) scale(1.04); }
-/* Below desktop the staggered wall stops reading as "curated" and just looks
-   broken — mismatched sizes on stacked rows. Drop the offsets AND the
-   double-width tiles so it becomes a tidy, uniform grid of square covers. */
-/* Stacked layouts use flex-wrap rather than a grid: the cover count rarely
-   divides evenly by the column count, and a grid leaves the shortfall as an
-   empty hole on the right of the last row (it reads as missing shows). Wrapping
-   + centring puts the short row in the middle, where it looks deliberate, and
-   it stays correct whatever the show count is. */
-@media (max-width: 900px) {
-  .selections {
-    --sel-cols: 4; --sel-gap: 12px;
-    display: flex; flex-wrap: wrap; justify-content: center;
-    gap: var(--sel-gap); align-items: flex-start;
-  }
-  .sel-item,
-  .sel-item:nth-child(4n+1),
-  .sel-item:nth-child(4n+3) { transform: none; }
-  .sel-item { flex: 0 0 calc((100% - (var(--sel-cols) - 1) * var(--sel-gap)) / var(--sel-cols) - 0.02px); }
-  .ph-wrap { flex: 0 0 100%; }
-}
-@media (max-width: 560px) {
-  .selections { --sel-cols: 3; --sel-gap: 10px; }
-  .sel-item { border-radius: 12px; }
-}
+/* The phone is a centred "now playing" feature band between the rows of covers. */
+.ph-wrap { flex: 0 0 100%; display: flex; align-items: center; justify-content: center; margin: 8px 0; }
+@media (max-width: 900px) { .selections { --sel-cols: 4; --sel-gap: 12px; } }
+@media (max-width: 560px) { .selections { --sel-cols: 3; --sel-gap: 10px; } .sel-item { border-radius: 12px; } }
 /* The wall is a taste of the network, not the catalogue — the full list sits
    directly below it. 24 covers makes a good collage on a desktop but eight rows
    of scrolling on a phone before the visitor reaches anything useful. Two rows
@@ -290,6 +274,15 @@ main { overflow-x: clip; }
   position: absolute; inset: 0; width: 100%; height: 100%; z-index: 0;
   object-fit: cover; filter: blur(40px) saturate(1.75) brightness(0.52); transform: scale(1.35);
 }
+/* Ambient life: the blurred cover slowly drifts + breathes so the featured
+   band feels alive without pulling focus. GPU transform only; motion-safe. */
+@media (prefers-reduced-motion: no-preference) {
+  .fbanner-slide.active .fb-bg { animation: fb-drift 30s ease-in-out infinite alternate; will-change: transform; }
+}
+@keyframes fb-drift {
+  from { transform: scale(1.35) translate3d(0, 0, 0); }
+  to   { transform: scale(1.52) translate3d(-2.5%, -2%, 0); }
+}
 .fb-art .fb-main {
   position: relative; z-index: 2; width: 100%; aspect-ratio: 1 / 1;
   object-fit: contain; object-position: center;
@@ -300,6 +293,9 @@ main { overflow-x: clip; }
 .fb-host { color: var(--accent); font-weight: 600; margin-bottom: 14px; }
 .fb-info p { color: rgba(255, 255, 255, 0.86); margin: 0 0 22px; max-width: 520px; }
 .fb-info .btn { align-self: flex-start; }
+/* Fun metallic hook shown beside the cover on phones only — desktop's second
+   column already fills the space, so it's hidden there. */
+.fb-kicker { display: none; }
 .fbanner-dots { display: flex; gap: 9px; justify-content: center; margin-top: 18px; }
 .fdot { width: 9px; height: 9px; border-radius: 999px; border: 0; padding: 0; background: var(--border); cursor: pointer; transition: background 0.2s, transform 0.2s; }
 .fdot.active { background: var(--accent); transform: scale(1.25); }
@@ -323,14 +319,29 @@ main { overflow-x: clip; }
   }
   /* position:static hands the blurred layer's containing block up to the slide,
      so it fills the whole band instead of sitting inside the art box. */
-  .fb-art { position: static; aspect-ratio: auto; width: auto; margin: 0 0 22px; display: block; }
+  /* Cover + fun metallic hook sit side by side, filling the band's width so
+     the blurred field isn't just empty space to the right of the art. */
+  .fb-art { position: static; aspect-ratio: auto; width: auto; margin: 0 0 22px;
+    display: flex; align-items: center; gap: 18px; }
   .fb-art .fb-bg {
     position: absolute; inset: 0; width: 100%; height: 100%; z-index: 0;
     filter: blur(40px) saturate(1.8) brightness(0.55); transform: scale(1.4);
   }
   .fb-art .fb-main {
-    position: relative; z-index: 2; width: 168px; height: 168px;
+    position: relative; z-index: 2; flex: 0 0 168px; width: 168px; height: 168px; margin: 0;
     border-radius: 14px; box-shadow: 0 18px 44px rgba(0, 0, 0, 0.55);
+  }
+  .fb-kicker {
+    display: flex; flex-direction: column; justify-content: center; gap: 9px;
+    position: relative; z-index: 2; flex: 1 1 auto; min-width: 0;
+  }
+  .fb-kicker-line {
+    font-weight: 700; font-size: 1.32rem; line-height: 1.12; letter-spacing: 0.005em;
+    /* Brushed-gold metallic: light sheen → brand gold → deep gold. */
+    background: linear-gradient(104deg, #fbe9ab 0%, #f2cf72 26%, #d59b1e 52%, #f4d585 72%, #b07d12 100%);
+    -webkit-background-clip: text; background-clip: text;
+    -webkit-text-fill-color: transparent; color: transparent;
+    filter: drop-shadow(0 1px 1px rgba(0,0,0,0.45));
   }
   /* Directional depth, the same trick the impact band uses, but neutral so it
      darkens for legibility without imposing a hue on the artwork. */
@@ -360,6 +371,136 @@ main { overflow-x: clip; }
 .impact-copy h2 { font-size: clamp(1.6rem, 3.4vw, 2.5rem); margin: 0 0 12px; line-height: 1.08; }
 .impact-copy p { color: #c6d6cf; margin: 0; font-size: 1.05rem; }
 .impact-cta { display: flex; flex-direction: column; gap: 12px; min-width: 220px; }
+
+/* Before / After Straw Hut — pinned-scroll comparison (Manychat-style).
+   The two columns share a grid row; with the default `stretch`, the shorter
+   "After" cell grows to the full height of the taller "Before" list, giving the
+   sticky card inside it room to travel. Pure CSS — no scroll-jacking. */
+.ba-grid {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 26px;
+  align-items: stretch;
+}
+.ba-col { min-width: 0; }                /* never let a long line push past the edge */
+.ba-col-head { margin: 0 0 16px; }
+.ba-tag {
+  display: inline-block; padding: 7px 16px; border-radius: 999px;
+  font-weight: 700; font-size: 0.82rem; letter-spacing: 0.04em; text-transform: uppercase;
+  background: var(--card-2); color: var(--muted); border: 1px solid var(--border);
+}
+.ba-tag-on { background: var(--accent); color: var(--accent-ink); border-color: transparent; }
+.ba-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 16px; }
+.ba-list li {
+  display: flex; align-items: center; gap: 14px; min-width: 0;
+  padding: 22px; border-radius: 16px; line-height: 1.4; font-size: 1.05rem; font-weight: 500;
+}
+.ba-mark {
+  flex: 0 0 auto; width: 30px; height: 30px; border-radius: 999px;
+  display: inline-flex; align-items: center; justify-content: center;
+  font-weight: 800; font-size: 0.95rem;
+}
+/* Before: dim + grim. The extra min-height makes this column tall, which is
+   what creates the scroll distance the sticky "After" card pins against. */
+.ba-before .ba-list li {
+  background: var(--card); border: 1px solid var(--border); color: var(--muted); min-height: 116px;
+}
+.ba-x { background: rgba(255,128,128,0.14); color: #ff8f8f; }
+/* After: bright, on-brand, and pinned. */
+.ba-after-card {
+  position: sticky; top: 92px;
+  background: linear-gradient(150deg, rgba(0,204,142,0.16), rgba(0,204,142,0.05) 55%, rgba(213,155,30,0.09));
+  border: 1px solid rgba(0,204,142,0.45); border-radius: 22px; padding: 26px 24px 28px; box-shadow: var(--shadow);
+}
+.ba-after-card .ba-list li {
+  background: rgba(0,204,142,0.08); border: 1px solid rgba(0,204,142,0.22); color: var(--text);
+}
+.ba-check { background: rgba(0,204,142,0.2); color: var(--accent); }
+.ba-cta { margin-top: 22px; }
+
+/* --- Scroll-triggered animation --------------------------------------------
+   A vertical accent line draws down through the green checks, the checks pop
+   in as it passes, each row slides up on a stagger, and the heading underline
+   draws in from the left. All states are gated behind `.ba-anim`, which the
+   section's own script adds only when motion is allowed — so with JS off or
+   reduced-motion on, everything renders fully and statically. */
+.ba-after-card .ba-list { position: relative; }
+.ba-after-card .ba-list li { position: relative; z-index: 1; }
+/* The drawing line — runs through the check-circle centres. */
+.ba-line {
+  position: absolute; z-index: 0; left: 37px; top: 30px; bottom: 30px; width: 2px;
+  border-radius: 2px; background: linear-gradient(180deg, var(--accent), rgba(0,204,142,0.15));
+  box-shadow: 0 0 10px rgba(0,204,142,0.6);   /* the line glows as it draws */
+  transform-origin: top center;   /* base (no JS): fully drawn */
+}
+/* Scroll-linked: JS sets scaleY (fill) and opacity (fade) from the section's
+   scroll progress each frame. The line draws down lighting each check, and once
+   all are lit it fades away, leaving the filled checks. Reverses on scroll-up.
+   The tiny linear transitions just smooth between rAF samples. */
+.ba-anim .ba-line { transform: scaleY(0); transition: transform 0.12s linear, opacity 0.2s linear; }
+/* Rows rise + fade. */
+.ba-anim .ba-list li { opacity: 0; transform: translateY(16px);
+  transition: opacity 0.5s ease, transform 0.55s cubic-bezier(0.22,0.61,0.36,1); }
+.ba-anim.ba-in .ba-list li { opacity: 1; transform: none; }
+/* Before ✕ marks pop in with a little overshoot on entry. (After checks are
+   handled by the scroll line below — they light up as it reaches them.) */
+.ba-anim .ba-before .ba-mark { opacity: 0; transform: scale(0.3);
+  transition: opacity 0.3s ease, transform 0.5s cubic-bezier(0.34,1.56,0.64,1); }
+.ba-anim.ba-in .ba-before .ba-mark { opacity: 1; transform: scale(1); }
+/* After checks: dim until the scroll line reaches them, then they fill in.
+   Gated behind .ba-anim, so with JS off / reduced-motion they render lit. */
+.ba-anim .ba-after-card .ba-check {
+  background: rgba(255,255,255,0.05); color: rgba(210,255,238,0.4);
+  border: 1px solid rgba(0,204,142,0.16);
+  transition: background-color 0.28s ease, color 0.28s ease, border-color 0.28s ease, transform 0.28s ease, box-shadow 0.28s ease;
+  transition-delay: 0s !important;
+}
+.ba-anim .ba-after-card .ba-check.ba-lit {
+  background: rgba(0,204,142,0.22); color: var(--accent);
+  border-color: rgba(0,204,142,0.4); transform: scale(1.1);
+  box-shadow: 0 0 0 5px rgba(0,204,142,0.10), 0 0 18px rgba(0,204,142,0.55);   /* flare on when the line reaches it */
+}
+/* Per-row stagger (applies to the row and its mark together). */
+.ba-anim.ba-in .ba-list li:nth-of-type(1), .ba-anim.ba-in .ba-list li:nth-of-type(1) .ba-mark { transition-delay: 0.05s; }
+.ba-anim.ba-in .ba-list li:nth-of-type(2), .ba-anim.ba-in .ba-list li:nth-of-type(2) .ba-mark { transition-delay: 0.12s; }
+.ba-anim.ba-in .ba-list li:nth-of-type(3), .ba-anim.ba-in .ba-list li:nth-of-type(3) .ba-mark { transition-delay: 0.19s; }
+.ba-anim.ba-in .ba-list li:nth-of-type(4), .ba-anim.ba-in .ba-list li:nth-of-type(4) .ba-mark { transition-delay: 0.26s; }
+.ba-anim.ba-in .ba-list li:nth-of-type(5), .ba-anim.ba-in .ba-list li:nth-of-type(5) .ba-mark { transition-delay: 0.33s; }
+.ba-anim.ba-in .ba-list li:nth-of-type(6), .ba-anim.ba-in .ba-list li:nth-of-type(6) .ba-mark { transition-delay: 0.40s; }
+/* CTA fades up last. */
+.ba-anim .ba-cta { opacity: 0; transform: translateY(10px); transition: opacity 0.4s ease, transform 0.4s ease; }
+.ba-anim.ba-in .ba-cta { opacity: 1; transform: none; transition-delay: 0.5s; }
+/* Heading underline draws in from the left. */
+.ba-anim .section-head h2::after { transform: scaleX(0); transform-origin: left center; transition: transform 0.7s ease 0.1s; }
+.ba-anim.ba-in .section-head h2::after { transform: scaleX(1); }
+@media (prefers-reduced-motion: reduce) {
+  .ba-anim .ba-list li, .ba-anim .ba-mark, .ba-anim .ba-cta { opacity: 1 !important; transform: none !important; }
+  .ba-anim .ba-line { transform: scaleY(1) !important; }
+  .ba-anim .section-head h2::after { transform: scaleX(1) !important; }
+}
+
+/* Phones: KEEP the two-column sticky pin (that's the whole effect Ryan loves),
+   just tuned compact so two cards fit a narrow screen. The "After" card still
+   pins while the taller "Before" column scrolls past it. */
+@media (max-width: 760px) {
+  .ba-grid { grid-template-columns: 1fr 1fr; gap: 10px; }
+  .ba-col-head { margin-bottom: 12px; }
+  .ba-tag { padding: 6px 11px; font-size: 0.66rem; letter-spacing: 0.02em; }
+  .ba-after-card { top: 74px; padding: 14px 12px 16px; border-radius: 16px; }
+  .ba-list { gap: 9px; }
+  .ba-list li {
+    align-items: flex-start; gap: 9px; padding: 12px 11px;
+    font-size: 0.82rem; line-height: 1.32; border-radius: 12px; min-width: 0;
+  }
+  .ba-mark { width: 22px; height: 22px; font-size: 0.72rem; }
+  /* Line runs through the smaller mark centres on phones. */
+  .ba-line { left: 22px; top: 22px; bottom: 22px; }
+  /* The pin is only visible for as far as the After card can travel inside its
+     cell (cell height − card height). Keep the Before column much taller than
+     the After card so the card stays locked for most of a screen as you scroll
+     — that long hold is the whole Manychat effect. Centre the text so the tall
+     cards read as deliberate, not padded-out. */
+  .ba-before .ba-list li { min-height: 172px; align-items: center; }
+  .ba-cta { margin-top: 14px; width: 100%; text-align: center; padding: 12px 10px; font-size: 0.82rem; }
+}
 
 /* Service page — hero cover-art collage */
 .svc-hero-art { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
@@ -880,6 +1021,23 @@ table.admin-table { width: 100%; border-collapse: collapse; }
 .cta-band p { margin: 0 auto 18px; color: var(--muted); max-width: 520px; line-height: 1.55; }
 .svc-card:hover { border-color: var(--accent); }
 
+/* Eyebrow kicker (course + landing heros) */
+.eyebrow { color: var(--accent); font-weight: 700; letter-spacing: 0.09em; text-transform: uppercase; font-size: 0.78rem; margin-bottom: 12px; }
+
+/* Course hero media (the poster/video frame) */
+.course-hero-media { border-radius: 18px; overflow: hidden; border: 1px solid var(--border); box-shadow: var(--shadow); background: var(--card); align-self: center; min-width: 0; }
+.course-hero-media img { display: block; width: 100%; height: auto; }
+
+/* Testimonial cards */
+.tgrid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px; }
+.tcard { background: var(--card); border: 1px solid var(--border); border-radius: 16px; padding: 24px 24px 20px; box-shadow: var(--shadow); display: flex; flex-direction: column; min-width: 0; }
+.tcard .tmark { color: var(--accent); font-size: 2.2rem; line-height: 0.6; font-weight: 800; margin-bottom: 8px; }
+.tcard .tquote { margin: 0 0 16px; font-size: 1.02rem; line-height: 1.6; color: var(--text); }
+.tcard .twho { display: flex; flex-direction: column; gap: 2px; margin-top: auto; }
+.tcard .tname { font-weight: 700; }
+.tcard .trole { color: var(--muted); font-size: 0.88rem; line-height: 1.4; }
+@media (max-width: 760px) { .tgrid { grid-template-columns: 1fr; } }
+
 /* Footer columns */
 .footer-cols { display: grid; grid-template-columns: repeat(3, 1fr); gap: 30px; margin-bottom: 26px; }
 .footer-col { display: flex; flex-direction: column; gap: 9px; }
@@ -899,21 +1057,38 @@ table.admin-table { width: 100%; border-collapse: collapse; }
   .nav {
     position: absolute; top: 100%; left: 0; right: 0;
     flex-direction: column; align-items: stretch; gap: 0;
-    background: rgba(18, 24, 47, 0.98); backdrop-filter: blur(12px);
+    /* Distinct elevated panel: lighter than the page navy, with a teal accent
+       line and a drop shadow so the open menu clearly floats above the content
+       instead of blending into the background. Opaque — no backdrop-filter,
+       which hurts scroll performance. */
+    background: linear-gradient(180deg, #232c4e 0%, #1a2140 100%);
+    border-top: 2px solid var(--accent);
     border-bottom: 1px solid var(--border);
+    box-shadow: 0 26px 44px rgba(0, 0, 0, 0.5);
     max-height: 0; overflow: hidden; transition: max-height 0.28s ease;
   }
-  .nav.open { max-height: 60vh; }
-  .nav a { padding: 15px 6vw; border-top: 1px solid var(--border); font-size: 1.02rem; }
+  .nav.open { max-height: 75vh; }
+  .nav a {
+    padding: 16px 6vw; border-top: 1px solid rgba(255, 255, 255, 0.07);
+    font-size: 1.05rem; position: relative;
+    transition: background 0.15s, color 0.15s, box-shadow 0.15s;
+  }
   .nav a:first-child { border-top: none; }
+  .nav a:hover, .nav a:active, .nav a.active {
+    background: rgba(0, 204, 142, 0.12); color: var(--text);
+    box-shadow: inset 4px 0 0 var(--accent);
+  }
   /* On mobile the Promote CTA reads as a normal nav row like the rest, not a
      standout green button (which was easy to miss). */
   .nav a.nav-cta {
     background: transparent; color: var(--muted); font-weight: 500;
-    margin: 0; padding: 15px 6vw; border-radius: 0; border-top: 1px solid var(--border);
-    text-align: left; font-size: 1.02rem;
+    margin: 0; padding: 16px 6vw; border-radius: 0; border-top: 1px solid rgba(255, 255, 255, 0.07);
+    text-align: left; font-size: 1.05rem;
   }
-  .nav a.nav-cta:hover, .nav a.nav-cta:active { background: transparent; color: var(--text); transform: none; }
+  .nav a.nav-cta:hover, .nav a.nav-cta:active {
+    background: rgba(0, 204, 142, 0.12); color: var(--text); transform: none;
+    box-shadow: inset 4px 0 0 var(--accent);
+  }
   /* 2-up cover art on mobile instead of one giant image per row */
   .grid { grid-template-columns: repeat(2, 1fr); gap: 12px; }
   .show-card h3 { font-size: 0.92rem; }
@@ -934,7 +1109,7 @@ table.admin-table { width: 100%; border-collapse: collapse; }
 /* Cookie consent bar — fixed to the bottom, above everything, dismissible. */
 .consent-bar {
   position: fixed; left: 0; right: 0; bottom: 0; z-index: 200;
-  background: rgba(18, 24, 47, 0.97); backdrop-filter: blur(12px);
+  background: rgba(18, 24, 47, 0.97); /* opaque; no backdrop-filter (scroll perf) */
   border-top: 1px solid var(--border); box-shadow: 0 -10px 30px rgba(0,0,0,0.35);
   padding: 16px 0;
 }
@@ -982,13 +1157,20 @@ table.admin-table { width: 100%; border-collapse: collapse; }
 .ph-chrome { display: flex; align-items: center; justify-content: space-between; color: var(--muted); font-size: 0.62rem; padding: 0 2px 2px; }
 .ph-chev { font-size: 0.9rem; line-height: 1; }
 .ph-slides { position: relative; }
-/* Each slide stacks in the same cell so the phone never changes height. */
-.ph-slide { grid-area: 1 / 1; display: flex; flex-direction: column; opacity: 0; transition: opacity 0.6s; }
-.ph-slides { display: grid; }
+/* Each slide stacks in the same cell so the phone never changes height.
+   grid-template-columns: minmax(0,1fr) + min-width:0 keep the stacking column
+   from expanding to fit the nowrap show-title label — without them that label
+   blew the column (and the cover art) past the phone frame, clipping the art
+   on the right. */
+.ph-slide { grid-area: 1 / 1; min-width: 0; display: flex; flex-direction: column; opacity: 0; transition: opacity 0.6s; }
+.ph-slides { display: grid; grid-template-columns: minmax(0, 1fr); }
 .ph-slide.active { opacity: 1; }
 .ph-show { color: var(--muted); font-size: 0.5rem; text-transform: uppercase; letter-spacing: 0.08em;
   text-align: center; margin-bottom: 7px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
-.ph-slide img { width: 100%; aspect-ratio: 1/1; object-fit: cover; border-radius: 8px; }
+/* Never crop cover art. Square covers fill the frame; the few landscape
+   covers letterbox cleanly against the phone's screen colour instead of
+   having their sides sliced off. */
+.ph-slide img { width: 100%; aspect-ratio: 1/1; object-fit: contain; background: #0b0e17; border-radius: 8px; }
 .ph-title { color: #fff; font-size: 0.62rem; font-weight: 700; margin-top: 9px; line-height: 1.2;
   display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 .ph-sub { color: var(--muted); font-size: 0.53rem; margin-top: 2px; }

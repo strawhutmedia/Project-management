@@ -13,22 +13,29 @@ import { addShowFromFeed, syncShow, syncAll, startScheduler } from './sync.js';
 import * as V from './views.js';
 import * as A from './admin_views.js';
 import { robotsTxt, sitemapXml, llmsTxt } from './seo.js';
-import { sendAnnouncement, mailConfigured, sendContactEmail, sendContactAutoReply, sendTrafficDigest } from './mail.js';
+import { sendAnnouncement, mailConfigured, bulkMailConfigured, sendContactEmail, sendContactAutoReply, sendTrafficDigest } from './mail.js';
+import { sesConfigured, sesAccountStatus } from './mailSes.js';
+import { handleSnsMessage, deliverabilityStats } from './sesEvents.js';
+import { buildIssue, sendToSubscribers, sendTestToOwner, maybeSendNewsletterDraft, setSchedule, getSchedule, runScheduledSend } from './newsletter.js';
 import { importFromSite } from './importer.js';
-import { writeLandingCopy, generateLandingCopy, fallbackLandingCopy, aiConfigured, generateShowMetaDescription, generateShowBlurb, generateEpisodeEnrichment } from './ai.js';
+import { writeLandingCopy, generateLandingCopy, fallbackLandingCopy, aiConfigured, generateShowMetaDescription, generateShowBlurb, generateShowTagline, generateEpisodeEnrichment } from './ai.js';
 import { POSTS, getPost } from './content/resources.js';
 import { SERVICE_PAGES, getServicePage } from './content/services.js';
 import * as reco from './recommend.js';
 import { matchAllShows, matchShowVideos } from './youtube.js';
 import { refreshPress } from './press.js';
 import { applyMonthlyRotation } from './spotlight.js';
-import { applyPopularSpotlight, megaphoneConfigured } from './popularity.js';
+import { applyPopularSpotlight, megaphoneConfigured, wickedStats, showMegaphoneStats } from './popularity.js';
+import { wickedYoutubeStats } from './youtube.js';
 import { resolveArtwork, imageWidth, MIN_ACCEPTABLE } from './artwork.js';
 import { inspect as inspectSubmission } from './antispam.js';
 import { verifyTurnstile, turnstileConfigured } from './turnstile.js';
 import { ghlConfigured, verifyGhl, upsertContact, ghlLastError,
          resolveBookingCalendar, ghlBookingState, probeGhlToken, ghlProbeState } from './ghl.js';
 import { toText as plainText, endsSentence } from './util.js';
+import { handleLeadHook } from './leadHook.js';
+import { startLeadOps } from './leadOps.js';
+import { startSubscriberSync, syncFromSheet } from './subscribers.js';
 import { ATTR_KEYS } from './tracking.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -44,6 +51,7 @@ const app = express();
 // spoofed by an extra X-Forwarded-For entry) — the form rate limit buckets on it.
 app.set('trust proxy', 1);
 app.use(express.urlencoded({ extended: true }));
+app.use(express.json({ limit: '1mb' })); // for POST /hooks/leads (Gmail sync)
 app.use(cookieParser());
 // Pages carried NO Cache-Control at all, only an ETag. Browsers — Safari
 // especially — then apply heuristic caching and can serve a stale page for
@@ -147,12 +155,38 @@ app.use(async (req, res, next) => {
   }
 });
 
+// ---- Canonical lowercase redirect ------------------------------------------
+// Every real URL on this site is lowercase (slugs run through slugify()). But
+// Express routing is case-insensitive, so /Press is served with a 200 just like
+// /press — which splits our traffic counts across two paths AND hands crawlers
+// duplicate-content URLs. 301 any GET page path that carries an uppercase
+// letter to its lowercase form. Skip file paths (dots) so static asset
+// filenames keep their case; tokens ride in the query string, never the path,
+// and the query is preserved verbatim.
+app.use((req, res, next) => {
+  if (req.method === 'GET' && /[A-Z]/.test(req.path) && !req.path.includes('.')) {
+    const qi = req.originalUrl.indexOf('?');
+    const qs = qi === -1 ? '' : req.originalUrl.slice(qi);
+    return res.redirect(301, req.path.toLowerCase() + qs);
+  }
+  next();
+});
+
 // ---- First-party traffic counting -----------------------------------------
 // Counts real page requests per path, per day, straight into our own Postgres.
 // Aggregate only — no IP, no user agent stored, no cookie — so it needs no
 // consent banner and can't be blocked by tracker blockers. Bots are filtered
 // best-effort so the numbers reflect people.
-const BOT_RE = /bot|crawl|spider|slurp|bingpreview|facebookexternalhit|headless|lighthouse|pingdom|uptime|curl|wget|python-requests|node-fetch|axios|monitor/i;
+//
+// Two layers: (1) a broad deny-list of known crawler / library / automation
+// UA tokens — including AI crawlers, SEO bots, and headless tooling; (2) a
+// positive gate requiring a real browser UA ("Mozilla/"). Every mainstream
+// browser (Chrome, Safari, Firefox, Edge, Samsung, mobile) sends "Mozilla/5.0",
+// while script libraries (Go-http-client, okhttp, urllib, scrapy, empty UAs)
+// do not — so this drops the datacenter scrapers that were inflating counts,
+// without dropping people. NOTE: this is a plain server-side regex literal, not
+// inside a template-literal <script>, so single-backslash escapes are correct.
+const BOT_RE = /bot|crawl|spider|slurp|bingpreview|facebookexternalhit|headless|lighthouse|pingdom|uptime|curl|wget|python-requests|node-fetch|axios|monitor|perplexity|google-extended|externalagent|externalfetcher|dataforseo|scrapy|okhttp|go-http-client|java\/|libwww|httpclient|urllib|httpx|aiohttp|guzzle|webdriver|selenium|puppeteer|playwright|phantomjs|archive\.org|ia_archiver|feedfetcher|feedly|zgrab|masscan|censys|expanse|semrush|ahrefs|petalbot|yandex|baiduspider|sogou/i;
 app.use((req, res, next) => {
   next(); // never delay the response
   try {
@@ -161,7 +195,8 @@ app.use((req, res, next) => {
     if (p.includes('.') || p.startsWith('/admin') || p.startsWith('/public') ||
         p.startsWith('/api') || p === '/healthz' || p === '/robots.txt' ||
         p === '/sitemap.xml' || p === '/llms.txt') return;
-    if (BOT_RE.test(req.headers['user-agent'] || '')) return;
+    const ua = req.headers['user-agent'] || '';
+    if (!/Mozilla\//.test(ua) || BOT_RE.test(ua)) return; // real browsers only
     res.on('finish', () => {
       if (res.statusCode !== 200) return; // only count pages actually served
       store.recordView(p.length > 200 ? p.slice(0, 200) : p).catch(() => {});
@@ -318,6 +353,166 @@ app.get('/admin/analytics', requireAdmin, async (req, res) => {
   const days = Math.min(90, Math.max(1, parseInt(req.query.days || '7', 10)));
   const stats = await store.viewStats(days);
   res.send(A.analyticsPage({ stats, days }));
+});
+
+// --- Newsletter (biweekly) — draft/preview + owner-triggered send ----------
+app.get('/admin/newsletter', requireAdmin, async (req, res) => {
+  const issue = await buildIssue(store).catch(() => null);
+  const subs = await store.listSubscribers();
+  res.send(
+    A.newsletterPage({
+      issue,
+      subscriberCount: subs.length,
+      lastSentAt: await store.getState('newsletter_sent_at'),
+      lastDraftAt: await store.getState('newsletter_draft_at'),
+      mail: mailConfigured(),
+      flash: readFlash(req, res),
+    })
+  );
+});
+// Live HTML preview of the current issue (rendered in an iframe on the admin page).
+app.get('/admin/newsletter/preview', requireAdmin, async (req, res) => {
+  const issue = await buildIssue(store).catch(() => null);
+  res.type('html').send(
+    issue ? issue.html.replace(/\{\{unsubscribe\}\}/g, '#') : '<p style="font-family:sans-serif;padding:24px">No episodes to feature yet.</p>'
+  );
+});
+app.post('/admin/newsletter/test', requireAdmin, async (req, res) => {
+  const r = await sendTestToOwner(store);
+  setFlash(res, r.ok ? { type: 'ok', msg: `Test sent to ${process.env.ADMIN_EMAIL || 'the admin inbox'}.` } : { type: 'err', msg: `Not sent: ${r.reason || r.error || 'unknown'}` });
+  res.redirect('/admin/newsletter');
+});
+app.post('/admin/newsletter/send', requireAdmin, async (req, res) => {
+  // Guard: require an explicit typed confirmation so a stray click can't blast the list.
+  if ((req.body.confirm || '').trim().toUpperCase() !== 'SEND') {
+    setFlash(res, { type: 'err', msg: 'Type SEND to confirm before sending to subscribers.' });
+    return res.redirect('/admin/newsletter');
+  }
+  const r = await sendToSubscribers(store);
+  setFlash(res, r.ok ? { type: 'ok', msg: `Newsletter sent to ${r.sent} subscriber(s).` } : { type: 'err', msg: `Not sent: ${r.reason || 'unknown'}` });
+  res.redirect('/admin/newsletter');
+});
+
+// --- Newsletter service API (token-gated) ----------------------------------
+// Lets the newsletter be run headlessly (list import, one-off issue, scheduled
+// send) without a browser admin session — the automation surface. Auth is a
+// shared secret in NEWSLETTER_SERVICE_TOKEN, sent as `X-Newsletter-Token` or
+// `Authorization: Bearer <token>`. Unset = the whole API is disabled (404-ish).
+function newsletterToken(req, res, next) {
+  const want = process.env.NEWSLETTER_SERVICE_TOKEN || '';
+  if (!want) return res.status(503).json({ ok: false, error: 'newsletter API disabled (no NEWSLETTER_SERVICE_TOKEN)' });
+  const got = (req.get('x-newsletter-token') || (req.get('authorization') || '').replace(/^Bearer\s+/i, '')).trim();
+  const a = Buffer.from(got);
+  const b = Buffer.from(want);
+  if (a.length !== b.length || !crypto.timingSafeEqual(a, b)) {
+    return res.status(401).json({ ok: false, error: 'bad token' });
+  }
+  next();
+}
+
+// SES → SNS bounce/complaint webhook (public — SNS calls it, not a browser).
+// Raw text body: SNS posts Content-Type text/plain, so parse it ourselves.
+app.post('/api/ses/notify', express.text({ type: '*/*', limit: '512kb' }), async (req, res) => {
+  try { await handleSnsMessage(store, req.body); } catch (e) { console.error('[ses] webhook error:', e.message); }
+  res.status(200).end(); // always 200 so SNS doesn't retry-storm
+});
+
+// Health/inventory — confirm transport + list size + live deliverability.
+app.get('/api/newsletter/status', newsletterToken, async (req, res) => {
+  const subs = await store.listSubscribers();
+  const ses = sesConfigured() ? await sesAccountStatus() : null;
+  let paused = null;
+  try { paused = JSON.parse((await store.getState('newsletter_send_paused')) || 'null'); } catch {}
+  res.json({
+    ok: true,
+    subscribers: subs.length,
+    transport: sesConfigured() ? 'ses' : mailConfigured() ? 'resend' : 'none',
+    sesProductionAccess: ses ? ses.productionAccessEnabled : null,
+    sesSendingEnabled: ses ? ses.sendingEnabled : null,
+    sesConfigSet: process.env.SES_CONFIG_SET || null,
+    deliverability: await deliverabilityStats(store),
+    sendPaused: paused,
+    lastSentAt: await store.getState('newsletter_sent_at'),
+  });
+});
+
+// Bulk-import subscribers. Body: { contacts: [{email, name?}] }. Idempotent —
+// addSubscriber upserts by email. Returns how many are on the list afterward.
+app.post('/api/newsletter/import', newsletterToken, async (req, res) => {
+  const contacts = Array.isArray(req.body?.contacts) ? req.body.contacts : [];
+  if (!contacts.length) return res.status(400).json({ ok: false, error: 'no contacts' });
+  let imported = 0, skipped = 0;
+  for (const c of contacts) {
+    const email = String(c?.email || '').trim().toLowerCase();
+    if (!email || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) { skipped++; continue; }
+    try { await store.addSubscriber(email, String(c?.name || c?.first_name || '').trim()); imported++; }
+    catch { skipped++; }
+  }
+  const subs = await store.listSubscribers();
+  res.json({ ok: true, imported, skipped, total: subs.length });
+});
+
+// Queue a hand-approved issue to send at a set time. Body:
+// { sendAt (ISO), subject, issueFile (name in /newsletter-issues), key?, text? }.
+app.post('/api/newsletter/schedule', newsletterToken, async (req, res) => {
+  const { sendAt, subject, issueFile, key, text } = req.body || {};
+  const r = await setSchedule(store, { sendAt, subject, issueFile, key, text });
+  res.status(r.ok ? 200 : 400).json(r);
+});
+app.get('/api/newsletter/schedule', newsletterToken, async (req, res) => {
+  res.json({ ok: true, schedule: await getSchedule(store) });
+});
+
+// Remove addresses from the list (list hygiene — junk/bot/typo cleanup).
+// Body: { emails: [..] }. Returns how many were removed + new total.
+app.post('/api/newsletter/prune', newsletterToken, async (req, res) => {
+  const emails = (Array.isArray(req.body?.emails) ? req.body.emails : []).map((e) => String(e).trim().toLowerCase()).filter(Boolean);
+  if (!emails.length) return res.status(400).json({ ok: false, error: 'no emails' });
+  const set = new Set(emails);
+  const subs = await store.listSubscribers();
+  let removed = 0;
+  for (const s of subs) {
+    if (set.has(String(s.email).toLowerCase())) { await store.removeSubscriber(s.id); removed++; }
+  }
+  const after = await store.listSubscribers();
+  res.json({ ok: true, removed, total: after.length });
+});
+
+// Trigger a Google-Sheet → list sync on demand (also runs hourly on its own).
+app.post('/api/newsletter/sync-sheet', newsletterToken, async (req, res) => {
+  const r = await syncFromSheet(store, req.body?.url);
+  const subs = await store.listSubscribers();
+  res.status(r.ok ? 200 : 400).json({ ...r, total: subs.length });
+});
+
+// Send an issue to the whole list. Body: { subject, html, text?, key }.
+// `key` makes it idempotent — a retry (or a double-fired schedule) with the same
+// key never sends twice. This is the endpoint the scheduled send hits.
+app.post('/api/newsletter/dispatch', newsletterToken, async (req, res) => {
+  const { subject, html, text, key } = req.body || {};
+  if (!subject || !html) return res.status(400).json({ ok: false, error: 'subject and html required' });
+  if (!bulkMailConfigured()) return res.status(503).json({ ok: false, error: 'no bulk transport (set SES_FROM + AWS creds)' });
+  const dedupeKey = String(key || '').trim();
+  if (dedupeKey) {
+    const prior = await store.getState(`nl_dispatch_${dedupeKey}`);
+    if (prior) return res.json({ ok: true, alreadySent: true, at: prior });
+  }
+  const subs = await store.listSubscribers();
+  if (!subs.length) return res.status(400).json({ ok: false, error: 'no subscribers' });
+  // Refuse a real blast while SES is still sandboxed — it would only reach
+  // verified addresses and silently drop everyone else. Caller should retry
+  // once production access is granted. `?allowSandbox=1` overrides for testing.
+  if (sesConfigured() && req.query.allowSandbox !== '1') {
+    const st = await sesAccountStatus();
+    if (st.ok && !st.productionAccessEnabled) {
+      return res.status(409).json({ ok: false, sandbox: true, error: 'SES still in sandbox — production access not yet granted' });
+    }
+  }
+  // Mark BEFORE sending so a slow send that overlaps a retry can't double-blast.
+  if (dedupeKey) await store.setState(`nl_dispatch_${dedupeKey}`, new Date().toISOString());
+  const r = await sendAnnouncement(subs, { subject, html, text });
+  await store.setState('newsletter_sent_at', new Date().toISOString());
+  res.json({ ok: true, recipients: subs.length, ...r });
 });
 
 app.get('/admin/shows', requireAdmin, async (req, res) => {
@@ -763,6 +958,56 @@ app.get('/healthz', async (req, res) => {
   });
 });
 
+// Read-only Wicked download numbers pulled straight from Megaphone, server-side
+// (so the API token never leaves the server). Feeds the standalone Wicked
+// performance dashboard so it can be refreshed with real figures instead of
+// hardcoded ones. Aggregate numbers only — the same figures we publish in the
+// public case study. Cached 6h so it can't be used to hammer the Megaphone API.
+let _wickedCache = null;
+app.get('/diag/wicked.json', async (req, res) => {
+  try {
+    if (!_wickedCache || Date.now() - _wickedCache.at > 6 * 3600 * 1000) {
+      const [megaphone, youtube] = await Promise.all([
+        wickedStats({ log: (m) => console.log('[wicked]', m) }),
+        wickedYoutubeStats().catch((e) => ({ configured: true, error: e.message })),
+      ]);
+      _wickedCache = { at: Date.now(), data: { megaphone, youtube } };
+    }
+    res.json({ ok: true, cachedAt: new Date(_wickedCache.at).toISOString(), ...(_wickedCache.data || {}) });
+  } catch (e) {
+    res.status(500).json({ ok: false, error: e.message });
+  }
+});
+
+// Generalized version of /diag/wicked.json for ANY show — used to pull real
+// numbers for the case studies (Seen on the Screen, Soul & Science, …).
+//   ?show=<substring of the Megaphone podcast title>   (required)
+//   ?playlist=<youtube playlist id>                     (optional, adds YT views)
+// Aggregate, read-only, cached 6h per query.
+const _showStatsCache = new Map();
+app.get('/diag/showstats.json', async (req, res) => {
+  const show = String(req.query.show || '').trim();
+  const playlist = String(req.query.playlist || '').trim();
+  if (!show) return res.status(400).json({ ok: false, error: 'pass ?show=<title substring>' });
+  const key = `${show}::${playlist}`;
+  try {
+    const cached = _showStatsCache.get(key);
+    if (!cached || Date.now() - cached.at > 6 * 3600 * 1000) {
+      const [megaphone, youtube] = await Promise.all([
+        showMegaphoneStats({ match: show, log: (m) => console.log('[showstats]', m) }),
+        playlist
+          ? wickedYoutubeStats({ playlistId: playlist }).catch((e) => ({ configured: true, error: e.message }))
+          : Promise.resolve({ skipped: 'no ?playlist provided' }),
+      ]);
+      _showStatsCache.set(key, { at: Date.now(), data: { show, playlist: playlist || null, megaphone, youtube } });
+    }
+    const hit = _showStatsCache.get(key);
+    res.json({ ok: true, cachedAt: new Date(hit.at).toISOString(), ...hit.data });
+  } catch (e) {
+    res.status(500).json({ ok: false, error: e.message });
+  }
+});
+
 // Which shows exist here — used by Podbooster to decide whether to offer the
 // "send ads to Straw Hut Media" option for a campaign. Titles and slugs only,
 // no counts or internals. Cached by the caller; cheap enough to serve openly.
@@ -819,6 +1064,7 @@ app.get('/studio', (req, res) => res.send(V.studioPage()));
 // We have one studio — the old LA landing page is consolidated into /studio.
 app.get('/podcast-studio-los-angeles', (req, res) => res.redirect(301, '/studio'));
 app.get('/services', (req, res) => res.send(V.servicesHubPage()));
+app.get('/podcast-primer', (req, res) => res.send(V.coursePage()));
 // The old static page lived at /services/ with the quote quiz at
 // /services/embed.html. Both are gone. Express's non-strict routing already
 // serves /services/ from the route above; the embed page needs a redirect.
@@ -837,6 +1083,10 @@ app.get('/pricing', (req, res) => res.send(V.pricingPage()));
 
 const canBook = () => Boolean(ghlBookingState().url);
 app.get('/contact', (req, res) => res.send(V.contactPage({ canBook: canBook() })));
+// Inbound lead capture: the Gmail Apps Script POSTs Outbound Labs / Appointlet
+// booking emails here (token-protected); we parse + upsert them into GHL.
+app.post('/hooks/leads', (req, res) => handleLeadHook(req, res, store));
+
 app.post('/contact', async (req, res) => {
   const { name = '', email = '', company = '', message = '', topic = 'general' } = req.body || {};
   const values = { name, email, company, message, topic };
@@ -907,6 +1157,8 @@ app.get('/press', async (req, res) => {
 });
 
 // ---- Resources (guides / blog) --------------------------------------------
+app.get('/case-studies', (req, res) =>
+  res.send(V.caseStudiesIndexPage({ studies: POSTS.filter((p) => p.category === 'Case Study') })));
 app.get('/resources', (req, res) => res.send(V.resourcesIndexPage({ posts: POSTS })));
 app.get('/resources/:slug', (req, res, next) => {
   const post = getPost(req.params.slug);
@@ -1318,6 +1570,29 @@ async function backfillShowSeo() {
   console.log(`[seo] meta descriptions written for ${done}/${missing.length} shows`);
 }
 
+// Short, non-cheesy taglines shown beside the featured cover art. Featured
+// shows are generated first so the mobile spotlight populates quickly. Paced,
+// once per boot, no-ops without ANTHROPIC_API_KEY. Set SHOW_TAGLINE=off to skip.
+async function backfillShowTaglines() {
+  if (process.env.SHOW_TAGLINE === 'off' || !aiConfigured()) return;
+  const shows = await store.listShows();
+  const missing = shows.filter((s) => !s.tagline);
+  if (!missing.length) return;
+  missing.sort((a, b) => (b.featured ? 1 : 0) - (a.featured ? 1 : 0));
+  console.log(`[tagline] writing taglines for ${missing.length} show(s)…`);
+  let done = 0;
+  for (const show of missing) {
+    try {
+      const text = await generateShowTagline({ show, log: (m) => console.log('[tagline]', m) });
+      if (text) { await store.updateShow(show.id, { tagline: text }); done++; }
+    } catch (e) {
+      console.error('[tagline] show', show.slug, 'failed:', e.message);
+    }
+    await new Promise((r) => setTimeout(r, 900)); // gentle pacing
+  }
+  console.log(`[tagline] taglines written for ${done}/${missing.length} shows`);
+}
+
 app.listen(PORT, async () => {
   console.log(`[strawhut-site] listening on :${PORT}`);
   console.log(`[strawhut-site] admin at /admin (password via ADMIN_PASSWORD env)`);
@@ -1404,10 +1679,33 @@ app.listen(PORT, async () => {
   setInterval(() => maybeSendTrafficDigest().catch(() => {}), 60 * 60 * 1000);
   maybeSendTrafficDigest().catch(() => {});
 
+  // Biweekly newsletter — checked every 6h, emails the OWNER a fresh draft on
+  // the cadence (never subscribers). Owner reviews + sends from /admin/newsletter.
+  setInterval(() => maybeSendNewsletterDraft(store).catch(() => {}), 6 * 60 * 60 * 1000);
+  maybeSendNewsletterDraft(store).catch((e) => console.error('[newsletter]', e.message));
+
+  // Fire any queued scheduled issue when due (every 3 min). Self-guards on time,
+  // dedupe key, and SES production access; holds quietly until all are satisfied.
+  const tickScheduled = () =>
+    runScheduledSend(store)
+      .then((r) => { if (r.ok) console.log(`[newsletter] scheduled send: ${r.sent} sent, ${r.failed} failed via ${r.transport}`); })
+      .catch((e) => console.error('[newsletter] scheduled send error:', e.message));
+  setInterval(tickScheduled, 3 * 60 * 1000);
+  setTimeout(tickScheduled, 20 * 1000);
+
   // Backfill unique, AI-written SEO meta descriptions for shows that don't have
   // one yet. Runs once per boot in the background, paced to be gentle on the
   // API; no-ops entirely if ANTHROPIC_API_KEY isn't set. Set SHOW_SEO=off to skip.
-  backfillShowSeo()
+  // Pre-call prep + follow-up drafts, driven off booked calls (server-side, so
+  // it runs without any chat session). Inert unless RESEND + ANTHROPIC keys set.
+  startLeadOps(store);
+
+  // Keep the newsletter list current from the owner's Google Sheet (published
+  // as CSV) — hourly upsert, never deletes. Inert without NEWSLETTER_SHEET_CSV_URL.
+  startSubscriberSync(store);
+
+  backfillShowTaglines()
+    .then(() => backfillShowSeo())
     .then(() => backfillShowBlurbs())
     .then(() => warmEpisodeEnrichment())
     .catch((e) => console.error('[seo] show backfill failed:', e.message));

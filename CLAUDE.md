@@ -112,6 +112,17 @@ Only `strawhutmedia.net` is verified in Resend today — a fan-facing address
 on another domain (e.g. `@strawhutmedia.com` or a per-show domain) requires
 verifying that domain in Resend first.
 
+**One deliberate exception: lead follow-ups.** For lists flagged
+`audience_lead_alerts` (sales pipelines, never fan lists — enforced
+server-side in `server/routes/audience.ts`), Claude drafts a personal
+follow-up per captured lead; a human adds context, edits, and sends it
+themselves — nothing auto-sends. The send uses a human display name +
+`Reply-To: <sender's own email>` so replies land in Caroline/Ryan's real
+inbox, not Slate. House style is baked into the prompt in `anthropic.ts`
+(`generateLeadFollowup`): retainer-first, never quote the hourly studio rate,
+never say "AI," the client always owns their show — Straw Hut runs/leads it,
+never "owns" it.
+
 ## Permissions
 
 - **Admin** (currently Ryan only): invite/remove users, delete projects/songs,

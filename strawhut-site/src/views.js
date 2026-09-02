@@ -383,6 +383,7 @@ function footerBlock() {
       <div class="footer-col">
         <div class="footer-h">Explore</div>
         <a href="/about">About</a>
+        <a href="/case-studies">Case Studies</a>
         <a href="/shows">All Shows</a>
         <a href="/resources">Guides &amp; Resources</a>
         <a href="/resources#faq">Podcasting FAQ</a>
@@ -391,8 +392,8 @@ function footerBlock() {
       </div>
       <div class="footer-col">
         <div class="footer-h">Get started</div>
-        <a href="/book">Book a 15-min fit call</a>
-        <a href="/pricing">Packages &amp; pricing</a>
+        <a href="/book">Book a 15-min call</a>
+        <a href="/podcast-primer">Free podcasting course</a>
       </div>
     </div>
     ${recentList}
@@ -537,6 +538,92 @@ function curateRow(pool, pinnedSlugs, count = 4) {
   return picked.slice(0, count);
 }
 
+// Before / After Straw Hut — a pinned-scroll comparison (Manychat-style).
+// The "After" panel is position:sticky so it stays in view while the taller
+// "Before" column scrolls past on desktop. Pure CSS — no scroll-jacking, no JS.
+// On phones (<=760px) it degrades to a simple vertical stack (see .ba-* CSS).
+const BEFORE_AFTER = {
+  before: [
+    "Recording in a closet, praying the audio's usable",
+    'Editing all weekend instead of running your business',
+    'Guessing at what your audience actually wants',
+    'Episodes that drop whenever you finally get to them',
+    'No clue whether any of it is actually working',
+    'A show nobody can find',
+  ],
+  after: [
+    'Show up, talk, walk out — we handle the rest',
+    'Recorded, edited, and polished — publish-ready',
+    'Episodes ship on schedule, every time',
+    'Distributed, promoted, actually growing',
+  ],
+};
+
+export function beforeAfterSection() {
+  const beforeItems = BEFORE_AFTER.before
+    .map((t) => `<li><span class="ba-mark ba-x" aria-hidden="true">✕</span><span>${esc(t)}</span></li>`)
+    .join('');
+  const afterItems = BEFORE_AFTER.after
+    .map((t) => `<li><span class="ba-mark ba-check" aria-hidden="true">✓</span><span>${esc(t)}</span></li>`)
+    .join('');
+  return `<section class="section ba-section" id="before-after"><div class="container">
+    <div class="section-head"><h2>Doing it alone vs. doing it with us</h2></div>
+    <div class="ba-grid">
+      <div class="ba-col ba-before">
+        <div class="ba-col-head"><span class="ba-tag">Before Straw Hut</span></div>
+        <ul class="ba-list">${beforeItems}</ul>
+      </div>
+      <div class="ba-col ba-after-col">
+        <div class="ba-after-card">
+          <div class="ba-col-head"><span class="ba-tag ba-tag-on">After Straw Hut</span></div>
+          <ul class="ba-list"><span class="ba-line" aria-hidden="true"></span>${afterItems}</ul>
+          <a class="btn btn-primary ba-cta" href="/book">Book a 15-min call →</a>
+        </div>
+      </div>
+    </div>
+  </div>
+  <script>(function(){
+    var s=document.getElementById('before-after');if(!s)return;
+    if(window.matchMedia&&window.matchMedia('(prefers-reduced-motion: reduce)').matches)return;
+    s.classList.add('ba-anim');
+    var line=s.querySelector('.ba-line');
+    // Reveal the rows/checks/underline once when the section first enters.
+    function go(){s.classList.add('ba-in');}
+    var vh0=window.innerHeight||document.documentElement.clientHeight;
+    if(s.getBoundingClientRect().top<vh0*0.85){go();}
+    else if('IntersectionObserver'in window){
+      var io=new IntersectionObserver(function(en){en.forEach(function(e){if(e.isIntersecting){go();io.disconnect();}});},{threshold:0,rootMargin:'0px 0px -12% 0px'});
+      io.observe(s);
+    }else{go();}
+    // Scroll-linked draw: the line fills down as you scroll, lighting each
+    // check as it reaches it; once all are lit (progress ~0.8) the line fades
+    // out over the last stretch. Everything reverses when you scroll back up.
+    var checks=s.querySelectorAll('.ba-after-card .ba-check');
+    var ticking=false;
+    function update(){
+      ticking=false;
+      var r=s.getBoundingClientRect();
+      var vh=window.innerHeight||document.documentElement.clientHeight;
+      if(r.bottom<-60||r.top>vh+60)return; /* skip work when far off-screen */
+      var total=r.height-vh;
+      var p=total>0?(-r.top)/total:(vh-r.top)/(vh+r.height);
+      p=p<0?0:(p>1?1:p);
+      var fill=p/0.8; if(fill>1)fill=1;             /* line fully drawn by 80% through */
+      var op=(1-p)/0.2; if(op<0)op=0; if(op>1)op=1; /* then fades out over the last 20% */
+      if(line){line.style.transform='scaleY('+fill+')';line.style.opacity=op;}
+      for(var i=0;i<checks.length;i++){
+        if(fill>=(i+0.5)/checks.length)checks[i].classList.add('ba-lit');
+        else checks[i].classList.remove('ba-lit');
+      }
+    }
+    function onScroll(){if(!ticking){ticking=true;requestAnimationFrame(update);}}
+    window.addEventListener('scroll',onScroll,{passive:true});
+    window.addEventListener('resize',onScroll,{passive:true});
+    update();
+  })();</script>
+  </section>`;
+}
+
 export function homePage({ shows }) {
   const featured = shows.filter((s) => s.featured);
   const originals = shows.filter((s) => (s.show_type || 'original') !== 'partnered');
@@ -569,6 +656,10 @@ export function homePage({ shows }) {
           s.image_url
             ? `<img class="fb-bg" src="${esc(s.image_url)}" alt="" aria-hidden="true" loading="lazy"><img class="fb-main" src="${esc(s.image_url)}" alt="${esc(s.title)}" loading="lazy">`
             : artOrPlaceholder(s.image_url, s.title)
+        }${
+          s.tagline
+            ? `<div class="fb-kicker"><span class="fb-kicker-line">${esc(s.tagline)}</span></div>`
+            : ''
         }</div>
         <div class="fb-info">
           <h3>${esc(s.title)}</h3>
@@ -636,15 +727,17 @@ export function homePage({ shows }) {
       </div>
       <div class="impact-cta">
         <a class="btn btn-primary" href="/podcast-production">Start your podcast →</a>
-        <a class="btn btn-ghost" href="/book">Book a 15-min fit call</a>
+        <a class="btn btn-ghost" href="/book">Book a 15-min call</a>
       </div>
     </div>
   </div></section>
 
+  ${beforeAfterSection()}
+
   ${
     partners.length
       ? `<section class="section" id="partnered"><div class="container">
-    <div class="section-head"><h2>Partner Shows</h2><a class="count" href="/shows#partner">View all ${partners.length} →</a></div>
+    <div class="section-head"><h2>Branded Shows</h2><a class="count" href="/shows#partner">View all ${partners.length} →</a></div>
     <div class="grid grid-4">${cards(partnerPicks)}</div>
   </div></section>`
       : ''
@@ -735,7 +828,7 @@ export function showsIndexPage({ shows }) {
   </div></section>`
       : ''
   }
-  ${shows.length ? section('original', 'Original Shows', originals) + section('partner', 'Partner Shows', partners) : `<section class="section"><div class="container"><div class="empty">No shows yet.</div></div></section>`}`;
+  ${shows.length ? section('original', 'Original Shows', originals) + section('partner', 'Branded Shows', partners) : `<section class="section"><div class="container"><div class="empty">No shows yet.</div></div></section>`}`;
   return layout({
     title: 'All Shows — Straw Hut Media',
     description: `Browse all ${shows.length} podcasts in the Straw Hut Media network — award-winning original shows and partner podcasts across comedy, true crime, culture, business, and film, produced and distributed by our Hollywood podcast agency.`,
@@ -756,13 +849,17 @@ export function showsIndexPage({ shows }) {
 
 // Shared visible-FAQ block (used by resource posts + service pages). Renders the
 // same <details> pattern as the homepage FAQ so styling is consistent.
+// Turn bare URLs in already-escaped text into links (esc() runs first, so the
+// text carries no live HTML — safe to inject anchors after).
+const linkifyUrls = (s) =>
+  String(s).replace(/(https?:\/\/[^\s<]+[^\s<.,;:!?)])/g, '<a href="$1">$1</a>');
 function faqSection(pairs, heading = 'Frequently asked questions') {
   if (!pairs || !pairs.length) return '';
   return `<section class="section" id="faq"><div class="container">
     <div class="section-head"><h2>${esc(heading)}</h2></div>
     <div class="faq-list">
       ${pairs
-        .map(([q, a]) => `<details class="faq-item"><summary>${esc(q)}</summary><p>${esc(a)}</p></details>`)
+        .map(([q, a]) => `<details class="faq-item"><summary>${esc(q)}</summary><p>${linkifyUrls(esc(a))}</p></details>`)
         .join('')}
     </div>
   </div></section>`;
@@ -784,6 +881,7 @@ export function resourcesIndexPage({ posts }) {
     <div class="breadcrumb" style="padding:0 0 14px"><a href="/">Home</a> / Resources</div>
     <h1>Podcasting <span class="accent">guides &amp; resources</span></h1>
     <p>Straight-talking guides to starting, producing, growing, and monetizing a podcast — written by the team at Straw Hut Media. No fluff, no filler.</p>
+    <p style="background:rgba(0,204,142,0.10);border:1px solid rgba(0,204,142,0.35);border-radius:12px;padding:14px 16px;margin:14px 0 0;max-width:640px">🎧 <strong>New to podcasting?</strong> Start with our <a href="/podcast-primer" style="color:var(--accent);font-weight:700;text-decoration:underline">free podcasting course</a> — the whole process, walked through step by step. <a href="/podcast-primer" style="color:var(--accent);font-weight:700;text-decoration:none;white-space:nowrap">See the course →</a></p>
   </div></section>
   <section class="section" style="padding-top:8px"><div class="container">
     <div class="resource-grid">${cards}</div>
@@ -792,13 +890,13 @@ export function resourcesIndexPage({ posts }) {
     <div class="section-head"><h2>Podcasting questions, answered</h2></div>
     <div class="faq-list">
       ${FAQ.map(
-        ([q, a]) => `<details class="faq-item"><summary>${esc(q)}</summary><p>${esc(a)}</p></details>`
+        ([q, a]) => `<details class="faq-item"><summary>${esc(q)}</summary><p>${linkifyUrls(esc(a))}</p></details>`
       ).join('')}
     </div>
     <div class="cta-band" style="margin-top:34px">
       <h2>Ready to make your podcast?</h2>
       <p>We take shows from first idea to chart-topping — production, distribution, and growth under one roof.</p>
-      <a class="btn btn-primary" href="/book">Book a 15-min fit call →</a>
+      <a class="btn btn-primary" href="/book">Book a 15-min call →</a>
     </div>
   </div></section>`;
   return layout({
@@ -815,6 +913,62 @@ export function resourcesIndexPage({ posts }) {
       ]) +
       '\n' +
       faqJsonLd(),
+  });
+}
+
+export function caseStudiesIndexPage({ studies }) {
+  const cards = studies
+    .map(
+      (p) => `<a class="resource-card" href="/resources/${esc(p.slug)}">
+      <span class="resource-cat">Case Study</span>
+      <h3>${esc(p.title.replace(/^Case Study:\s*/i, ''))}</h3>
+      <p>${esc(p.description)}</p>
+      <span class="resource-more">Read the case study <span class="accent">→</span></span>
+    </a>`
+    )
+    .join('');
+  const itemList =
+    '<script type="application/ld+json">' +
+    JSON.stringify({
+      '@context': 'https://schema.org',
+      '@type': 'ItemList',
+      name: 'Straw Hut Media podcast case studies',
+      itemListElement: studies.map((p, i) => ({
+        '@type': 'ListItem',
+        position: i + 1,
+        url: canonical('/resources/' + p.slug),
+        name: p.title,
+      })),
+    }) +
+    '</script>';
+  const body = `
+  <section class="hero" style="padding-bottom:14px"><div class="container">
+    <div class="breadcrumb" style="padding:0 0 14px"><a href="/">Home</a> / Case Studies</div>
+    <h1>Case <span class="accent">studies</span></h1>
+    <p>Real shows we built, and the numbers to prove it — from an 11.7M-reach studio launch, to a film podcast with 12M+ YouTube views, to a marketing show that turns its guests into clients.</p>
+  </div></section>
+  <section class="section" style="padding-top:8px"><div class="container">
+    <div class="resource-grid">${cards}</div>
+    <div class="cta-band" style="margin-top:34px">
+      <h2>Want results like these?</h2>
+      <p>We take shows from first idea to chart-topping — production, distribution, and growth under one roof.</p>
+      <a class="btn btn-primary" href="/book">Book a 15-min call →</a>
+    </div>
+  </div></section>`;
+  return layout({
+    title: 'Podcast Case Studies — Straw Hut Media',
+    description:
+      'Real results from shows Straw Hut Media produced — Wicked: The Official Podcast (11.7M reach in 11 weeks), Seen on the Screen (12M+ YouTube views), and Soul & Science. Proof of full-service podcast production that performs.',
+    body,
+    activeNav: '/case-studies',
+    path: '/case-studies',
+    jsonLd:
+      breadcrumbJsonLd([
+        { name: 'Home', path: '/' },
+        { name: 'Case Studies', path: '/case-studies' },
+      ]) +
+      '\n' +
+      itemList,
   });
 }
 
@@ -843,7 +997,7 @@ export function resourcePostPage({ post, related = [] }) {
       <div class="cta-band">
         <h2>Want this done for you?</h2>
         <p>Straw Hut Media is a full-service podcast production company and network. Book a quick call and we'll map out exactly what your show takes.</p>
-        <a class="btn btn-primary" href="/book">Book a 15-min fit call →</a>
+        <a class="btn btn-primary" href="/book">Book a 15-min call →</a>
       </div>
     </div>
   </article>
@@ -873,7 +1027,11 @@ export function resourcePostPage({ post, related = [] }) {
 
 // --- Per-service landing pages ---------------------------------------------
 
-const STUDIO_SHOTS = ['CA6A0788', 'CA6A0790', 'CA6A0794', 'CA6A0798', 'CA6A0800', 'CA6A0803'].map(
+// Sales-page studio strip — warm, inviting room shots only. The ceiling
+// lighting-rig shot (CA6A0800) reads as a hardware close-up, fine on /studio
+// but off-brand on a service landing page, so it's swapped for the cozy
+// lounge (CA6A0799).
+const STUDIO_SHOTS = ['CA6A0788', 'CA6A0790', 'CA6A0794', 'CA6A0798', 'CA6A0799', 'CA6A0803'].map(
   (n) => `/public/studio/${n}.jpg`
 );
 
@@ -958,6 +1116,8 @@ export function servicePage(cfg, { shows = [] } = {}) {
     </div></section>`
     )
     .join('');
+  // Before/After comparison — only on the podcast-production page.
+  const beforeAfter = cfg.slug === 'podcast-production' ? beforeAfterSection() : '';
   const body = `
   <section class="hero"><div class="container hero-inner">
     <div class="hero-copy">
@@ -978,6 +1138,7 @@ export function servicePage(cfg, { shows = [] } = {}) {
   </div></section>`
       : ''
   }
+  ${beforeAfter}
   ${marquee}
   ${sections}
   ${studioStrip}
@@ -1054,7 +1215,7 @@ export function aboutPage() {
     <h1>Think outside the <span class="accent">pod</span>.</h1>
     <p>We're Straw Hut Media — an award-winning podcast production company and network, founded in Hollywood in 2017 and making podcasts since 2018.</p>
     <p>Anyone can hit record. Turning that into a show people won't stop listening to is the part we've spent years getting very good at.</p>
-    <div style="margin-top:22px"><a class="btn btn-primary" href="/book">Book a 15-min fit call</a> <a class="btn btn-ghost" href="/shows" style="margin-left:8px">Hear our shows</a></div>
+    <div style="margin-top:22px"><a class="btn btn-primary" href="/book">Book a 15-min call</a> <a class="btn btn-ghost" href="/shows" style="margin-left:8px">Hear our shows</a></div>
   </div></section>
 
   <section class="section clients-band" id="clients"><div class="container">
@@ -1067,7 +1228,7 @@ export function aboutPage() {
   <section class="section"><div class="container"><div class="cta-band">
     <h2>Let's make something people love</h2>
     <p>From first idea to chart-topping show — production, distribution, and growth under one roof.</p>
-    <a class="btn btn-primary" href="/book">Book a 15-min fit call →</a>
+    <a class="btn btn-primary" href="/book">Book a 15-min call →</a>
   </div></div></section>`;
   const personLd = TEAM.map((m) =>
     `<script type="application/ld+json">${JSON.stringify({
@@ -1096,7 +1257,7 @@ export function aboutPage() {
   });
 }
 
-// --- Book a call (GoHighLevel-backed 15-min fit call) -----------------------
+// --- Book a call (GoHighLevel-backed 15-min call) -----------------------
 
 export function bookPage({ widgetUrl = '' } = {}) {
   // Scheduling lives in GoHighLevel so every booking is a CRM event that can
@@ -1181,7 +1342,7 @@ const SERVICE_LINES = [
   {
     name: 'Network distribution',
     href: '/shows',
-    text: 'Join a network of award-winning originals and partner shows. Published and optimized across Apple Podcasts, Spotify, YouTube, and everywhere else people listen.',
+    text: 'Join a network of award-winning originals and branded shows. Published and optimized across Apple Podcasts, Spotify, YouTube, and everywhere else people listen.',
     serviceType: 'Podcast distribution',
   },
   {
@@ -1234,8 +1395,7 @@ export function servicesHubPage() {
     <h1>Everything a podcast needs, <span class="accent">under one roof</span></h1>
     <p>Straw Hut Media is a full-service podcast production company and network based in Hollywood. We build shows from the idea up, distribute them, sell the ads that pay for them, and rent the studio they are recorded in — and you can use any one piece of that on its own.</p>
     <div style="margin-top:22px">
-      <a class="btn btn-primary" href="/book">Book a 15-min fit call →</a>
-      <a class="btn btn-ghost" href="/pricing" style="margin-left:8px">See packages &amp; pricing</a>
+      <a class="btn btn-primary" href="/book">Book a 15-min call →</a>
     </div>
   </div></section>
 
@@ -1267,7 +1427,7 @@ export function servicesHubPage() {
   <section class="section"><div class="container"><div class="cta-band">
     <h2>Not sure which piece you need?</h2>
     <p>That is exactly what the call is for. Fifteen minutes, an honest answer, no obligation.</p>
-    <a class="btn btn-primary" href="/book">Book a 15-min fit call →</a>
+    <a class="btn btn-primary" href="/book">Book a 15-min call →</a>
   </div></div></section>`;
 
   const itemList = `<script type="application/ld+json">${JSON.stringify({
@@ -1990,6 +2150,134 @@ export function episodePage({ show, episode, moreFromShow = [], related = [], ad
         { name: 'Home', path: '/' },
         { name: show.title, path: '/' + show.slug },
         { name: episode.title, path: `/${show.slug}/${episode.slug}` },
+      ]),
+  });
+}
+
+// --- Podcast Primer course (sales page on our own site) --------------------
+// A site-quality landing page for the "Podcast Primer Pro" course.
+// Enrollment link = the GHL client-portal offer on its WORKING default domain
+// (podcastprimer.app.clientclub.net). The pretty course.strawhutmedia.com is
+// not connected as a custom domain in GHL yet, so it 404s; the clientclub.net
+// default serves the same offer. Swap to course.strawhutmedia.com/offers/... if
+// the custom domain is later connected in GHL's Client Portal settings.
+const COURSE_OFFER_URL = 'https://podcastprimer.app.clientclub.net/offers/888909af-7dc5-4cfa-8e85-fe7c6f8813df';
+
+export function coursePage() {
+  const included = [
+    { name: 'Recording & gear', text: 'Exactly what equipment to use and how to sound professional from day one — all covered in the course.' },
+    { name: 'Editing & engineering', text: 'Edit, mix, and master so every episode sounds clean and polished.' },
+    { name: 'Publish everywhere', text: 'Get live on Apple Podcasts, Spotify, and every major platform, the right way.' },
+    { name: 'Video podcasting', text: 'Film and publish the video version of your show, not just the audio.' },
+    { name: 'A month of social — done for you', text: 'We write and post a full month of your social content so your launch has momentum.' },
+    { name: 'Community & the Straw Hut team', text: 'Direct access to our team in a private community while you build your show.' },
+  ];
+  const testimonials = [
+    { name: 'Jason Harris', role: 'CEO, Mekanism', quote: 'Attracted new partnerships, drove exponential business growth, and became an industry leader in marketing strategy — through podcasting.' },
+    { name: 'Lisane Basquiat', role: 'CEO, Shaping Freedom · King Pleasure', quote: 'Launched her podcast and attracted thousands of loyal listeners within two weeks.' },
+    { name: 'Phil Rosenthal', role: 'Creator, Everybody Loves Raymond · Host, Somebody Feed Phil', quote: 'Used podcasting to connect intimately with fans and deepen his position in entertainment.' },
+    { name: 'Brandi Glanville', role: 'The Real Housewives of Beverly Hills', quote: 'Expanded her reach far beyond the Bravo universe and engaged her fans on a whole new level.' },
+  ];
+  const faq = [
+    ['Do you go over video podcasts?', 'Yes — video podcasting is fully covered, from filming your show to publishing the video version alongside the audio.'],
+    ['Will I learn how to publish a podcast?', 'Yes. We walk you through publishing to all the major platforms — Apple Podcasts, Spotify, and the rest.'],
+    ['What kind of things does the course cover?', 'All of it: scheduling and booking, writing, engineering, recording, choosing the right equipment, editing, distribution, and even marketing.'],
+    ['What is the best equipment to use?', "That's all covered inside the course — the exact gear and how to use it."],
+    ['Is there a community?', 'Yes. The course comes with access to a private community where you can talk directly with the Straw Hut team.'],
+  ];
+
+  // Trusted-by strip — reuse the same client marks as the rest of the site.
+  const trusted = CLIENTS.filter((c) => c.logo);
+  const trustedStrip = trusted.length
+    ? `<section class="section clients-band"><div class="container">
+      <p class="trusted-eyebrow" style="color:#5a6270">Trusted by the teams behind</p>
+      <div class="logo-wall">${trusted
+        .map((c) => `<span class="logo-item${c.tall ? ' tall' : ''}${c.mid ? ' mid' : ''}"><img src="${esc(c.logo)}" alt="${esc(c.name)}" loading="lazy"></span>`)
+        .join('')}</div>
+    </div></section>`
+    : '';
+
+  const includedHtml = included
+    .map((h) => `<div class="inc-item"><span class="inc-check">✓</span><div><h3>${esc(h.name)}</h3><p>${esc(h.text)}</p></div></div>`)
+    .join('');
+
+  const testimonialsHtml = testimonials
+    .map(
+      (t) => `<figure class="tcard">
+        <div class="tmark" aria-hidden="true">&ldquo;</div>
+        <blockquote class="tquote">${esc(t.quote)}</blockquote>
+        <figcaption class="twho"><span class="tname">${esc(t.name)}</span><span class="trole">${esc(t.role)}</span></figcaption>
+      </figure>`
+    )
+    .join('');
+
+  const body = `
+  <section class="hero"><div class="container hero-inner">
+    <div class="hero-copy">
+      <div class="breadcrumb" style="padding:0 0 12px"><a href="/">Home</a> / Podcast Primer</div>
+      <div class="eyebrow">Podcast Primer Pro</div>
+      <h1>Done-with-you podcast creation — taught by the team behind the shows</h1>
+      <p>Learn to plan, record, edit, publish, and grow your podcast, with Straw Hut Media's CEO Ryan Tillotson walking you through every step — plus your first month of social content written and posted for you.</p>
+      <div class="hero-cta">
+        <a class="btn btn-primary" href="${esc(COURSE_OFFER_URL)}" data-shm="course_cta_hero">Get the free course</a>
+        <a class="btn btn-ghost" href="/shows">Hear our shows</a>
+      </div>
+    </div>
+    <div class="course-hero-media"><img src="/public/img/primer-poster.webp" alt="Ryan Tillotson recording a podcast in the Straw Hut Media studio" width="1200" height="675" loading="eager"></div>
+  </div></section>
+  ${trustedStrip}
+  <section class="section"><div class="container">
+    <div class="section-head"><h2>What's inside the course</h2></div>
+    <div class="inc-grid">${includedHtml}</div>
+  </div></section>
+  <section class="section"><div class="container">
+    <div class="section-head"><h2>The results speak for themselves</h2></div>
+    <div class="tgrid">${testimonialsHtml}</div>
+  </div></section>
+  <section class="section"><div class="container"><div class="cta-band">
+    <h2>Automate your content. Free up your time.</h2>
+    <p>Let us take care of your social media schedule, so you can focus on growing your business — and your show.</p>
+    <a class="btn btn-primary" href="${esc(COURSE_OFFER_URL)}" data-shm="course_cta_mid">Get the free course →</a>
+  </div></div></section>
+  ${faqSection(faq)}
+  <section class="section"><div class="container"><div class="cta-band">
+    <h2>Ready to start your podcast?</h2>
+    <p>Get the full Podcast Primer Pro course, the done-with-you support, and the community — and launch a show you're proud of.</p>
+    <a class="btn btn-primary" href="${esc(COURSE_OFFER_URL)}" data-shm="course_cta_footer">Get the free course →</a>
+  </div></div></section>
+  ${audienceEvent('view_course', { course: 'podcast-primer-pro' })}`;
+
+  const courseJsonLd = `<script type="application/ld+json">${JSON.stringify({
+    '@context': 'https://schema.org',
+    '@type': 'Course',
+    name: 'Podcast Primer Pro',
+    description:
+      'A done-with-you podcasting course from Straw Hut Media: plan, record, edit, publish, and grow your show — taught by CEO Ryan Tillotson, with a month of social content written and posted for you and access to the Straw Hut team.',
+    url: canonical('/podcast-primer'),
+    provider: { '@type': 'Organization', name: 'Straw Hut Media', sameAs: 'https://www.strawhutmedia.com' },
+    hasCourseInstance: {
+      '@type': 'CourseInstance',
+      courseMode: 'online',
+      courseWorkload: 'PT10H',
+    },
+  })}</script>`;
+
+  return layout({
+    title: 'Podcast Primer Pro — the done-with-you podcasting course | Straw Hut Media',
+    description:
+      'Learn to launch and grow your podcast with Straw Hut Media. Recording, editing, publishing, video, and a month of social content done for you — taught by CEO Ryan Tillotson.',
+    image: canonical('/public/img/primer-poster.webp'),
+    body,
+    activeNav: '',
+    path: '/podcast-primer',
+    jsonLd:
+      courseJsonLd +
+      '\n' +
+      faqJsonLdFrom(faq) +
+      '\n' +
+      breadcrumbJsonLd([
+        { name: 'Home', path: '/' },
+        { name: 'Podcast Primer', path: '/podcast-primer' },
       ]),
   });
 }
