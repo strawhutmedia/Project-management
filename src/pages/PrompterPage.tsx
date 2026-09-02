@@ -1333,6 +1333,11 @@ function Runner({
     if (el) el.scrollTop = Math.max(0, el.scrollTop + deltaPx)
   }, [])
 
+  // A "slightly" step — a couple of lines at the current text size,
+  // not a full page. Scales with font size so it means the same thing
+  // (roughly two lines) whatever size the reader is running.
+  const nudgeAmount = settings.fontSize * settings.lineHeight * 2.2
+
   const toggleFullscreen = useCallback(() => {
     const d = document as any
     if (!d.fullscreenElement && document.documentElement.requestFullscreen) {
@@ -1444,6 +1449,19 @@ function Runner({
         onWheel={() => {
           if (playing) setPlaying(false)
         }}
+        onTouchStart={() => {
+          // A finger touching down to manually scroll is the touch
+          // equivalent of the wheel event above — without this, the
+          // autoscroll loop keeps forcing scrollTop forward every frame
+          // and simply overrides a drag before it can move anything,
+          // which is what made manual scroll look broken on iPad.
+          if (playing) setPlaying(false)
+        }}
+        onClick={() => {
+          togglePlay()
+          revealControls()
+        }}
+        onMouseMove={revealControls}
       >
         <div
           className="mx-auto"
@@ -1474,15 +1492,6 @@ function Runner({
       )}
       <div className="pointer-events-none absolute inset-x-0 top-0 h-[22vh]" style={{ background: `linear-gradient(to bottom, rgba(${fadeRgb},0.85), transparent)` }} />
       <div className="pointer-events-none absolute inset-x-0 bottom-0 h-[22vh]" style={{ background: `linear-gradient(to top, rgba(${fadeRgb},0.85), transparent)` }} />
-
-      <div
-        className="absolute inset-0"
-        onClick={() => {
-          togglePlay()
-          revealControls()
-        }}
-        onMouseMove={revealControls}
-      />
 
       {countdown != null && (
         <div className="absolute inset-0 grid place-items-center pointer-events-none">
@@ -1535,9 +1544,27 @@ function Runner({
               </CtrlBtn>
             </div>
 
-            <button onClick={restart} className="text-xs sm:text-sm text-white/70 hover:text-white px-2 py-2" title="Restart">
-              ↺
-            </button>
+            <div className="flex items-center gap-1">
+              <button
+                onClick={() => jump(-nudgeAmount)}
+                className="text-xs sm:text-sm text-white/70 hover:text-white px-2 py-2"
+                title="Back a touch — keeps reading, doesn't stop"
+                aria-label="Back a touch"
+              >
+                ‹ back
+              </button>
+              <button
+                onClick={() => jump(nudgeAmount)}
+                className="text-xs sm:text-sm text-white/70 hover:text-white px-2 py-2"
+                title="Forward a touch — keeps reading, doesn't stop"
+                aria-label="Forward a touch"
+              >
+                fwd ›
+              </button>
+              <button onClick={restart} className="text-xs sm:text-sm text-white/70 hover:text-white px-2 py-2" title="Restart">
+                ↺
+              </button>
+            </div>
           </div>
 
           <div className="flex items-center justify-center gap-2 mt-2 flex-wrap">
