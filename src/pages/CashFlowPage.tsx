@@ -257,8 +257,8 @@ export default function CashFlowPage() {
       {/* Baseline vs one-time — the sustainable number vs lumpy project wins */}
       <div className={`${card} p-4`}>
         <div className="flex items-center justify-between mb-3">
-          <div className="font-bold text-text">Recurring baseline vs one-time · this month</div>
-          <div className="text-xs text-muted">What you can count on, separate from big one-off jobs</div>
+          <div className="font-bold text-text">Monthly recurring revenue vs. costs</div>
+          <div className="text-xs text-muted">What you can count on, separate from big one-off jobs like Disney or Hulu</div>
         </div>
         <div className="grid grid-cols-2 gap-3">
           <div className="rounded-xl border border-line bg-ink/40 p-3">
@@ -271,7 +271,7 @@ export default function CashFlowPage() {
             </div>
           </div>
           <div className="rounded-xl border border-line bg-ink/40 p-3">
-            <div className={labelCls}>One-time net</div>
+            <div className={labelCls}>One-time net · this month</div>
             <div className={`text-xl font-bold mt-1 tabular-nums ${overview.currentMonthBaseline.oneTimeNetCents > 0 ? 'text-stage-done' : overview.currentMonthBaseline.oneTimeNetCents < 0 ? 'text-urgent' : 'text-muted'}`}>
               {(overview.currentMonthBaseline.oneTimeNetCents > 0 ? '+' : '') + money(overview.currentMonthBaseline.oneTimeNetCents)}
             </div>
@@ -279,6 +279,13 @@ export default function CashFlowPage() {
               {money(overview.currentMonthBaseline.oneTimeInCents)} in − {money(overview.currentMonthBaseline.oneTimeOutCents)} out
             </div>
           </div>
+        </div>
+        <div className={`mt-3 rounded-xl border px-3 py-2.5 text-sm ${overview.currentMonthBaseline.recurringNetCents >= 0
+          ? 'border-stage-done/40 bg-stage-done/10 text-stage-done'
+          : 'border-urgent/40 bg-urgent/10 text-urgent'}`}>
+          {overview.currentMonthBaseline.recurringNetCents >= 0
+            ? <>Your recurring clients cover your monthly costs on their own, with <b>{money(overview.currentMonthBaseline.recurringNetCents)}</b> to spare — before counting any one-off project wins.</>
+            : <>Your recurring clients alone don't cover your monthly costs — there's a <b>{money(Math.abs(overview.currentMonthBaseline.recurringNetCents))}</b> gap that has to come from new clients or one-time deals. This is the number to watch, not the total that includes big project payments.</>}
         </div>
       </div>
 
