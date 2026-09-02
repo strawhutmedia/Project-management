@@ -1376,8 +1376,18 @@ function Runner({
       case 'exit':
         handleExit()
         break
+      case 'back':
+        // Nudge only — deliberately does NOT pause. Restart was the
+        // remote's only correction option before this, which meant any
+        // small slip forced starting over from zero. This corrects a
+        // couple of lines without losing the take.
+        jump(-nudgeAmount)
+        break
+      case 'fwd':
+        jump(nudgeAmount)
+        break
     }
-  }, [command, togglePlay, restart, handleExit])
+  }, [command, togglePlay, restart, handleExit, jump, nudgeAmount])
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {

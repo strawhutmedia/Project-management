@@ -91,6 +91,15 @@ export default function RemotePage() {
         ▶ / ❚❚ Play&nbsp;·&nbsp;Pause
       </button>
 
+      {/* Nudge — corrects position a couple of lines without stopping
+          the read or losing the take. Restart below still exists for
+          starting completely over, but shouldn't be the only option. */}
+      <p className="text-[11px] uppercase tracking-wider text-muted mb-1 text-center">Slipped? Nudge it</p>
+      <div className="grid grid-cols-2 gap-3 mb-4">
+        <RemoteBtn onClick={() => send('back', '‹ Back')}>‹ Back a bit</RemoteBtn>
+        <RemoteBtn onClick={() => send('fwd', 'Fwd ›')}>Fwd a bit ›</RemoteBtn>
+      </div>
+
       {/* Speed */}
       <p className="text-[11px] uppercase tracking-wider text-muted mb-1 text-center">Speed</p>
       <div className="grid grid-cols-2 gap-3 mb-4">
