@@ -147,6 +147,26 @@ cashflowRouter.get('/overview', async (_req, res) => {
     const recurringInCents = Number(recurringLatest.rows.find((r) => r.kind === 'in')?.total_cents ?? 0)
     const recurringOutCents = Number(recurringLatest.rows.find((r) => r.kind === 'out')?.total_cents ?? 0)
 
+    // Same "latest recurring row per counterparty" logic as above, but the
+    // itemized list instead of just the sum — a checklist Ryan can actually
+    // read line by line and check against reality, not just trust a total.
+    const recurringChecklistRows = await pool.query(
+      `SELECT DISTINCT ON (kind, counterparty) kind, counterparty, category, amount_cents
+       FROM cashflow_entries
+       WHERE is_recurring = true
+       ORDER BY kind, counterparty, occurred_on DESC, created_at DESC`,
+    )
+    const recurringChecklist = {
+      in: recurringChecklistRows.rows
+        .filter((r) => r.kind === 'in')
+        .map((r) => ({ counterparty: r.counterparty as string, category: r.category as string, amountCents: Number(r.amount_cents) }))
+        .sort((a, b) => b.amountCents - a.amountCents),
+      out: recurringChecklistRows.rows
+        .filter((r) => r.kind === 'out')
+        .map((r) => ({ counterparty: r.counterparty as string, category: r.category as string, amountCents: Number(r.amount_cents) }))
+        .sort((a, b) => b.amountCents - a.amountCents),
+    }
+
     // One-time/lumpy money (Disney-style project payments, a one-off
     // purchase) is a real dated event, so this one stays scoped to the
     // current calendar month — a single big win shouldn't inflate every
@@ -172,6 +192,7 @@ cashflowRouter.get('/overview', async (_req, res) => {
         category: r.category as string,
         totalCents: Number(r.total_cents),
       })),
+      recurringChecklist,
       currentMonthBaseline: {
         recurringInCents, recurringOutCents,
         recurringNetCents: recurringInCents - recurringOutCents,

@@ -774,6 +774,10 @@ export type ApiCashflowOverview = {
   entryCount: number
   months: ApiCashflowMonth[]
   currentMonthCategories: { kind: 'in' | 'out'; category: string; totalCents: number }[]
+  recurringChecklist: {
+    in: { counterparty: string; category: string; amountCents: number }[]
+    out: { counterparty: string; category: string; amountCents: number }[]
+  }
   currentMonthBaseline: {
     recurringInCents: number; recurringOutCents: number; recurringNetCents: number
     oneTimeInCents: number; oneTimeOutCents: number; oneTimeNetCents: number

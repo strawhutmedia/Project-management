@@ -289,6 +289,54 @@ export default function CashFlowPage() {
         </div>
       </div>
 
+      {/* Recurring checklist — every in, every out, so the totals above are checkable line by line, not a black box */}
+      <div className={`${card} p-4`}>
+        <div className="flex items-center justify-between mb-3">
+          <div className="font-bold text-text">Recurring checklist — every in, every out</div>
+          <div className="text-xs text-muted">Line by line, so you can check it yourself</div>
+        </div>
+        <div className="grid sm:grid-cols-2 gap-4">
+          <div>
+            <div className={`${labelCls} mb-2`}>In · {overview.recurringChecklist.in.length} clients</div>
+            <div className="space-y-1">
+              {overview.recurringChecklist.in.map((r, i) => (
+                <div key={i} className="flex items-center justify-between gap-2 rounded-lg bg-ink/40 border border-line px-2.5 py-1.5 text-sm">
+                  <span className="text-stage-done">✓</span>
+                  <span className="flex-1 min-w-0 truncate text-text">{r.counterparty || r.category || 'Unnamed'}</span>
+                  <span className="tabular-nums font-semibold text-stage-done">{money(r.amountCents)}</span>
+                </div>
+              ))}
+            </div>
+            <div className="flex items-center justify-between mt-2 pt-2 border-t border-line/60 text-sm font-bold">
+              <span className="text-text">Total in</span>
+              <span className="tabular-nums text-stage-done">{money(overview.currentMonthBaseline.recurringInCents)}</span>
+            </div>
+          </div>
+          <div>
+            <div className={`${labelCls} mb-2`}>Out · {overview.recurringChecklist.out.length} lines</div>
+            <div className="space-y-1">
+              {overview.recurringChecklist.out.map((r, i) => (
+                <div key={i} className="flex items-center justify-between gap-2 rounded-lg bg-ink/40 border border-line px-2.5 py-1.5 text-sm">
+                  <span className="text-urgent">✓</span>
+                  <span className="flex-1 min-w-0 truncate text-text">{r.counterparty || r.category || 'Unnamed'}</span>
+                  <span className="tabular-nums font-semibold text-urgent">{money(r.amountCents)}</span>
+                </div>
+              ))}
+            </div>
+            <div className="flex items-center justify-between mt-2 pt-2 border-t border-line/60 text-sm font-bold">
+              <span className="text-text">Total out</span>
+              <span className="tabular-nums text-urgent">{money(overview.currentMonthBaseline.recurringOutCents)}</span>
+            </div>
+          </div>
+        </div>
+        <div className="mt-3 pt-3 border-t border-line flex items-center justify-between text-sm font-bold">
+          <span className="text-text">Does it equal out?</span>
+          <span className={`tabular-nums ${overview.currentMonthBaseline.recurringNetCents >= 0 ? 'text-stage-done' : 'text-urgent'}`}>
+            {(overview.currentMonthBaseline.recurringNetCents >= 0 ? '+' : '') + money(overview.currentMonthBaseline.recurringNetCents)}
+          </span>
+        </div>
+      </div>
+
       {/* Quick add / edit */}
       <div className={`${card} p-4 space-y-3`}>
         <div className="flex items-center justify-between">
