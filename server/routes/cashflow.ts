@@ -128,21 +128,37 @@ cashflowRouter.get('/overview', async (_req, res) => {
        GROUP BY 1, 2 ORDER BY total_cents DESC`,
     )
 
-    // Recurring (steady monthly baseline) vs one-time (lumpy/project) split
-    // for the current month — so a single big win doesn't make the month
-    // look more sustainable than it is.
-    const baseline = await pool.query(
-      `SELECT kind, is_recurring, COALESCE(SUM(amount_cents), 0) AS total_cents
-       FROM cashflow_entries
-       WHERE to_char(occurred_on, 'YYYY-MM') = to_char(CURRENT_DATE, 'YYYY-MM')
-       GROUP BY 1, 2`,
+    // Recurring baseline: the current steady monthly picture, NOT locked to
+    // whatever happens to be dated in the current calendar month. Recurring
+    // entries are corrected in place (an UPDATE when a client's real rate
+    // changes) rather than re-logged every month, so pin each counterparty
+    // to its most recent recurring row and sum those — this stays accurate
+    // whether the month just rolled over or not.
+    const recurringLatest = await pool.query(
+      `SELECT kind, COALESCE(SUM(amount_cents), 0) AS total_cents
+       FROM (
+         SELECT DISTINCT ON (kind, counterparty) kind, amount_cents
+         FROM cashflow_entries
+         WHERE is_recurring = true
+         ORDER BY kind, counterparty, occurred_on DESC, created_at DESC
+       ) latest
+       GROUP BY 1`,
     )
-    const pick = (kind: 'in' | 'out', recurring: boolean) =>
-      Number(baseline.rows.find((r) => r.kind === kind && r.is_recurring === recurring)?.total_cents ?? 0)
-    const recurringInCents = pick('in', true)
-    const recurringOutCents = pick('out', true)
-    const oneTimeInCents = pick('in', false)
-    const oneTimeOutCents = pick('out', false)
+    const recurringInCents = Number(recurringLatest.rows.find((r) => r.kind === 'in')?.total_cents ?? 0)
+    const recurringOutCents = Number(recurringLatest.rows.find((r) => r.kind === 'out')?.total_cents ?? 0)
+
+    // One-time/lumpy money (Disney-style project payments, a one-off
+    // purchase) is a real dated event, so this one stays scoped to the
+    // current calendar month — a single big win shouldn't inflate every
+    // month going forward the way a stale recurring row would.
+    const oneTime = await pool.query(
+      `SELECT kind, COALESCE(SUM(amount_cents), 0) AS total_cents
+       FROM cashflow_entries
+       WHERE is_recurring = false AND to_char(occurred_on, 'YYYY-MM') = to_char(CURRENT_DATE, 'YYYY-MM')
+       GROUP BY 1`,
+    )
+    const oneTimeInCents = Number(oneTime.rows.find((r) => r.kind === 'in')?.total_cents ?? 0)
+    const oneTimeOutCents = Number(oneTime.rows.find((r) => r.kind === 'out')?.total_cents ?? 0)
 
     res.json({
       settings,
