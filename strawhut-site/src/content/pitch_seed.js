@@ -275,5 +275,93 @@ Build-out plus a first cohort — well inside the $100,000 grant range that fund
   ],
 };
 
+// Third pitch document: TRADE WINDS (working title) — the weekly B2B podcast
+// for the travel trade, hosted by Bruce Poon Tip. The idea Ryan flagged as
+// "the one I'm the most interested in" from the Bruce meeting.
+export const TRADE_WINDS_PITCH = {
+  slug: 'trade-winds',
+  title: 'Trade Winds',
+  working_title: true,
+  theme: 'expedition',
+  eyebrow: 'Straw Hut Media × Bruce Poon Tip · A weekly podcast',
+  logline: 'The weekly briefing for the people who sell travel — hosted by Bruce Poon Tip, founder of G Adventures.',
+  meta_tags: 'Weekly · 35–45 min, B2B travel trade, Hosted by Bruce Poon Tip',
+  contact_name: 'Ryan Tillotson',
+  contact_company: 'Straw Hut Media · Los Angeles',
+  contact_email: 'ryan@strawhutmedia.com',
+  contact_phone: '760.807.7138',
+  footer_note: 'Confidential — prepared by Straw Hut Media for development discussion purposes.',
+  sections: [
+    {
+      kind: 'text',
+      eyebrow: 'The idea',
+      heading: 'The show a travel advisor plays Monday morning.',
+      body: `<p class="big">Travel is being rewritten in real time — AI is upending how trips are planned and booked, wars and geopolitics are redrawing the map month to month, and overtourism is changing what destinations even want. The travel trade — agents, advisors, tour operators — has to navigate all of it, and has no trusted weekly voice to do it with.</p>
+<p><em>Trade Winds</em> is that voice: what changed this week, why it matters, and what to do about it — from the one host every CEO in the industry will actually sit down with.</p>`,
+    },
+    {
+      kind: 'text',
+      eyebrow: 'Why now',
+      heading: 'The seat is open.',
+      body: `<ul>
+<li>AI booking tools are coming for the agent's role — agents need a guide, fast</li>
+<li>Conflict and geopolitics are rerouting demand in real time</li>
+<li>Record post-pandemic volume, thinner margins, higher client expectations</li>
+<li>No premium B2B travel show owns this slot</li>
+</ul>`,
+    },
+    {
+      kind: 'cards',
+      eyebrow: 'The format — weekly, 35–45 min',
+      heading: 'Three segments, every week.',
+      body: `The Briefing
+~Segment 01
+What moved this week — AI, policy, geopolitics, consumer shifts — and what it means for bookings.
+
+The Corner Office
+~Segment 02
+One marquee interview: the founders and CEOs who run travel, speaking founder-to-founder with Bruce.
+
+The Playbook
+~Segment 03
+One tactical takeaway an advisor or operator can use with clients on Monday morning.`,
+    },
+    {
+      kind: 'text',
+      eyebrow: 'The host',
+      heading: 'Bruce Poon Tip — the one voice the whole trade trusts.',
+      body: `<ul>
+<li>Built <strong>G&nbsp;Adventures</strong> into the world's largest independent adventure travel company — sells through the agent channel every day</li>
+<li>Officer of the Order of Canada (2023) — the travel industry's first in 34 years</li>
+<li>EP of <em>The Last Tourist</em>; NYT-bestselling author of <em>Looptail</em></li>
+<li>His peer group is the guest list: the CEOs of the Virgin and Uber tier</li>
+<li>Hosts <strong>GX</strong>, his annual summit of agents, operators, media, and influencers</li>
+</ul>`,
+    },
+    {
+      kind: 'chips',
+      eyebrow: 'Who it’s for',
+      heading: '',
+      body: `Travel advisors & agencies
+Tour operators
+Tourism boards & DMOs
+Hospitality & travel tech`,
+    },
+    {
+      kind: 'text',
+      eyebrow: 'The built-in flywheel',
+      heading: 'GX is the launchpad.',
+      body: `<p>Bruce already hosts an annual summit of exactly this audience — agents, tour operators, media, influencers. That's a live-show stage, a guaranteed launch audience, and an annual tentpole episode. G&nbsp;Adventures' global agent network carries it the rest of the year, and Straw Hut runs production, distribution, and growth.</p>
+<p><strong>The money follows the room:</strong> a pure B2B travel-trade audience is what tourism boards, travel tech, and suppliers pay premium rates to reach — sponsorship, GX activations, and branded segments from day one.</p>`,
+    },
+    {
+      kind: 'text',
+      eyebrow: 'Next step',
+      heading: 'Greenlight a pilot.',
+      body: `Pilot with Bruce, line up the first three Corner Office guests, and aim the launch window at the next GX.`,
+    },
+  ],
+};
+
 // Everything the boot seed installs when the store has no pitches yet.
-export const PITCH_SEEDS = [BORN_EXPLORERS_PITCH, MEDIA_ARTS_PITCH];
+export const PITCH_SEEDS = [BORN_EXPLORERS_PITCH, MEDIA_ARTS_PITCH, TRADE_WINDS_PITCH];
