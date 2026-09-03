@@ -60,6 +60,16 @@ address against what Ryan actually says, not just whatever QuickBooks has on
 file for the customer — a wrong on-file contact is exactly what caused the
 Sept 2026 incident.
 
+Every invoice in the Client Invoices card — draft or already-sent — has an
+**Edit** button (`PUT /api/qb/invoices/:id`) that lets Ryan/Caroline fix
+line items, dates, the note, the send-to address, or the CC. Editing never
+emails anyone by itself, even on an already-sent invoice; it just updates
+the QuickBooks record. Fixing a mistake on an invoice that already went out
+means: edit it here, then hit **Resend** (the same Send button, relabeled)
+— which is still the one and only action that emails the client, still
+gated behind an explicit button press, still never called by Claude
+directly.
+
 This rule extends to **all** outbound client-facing email, not just
 invoices: never send anything to a client, fan, or lead from any tool
 (Gmail, Resend, the QuickBooks connector, anything) without an explicit,

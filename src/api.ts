@@ -899,14 +899,23 @@ export const api = {
       id: string; docNumber: string; total: number; balance: number
       dueDate: string | null; txnDate: string | null
       customerId: string | null; customerName: string; billEmail: string | null; ccEmail: string | null
+      note: string
       sent: boolean; paid: boolean
-      lines: Array<{ description: string; qty: number; rate: number; amount: number }>
+      lines: Array<{ itemId: string; description: string; qty: number; rate: number; amount: number }>
     }> }>('/api/qb/invoices'),
   qbCreateInvoiceDraft: (body: {
     customerId: string; dueDate?: string; txnDate?: string; note?: string; billEmail?: string; ccEmail?: string
     lines: Array<{ itemId: string; description?: string; qty?: number; rate: number }>
   }) => request<{ invoice: { id: string; docNumber: string; total: number } }>('/api/qb/invoices', {
     method: 'POST', body: JSON.stringify(body),
+  }),
+  // Edit an existing invoice (line items/dates/note/emails) — never emails
+  // by itself, sent or not. Use this to fix a mistake, then Send/Resend below.
+  qbUpdateInvoice: (id: string, body: {
+    dueDate?: string; note?: string; billEmail?: string; ccEmail?: string
+    lines: Array<{ itemId: string; description?: string; qty?: number; rate: number }>
+  }) => request<{ invoice: { id: string; docNumber: string; total: number } }>(`/api/qb/invoices/${id}`, {
+    method: 'PUT', body: JSON.stringify(body),
   }),
   qbSendInvoice: (id: string, sendTo: string) =>
     request<{ ok: true }>(`/api/qb/invoices/${id}/send`, { method: 'POST', body: JSON.stringify({ sendTo }) }),

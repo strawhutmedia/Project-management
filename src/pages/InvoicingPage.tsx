@@ -882,13 +882,57 @@ function ClientInvoicesCard({ flash }: { flash: (m: string) => void }) {
   async function sendInvoice(inv: ApiQbInvoice) {
     const to = (sendTo[inv.id] ?? inv.billEmail ?? '').trim()
     if (!to) { flash('Enter an email to send to'); return }
-    if (!window.confirm(`Send invoice #${inv.docNumber || inv.id} to ${to}? This emails the client right now.`)) return
+    const verb = inv.sent ? 'Resend' : 'Send'
+    if (!window.confirm(`${verb} invoice #${inv.docNumber || inv.id} to ${to}? This emails the client right now.`)) return
     try {
       await api.qbSendInvoice(inv.id, to)
-      flash(`Sent to ${to}`)
+      flash(`${verb === 'Resend' ? 'Resent' : 'Sent'} to ${to}`)
       reload()
     } catch (err) {
       flash(err instanceof Error ? err.message : 'Send failed')
+    }
+  }
+
+  // Editing an existing invoice — line items, dates, note, send-to/cc.
+  // Never emails by itself; only Send/Resend above does that.
+  const [editingId, setEditingId] = useState<string | null>(null)
+  const [editLines, setEditLines] = useState<Array<{ itemId: string; description: string; qty: number; rate: number }>>([])
+  const [editDueDate, setEditDueDate] = useState('')
+  const [editNote, setEditNote] = useState('')
+  const [editBillEmail, setEditBillEmail] = useState('')
+  const [editCcEmail, setEditCcEmail] = useState('')
+  const [savingEdit, setSavingEdit] = useState(false)
+
+  function startEdit(inv: ApiQbInvoice) {
+    setEditingId(inv.id)
+    setEditLines(inv.lines.map((l) => ({ itemId: l.itemId, description: l.description, qty: l.qty, rate: l.rate })))
+    setEditDueDate(inv.dueDate || '')
+    setEditNote(inv.note || '')
+    setEditBillEmail(inv.billEmail || '')
+    setEditCcEmail(inv.ccEmail || '')
+  }
+  function cancelEdit() { setEditingId(null) }
+  function updateEditLine(i: number, patch: Partial<{ itemId: string; description: string; qty: number; rate: number }>) {
+    setEditLines((ls) => ls.map((l, idx) => (idx === i ? { ...l, ...patch } : l)))
+  }
+  async function saveEdit(inv: ApiQbInvoice) {
+    if (editLines.length === 0) { flash('Add at least one line item'); return }
+    setSavingEdit(true)
+    try {
+      await api.qbUpdateInvoice(inv.id, {
+        dueDate: editDueDate || undefined,
+        note: editNote,
+        billEmail: editBillEmail || undefined,
+        ccEmail: editCcEmail || undefined,
+        lines: editLines.map((l) => ({ itemId: l.itemId, description: l.description || undefined, qty: l.qty, rate: l.rate })),
+      })
+      flash(inv.sent ? 'Invoice updated — hit Resend when ready, nothing sent yet' : 'Invoice updated')
+      setEditingId(null)
+      reload()
+    } catch (err) {
+      flash(err instanceof Error ? err.message : 'Update failed')
+    } finally {
+      setSavingEdit(false)
     }
   }
 
@@ -1005,9 +1049,70 @@ function ClientInvoicesCard({ flash }: { flash: (m: string) => void }) {
                 }`}>
                   {inv.paid ? 'Paid' : inv.sent ? 'Sent' : 'Draft — not sent'}
                 </span>
+                <Btn variant="ghost" onClick={() => (editingId === inv.id ? cancelEdit() : startEdit(inv))}>
+                  {editingId === inv.id ? 'Cancel' : 'Edit'}
+                </Btn>
               </div>
             </div>
-            {!inv.sent && (
+
+            {editingId === inv.id ? (
+              <div className="space-y-2 border-t border-line pt-2">
+                {inv.sent && (
+                  <p className="text-xs text-stage-mastering">
+                    Already sent once — editing here only changes the QuickBooks record. Nothing goes to the
+                    client until you hit Resend below.
+                  </p>
+                )}
+                <Labeled label="Send-to email">
+                  <input className={inputCls} value={editBillEmail} onChange={(e) => setEditBillEmail(e.target.value)} placeholder="client@company.com" />
+                </Labeled>
+                <Labeled label="CC">
+                  <input className={inputCls} value={editCcEmail} onChange={(e) => setEditCcEmail(e.target.value)} placeholder="accounting@strawhutmedia.com" />
+                </Labeled>
+                <div className="space-y-2">
+                  <span className={labelCls}>Line items</span>
+                  {editLines.map((l, i) => (
+                    <div key={i} className="flex flex-wrap gap-2 items-center">
+                      <select
+                        className={`${inputCls} w-auto`}
+                        value={l.itemId}
+                        onChange={(e) => {
+                          const it = items.find((x) => x.id === e.target.value)
+                          updateEditLine(i, { itemId: e.target.value, rate: it?.unitPrice ?? l.rate })
+                        }}
+                      >
+                        {items.map((it) => <option key={it.id} value={it.id}>{it.name}</option>)}
+                      </select>
+                      <input className={`${inputCls} flex-1 min-w-[160px]`} placeholder="Description" value={l.description}
+                        onChange={(e) => updateEditLine(i, { description: e.target.value })} />
+                      <input className={`${inputCls} w-20`} type="number" min={0} value={l.qty}
+                        onChange={(e) => updateEditLine(i, { qty: Number(e.target.value) })} />
+                      <span className="text-muted text-sm">@</span>
+                      <input className={`${inputCls} w-28`} type="number" min={0} step="0.01" value={l.rate}
+                        onChange={(e) => updateEditLine(i, { rate: Number(e.target.value) })} />
+                      <Btn variant="danger" onClick={() => setEditLines((ls) => ls.filter((_, idx) => idx !== i))}>✕</Btn>
+                    </div>
+                  ))}
+                  <Btn variant="ghost" onClick={() => setEditLines((ls) => [...ls, { itemId: items[0]?.id ?? '', description: '', qty: 1, rate: items[0]?.unitPrice ?? 0 }])}>
+                    + Add line item
+                  </Btn>
+                </div>
+                <div className="flex gap-3 flex-wrap">
+                  <Labeled label="Due date">
+                    <input className={inputCls} type="date" value={editDueDate} onChange={(e) => setEditDueDate(e.target.value)} />
+                  </Labeled>
+                  <Labeled label="Note to customer">
+                    <input className={inputCls} value={editNote} onChange={(e) => setEditNote(e.target.value)} />
+                  </Labeled>
+                </div>
+                <div className="flex justify-end gap-2 pt-1">
+                  <Btn onClick={cancelEdit}>Cancel</Btn>
+                  <Btn variant="primary" onClick={() => saveEdit(inv)} disabled={savingEdit}>
+                    {savingEdit ? 'Saving…' : 'Save changes (does not send)'}
+                  </Btn>
+                </div>
+              </div>
+            ) : (
               <div className="flex items-center gap-2 flex-wrap">
                 <input
                   className={`${inputCls} flex-1 min-w-[200px]`}
@@ -1015,7 +1120,7 @@ function ClientInvoicesCard({ flash }: { flash: (m: string) => void }) {
                   value={sendTo[inv.id] ?? inv.billEmail ?? ''}
                   onChange={(e) => setSendTo((s) => ({ ...s, [inv.id]: e.target.value }))}
                 />
-                <Btn variant="primary" onClick={() => sendInvoice(inv)}>Send</Btn>
+                <Btn variant="primary" onClick={() => sendInvoice(inv)}>{inv.sent ? 'Resend' : 'Send'}</Btn>
               </div>
             )}
           </div>
