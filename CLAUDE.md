@@ -36,6 +36,36 @@ If you see errors that aren't yet fixed in `main`, **investigate, fix, push to
 main**. Railway will auto-deploy. After the new boot reports healthy, the app
 emails the admin (Ryan) a "Recovered" alert automatically.
 
+## Client invoices (QuickBooks AR) — NEVER send one yourself
+
+`/invoicing` has a "Client Invoices" card (`server/routes/qb_invoices.ts` +
+`ClientInvoicesCard` in `src/pages/InvoicingPage.tsx`) for billing clients
+(Shaping Freedom, etc.) via QuickBooks. **Creating a draft there never emails
+anyone** — QBO invoices are born unsent. Only a separate "Send" button, one
+per invoice, actually emails the client, and **Claude must never call that
+send endpoint (or any raw QuickBooks-connector send/email tool) itself.**
+Ryan reviews every draft and clicks Send personally, every time, no
+exceptions — this was learned the hard way (Sept 2026: an invoice went to
+the wrong recipient, on the client's birthday, because a session sent
+directly via the QuickBooks MCP connector without this review step, and the
+"draft in Slate" system this note describes didn't actually exist yet).
+
+If asked to "create" or "make" an invoice, that means create a **draft** —
+in the Client Invoices card above, not a bare QuickBooks-connector call.
+Never treat "make/create the invoice" as authorization to also send it.
+
+Every draft should CC `accounting@strawhutmedia.com` (the form defaults to
+this — don't clear it without being told to). Double-check the send-to
+address against what Ryan actually says, not just whatever QuickBooks has on
+file for the customer — a wrong on-file contact is exactly what caused the
+Sept 2026 incident.
+
+This rule extends to **all** outbound client-facing email, not just
+invoices: never send anything to a client, fan, or lead from any tool
+(Gmail, Resend, the QuickBooks connector, anything) without an explicit,
+same-turn instruction to send — draft it and hand it back for review by
+default.
+
 ## Email triggers (already wired)
 
 - Magic-link sign-in → user's inbox

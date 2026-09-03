@@ -889,6 +889,27 @@ export const api = {
   // QuickBooks connection (AR side)
   qbStatus: () => request<{ configured: boolean; connected: boolean; env: string; realmId: string | null; redirectUri: string }>('/api/qb/status'),
   qbDisconnect: () => request<{ ok: true }>('/api/qb/disconnect', { method: 'POST' }),
+  // Client invoices (AR) — create is draft-only, never emails. Send is a
+  // separate, explicit call only ever made from a button the owner clicks.
+  qbSearchCustomers: (q: string) =>
+    request<{ customers: Array<{ id: string; name: string; email: string | null }> }>(`/api/qb/customers/search?q=${encodeURIComponent(q)}`),
+  qbItems: () => request<{ items: Array<{ id: string; name: string; unitPrice: number }> }>('/api/qb/items'),
+  qbListInvoices: () =>
+    request<{ invoices: Array<{
+      id: string; docNumber: string; total: number; balance: number
+      dueDate: string | null; txnDate: string | null
+      customerId: string | null; customerName: string; billEmail: string | null; ccEmail: string | null
+      sent: boolean; paid: boolean
+      lines: Array<{ description: string; qty: number; rate: number; amount: number }>
+    }> }>('/api/qb/invoices'),
+  qbCreateInvoiceDraft: (body: {
+    customerId: string; dueDate?: string; txnDate?: string; note?: string; billEmail?: string; ccEmail?: string
+    lines: Array<{ itemId: string; description?: string; qty?: number; rate: number }>
+  }) => request<{ invoice: { id: string; docNumber: string; total: number } }>('/api/qb/invoices', {
+    method: 'POST', body: JSON.stringify(body),
+  }),
+  qbSendInvoice: (id: string, sendTo: string) =>
+    request<{ ok: true }>(`/api/qb/invoices/${id}/send`, { method: 'POST', body: JSON.stringify({ sendTo }) }),
 
   // Teleprompter — shared sessions for the podcast team.
   teleprompterList: () => request<{ sessions: ApiTeleprompterSession[] }>('/api/teleprompter'),
