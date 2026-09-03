@@ -790,6 +790,237 @@ function SettingsPanel({ settings, onSaved, flash }: {
       </div>
 
       <QuickBooksCard flash={flash} />
+      <ClientInvoicesCard flash={flash} />
+    </div>
+  )
+}
+
+// Client-facing (AR) invoices — draft here, review, then Send is a
+// separate button click. Creating a draft never emails anyone;
+// QuickBooks invoices are born unsent. Only the Send button (one per
+// invoice, below) calls the endpoint that actually emails a client.
+function ClientInvoicesCard({ flash }: { flash: (m: string) => void }) {
+  const [connected, setConnected] = useState(false)
+  useEffect(() => { api.qbStatus().then((s) => setConnected(s.connected)).catch(() => setConnected(false)) }, [])
+
+  type ApiQbInvoice = Awaited<ReturnType<typeof api.qbListInvoices>>['invoices'][number]
+  type ApiQbCustomer = { id: string; name: string; email: string | null }
+  type ApiQbItem = { id: string; name: string; unitPrice: number }
+
+  const [invoices, setInvoices] = useState<ApiQbInvoice[]>([])
+  const [loadingList, setLoadingList] = useState(false)
+  const reload = useCallback(() => {
+    setLoadingList(true)
+    api.qbListInvoices().then((r) => setInvoices(r.invoices)).catch(() => {}).finally(() => setLoadingList(false))
+  }, [])
+  useEffect(() => { if (connected) reload() }, [connected, reload])
+
+  const [items, setItems] = useState<ApiQbItem[]>([])
+  useEffect(() => { if (connected) api.qbItems().then((r) => setItems(r.items)).catch(() => {}) }, [connected])
+
+  const [customerQuery, setCustomerQuery] = useState('')
+  const [customerResults, setCustomerResults] = useState<ApiQbCustomer[]>([])
+  const [customer, setCustomer] = useState<ApiQbCustomer | null>(null)
+  useEffect(() => {
+    if (customer || customerQuery.trim().length < 2) { setCustomerResults([]); return }
+    const t = window.setTimeout(() => {
+      api.qbSearchCustomers(customerQuery).then((r) => setCustomerResults(r.customers)).catch(() => {})
+    }, 300)
+    return () => window.clearTimeout(t)
+  }, [customerQuery, customer])
+
+  const [lines, setLines] = useState<Array<{ itemId: string; description: string; qty: number; rate: number }>>([])
+  const [dueDate, setDueDate] = useState('')
+  const [note, setNote] = useState('')
+  const [billEmail, setBillEmail] = useState('')
+  // Standing rule: every client invoice CCs accounting. Baked into the
+  // invoice itself (QBO CCs this address whenever it's sent, by whoever
+  // clicks Send) — editable/removable per invoice if there's a reason to.
+  const [ccEmail, setCcEmail] = useState('accounting@strawhutmedia.com')
+  const [creating, setCreating] = useState(false)
+
+  function addLine() {
+    setLines((ls) => [...ls, { itemId: items[0]?.id ?? '', description: '', qty: 1, rate: items[0]?.unitPrice ?? 0 }])
+  }
+  function updateLine(i: number, patch: Partial<{ itemId: string; description: string; qty: number; rate: number }>) {
+    setLines((ls) => ls.map((l, idx) => (idx === i ? { ...l, ...patch } : l)))
+  }
+  function removeLine(i: number) {
+    setLines((ls) => ls.filter((_, idx) => idx !== i))
+  }
+  const total = lines.reduce((s, l) => s + (l.qty || 1) * l.rate, 0)
+
+  function resetForm() {
+    setCustomer(null); setCustomerQuery(''); setLines([]); setDueDate(''); setNote(''); setBillEmail('')
+    setCcEmail('accounting@strawhutmedia.com')
+  }
+
+  async function createDraft() {
+    if (!customer) { flash('Pick a customer first'); return }
+    if (lines.length === 0) { flash('Add at least one line item'); return }
+    setCreating(true)
+    try {
+      await api.qbCreateInvoiceDraft({
+        customerId: customer.id,
+        dueDate: dueDate || undefined,
+        note: note || undefined,
+        billEmail: billEmail || customer.email || undefined,
+        ccEmail: ccEmail || undefined,
+        lines: lines.map((l) => ({ itemId: l.itemId, description: l.description || undefined, qty: l.qty, rate: l.rate })),
+      })
+      flash('Draft created — review it below. Nothing has been sent.')
+      resetForm()
+      reload()
+    } catch (err) {
+      flash(err instanceof Error ? err.message : 'Failed to create draft')
+    } finally {
+      setCreating(false)
+    }
+  }
+
+  const [sendTo, setSendTo] = useState<Record<string, string>>({})
+  async function sendInvoice(inv: ApiQbInvoice) {
+    const to = (sendTo[inv.id] ?? inv.billEmail ?? '').trim()
+    if (!to) { flash('Enter an email to send to'); return }
+    if (!window.confirm(`Send invoice #${inv.docNumber || inv.id} to ${to}? This emails the client right now.`)) return
+    try {
+      await api.qbSendInvoice(inv.id, to)
+      flash(`Sent to ${to}`)
+      reload()
+    } catch (err) {
+      flash(err instanceof Error ? err.message : 'Send failed')
+    }
+  }
+
+  if (!connected) return null
+
+  return (
+    <div className={`${card} p-5 space-y-4`}>
+      <div>
+        <h2 className="font-display text-xl">Client Invoices</h2>
+        <p className="text-sm text-muted">
+          Build a draft here and it stays a draft — QuickBooks never emails on creation. Review it below,
+          then hit <b className="text-text">Send</b> yourself when you're ready. Nothing goes to a client any other way.
+        </p>
+      </div>
+
+      <div className="space-y-3 border-t border-line pt-4">
+        <Labeled label="Customer">
+          <input
+            className={inputCls}
+            value={customer ? customer.name : customerQuery}
+            onChange={(e) => { setCustomer(null); setCustomerQuery(e.target.value) }}
+            placeholder="Search QuickBooks customers…"
+          />
+          {!customer && customerResults.length > 0 && (
+            <div className="mt-1 rounded-xl border border-line bg-ink/80 overflow-hidden">
+              {customerResults.map((c) => (
+                <button
+                  key={c.id} type="button"
+                  className="block w-full text-left px-3 py-2 text-sm hover:bg-line/40"
+                  onClick={() => { setCustomer(c); setCustomerQuery(c.name); setCustomerResults([]); if (c.email) setBillEmail(c.email) }}
+                >
+                  {c.name}{c.email ? <span className="text-muted"> — {c.email}</span> : null}
+                </button>
+              ))}
+            </div>
+          )}
+        </Labeled>
+
+        {customer && (
+          <>
+            <Labeled label="Send-to email, for when you're ready — the on-file address isn't always the right one">
+              <input className={inputCls} value={billEmail} onChange={(e) => setBillEmail(e.target.value)} placeholder="client@company.com" />
+            </Labeled>
+            <Labeled label="CC (always accounting, unless you clear it)">
+              <input className={inputCls} value={ccEmail} onChange={(e) => setCcEmail(e.target.value)} placeholder="accounting@strawhutmedia.com" />
+            </Labeled>
+
+            <div className="space-y-2">
+              <span className={labelCls}>Line items</span>
+              {lines.map((l, i) => (
+                <div key={i} className="flex flex-wrap gap-2 items-center">
+                  <select
+                    className={`${inputCls} w-auto`}
+                    value={l.itemId}
+                    onChange={(e) => {
+                      const it = items.find((x) => x.id === e.target.value)
+                      updateLine(i, { itemId: e.target.value, rate: it?.unitPrice ?? l.rate })
+                    }}
+                  >
+                    {items.map((it) => <option key={it.id} value={it.id}>{it.name}</option>)}
+                  </select>
+                  <input className={`${inputCls} flex-1 min-w-[160px]`} placeholder="Description" value={l.description}
+                    onChange={(e) => updateLine(i, { description: e.target.value })} />
+                  <input className={`${inputCls} w-20`} type="number" min={0} value={l.qty}
+                    onChange={(e) => updateLine(i, { qty: Number(e.target.value) })} />
+                  <span className="text-muted text-sm">@</span>
+                  <input className={`${inputCls} w-28`} type="number" min={0} step="0.01" value={l.rate}
+                    onChange={(e) => updateLine(i, { rate: Number(e.target.value) })} />
+                  <Btn variant="danger" onClick={() => removeLine(i)}>✕</Btn>
+                </div>
+              ))}
+              <Btn variant="ghost" onClick={addLine}>+ Add line item</Btn>
+            </div>
+
+            <div className="flex gap-3 flex-wrap">
+              <Labeled label="Due date">
+                <input className={inputCls} type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} />
+              </Labeled>
+              <Labeled label="Note to customer">
+                <input className={inputCls} value={note} onChange={(e) => setNote(e.target.value)} />
+              </Labeled>
+            </div>
+
+            <div className="flex items-center justify-between pt-2">
+              <span className="text-lg font-bold">${total.toLocaleString('en-US', { minimumFractionDigits: 2 })}</span>
+              <Btn variant="primary" onClick={createDraft} disabled={creating}>
+                {creating ? 'Creating…' : 'Create draft (does not send)'}
+              </Btn>
+            </div>
+          </>
+        )}
+      </div>
+
+      <div className="space-y-2 border-t border-line pt-4">
+        <div className="flex items-center justify-between">
+          <span className={labelCls}>Recent invoices</span>
+          <Btn variant="ghost" onClick={reload}>{loadingList ? 'Loading…' : 'Refresh'}</Btn>
+        </div>
+        {invoices.length === 0 && <p className="text-sm text-muted">No invoices yet.</p>}
+        {invoices.map((inv) => (
+          <div key={inv.id} className="rounded-xl border border-line p-3 space-y-2">
+            <div className="flex items-center justify-between flex-wrap gap-2">
+              <div>
+                <span className="font-bold">#{inv.docNumber || inv.id}</span>{' '}
+                <span className="text-muted">{inv.customerName}</span>
+                {inv.ccEmail && <span className="text-[10px] text-muted block">cc: {inv.ccEmail}</span>}
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-sm">${inv.total.toLocaleString('en-US', { minimumFractionDigits: 2 })}</span>
+                <span className={`text-[10px] uppercase tracking-wider font-bold rounded-full px-2 py-1 border ${
+                  inv.paid ? 'text-stage-done border-stage-done/40 bg-stage-done/10'
+                    : inv.sent ? 'text-stage-mastering border-stage-mastering/40 bg-stage-mastering/10'
+                    : 'text-muted border-line bg-line/20'
+                }`}>
+                  {inv.paid ? 'Paid' : inv.sent ? 'Sent' : 'Draft — not sent'}
+                </span>
+              </div>
+            </div>
+            {!inv.sent && (
+              <div className="flex items-center gap-2 flex-wrap">
+                <input
+                  className={`${inputCls} flex-1 min-w-[200px]`}
+                  placeholder="Send to…"
+                  value={sendTo[inv.id] ?? inv.billEmail ?? ''}
+                  onChange={(e) => setSendTo((s) => ({ ...s, [inv.id]: e.target.value }))}
+                />
+                <Btn variant="primary" onClick={() => sendInvoice(inv)}>Send</Btn>
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
     </div>
   )
 }

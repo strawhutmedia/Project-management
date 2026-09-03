@@ -33,6 +33,7 @@ import { cashflowRouter } from './routes/cashflow'
 import { intakeRouter } from './routes/intake'
 import { audienceRouter } from './routes/audience'
 import { quickbooksRouter } from './routes/quickbooks'
+import { qbInvoicesRouter } from './routes/qb_invoices'
 import { handleResendWebhook } from './routes/outreach_webhook'
 import { seedBackInYourArms } from './seeds/back_in_your_arms'
 import { seedMadelineInvite } from './seeds/invite_madeline'
@@ -131,6 +132,7 @@ app.use('/api/intake', intakeRouter)
 // public (ManyChat posts to it); everything else requires a session.
 app.use('/api/audience', audienceRouter)
 app.use('/api/qb', quickbooksRouter)
+app.use('/api/qb', qbInvoicesRouter)
 
 // Public per-show one-sheet page (guest outreach). Mounted at the root
 // so URLs are /shows/<slug>, and BEFORE the SPA fallback so requests
