@@ -314,7 +314,7 @@ What moved this week, and what it means for bookings.
 
 The Corner Office
 ~Segment 02
-One marquee interview — the CEOs who run travel, founder-to-founder.
+One marquee interview — the CEOs who run travel, founder-to-founder — cut to a tight, concise 20 minutes.
 
 The Playbook
 ~Segment 03
@@ -322,7 +322,7 @@ One tactic to use with clients on Monday.
 
 Bonus Episodes
 ~Specials
-Celebrity travelers — the Phil Rosenthal and Josh Brolin conversations — as specials in the same feed, bringing a consumer audience with them.`,
+Long-form celebrity interviews — the Phil Rosenthal and Josh Brolin conversations — as specials in the same feed, bringing a consumer audience with them.`,
     },
     {
       kind: 'text',
