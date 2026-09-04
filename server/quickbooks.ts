@@ -147,7 +147,7 @@ export async function qbFetch(path: string, init?: RequestInit): Promise<unknown
     // disconnected/revoked in QBO. Clear the stale connection so the UI
     // shows disconnected state and the user can reconnect.
     const textLower = text.toLowerCase()
-    if (res.status === 403 && (textLower.includes('applicationauthorizationfailed') || text.includes('"code":"3100"'))) {
+    if (res.status === 403 && (textLower.includes('applicationauthorizationfailed') || /"code"\s*:\s*"0*3100"/i.test(text) || /"code"\s*:\s*"3100"/i.test(text))) {
       await clearConnection().catch(() => {})
       throw new Error('not_connected')
     }

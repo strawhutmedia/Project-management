@@ -72,10 +72,10 @@ qbInvoicesRouter.get('/customers/search', async (req, res) => {
     res.json({ customers })
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err)
-    logError('qb customer search failed', { error: msg })
     if (msg === 'not_connected') {
       res.status(401).json({ error: 'not_connected', detail: 'QuickBooks authorization required' })
     } else {
+      logError('qb customer search failed', { error: msg })
       res.status(500).json({ error: 'qb_error', detail: msg })
     }
   }
@@ -92,10 +92,10 @@ qbInvoicesRouter.get('/items', async (_req, res) => {
     res.json({ items })
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err)
-    logError('qb items list failed', { error: msg })
     if (msg === 'not_connected') {
       res.status(401).json({ error: 'not_connected', detail: 'QuickBooks authorization required' })
     } else {
+      logError('qb items list failed', { error: msg })
       res.status(500).json({ error: 'qb_error', detail: msg })
     }
   }
@@ -139,10 +139,10 @@ qbInvoicesRouter.get('/invoices', async (_req, res) => {
     res.json({ invoices })
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err)
-    logError('qb invoices list failed', { error: msg })
     if (msg === 'not_connected') {
       res.status(401).json({ error: 'not_connected', detail: 'QuickBooks authorization required' })
     } else {
+      logError('qb invoices list failed', { error: msg })
       res.status(500).json({ error: 'qb_error', detail: msg })
     }
   }
@@ -195,10 +195,10 @@ qbInvoicesRouter.post('/invoices', async (req, res) => {
     res.json({ invoice: invoiceToApi(data.Invoice) })
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err)
-    logError('qb invoice create failed', { error: msg })
     if (msg === 'not_connected') {
       res.status(401).json({ error: 'not_connected', detail: 'QuickBooks authorization required' })
     } else {
+      logError('qb invoice create failed', { error: msg })
       res.status(500).json({ error: 'qb_error', detail: msg })
     }
   }
