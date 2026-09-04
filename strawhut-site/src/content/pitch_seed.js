@@ -296,69 +296,50 @@ export const TRADE_WINDS_PITCH = {
       kind: 'text',
       eyebrow: 'The idea',
       heading: 'The show a travel advisor plays Monday morning.',
-      body: `<p class="big">Travel is being rewritten in real time — AI is upending how trips are planned and booked, wars and geopolitics are redrawing the map month to month, and overtourism is changing what destinations even want. The travel trade — agents, advisors, tour operators — has to navigate all of it, and has no trusted weekly voice to do it with.</p>
-<p><em>Trade Winds</em> is that voice: what changed this week, why it matters, and what to do about it — from the one host every CEO in the industry will actually sit down with.</p>`,
-    },
-    {
-      kind: 'text',
-      eyebrow: 'Why now',
-      heading: 'The seat is open.',
-      body: `<ul>
-<li>AI booking tools are coming for the agent's role — agents need a guide, fast</li>
-<li>Conflict and geopolitics are rerouting demand in real time</li>
-<li>Record post-pandemic volume, thinner margins, higher client expectations</li>
-<li>No premium B2B travel show owns this slot</li>
-</ul>`,
+      body: `<p class="big">AI, geopolitics, and overtourism are rewriting travel in real time, and the trade has no trusted weekly voice to navigate it. <em>Trade Winds</em> is that voice — from the one host every CEO in the industry will sit down with.</p>
+<p>For travel advisors · tour operators · tourism boards · travel tech.</p>`,
     },
     {
       kind: 'cards',
-      eyebrow: 'The format — weekly, 35–45 min',
-      heading: 'Three segments, every week.',
+      eyebrow: 'Weekly · 35–45 min',
+      heading: '',
       body: `The Briefing
 ~Segment 01
-What moved this week — AI, policy, geopolitics, consumer shifts — and what it means for bookings.
+What moved this week, and what it means for bookings.
 
 The Corner Office
 ~Segment 02
-One marquee interview: the founders and CEOs who run travel, speaking founder-to-founder with Bruce.
+One marquee interview — the CEOs who run travel, founder-to-founder.
 
 The Playbook
 ~Segment 03
-One tactical takeaway an advisor or operator can use with clients on Monday morning.`,
+One tactic to use with clients on Monday.`,
     },
     {
       kind: 'text',
       eyebrow: 'The host',
-      heading: 'Bruce Poon Tip — the one voice the whole trade trusts.',
+      heading: 'Bruce Poon Tip',
       body: `<ul>
-<li>Built <strong>G&nbsp;Adventures</strong> into the world's largest independent adventure travel company — sells through the agent channel every day</li>
-<li>Officer of the Order of Canada (2023) — the travel industry's first in 34 years</li>
-<li>EP of <em>The Last Tourist</em>; NYT-bestselling author of <em>Looptail</em></li>
-<li>His peer group is the guest list: the CEOs of the Virgin and Uber tier</li>
-<li>Hosts <strong>GX</strong>, his annual summit of agents, operators, media, and influencers</li>
+<li>Founder of <strong>G&nbsp;Adventures</strong> — sells through the agent channel every day</li>
+<li>Officer of the Order of Canada; EP of <em>The Last Tourist</em>; NYT-bestselling author of <em>Looptail</em></li>
+<li>Hosts <strong>GX</strong>, his annual summit of this exact audience — the built-in launchpad and live stage</li>
 </ul>`,
     },
     {
-      kind: 'chips',
-      eyebrow: 'Who it’s for',
-      heading: '',
-      body: `Travel advisors & agencies
-Tour operators
-Tourism boards & DMOs
-Hospitality & travel tech`,
-    },
-    {
       kind: 'text',
-      eyebrow: 'The built-in flywheel',
-      heading: 'GX is the launchpad.',
-      body: `<p>Bruce already hosts an annual summit of exactly this audience — agents, tour operators, media, influencers. That's a live-show stage, a guaranteed launch audience, and an annual tentpole episode. G&nbsp;Adventures' global agent network carries it the rest of the year, and Straw Hut runs production, distribution, and growth.</p>
-<p><strong>The money follows the room:</strong> a pure B2B travel-trade audience is what tourism boards, travel tech, and suppliers pay premium rates to reach — sponsorship, GX activations, and branded segments from day one.</p>`,
+      eyebrow: 'Where it grows',
+      heading: 'One show, three acts.',
+      body: `<ul>
+<li><strong>Own the trade.</strong> Launch at GX, become the industry's weekly habit, and let B2B sponsors fund it from day one.</li>
+<li><strong>Open the doors to celebrities.</strong> The show becomes the platform for Bruce's celebrity travel conversations — the Phil Rosenthal and Josh Brolin tier — bringing a consumer audience with them.</li>
+<li><strong>Communityship throughout.</strong> The philosophy behind Bruce's next book is the show's spine — every conversation is about businesses built on community — and the show becomes the book's home when it lands.</li>
+</ul>`,
     },
     {
       kind: 'text',
       eyebrow: 'Next step',
       heading: 'Greenlight a pilot.',
-      body: `Pilot with Bruce, line up the first three Corner Office guests, and aim the launch window at the next GX.`,
+      body: `Book the first three Corner Office guests and launch at the next GX.`,
     },
   ],
 };
