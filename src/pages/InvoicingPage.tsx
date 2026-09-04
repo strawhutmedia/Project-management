@@ -24,7 +24,7 @@ const todayISO = () => new Date().toISOString().slice(0, 10)
 const defaultPeriod = () => new Date().toLocaleString('en-US', { month: 'long', year: 'numeric' })
 
 type EditItem = { desc: string; hours: string; rate: string }
-type Tab = 'dashboard' | 'new' | 'invoices' | 'contractors' | 'settings'
+type Tab = 'dashboard' | 'new' | 'invoices' | 'clients' | 'contractors' | 'settings'
 
 // Parse pasted spreadsheet rows / CSV into line items.
 function parseRows(text: string, fallbackRateCents: number): EditItem[] {
@@ -133,8 +133,9 @@ export default function InvoicingPage() {
 
   const tabs: { key: Tab; label: string }[] = [
     { key: 'dashboard', label: 'Dashboard' },
+    { key: 'clients', label: 'Client Invoices' },
     { key: 'new', label: 'New Invoice' },
-    { key: 'invoices', label: 'Invoices' },
+    { key: 'invoices', label: 'Contractor Invoices' },
     { key: 'contractors', label: 'Contractors' },
     { key: 'settings', label: 'Settings' },
   ]
@@ -172,6 +173,11 @@ export default function InvoicingPage() {
           contractorCount={contractors.length} invoices={invoices.slice(0, 6)}
           onOpen={(id) => setViewingId(id)} onNew={() => setTab('new')}
         />
+      ) : tab === 'clients' ? (
+        <div className="space-y-4 max-w-2xl">
+          <QuickBooksCard flash={flash} />
+          <ClientInvoicesCard flash={flash} />
+        </div>
       ) : tab === 'new' ? (
         <NewInvoice
           contractors={contractors} settings={settings} flash={flash}
@@ -793,9 +799,6 @@ function SettingsPanel({ settings, onSaved, flash }: {
         </div>
         <div className="flex justify-end"><Btn variant="primary" onClick={save} disabled={saving}>{saving ? 'Saving…' : 'Save settings'}</Btn></div>
       </div>
-
-      <QuickBooksCard flash={flash} />
-      <ClientInvoicesCard flash={flash} />
     </div>
   )
 }
