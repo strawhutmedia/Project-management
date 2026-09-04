@@ -327,8 +327,8 @@ Celebrity travelers — the Phil Rosenthal and Josh Brolin conversations — as 
     {
       kind: 'text',
       eyebrow: 'Next step',
-      heading: 'Greenlight a pilot.',
-      body: `Book the first three Corner Office guests and launch at the next GX — the annual room of exactly this audience — with B2B sponsors from day one.`,
+      heading: 'Ready to go?',
+      body: `Say the word and we're rolling — the first three Corner Office guests booked, launching at the next GX — the annual room of exactly this audience — with B2B sponsors from day one.`,
     },
   ],
 };
