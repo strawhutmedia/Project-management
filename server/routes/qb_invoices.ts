@@ -18,17 +18,16 @@
 //                                      in the UI — no automated code path
 //                                      in this app calls it.
 //
-// Owner-only (requireOwner from ../auth) — which now also covers anyone
-// flagged is_invoicing_owner (see migration 136), currently Caroline,
-// given the same full access as Ryan across invoicing/payroll, Cash
-// Flow, and QuickBooks.
+// Owner OR the named invoicing co-owner (Caroline — see migration 136 and
+// requireInvoicingAccess in ../auth). This is the client-facing (AR) side
+// specifically; contractor payroll/W9 and Cash Flow stay owner-only.
 import { Router } from 'express'
-import { requireOwner } from '../auth'
+import { requireInvoicingAccess } from '../auth'
 import { logError, logInfo } from '../diag'
 import { qbFetch } from '../quickbooks'
 
 export const qbInvoicesRouter = Router()
-qbInvoicesRouter.use(requireOwner)
+qbInvoicesRouter.use(requireInvoicingAccess)
 
 // Escape a value for QBO's SQL-like query language (single quotes only —
 // this is not a real SQL injection surface since qbFetch requires an
@@ -241,8 +240,8 @@ qbInvoicesRouter.put('/invoices/:id', async (req, res) => {
 // POST send — THE only endpoint in this file that emails a client.
 // Works the same whether the invoice has never been sent or is being
 // resent after a correction (QBO just re-sends). Owner-only (route-level
-// requireOwner above, which also covers Caroline), and only ever
-// reachable via an explicit button press in the Invoicing UI.
+// requireInvoicingAccess above), and only ever reachable via an explicit
+// button press in the Invoicing UI.
 qbInvoicesRouter.post('/invoices/:id/send', async (req, res) => {
   const id = req.params.id
   const sendTo = String(req.body?.sendTo || '').trim()

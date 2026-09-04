@@ -63,9 +63,10 @@ function Stat({ label, value, tone }: { label: string; value: string; tone?: 'go
   )
 }
 
-// The server is the real gate (403s for anyone but the owner — which
-// also covers is_invoicing_owner, migration 136, currently Caroline).
-// This client-side check just hides the UI from other signed-in accounts.
+// The server is the real gate (403s for anyone but the owner). This
+// client-side check just hides the UI from other signed-in accounts.
+// Deliberately Ryan-only — Cash Flow does NOT extend to the invoicing
+// co-owner (Caroline); see server/auth.ts requireInvoicingAccess.
 const OWNER_EMAIL = 'ryan@strawhutmedia.com'
 
 type EntryDraft = {
@@ -129,7 +130,7 @@ export default function CashFlowPage() {
   const monthsNewestFirst = useMemo(() => (overview ? [...overview.months].reverse() : []), [overview])
 
   if (!user) return null
-  if ((user.email || '').trim().toLowerCase() !== OWNER_EMAIL && !user.is_invoicing_owner) {
+  if ((user.email || '').trim().toLowerCase() !== OWNER_EMAIL) {
     return <div className="max-w-2xl"><div className={`${card} p-8 text-center text-muted`}>This section is private.</div></div>
   }
   if (loading || !overview) return <div className="text-muted text-sm">Loading cash flow…</div>
