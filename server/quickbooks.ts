@@ -115,9 +115,16 @@ async function validAccessToken(): Promise<{ token: string; realmId: string } | 
   if (!c) return null
   const exp = new Date(c.access_expires_at).getTime()
   if (Date.now() < exp - 120_000) return { token: c.access_token, realmId: c.realm_id }
-  const t = await refreshTokens(c.refresh_token)
-  await saveConnection(c.realm_id, t)
-  return { token: t.access_token, realmId: c.realm_id }
+  try {
+    const t = await refreshTokens(c.refresh_token)
+    await saveConnection(c.realm_id, t)
+    return { token: t.access_token, realmId: c.realm_id }
+  } catch (err) {
+    // Refresh token expired or revoked — clear the stale connection so the
+    // user sees disconnected state and can reconnect.
+    await clearConnection().catch(() => {})
+    return null
+  }
 }
 
 // Authenticated QuickBooks API call (path is relative to the company base,
@@ -136,6 +143,14 @@ export async function qbFetch(path: string, init?: RequestInit): Promise<unknown
   })
   if (!res.ok) {
     const text = await res.text().catch(() => '')
+    // 403 ApplicationAuthorizationFailed (code 3100) means the app was
+    // disconnected/revoked in QBO. Clear the stale connection so the UI
+    // shows disconnected state and the user can reconnect.
+    const textLower = text.toLowerCase()
+    if (res.status === 403 && (textLower.includes('applicationauthorizationfailed') || text.includes('"code":"3100"'))) {
+      await clearConnection().catch(() => {})
+      throw new Error('not_connected')
+    }
     throw new Error(`quickbooks api ${res.status}: ${text.slice(0, 300)}`)
   }
   return res.json()

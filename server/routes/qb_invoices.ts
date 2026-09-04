@@ -71,8 +71,13 @@ qbInvoicesRouter.get('/customers/search', async (req, res) => {
     }))
     res.json({ customers })
   } catch (err) {
-    logError('qb customer search failed', { error: err instanceof Error ? err.message : String(err) })
-    res.status(500).json({ error: 'qb_error', detail: err instanceof Error ? err.message : String(err) })
+    const msg = err instanceof Error ? err.message : String(err)
+    logError('qb customer search failed', { error: msg })
+    if (msg === 'not_connected') {
+      res.status(401).json({ error: 'not_connected', detail: 'QuickBooks authorization required' })
+    } else {
+      res.status(500).json({ error: 'qb_error', detail: msg })
+    }
   }
 })
 
@@ -86,8 +91,13 @@ qbInvoicesRouter.get('/items', async (_req, res) => {
       .map((i) => ({ id: i.Id, name: i.Name, unitPrice: i.UnitPrice ?? 0 }))
     res.json({ items })
   } catch (err) {
-    logError('qb items list failed', { error: err instanceof Error ? err.message : String(err) })
-    res.status(500).json({ error: 'qb_error', detail: err instanceof Error ? err.message : String(err) })
+    const msg = err instanceof Error ? err.message : String(err)
+    logError('qb items list failed', { error: msg })
+    if (msg === 'not_connected') {
+      res.status(401).json({ error: 'not_connected', detail: 'QuickBooks authorization required' })
+    } else {
+      res.status(500).json({ error: 'qb_error', detail: msg })
+    }
   }
 })
 
@@ -128,8 +138,13 @@ qbInvoicesRouter.get('/invoices', async (_req, res) => {
     const invoices = (data.QueryResponse?.Invoice ?? []).map(invoiceToApi)
     res.json({ invoices })
   } catch (err) {
-    logError('qb invoices list failed', { error: err instanceof Error ? err.message : String(err) })
-    res.status(500).json({ error: 'qb_error', detail: err instanceof Error ? err.message : String(err) })
+    const msg = err instanceof Error ? err.message : String(err)
+    logError('qb invoices list failed', { error: msg })
+    if (msg === 'not_connected') {
+      res.status(401).json({ error: 'not_connected', detail: 'QuickBooks authorization required' })
+    } else {
+      res.status(500).json({ error: 'qb_error', detail: msg })
+    }
   }
 })
 
@@ -179,8 +194,13 @@ qbInvoicesRouter.post('/invoices', async (req, res) => {
     logInfo('qb invoice draft created', { invoiceId: data.Invoice.Id, customerId })
     res.json({ invoice: invoiceToApi(data.Invoice) })
   } catch (err) {
-    logError('qb invoice create failed', { error: err instanceof Error ? err.message : String(err) })
-    res.status(500).json({ error: 'qb_error', detail: err instanceof Error ? err.message : String(err) })
+    const msg = err instanceof Error ? err.message : String(err)
+    logError('qb invoice create failed', { error: msg })
+    if (msg === 'not_connected') {
+      res.status(401).json({ error: 'not_connected', detail: 'QuickBooks authorization required' })
+    } else {
+      res.status(500).json({ error: 'qb_error', detail: msg })
+    }
   }
 })
 
@@ -232,8 +252,13 @@ qbInvoicesRouter.put('/invoices/:id', async (req, res) => {
     logInfo('qb invoice updated', { invoiceId: id })
     res.json({ invoice: invoiceToApi(data.Invoice) })
   } catch (err) {
-    logError('qb invoice update failed', { invoiceId: id, error: err instanceof Error ? err.message : String(err) })
-    res.status(500).json({ error: 'qb_error', detail: err instanceof Error ? err.message : String(err) })
+    const msg = err instanceof Error ? err.message : String(err)
+    logError('qb invoice update failed', { invoiceId: id, error: msg })
+    if (msg === 'not_connected') {
+      res.status(401).json({ error: 'not_connected', detail: 'QuickBooks authorization required' })
+    } else {
+      res.status(500).json({ error: 'qb_error', detail: msg })
+    }
   }
 })
 
@@ -257,7 +282,12 @@ qbInvoicesRouter.post('/invoices/:id/send', async (req, res) => {
     logInfo('qb invoice sent', { invoiceId: id, sendTo })
     res.json({ ok: true, invoice: data.Invoice ? invoiceToApi(data.Invoice) : null })
   } catch (err) {
-    logError('qb invoice send failed', { invoiceId: id, error: err instanceof Error ? err.message : String(err) })
-    res.status(500).json({ error: 'qb_error', detail: err instanceof Error ? err.message : String(err) })
+    const msg = err instanceof Error ? err.message : String(err)
+    logError('qb invoice send failed', { invoiceId: id, error: msg })
+    if (msg === 'not_connected') {
+      res.status(401).json({ error: 'not_connected', detail: 'QuickBooks authorization required' })
+    } else {
+      res.status(500).json({ error: 'qb_error', detail: msg })
+    }
   }
 })
