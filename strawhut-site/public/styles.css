@@ -854,7 +854,9 @@ main { overflow-x: clip; }
 .admin-nav a { display: flex; align-items: center; gap: 10px; padding: 11px 14px; border-radius: 10px; color: var(--muted); font-weight: 500; margin-bottom: 2px; }
 .admin-nav a:hover { background: var(--card); color: var(--text); }
 .admin-nav a.active { background: var(--accent); color: var(--accent-ink); }
-.admin-main { padding: 34px 40px; }
+/* min-width: 0 — grid children default to min-width:auto, so one wide table
+   drags the whole main column past the phone's screen edge. */
+.admin-main { padding: 34px 40px; min-width: 0; }
 .admin-main h1 { margin: 0 0 24px; }
 .stat-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 18px; margin-bottom: 34px; }
 .stat {
