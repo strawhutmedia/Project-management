@@ -118,15 +118,15 @@ export default function Layout() {
                         🎬 Teleprompter
                       </NavMenuLink>
                     )}
+                    {(user?.email?.trim().toLowerCase() === 'ryan@strawhutmedia.com' || user?.is_invoicing_owner) && (
+                      <NavMenuLink to="/invoicing" onClick={() => setNavOpen(false)}>
+                        🧾 Invoices
+                      </NavMenuLink>
+                    )}
                     {user?.email?.trim().toLowerCase() === 'ryan@strawhutmedia.com' && (
-                      <>
-                        <NavMenuLink to="/invoicing" onClick={() => setNavOpen(false)}>
-                          🧾 Invoices
-                        </NavMenuLink>
-                        <NavMenuLink to="/cashflow" onClick={() => setNavOpen(false)}>
-                          💵 Cash Flow
-                        </NavMenuLink>
-                      </>
+                      <NavMenuLink to="/cashflow" onClick={() => setNavOpen(false)}>
+                        💵 Cash Flow
+                      </NavMenuLink>
                     )}
                     {user?.role === 'admin' && (
                       <>

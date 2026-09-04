@@ -18,6 +18,7 @@ export type SessionUser = {
   display_name: string | null
   role: UserRole
   timezone: string
+  is_invoicing_owner: boolean
 }
 
 // Convenience: returns true for viewer accounts (read-only). Used by
@@ -55,7 +56,7 @@ export async function getSessionUser(req: Request): Promise<SessionUser | null> 
   const sid = req.cookies?.[SESSION_COOKIE]
   if (!sid) return null
   const { rows } = await pool.query(
-    `SELECT u.id, u.email, u.name, u.display_name, u.role, u.timezone
+    `SELECT u.id, u.email, u.name, u.display_name, u.role, u.timezone, u.is_invoicing_owner
      FROM sessions s JOIN users u ON u.id = s.user_id
      WHERE s.id = $1 AND s.expires_at > now()`,
     [sid],
@@ -120,6 +121,27 @@ export async function requireOwner(req: Request, res: Response, next: NextFuncti
   next()
 }
 
+// A narrow, named second seat on the CLIENT (AR) side of invoicing —
+// QuickBooks connection + Client Invoices — granted via the
+// `is_invoicing_owner` flag (see migration 136). Ryan asked for Caroline
+// specifically to have this, since she's the one who edits/sends client
+// invoices day to day. Deliberately NOT wired into requireOwner/isOwner
+// themselves, so it does not also widen Cash Flow or contractor
+// payroll/W9 (TIN) access — those stay locked to the single owner.
+export function isInvoicingCoOwner(user: { is_invoicing_owner?: boolean }): boolean {
+  return Boolean(user.is_invoicing_owner)
+}
+
+export async function requireInvoicingAccess(req: Request, res: Response, next: NextFunction) {
+  const u = await getSessionUser(req)
+  if (!u || !(isOwner(u) || isInvoicingCoOwner(u))) {
+    res.status(403).json({ error: 'forbidden' })
+    return
+  }
+  ;(req as Request & { user: SessionUser }).user = u
+  next()
+}
+
 function safeEqual(a: string, b: string): boolean {
   const ba = Buffer.from(a)
   const bb = Buffer.from(b)
@@ -141,7 +163,7 @@ export async function requireOwnerOrService(req: Request, res: Response, next: N
     (authHeader.startsWith('Bearer ') ? authHeader.slice(7).trim() : '')
   if (expected && header && safeEqual(header, expected)) {
     const { rows } = await pool.query(
-      `SELECT id, email, name, display_name, role, timezone FROM users WHERE lower(email) = $1 LIMIT 1`,
+      `SELECT id, email, name, display_name, role, timezone, is_invoicing_owner FROM users WHERE lower(email) = $1 LIMIT 1`,
       [ownerEmail()],
     )
     if (!rows[0]) { res.status(500).json({ error: 'owner_user_missing' }); return }
