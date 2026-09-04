@@ -1,9 +1,9 @@
 {
   "version": "0.2.2",
-  "now": "2026-09-04T05:13:07.410Z",
+  "now": "2026-09-04T18:31:23.917Z",
   "boot": {
-    "startedAt": "2026-09-04T05:13:07.082Z",
-    "completedAt": "2026-09-04T05:13:07.396Z",
+    "startedAt": "2026-09-04T18:31:23.600Z",
+    "completedAt": "2026-09-04T18:31:23.910Z",
     "error": null
   },
   "env": {
@@ -169,7 +169,8 @@
       "132_cashflow_codestrap_rate_increase.sql",
       "133_cashflow_indiefilmaking_churned_confirmed.sql",
       "134_cashflow_expense_corrections.sql",
-      "135_cashflow_gohighlevel_calendly_note.sql"
+      "135_cashflow_gohighlevel_calendly_note.sql",
+      "136_invoicing_co_owner.sql"
     ],
     "userCount": 12,
     "projectCount": 16
@@ -177,7 +178,7 @@
   "recentLog": [
     {
       "level": "info",
-      "ts": "2026-09-04T05:13:07.078Z",
+      "ts": "2026-09-04T18:31:23.599Z",
       "msg": "serving client from",
       "data": {
         "clientDir": "/app/dist"
@@ -185,7 +186,7 @@
     },
     {
       "level": "info",
-      "ts": "2026-09-04T05:13:07.082Z",
+      "ts": "2026-09-04T18:31:23.600Z",
       "msg": "boot starting",
       "data": {
         "cwd": "/app",
@@ -196,12 +197,12 @@
     },
     {
       "level": "info",
-      "ts": "2026-09-04T05:13:07.316Z",
+      "ts": "2026-09-04T18:31:23.813Z",
       "msg": "migrations complete"
     },
     {
       "level": "info",
-      "ts": "2026-09-04T05:13:07.386Z",
+      "ts": "2026-09-04T18:31:23.900Z",
       "msg": "wardrobe outfits: applied",
       "data": {
         "projectId": "12f53ed1-c6c7-4c11-8d7b-06d91744c9af",
@@ -212,7 +213,7 @@
     },
     {
       "level": "info",
-      "ts": "2026-09-04T05:13:07.386Z",
+      "ts": "2026-09-04T18:31:23.900Z",
       "msg": "BIYA seed: project already exists, ensured shoot days",
       "data": {
         "projectId": "12f53ed1-c6c7-4c11-8d7b-06d91744c9af"
@@ -220,17 +221,17 @@
     },
     {
       "level": "info",
-      "ts": "2026-09-04T05:13:07.396Z",
+      "ts": "2026-09-04T18:31:23.910Z",
       "msg": "listening on :8080"
     },
     {
       "level": "info",
-      "ts": "2026-09-04T05:13:07.397Z",
+      "ts": "2026-09-04T18:31:23.910Z",
       "msg": "scheduler started (every 5 min)"
     },
     {
       "level": "info",
-      "ts": "2026-09-04T05:13:07.402Z",
+      "ts": "2026-09-04T18:31:23.913Z",
       "msg": "autopilot: loop started",
       "data": {
         "tickMinutes": 10
@@ -238,7 +239,7 @@
     },
     {
       "level": "info",
-      "ts": "2026-09-04T05:13:07.402Z",
+      "ts": "2026-09-04T18:31:23.913Z",
       "msg": "cashflow payment check: loop started",
       "data": {
         "tickHours": 6
