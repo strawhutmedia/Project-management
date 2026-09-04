@@ -345,7 +345,7 @@ export function pitchPage({ pitch }) {
   section{padding:64px 0;border-top:1px solid var(--line-soft)}
   section > :last-child{margin-bottom:0}
 
-  .cover{padding:84px 0 72px;text-align:center}
+  .cover{padding-top:84px;padding-bottom:72px;text-align:center}
   .cover .studio{font-family:var(--font-label);font-weight:600;font-size:12px;letter-spacing:.2em;text-transform:uppercase;color:var(--ink-soft);margin:0 0 34px}
   .mark{width:70px;height:auto;max-height:70px;margin:0 auto 28px;display:block}
   .cover h1{font-size:clamp(44px,9vw,92px);letter-spacing:var(--display-tracking)}
@@ -380,7 +380,7 @@ export function pitchPage({ pitch }) {
   .alt-titles{display:flex;flex-wrap:wrap;gap:10px;margin-top:6px}
   .alt-titles span{font-family:var(--font-display);font-weight:var(--display-weight);font-size:16px;border:1px solid var(--card-border);background:var(--tag-bg);padding:8px 18px;border-radius:999px}
 
-  .close{padding:72px 0 40px;text-align:center;border-top:1px solid var(--line-soft)}
+  .close{padding-top:72px;padding-bottom:40px;text-align:center;border-top:1px solid var(--line-soft)}
   .close .contact{margin:0 auto;max-width:520px;background:var(--card);border:1px solid var(--card-border);padding:26px 26px}
   .close .who{font-family:var(--font-display);font-weight:var(--display-weight);font-size:22px}
   .close .co{font-family:var(--font-label);font-size:12px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:var(--brass);margin:4px 0 14px}
