@@ -29,7 +29,11 @@ function adminLayout({ title, active, body, stats }) {
 <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <title>${esc(title)} · Straw Hut Admin</title>${FONT}
 <link rel="stylesheet" href="/styles.css"></head>
-<body class="admin-body"><div class="admin-shell">
+<body class="admin-body"><div class="admin-shell" id="admin-shell">
+  <header class="admin-topbar">
+    <button type="button" class="admin-menu-btn" id="admin-menu-btn" aria-label="Open menu" aria-expanded="false">&#9776;</button>
+    <div class="brand">Straw Hut<span class="dot" style="color:var(--accent)">.</span></div>
+  </header>
   <aside class="admin-side">
     <div class="brand">Straw Hut<span class="dot" style="color:var(--accent)">.</span></div>
     <nav class="admin-nav">${nav}</nav>
@@ -38,8 +42,28 @@ function adminLayout({ title, active, body, stats }) {
       <a href="/admin/logout" style="color:var(--muted)">Log out</a>
     </div>
   </aside>
+  <div class="admin-backdrop" id="admin-backdrop"></div>
   <main class="admin-main">${body}</main>
-</div></body></html>`;
+</div>
+<script>
+(function () {
+  var shell = document.getElementById('admin-shell');
+  var btn = document.getElementById('admin-menu-btn');
+  var backdrop = document.getElementById('admin-backdrop');
+  if (!shell || !btn) return;
+  function setOpen(open) {
+    shell.classList.toggle('nav-open', open);
+    btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+  }
+  btn.addEventListener('click', function () { setOpen(!shell.classList.contains('nav-open')); });
+  if (backdrop) backdrop.addEventListener('click', function () { setOpen(false); });
+  var links = document.querySelectorAll('.admin-nav a');
+  for (var i = 0; i < links.length; i++) {
+    links[i].addEventListener('click', function () { setOpen(false); });
+  }
+})();
+</script>
+</body></html>`;
 }
 
 export function loginPage({ error } = {}) {
