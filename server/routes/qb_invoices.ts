@@ -40,10 +40,11 @@ type QbItem = { Id: string; Name: string; UnitPrice?: number; Type?: string }
 type QbInvoiceLine = {
   Amount?: number
   Description?: string
-  SalesItemLineDetail?: { ItemRef?: { name?: string }; Qty?: number; UnitPrice?: number }
+  SalesItemLineDetail?: { ItemRef?: { value?: string; name?: string }; Qty?: number; UnitPrice?: number }
 }
 type QbInvoice = {
   Id: string
+  SyncToken?: string
   DocNumber?: string
   TotalAmt?: number
   Balance?: number
@@ -52,6 +53,7 @@ type QbInvoice = {
   CustomerRef?: { value?: string; name?: string }
   BillEmail?: { Address?: string }
   BillEmailCc?: { Address?: string }
+  CustomerMemo?: { value?: string }
   EmailStatus?: string
   Line?: QbInvoiceLine[]
 }
@@ -100,12 +102,14 @@ function invoiceToApi(inv: QbInvoice) {
     customerName: inv.CustomerRef?.name ?? '',
     billEmail: inv.BillEmail?.Address ?? null,
     ccEmail: inv.BillEmailCc?.Address ?? null,
+    note: inv.CustomerMemo?.value ?? '',
     // QBO's EmailStatus: 'NotSet' (never sent) | 'NeedToSend' | 'EmailSent'.
     sent: inv.EmailStatus === 'EmailSent',
     paid: (inv.Balance ?? inv.TotalAmt ?? 0) <= 0,
     lines: (inv.Line ?? [])
       .filter((l) => l.SalesItemLineDetail)
       .map((l) => ({
+        itemId: l.SalesItemLineDetail?.ItemRef?.value ?? '',
         description: l.Description ?? '',
         qty: l.SalesItemLineDetail?.Qty ?? 1,
         rate: l.SalesItemLineDetail?.UnitPrice ?? 0,
@@ -179,9 +183,64 @@ qbInvoicesRouter.post('/invoices', async (req, res) => {
   }
 })
 
+// PUT edit an existing invoice — line items, dates, note, send-to/cc.
+// Does NOT email anyone by itself, sent or not: this only edits the QBO
+// record via a sparse update. If the invoice was already sent (e.g. it
+// went out with a wrong recipient, wrong dates, or a missing CC), fixing
+// it here and then hitting Send below is how a correction actually
+// reaches the client — nothing here sends on its own.
+qbInvoicesRouter.put('/invoices/:id', async (req, res) => {
+  const id = req.params.id
+  const body = req.body as {
+    dueDate?: string
+    note?: string
+    billEmail?: string
+    ccEmail?: string
+    lines?: Array<{ itemId: string; description?: string; qty?: number; rate: number }>
+  }
+  const lines = Array.isArray(body.lines) ? body.lines : []
+  if (lines.length === 0) { res.status(400).json({ error: 'line_items_required' }); return }
+
+  try {
+    const current = await qbFetch(`/invoice/${id}`) as { Invoice?: QbInvoice }
+    if (!current.Invoice) { res.status(404).json({ error: 'not_found' }); return }
+
+    const payload: Record<string, unknown> = {
+      Id: id,
+      SyncToken: current.Invoice.SyncToken,
+      sparse: true,
+      CustomerRef: current.Invoice.CustomerRef,
+      Line: lines.map((l) => ({
+        DetailType: 'SalesItemLineDetail',
+        Amount: (l.qty ?? 1) * l.rate,
+        Description: l.description || undefined,
+        SalesItemLineDetail: {
+          ItemRef: { value: l.itemId },
+          Qty: l.qty ?? 1,
+          UnitPrice: l.rate,
+        },
+      })),
+    }
+    if (body.dueDate) payload.DueDate = body.dueDate
+    if (body.note !== undefined) payload.CustomerMemo = { value: body.note }
+    if (body.billEmail) payload.BillEmail = { Address: body.billEmail }
+    if (body.ccEmail) payload.BillEmailCc = { Address: body.ccEmail }
+
+    const data = await qbFetch('/invoice', { method: 'POST', body: JSON.stringify(payload) }) as { Invoice?: QbInvoice }
+    if (!data.Invoice) throw new Error('no_invoice_in_response')
+    logInfo('qb invoice updated', { invoiceId: id })
+    res.json({ invoice: invoiceToApi(data.Invoice) })
+  } catch (err) {
+    logError('qb invoice update failed', { invoiceId: id, error: err instanceof Error ? err.message : String(err) })
+    res.status(500).json({ error: 'qb_error', detail: err instanceof Error ? err.message : String(err) })
+  }
+})
+
 // POST send — THE only endpoint in this file that emails a client.
-// Owner-only (route-level requireOwner above), and only ever reachable
-// via an explicit button press in the Invoicing UI.
+// Works the same whether the invoice has never been sent or is being
+// resent after a correction (QBO just re-sends). Owner-only (route-level
+// requireOwner above), and only ever reachable via an explicit button
+// press in the Invoicing UI.
 qbInvoicesRouter.post('/invoices/:id/send', async (req, res) => {
   const id = req.params.id
   const sendTo = String(req.body?.sendTo || '').trim()
