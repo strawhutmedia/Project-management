@@ -80,6 +80,12 @@ app.use('/styles.css', express.static(path.join(__dirname, '..', 'public', 'styl
 app.use('/onboarding', express.static(path.join(__dirname, '..', 'public', 'onboarding'), staticOpts));
 // Services / packages quote builder (standalone static, from Sales-Quoting).
 app.use('/public', express.static(path.join(__dirname, '..', 'public'), staticOpts));
+// Pitch PDFs and other share-by-URL documents. Same confidential posture as
+// /pitch/ pages: unlisted URLs, never linked from public pages, never indexed.
+app.use('/files', express.static(path.join(__dirname, '..', 'public', 'files'), {
+  maxAge: '5m',
+  setHeaders(res) { res.setHeader('X-Robots-Tag', 'noindex, nofollow'); },
+}));
 
 // ---- Domain-migration safety net ----------------------------------------
 // When strawhutmedia.com moves onto this app, we must not lose the old site's
