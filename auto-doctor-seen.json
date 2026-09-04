@@ -452,5 +452,17 @@
     "outcome": "gave_up",
     "summary": "hit max iterations (20)",
     "iterations": 20
+  },
+  "qb items list failed::{\"error\":\"quickbooks api 403: {\\\"warnings\\\":null,\\\"intuitObject\\\":null,\\\"fault\\\"": {
+    "attemptedAt": "2026-09-04T19:59:47.947Z",
+    "outcome": "fixed",
+    "summary": "Fixed QuickBooks 403 error detection to properly match error code \"3100\" and clear stale connection, allowing users to reconnect after app authorization is revoked.",
+    "iterations": 12
+  },
+  "qb invoices list failed::{\"error\":\"quickbooks api 403: {\\\"warnings\\\":null,\\\"intuitObject\\\":null,\\\"fault\\\"": {
+    "attemptedAt": "2026-09-04T20:01:19.037Z",
+    "outcome": "no_tool_call",
+    "summary": "agent stopped without calling a terminal tool",
+    "iterations": 9
   }
 }
