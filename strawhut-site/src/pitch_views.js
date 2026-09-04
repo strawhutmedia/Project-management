@@ -61,6 +61,29 @@ export const PITCH_THEMES = {
       card: '#16231D', 'card-border': '#2C3A32', 'tag-bg': '#1E2D25',
     },
   },
+  briefing: {
+    label: 'Briefing (vintage travel poster — navy, cream, gold & signal red)',
+    fontsHref:
+      'https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,600;0,9..144,900;1,9..144,500&family=Karla:ital,wght@0,400;0,500;0,700;0,800;1,400&display=swap',
+    fontDisplay: 'Fraunces,Georgia,serif',
+    fontBody: 'Karla,system-ui,-apple-system,sans-serif',
+    fontLabel: 'Karla,system-ui,-apple-system,sans-serif',
+    displayWeight: '900',
+    displayTracking: '.01em',
+    mark: 'wind',
+    light: {
+      paper: '#F6EFDF', 'paper-raised': '#FFFDF6', ink: '#22313B', 'ink-soft': '#5C6B74',
+      pine: '#0E2A3C', 'pine-deep': '#0E2A3C', brass: '#C64B33',
+      line: '#D8CCB2', 'line-soft': '#E5DCC6', route: '#C9BC9E',
+      card: '#FFFDF6', 'card-border': '#D8CCB2', 'tag-bg': '#F3D9A8',
+    },
+    dark: {
+      paper: '#0E2A3C', 'paper-raised': '#123549', ink: '#F6EFDF', 'ink-soft': '#B9C2C6',
+      pine: '#E8A23D', 'pine-deep': '#F0B963', brass: '#E8834A',
+      line: '#24485E', 'line-soft': '#1B3C50', route: '#3A5A70',
+      card: '#123549', 'card-border': '#24485E', 'tag-bg': '#3B4E3A',
+    },
+  },
   pride: {
     label: 'Pride (Rainbow Media Co — pink, sky blue & rainbow)',
     fontsHref:
@@ -240,6 +263,13 @@ const tokenBlock = (vars) =>
   Object.entries(vars).map(([k, v]) => `--${k}:${v};`).join('');
 
 function coverMark(kind) {
+  if (kind === 'wind') {
+    return `<svg class="mark" viewBox="0 0 64 48" role="img" aria-label="Trade winds">
+    <path d="M6 16 H37 a7 7 0 1 0 -7 -7" fill="none" stroke="var(--pine)" stroke-width="3.5" stroke-linecap="round"/>
+    <path d="M6 27 H50 a7.5 7.5 0 1 1 -7.5 7.5" fill="none" stroke="var(--brass)" stroke-width="3.5" stroke-linecap="round"/>
+    <path d="M6 38 H28" fill="none" stroke="var(--route)" stroke-width="3.5" stroke-linecap="round"/>
+  </svg>`;
+  }
   if (kind === 'rainbow') {
     const stripes = ['#FF4338', '#FF6B00', '#E5A81B', '#2FB673', '#4DB2EC', '#B44FD6'];
     const arcs = stripes
@@ -315,7 +345,7 @@ export function pitchPage({ pitch }) {
   section{padding:64px 0;border-top:1px solid var(--line-soft)}
   section > :last-child{margin-bottom:0}
 
-  .cover{padding:84px 0 72px;text-align:center}
+  .cover{padding-top:84px;padding-bottom:72px;text-align:center}
   .cover .studio{font-family:var(--font-label);font-weight:600;font-size:12px;letter-spacing:.2em;text-transform:uppercase;color:var(--ink-soft);margin:0 0 34px}
   .mark{width:70px;height:auto;max-height:70px;margin:0 auto 28px;display:block}
   .cover h1{font-size:clamp(44px,9vw,92px);letter-spacing:var(--display-tracking)}
@@ -350,7 +380,7 @@ export function pitchPage({ pitch }) {
   .alt-titles{display:flex;flex-wrap:wrap;gap:10px;margin-top:6px}
   .alt-titles span{font-family:var(--font-display);font-weight:var(--display-weight);font-size:16px;border:1px solid var(--card-border);background:var(--tag-bg);padding:8px 18px;border-radius:999px}
 
-  .close{padding:72px 0 40px;text-align:center;border-top:1px solid var(--line-soft)}
+  .close{padding-top:72px;padding-bottom:40px;text-align:center;border-top:1px solid var(--line-soft)}
   .close .contact{margin:0 auto;max-width:520px;background:var(--card);border:1px solid var(--card-border);padding:26px 26px}
   .close .who{font-family:var(--font-display);font-weight:var(--display-weight);font-size:22px}
   .close .co{font-family:var(--font-label);font-size:12px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:var(--brass);margin:4px 0 14px}

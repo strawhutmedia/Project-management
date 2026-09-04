@@ -187,7 +187,7 @@ export const MEDIA_ARTS_PITCH = {
   theme: 'pride',
   eyebrow: 'Proposal — prepared for the Los Angeles LGBT Center',
   logline:
-    'A 12-week vocational track in podcast and media production — the same length as your Culinary Arts program, and pitched by the studio that would run it.',
+    'A 12-week vocational track in podcast and media production — taught by the studio that does it for a living.',
   meta_tags: '12-week track, Three modules, Podcast & media production',
   contact_name: 'Ryan Tillotson',
   contact_company: 'Straw Hut Media · Los Angeles',
@@ -199,18 +199,17 @@ export const MEDIA_ARTS_PITCH = {
       kind: 'text',
       eyebrow: 'Why this, why now',
       heading: "You've already proven the model.",
-      body: `<p class="big">Your Culinary Arts program takes people with no professional kitchen experience and puts them into paid restaurant jobs, in a fixed number of weeks, funded by grants that trust the structure because the structure works.</p>
-<p>Podcasting and media production are hiring right now — editors, audio producers, ad ops coordinators, social/video cutters — and almost none of it requires a degree. It requires exactly what your model is built to deliver: real hours on real equipment, a real production to point to, and a warm handoff into paid work. We'd like to build that program with you, run the instruction, and hand your team a Media Arts track that sits next to Culinary Arts on your list of vocational programs.</p>
-<p style="font-size:14px;color:var(--ink-soft)">Model source: Culinary Arts, Los Angeles LGBT Center — lalgbtcenter.org/programs/vocational-programs/culinary-arts</p>`,
+      body: `<p class="big">The Center's vocational model already works — a fixed number of weeks, real equipment, real work to point to, and a warm handoff into a paid job. Culinary Arts proved it. This is the media version.</p>
+<p>Podcasting and media production are hiring right now — editors, audio producers, ad ops coordinators, social/video cutters — and almost none of it requires a degree. We'd like to build the program with you, run the instruction, and hand your team a Media Arts track for your vocational lineup.</p>`,
     },
     {
       kind: 'stats',
-      eyebrow: 'The model we’re building on',
+      eyebrow: 'The shape of it',
       heading: '',
-      body: `12 | Weeks — same as Culinary Arts
-3 | Modules — same shape as Culinary Arts
+      body: `12 | Weeks
+3 | Modules
 300 | Training hours
-3 | Cohorts fundable per year`,
+3 | Cohorts per year`,
     },
     {
       kind: 'episodes',
@@ -224,7 +223,7 @@ Show concept, format, and audience strategy; interview prep and story structure;
 
 Production & Editing
 Weeks 6–9 · Module 2
-Recording real episodes on studio equipment, then the full editing workflow — cutting, sound, pacing — through to a finished mix. This is the "cook real meals" module. By week 9: a finished, edited episode with the student's name in the credits.
+Recording real episodes on studio equipment, then the full editing workflow — cutting, sound, pacing — through to a finished mix. By week 9: a finished, edited episode with the student's name in the credits.
 
 Marketing & Distribution
 Weeks 10–12 · Module 3
@@ -253,7 +252,7 @@ Our working post-production team, teaching the craft they practice weekly and re
     {
       kind: 'cards',
       eyebrow: 'Investment',
-      heading: 'Priced to sit next to Culinary Arts on a grant application.',
+      heading: 'Built to fit a vocational-program grant.',
       body: `Studio Build-Out
 ~$25,000 · one-time
 Recording stations, editing lab, video kit, and flexible furniture — a space that can actually run the program.
@@ -264,7 +263,7 @@ The full 12-week track for one cohort, instruction and curriculum included. $84�
 
 Year one, all-in
 ~≈ $53,000–60,000
-Build-out plus a first cohort — well inside the $100,000 grant range that funded Culinary Arts, with the space already paid for every year after.`,
+Build-out plus a first cohort — squarely in vocational-grant range, with the space already paid for every year after.`,
     },
     {
       kind: 'text',
@@ -282,9 +281,9 @@ export const TRADE_WINDS_PITCH = {
   slug: 'trade-winds',
   title: 'Trade Winds',
   working_title: true,
-  theme: 'expedition',
+  theme: 'briefing',
   eyebrow: 'Straw Hut Media × Bruce Poon Tip · A weekly podcast',
-  logline: 'The weekly briefing for the people who sell travel — hosted by Bruce Poon Tip, founder of G Adventures.',
+  logline: 'The weekly briefing for the people who sell travel — hosted by Bruce Poon Tip.',
   meta_tags: 'Weekly · 35–45 min, B2B travel trade, Hosted by Bruce Poon Tip',
   contact_name: 'Ryan Tillotson',
   contact_company: 'Straw Hut Media · Los Angeles',
@@ -300,6 +299,12 @@ export const TRADE_WINDS_PITCH = {
 <p>For travel advisors · tour operators · tourism boards · travel tech.</p>`,
     },
     {
+      kind: 'text',
+      eyebrow: 'The through-line: communityship',
+      heading: 'Not a segment — the lens.',
+      body: `Communityship is how Bruce runs G&nbsp;Adventures and lives his life, so it will surface in every briefing and every interview on its own. And when the new book lands, the show is already its home.`,
+    },
+    {
       kind: 'cards',
       eyebrow: 'Weekly · 35–45 min',
       heading: '',
@@ -313,33 +318,17 @@ One marquee interview — the CEOs who run travel, founder-to-founder.
 
 The Playbook
 ~Segment 03
-One tactic to use with clients on Monday.`,
-    },
-    {
-      kind: 'text',
-      eyebrow: 'The host',
-      heading: 'Bruce Poon Tip',
-      body: `<ul>
-<li>Founder of <strong>G&nbsp;Adventures</strong> — sells through the agent channel every day</li>
-<li>Officer of the Order of Canada; EP of <em>The Last Tourist</em>; NYT-bestselling author of <em>Looptail</em></li>
-<li>Hosts <strong>GX</strong>, his annual summit of this exact audience — the built-in launchpad and live stage</li>
-</ul>`,
-    },
-    {
-      kind: 'text',
-      eyebrow: 'Where it grows',
-      heading: 'One show, three acts.',
-      body: `<ul>
-<li><strong>Own the trade.</strong> Launch at GX, become the industry's weekly habit, and let B2B sponsors fund it from day one.</li>
-<li><strong>Open the doors to celebrities.</strong> The show becomes the platform for Bruce's celebrity travel conversations — the Phil Rosenthal and Josh Brolin tier — bringing a consumer audience with them.</li>
-<li><strong>Communityship throughout.</strong> The philosophy behind Bruce's next book is the show's spine — every conversation is about businesses built on community — and the show becomes the book's home when it lands.</li>
-</ul>`,
+One tactic to use with clients on Monday.
+
+Bonus Episodes
+~Specials
+Celebrity travelers — the Phil Rosenthal and Josh Brolin conversations — as specials in the same feed, bringing a consumer audience with them.`,
     },
     {
       kind: 'text',
       eyebrow: 'Next step',
       heading: 'Greenlight a pilot.',
-      body: `Book the first three Corner Office guests and launch at the next GX.`,
+      body: `Book the first three Corner Office guests and launch at the next GX — the annual room of exactly this audience — with B2B sponsors from day one.`,
     },
   ],
 };

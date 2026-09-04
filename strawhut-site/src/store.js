@@ -448,6 +448,7 @@ class PgStore {
         title           TEXT NOT NULL,
         working_title   BOOLEAN DEFAULT FALSE,
         theme           TEXT DEFAULT 'expedition',
+        seeded          BOOLEAN DEFAULT FALSE,
         eyebrow         TEXT,
         logline         TEXT,
         meta_tags       TEXT,
@@ -485,6 +486,7 @@ class PgStore {
       ALTER TABLE episodes ADD COLUMN IF NOT EXISTS youtube_id         TEXT;
       ALTER TABLE press_items ADD COLUMN IF NOT EXISTS image_url       TEXT;
       ALTER TABLE pitches  ADD COLUMN IF NOT EXISTS theme              TEXT DEFAULT 'expedition';
+      ALTER TABLE pitches  ADD COLUMN IF NOT EXISTS seeded             BOOLEAN DEFAULT FALSE;
     `);
     console.log('[store] using Postgres store');
   }
@@ -814,10 +816,10 @@ class PgStore {
   async createPitch(p) {
     const id = p.id || newId();
     await this.pool.query(
-      `INSERT INTO pitches (id, slug, title, working_title, theme, eyebrow, logline, meta_tags, sections,
+      `INSERT INTO pitches (id, slug, title, working_title, theme, seeded, eyebrow, logline, meta_tags, sections,
                             contact_name, contact_company, contact_email, contact_phone, footer_note)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)`,
-      [id, p.slug, p.title, !!p.working_title, p.theme || 'expedition', p.eyebrow || '', p.logline || '', p.meta_tags || '',
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)`,
+      [id, p.slug, p.title, !!p.working_title, p.theme || 'expedition', !!p.seeded, p.eyebrow || '', p.logline || '', p.meta_tags || '',
        JSON.stringify(p.sections || []), p.contact_name || '', p.contact_company || '',
        p.contact_email || '', p.contact_phone || '', p.footer_note || '']
     );
@@ -840,11 +842,11 @@ class PgStore {
     if (!existing) return null;
     const m = { ...existing, ...patch, id };
     await this.pool.query(
-      `UPDATE pitches SET slug=$2, title=$3, working_title=$4, theme=$5, eyebrow=$6, logline=$7, meta_tags=$8,
-         sections=$9, contact_name=$10, contact_company=$11, contact_email=$12, contact_phone=$13,
-         footer_note=$14, updated_at=now()
+      `UPDATE pitches SET slug=$2, title=$3, working_title=$4, theme=$5, seeded=$6, eyebrow=$7, logline=$8, meta_tags=$9,
+         sections=$10, contact_name=$11, contact_company=$12, contact_email=$13, contact_phone=$14,
+         footer_note=$15, updated_at=now()
        WHERE id=$1`,
-      [id, m.slug, m.title, !!m.working_title, m.theme || 'expedition', m.eyebrow || '', m.logline || '', m.meta_tags || '',
+      [id, m.slug, m.title, !!m.working_title, m.theme || 'expedition', !!m.seeded, m.eyebrow || '', m.logline || '', m.meta_tags || '',
        JSON.stringify(m.sections || []), m.contact_name || '', m.contact_company || '',
        m.contact_email || '', m.contact_phone || '', m.footer_note || '']
     );
