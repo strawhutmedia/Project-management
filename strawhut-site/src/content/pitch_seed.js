@@ -284,7 +284,7 @@ export const TRADE_WINDS_PITCH = {
   working_title: true,
   theme: 'expedition',
   eyebrow: 'Straw Hut Media × Bruce Poon Tip · A weekly podcast',
-  logline: 'The weekly briefing for the people who sell travel — hosted by Bruce Poon Tip, founder of G Adventures.',
+  logline: 'The weekly briefing for the people who sell travel — hosted by Bruce Poon Tip.',
   meta_tags: 'Weekly · 35–45 min, B2B travel trade, Hosted by Bruce Poon Tip',
   contact_name: 'Ryan Tillotson',
   contact_company: 'Straw Hut Media · Los Angeles',
@@ -300,6 +300,12 @@ export const TRADE_WINDS_PITCH = {
 <p>For travel advisors · tour operators · tourism boards · travel tech.</p>`,
     },
     {
+      kind: 'text',
+      eyebrow: 'The through-line: communityship',
+      heading: 'Not a segment — the lens.',
+      body: `Communityship is how Bruce runs G&nbsp;Adventures and lives his life, so it will surface in every briefing and every interview on its own. And when the new book lands, the show is already its home.`,
+    },
+    {
       kind: 'cards',
       eyebrow: 'Weekly · 35–45 min',
       heading: '',
@@ -313,33 +319,17 @@ One marquee interview — the CEOs who run travel, founder-to-founder.
 
 The Playbook
 ~Segment 03
-One tactic to use with clients on Monday.`,
-    },
-    {
-      kind: 'text',
-      eyebrow: 'The host',
-      heading: 'Bruce Poon Tip',
-      body: `<ul>
-<li>Founder of <strong>G&nbsp;Adventures</strong> — sells through the agent channel every day</li>
-<li>Officer of the Order of Canada; EP of <em>The Last Tourist</em>; NYT-bestselling author of <em>Looptail</em></li>
-<li>Hosts <strong>GX</strong>, his annual summit of this exact audience — the built-in launchpad and live stage</li>
-</ul>`,
-    },
-    {
-      kind: 'text',
-      eyebrow: 'Where it grows',
-      heading: 'One show, three acts.',
-      body: `<ul>
-<li><strong>Own the trade.</strong> Launch at GX, become the industry's weekly habit, and let B2B sponsors fund it from day one.</li>
-<li><strong>Open the doors to celebrities.</strong> The show becomes the platform for Bruce's celebrity travel conversations — the Phil Rosenthal and Josh Brolin tier — bringing a consumer audience with them.</li>
-<li><strong>Communityship throughout.</strong> The philosophy behind Bruce's next book is the show's spine — every conversation is about businesses built on community — and the show becomes the book's home when it lands.</li>
-</ul>`,
+One tactic to use with clients on Monday.
+
+Bonus Episodes
+~Specials
+Celebrity travelers — the Phil Rosenthal and Josh Brolin conversations — as specials in the same feed, bringing a consumer audience with them.`,
     },
     {
       kind: 'text',
       eyebrow: 'Next step',
       heading: 'Greenlight a pilot.',
-      body: `Book the first three Corner Office guests and launch at the next GX.`,
+      body: `Book the first three Corner Office guests and launch at the next GX — the annual room of exactly this audience — with B2B sponsors from day one.`,
     },
   ],
 };

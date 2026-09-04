@@ -905,6 +905,7 @@ function pitchFromBody(body, existing = {}) {
   return {
     title: (body.title || '').trim(),
     working_title: !!body.working_title,
+    seeded: false, // any admin save makes their version authoritative over the seed
     theme: PITCH_THEMES[body.theme] ? body.theme : (existing.theme || 'expedition'),
     eyebrow: (body.eyebrow || '').trim(),
     logline: (body.logline || '').trim(),
@@ -1713,18 +1714,36 @@ app.listen(PORT, async () => {
     console.error('[import] auto-import failed:', e.message);
   }
 
-  // Seed the initial pitch documents (Born Explorers + Media Arts Program) so
-  // they're editable in /admin/pitches and shareable at /pitch/<slug> from the
-  // first boot. Idempotent: only when the store has no pitches at all — after
-  // that the admin's edits (and deletions) are the source of truth, and
-  // nothing gets resurrected on redeploy. Set SEED_PITCH=off to skip.
+  // Seed the initial pitch documents so they're editable in /admin/pitches and
+  // shareable at /pitch/<slug> from the first boot. Rules:
+  //   - Empty store → create every seed.
+  //   - A seeded pitch the admin has NEVER edited (updated_at ≈ created_at) is
+  //     refreshed with the latest seed copy on each deploy, so copy iterations
+  //     land in prod without touching the DB by hand.
+  //   - The moment the admin saves a pitch, their version wins forever; and a
+  //     deleted pitch is never resurrected once the store has any pitches.
+  //   - Set SEED_PITCH=off to skip entirely.
   try {
     if (process.env.SEED_PITCH !== 'off') {
       const pitches = await store.listPitches();
       if (!pitches.length) {
         for (const seed of PITCH_SEEDS) {
-          await store.createPitch(seed);
+          await store.createPitch({ ...seed, seeded: true });
           console.log('[seed] created pitch /pitch/' + seed.slug);
+        }
+      } else {
+        for (const seed of PITCH_SEEDS) {
+          const existing = pitches.find((p) => p.slug === seed.slug);
+          if (!existing) continue;
+          // seeded flag = never saved by the admin. Timestamp fallback covers
+          // rows created before the flag existed.
+          const untouched =
+            existing.seeded === true ||
+            new Date(existing.updated_at) - new Date(existing.created_at) < 5000;
+          if (untouched) {
+            await store.updatePitch(existing.id, { ...seed, slug: existing.slug, seeded: true });
+            console.log('[seed] refreshed unedited pitch /pitch/' + existing.slug);
+          }
         }
       }
     }
