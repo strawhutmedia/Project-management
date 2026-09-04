@@ -119,9 +119,14 @@ export default function Layout() {
                       </NavMenuLink>
                     )}
                     {user?.email?.trim().toLowerCase() === 'ryan@strawhutmedia.com' && (
-                      <NavMenuLink to="/invoicing" onClick={() => setNavOpen(false)}>
-                        🧾 Invoices
-                      </NavMenuLink>
+                      <>
+                        <NavMenuLink to="/invoicing" onClick={() => setNavOpen(false)}>
+                          🧾 Invoices
+                        </NavMenuLink>
+                        <NavMenuLink to="/cashflow" onClick={() => setNavOpen(false)}>
+                          💵 Cash Flow
+                        </NavMenuLink>
+                      </>
                     )}
                     {user?.role === 'admin' && (
                       <>

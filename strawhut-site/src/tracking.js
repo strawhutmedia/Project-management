@@ -76,7 +76,76 @@ try{if(localStorage.getItem('shm_consent')==='all')window.shmLoadPixels();}catch
   // Unified event helper: pushes to dataLayer (GTM/GA4) AND mirrors to Meta +
   // TikTok so a single call fans out to every platform for conversions/audiences.
   out += `<script>window.SHM_SITE='${j(SITE_ID)}';window.shmTrack=function(ev,params){params=Object.assign({site:window.SHM_SITE},params||{});try{(window.dataLayer=window.dataLayer||[]).push(Object.assign({event:ev},params));}catch(e){}try{if(window.gtag)gtag('event',ev,params);}catch(e){}try{if(window.fbq)fbq('trackCustom',ev,params);}catch(e){}try{if(window.ttq)ttq.track(ev,params);}catch(e){}};</script>`;
+
+  out += attributionCapture();
   return out;
+}
+
+// ---- Ad attribution (first-touch) -----------------------------------------
+//
+// When someone arrives from an ad, the click ids (gclid/gbraid/wbraid) and the
+// utm_* params are only in the URL of that first landing. They're gone by the
+// time the visitor navigates to /contact and submits. So on the FIRST public
+// page they hit we stash whatever is in the query string in a first-party
+// cookie (shm_attr, ~90 days), first-touch — never overwritten — and the
+// contact form reads it back into hidden fields so the lead carries which ad
+// produced it all the way to the GoHighLevel contact. First-party + functional
+// only; no data leaves the browser except on a form the visitor submits.
+
+export const ATTR_KEYS = [
+  'gclid', 'gbraid', 'wbraid',
+  'utm_source', 'utm_medium', 'utm_campaign', 'utm_term', 'utm_content',
+];
+export const ATTR_COOKIE = 'shm_attr';
+
+// NB: this string is injected into a template literal via layout(), so every
+// backslash in an inline regex must be doubled. It is written to avoid regexes
+// entirely (cookie parsing via split, values via URLSearchParams) for that
+// reason — see the CLAUDE.md double-escape gotcha.
+function attributionCapture() {
+  const keys = JSON.stringify(ATTR_KEYS);
+  return `<script>(function(){try{
+var KEYS=${keys},NAME='${ATTR_COOKIE}';
+function read(n){var p=('; '+document.cookie).split('; '+n+'=');if(p.length===2)return p.pop().split(';').shift();return '';}
+if(read(NAME))return;
+var qs=new URLSearchParams(location.search||'');var data={},any=false;
+KEYS.forEach(function(k){var val=qs.get(k);if(val){data[k]=String(val).slice(0,200);any=true;}});
+if(!any)return;
+data.t=Date.now();data.lp=location.pathname.slice(0,200);
+var exp=new Date(Date.now()+90*24*3600*1000).toUTCString();
+var sec=location.protocol==='https:'?'; Secure':'';
+document.cookie=NAME+'='+encodeURIComponent(JSON.stringify(data))+'; Path=/; Expires='+exp+'; SameSite=Lax'+sec;
+}catch(e){}})();</script>`;
+}
+
+/**
+ * Hidden <input> fields for a form plus a tiny script that fills them from the
+ * first-touch shm_attr cookie (falling back to the current URL's query string,
+ * so a same-page arrival still attributes). Drop this inside any form whose
+ * submission should carry ad attribution to the CRM. No regexes — see above.
+ */
+export function attributionFields() {
+  const keys = JSON.stringify(ATTR_KEYS);
+  const inputs = ATTR_KEYS
+    .map((k) => `<input type="hidden" name="${k}" value="">`)
+    .join('');
+  return `<div aria-hidden="true" style="display:none">${inputs}</div>
+<script>(function(){try{
+var KEYS=${keys},NAME='${ATTR_COOKIE}',data={};
+function read(n){var p=('; '+document.cookie).split('; '+n+'=');if(p.length===2)return p.pop().split(';').shift();return '';}
+var raw=read(NAME);
+if(raw){try{data=JSON.parse(decodeURIComponent(raw))||{};}catch(e){data={};}}
+var qs=new URLSearchParams(location.search||'');
+var form=document.currentScript&&document.currentScript.previousElementSibling;
+form=(form&&form.closest)?form.closest('form'):null;
+if(!form)form=document.querySelector('form.contact-form');
+if(!form)return;
+KEYS.forEach(function(k){
+  var v=data[k];if(v==null||v==='')v=qs.get(k)||'';
+  var el=form.querySelector('input[name="'+k+'"]');
+  if(el&&v)el.value=String(v).slice(0,200);
+});
+}catch(e){}})();</script>`;
 }
 
 /** GTM <noscript> for immediately after <body>. */

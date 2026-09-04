@@ -92,13 +92,50 @@ function splitName(full) {
   return { firstName: parts[0], lastName: parts.slice(1).join(' ') };
 }
 
+// Turn the first-touch ad attribution into GHL tags WITHOUT needing any
+// pre-created custom fields in the sub-account. Tags are the one contact
+// attribute the contacts-scoped token can always write, and they're filterable
+// in the GHL UI — so Ryan can pull "everyone who came from campaign X" without
+// any setup. We add: src:<utm_source>, campaign:<utm_campaign>, and a flat
+// `paid-ad` tag whenever a Google click id is present (gclid/gbraid/wbraid).
+// Values are lower-cased and stripped to tag-safe characters; GHL treats tags
+// case-insensitively, so this keeps them from fragmenting.
+function attributionTags(attr = {}) {
+  const clean = (s) => String(s || '').toLowerCase().replace(/[^a-z0-9_-]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 60);
+  const tags = [];
+  if (attr.gclid || attr.gbraid || attr.wbraid) tags.push('paid-ad');
+  const src = clean(attr.utm_source);
+  if (src) tags.push(`src:${src}`);
+  const camp = clean(attr.utm_campaign);
+  if (camp) tags.push(`campaign:${camp}`);
+  const med = clean(attr.utm_medium);
+  if (med) tags.push(`medium:${med}`);
+  return tags;
+}
+
+// A single human-readable line with the raw values, appended to the enquiry
+// note. Nothing is lost (the exact gclid is what an offline-conversion import
+// needs later), and it's legible in the CRM without opening custom fields.
+function attributionNoteLine(attr = {}) {
+  const order = ['utm_source', 'utm_medium', 'utm_campaign', 'utm_term', 'utm_content', 'gclid', 'gbraid', 'wbraid'];
+  const parts = order
+    .filter((k) => attr[k])
+    .map((k) => `${k}=${String(attr[k]).slice(0, 200)}`);
+  return parts.length ? `Ad attribution — ${parts.join(' ')}` : '';
+}
+
 /**
  * Create or update a contact, then attach the enquiry text as a note so the
  * CRM shows what they actually asked for. Returns { ok, id } and never throws.
+ *
+ * `attribution` is the first-touch ad data ({gclid, utm_source, ...}); it is
+ * attached as filterable tags and appended to the note, no custom fields
+ * required. Absent/empty for organic leads — everything else is unchanged.
  */
-export async function upsertContact({ name, email, company, message, tags = [], source = 'strawhutmedia.com' } = {}) {
+export async function upsertContact({ name, email, company, message, tags = [], source = 'strawhutmedia.com', attribution = {} } = {}) {
   if (!ghlConfigured() || !email) return { ok: false, state: 'skipped' };
   const { firstName, lastName } = splitName(name);
+  const allTags = [...tags, ...attributionTags(attribution)].filter(Boolean);
   const r = await call('/contacts/upsert', {
     method: 'POST',
     body: {
@@ -109,7 +146,7 @@ export async function upsertContact({ name, email, company, message, tags = [], 
       name: String(name || '').trim() || undefined,
       companyName: String(company || '').trim() || undefined,
       source,
-      tags: tags.filter(Boolean),
+      tags: allTags,
     },
   });
   if (!r.ok) {
@@ -121,11 +158,14 @@ export async function upsertContact({ name, email, company, message, tags = [], 
 
   // The message is the whole point of the lead — without it the CRM entry is
   // just an email address. Attached as a note; a failure here doesn't undo the
-  // contact, which is the more important half.
-  if (id && String(message || '').trim()) {
+  // contact, which is the more important half. The raw attribution values ride
+  // along on the same note so nothing is lost for offline-conversion import.
+  const attrLine = attributionNoteLine(attribution);
+  const noteBody = [String(message || '').trim(), attrLine].filter(Boolean).join('\n\n');
+  if (id && noteBody) {
     const n = await call(`/contacts/${encodeURIComponent(id)}/notes`, {
       method: 'POST',
-      body: { body: String(message).slice(0, 5000), userId: undefined },
+      body: { body: noteBody.slice(0, 5000), userId: undefined },
     });
     if (!n.ok) console.error('[ghl] note failed:', n.error);
   }

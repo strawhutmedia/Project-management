@@ -23,7 +23,7 @@ function newId() {
 // ---------------------------------------------------------------------------
 class JsonStore {
   constructor() {
-    this.db = { shows: {}, episodes: {}, subscribers: {}, announcements: {}, press_items: {}, landing_pages: {} };
+    this.db = { shows: {}, episodes: {}, subscribers: {}, announcements: {}, press_items: {}, landing_pages: {}, pitches: {} };
   }
   async init() {
     try {
@@ -35,6 +35,7 @@ class JsonStore {
         this.db.announcements ||= {};
         this.db.press_items ||= {};
         this.db.landing_pages ||= {};
+        this.db.pitches ||= {};
       } else {
         fs.mkdirSync(DATA_DIR, { recursive: true });
         this._flush();
@@ -298,6 +299,36 @@ class JsonStore {
     delete this.db.landing_pages[id];
     this._flush();
   }
+
+  // --- pitches (development pitch documents, served at /pitch/<slug>) ---
+  async createPitch(p) {
+    const id = p.id || newId();
+    const now = new Date().toISOString();
+    this.db.pitches[id] = { id, created_at: now, updated_at: now, ...p };
+    this._flush();
+    return this.db.pitches[id];
+  }
+  async listPitches() {
+    return Object.values(this.db.pitches).sort(
+      (a, b) => new Date(b.created_at) - new Date(a.created_at)
+    );
+  }
+  async getPitchBySlug(slug) {
+    return Object.values(this.db.pitches).find((p) => p.slug === slug) || null;
+  }
+  async getPitchById(id) {
+    return this.db.pitches[id] || null;
+  }
+  async updatePitch(id, patch) {
+    if (!this.db.pitches[id]) return null;
+    this.db.pitches[id] = { ...this.db.pitches[id], ...patch, id, updated_at: new Date().toISOString() };
+    this._flush();
+    return this.db.pitches[id];
+  }
+  async deletePitch(id) {
+    delete this.db.pitches[id];
+    this._flush();
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -316,6 +347,7 @@ class PgStore {
         description  TEXT,
         seo_description TEXT,
         blurb           TEXT,
+        tagline         TEXT,
         author       TEXT,
         image_url    TEXT,
         feed_url     TEXT UNIQUE NOT NULL,
@@ -410,6 +442,24 @@ class PgStore {
         gtag_id       TEXT,
         created_at    TIMESTAMPTZ DEFAULT now()
       );
+      CREATE TABLE IF NOT EXISTS pitches (
+        id              TEXT PRIMARY KEY,
+        slug            TEXT UNIQUE NOT NULL,
+        title           TEXT NOT NULL,
+        working_title   BOOLEAN DEFAULT FALSE,
+        theme           TEXT DEFAULT 'expedition',
+        eyebrow         TEXT,
+        logline         TEXT,
+        meta_tags       TEXT,
+        sections        TEXT,
+        contact_name    TEXT,
+        contact_company TEXT,
+        contact_email   TEXT,
+        contact_phone   TEXT,
+        footer_note     TEXT,
+        created_at      TIMESTAMPTZ DEFAULT now(),
+        updated_at      TIMESTAMPTZ DEFAULT now()
+      );
     `);
     // Lightweight migrations: CREATE TABLE IF NOT EXISTS won't add columns to
     // a table that already exists, so add any newer columns idempotently.
@@ -421,6 +471,7 @@ class PgStore {
       ALTER TABLE shows    ADD COLUMN IF NOT EXISTS platform_links     TEXT;
       ALTER TABLE shows    ADD COLUMN IF NOT EXISTS seo_description    TEXT;
       ALTER TABLE shows    ADD COLUMN IF NOT EXISTS blurb              TEXT;
+      ALTER TABLE shows    ADD COLUMN IF NOT EXISTS tagline            TEXT;
       ALTER TABLE episodes ADD COLUMN IF NOT EXISTS ai_hook            TEXT;
       ALTER TABLE episodes ADD COLUMN IF NOT EXISTS ai_takeaways       TEXT;
       ALTER TABLE episodes ADD COLUMN IF NOT EXISTS guests             TEXT;
@@ -433,6 +484,7 @@ class PgStore {
       ALTER TABLE episodes ADD COLUMN IF NOT EXISTS embedding          TEXT;
       ALTER TABLE episodes ADD COLUMN IF NOT EXISTS youtube_id         TEXT;
       ALTER TABLE press_items ADD COLUMN IF NOT EXISTS image_url       TEXT;
+      ALTER TABLE pitches  ADD COLUMN IF NOT EXISTS theme              TEXT DEFAULT 'expedition';
     `);
     console.log('[store] using Postgres store');
   }
@@ -467,18 +519,18 @@ class PgStore {
     const id = existing?.id || show.id || newId();
     const m = { ...existing, ...show, id };
     await this.pool.query(
-      `INSERT INTO shows (id, slug, title, description, author, image_url, feed_url, link, categories, spotify_url, apple_url, show_type, youtube_channel_id, platform_links, featured, sort_order, last_synced, seo_description, artwork_url, blurb)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20)
+      `INSERT INTO shows (id, slug, title, description, author, image_url, feed_url, link, categories, spotify_url, apple_url, show_type, youtube_channel_id, platform_links, featured, sort_order, last_synced, seo_description, artwork_url, blurb, tagline)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21)
        ON CONFLICT (id) DO UPDATE SET
          slug=$2, title=$3, description=$4, author=$5, image_url=$6, feed_url=$7, link=$8,
-         categories=$9, spotify_url=$10, apple_url=$11, show_type=$12, youtube_channel_id=$13, platform_links=$14, featured=$15, sort_order=$16, last_synced=$17, seo_description=$18, artwork_url=$19, blurb=$20`,
+         categories=$9, spotify_url=$10, apple_url=$11, show_type=$12, youtube_channel_id=$13, platform_links=$14, featured=$15, sort_order=$16, last_synced=$17, seo_description=$18, artwork_url=$19, blurb=$20, tagline=$21`,
       [
         id, m.slug, m.title, m.description, m.author, m.image_url, m.feed_url, m.link,
         JSON.stringify(m.categories || []), m.spotify_url, m.apple_url,
         m.show_type || 'original', m.youtube_channel_id || null,
         m.platform_links ? (typeof m.platform_links === 'string' ? m.platform_links : JSON.stringify(m.platform_links)) : null,
         !!m.featured, m.sort_order || 0, m.last_synced || null, m.seo_description || null,
-        m.artwork_url || null, m.blurb || null,
+        m.artwork_url || null, m.blurb || null, m.tagline || null,
       ]
     );
     return this.getShowById(id);
@@ -613,7 +665,7 @@ class PgStore {
   }
   async recentEpisodes(limit = 6) {
     const { rows } = await this.pool.query(
-      `SELECT e.id, e.show_id, e.slug, e.title, e.image_url, e.duration, e.published_at, e.youtube_id,
+      `SELECT e.id, e.show_id, e.slug, e.title, e.description, e.image_url, e.duration, e.published_at, e.youtube_id,
               s.slug AS show_slug, s.title AS show_title, s.image_url AS show_image
          FROM episodes e JOIN shows s ON s.id = e.show_id
         WHERE e.published_at IS NOT NULL
@@ -750,6 +802,56 @@ class PgStore {
   }
   async deleteLanding(id) {
     await this.pool.query(`DELETE FROM landing_pages WHERE id=$1`, [id]);
+  }
+
+  // --- pitches (development pitch documents, served at /pitch/<slug>) ---
+  _rowToPitch(r) {
+    if (!r) return null;
+    let sections = [];
+    if (r.sections) { try { sections = JSON.parse(r.sections); } catch { sections = []; } }
+    return { ...r, sections };
+  }
+  async createPitch(p) {
+    const id = p.id || newId();
+    await this.pool.query(
+      `INSERT INTO pitches (id, slug, title, working_title, theme, eyebrow, logline, meta_tags, sections,
+                            contact_name, contact_company, contact_email, contact_phone, footer_note)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)`,
+      [id, p.slug, p.title, !!p.working_title, p.theme || 'expedition', p.eyebrow || '', p.logline || '', p.meta_tags || '',
+       JSON.stringify(p.sections || []), p.contact_name || '', p.contact_company || '',
+       p.contact_email || '', p.contact_phone || '', p.footer_note || '']
+    );
+    return this.getPitchById(id);
+  }
+  async listPitches() {
+    const { rows } = await this.pool.query(`SELECT * FROM pitches ORDER BY created_at DESC`);
+    return rows.map((r) => this._rowToPitch(r));
+  }
+  async getPitchBySlug(slug) {
+    const { rows } = await this.pool.query(`SELECT * FROM pitches WHERE slug=$1`, [slug]);
+    return this._rowToPitch(rows[0]);
+  }
+  async getPitchById(id) {
+    const { rows } = await this.pool.query(`SELECT * FROM pitches WHERE id=$1`, [id]);
+    return this._rowToPitch(rows[0]);
+  }
+  async updatePitch(id, patch) {
+    const existing = await this.getPitchById(id);
+    if (!existing) return null;
+    const m = { ...existing, ...patch, id };
+    await this.pool.query(
+      `UPDATE pitches SET slug=$2, title=$3, working_title=$4, theme=$5, eyebrow=$6, logline=$7, meta_tags=$8,
+         sections=$9, contact_name=$10, contact_company=$11, contact_email=$12, contact_phone=$13,
+         footer_note=$14, updated_at=now()
+       WHERE id=$1`,
+      [id, m.slug, m.title, !!m.working_title, m.theme || 'expedition', m.eyebrow || '', m.logline || '', m.meta_tags || '',
+       JSON.stringify(m.sections || []), m.contact_name || '', m.contact_company || '',
+       m.contact_email || '', m.contact_phone || '', m.footer_note || '']
+    );
+    return this.getPitchById(id);
+  }
+  async deletePitch(id) {
+    await this.pool.query(`DELETE FROM pitches WHERE id=$1`, [id]);
   }
 }
 

@@ -29,6 +29,7 @@ import { outreachRouter, startOutreachSendLoop, enableDomainOpenTracking } from 
 import { teleprompterRouter } from './routes/teleprompter'
 import { teleprompterRemoteRouter } from './routes/teleprompter_remote'
 import { invoicingRouter } from './routes/invoicing'
+import { cashflowRouter } from './routes/cashflow'
 import { intakeRouter } from './routes/intake'
 import { audienceRouter } from './routes/audience'
 import { quickbooksRouter } from './routes/quickbooks'
@@ -123,6 +124,8 @@ app.use('/api/admin/outreach/domains', outreachDomainsRouter)
 app.use('/api/outreach', outreachRouter)
 app.use('/api/teleprompter', teleprompterRouter)
 app.use('/api/invoicing', invoicingRouter)
+// Owner-only cash flow tracker (same lock as invoicing).
+app.use('/api/cashflow', cashflowRouter)
 // PUBLIC (token-gated, no login) — vendors submit their W9 via a private link.
 app.use('/api/intake', intakeRouter)
 // Per-show audience lists. The /hooks/:token capture route inside is
@@ -244,6 +247,9 @@ async function start() {
     startOutreachSendLoop()
     void import('./socials_autopilot').then(({ startSocialsAutopilotLoop }) => {
       startSocialsAutopilotLoop()
+    })
+    void import('./cashflow_payment_check').then(({ startCashflowPaymentCheckLoop }) => {
+      startCashflowPaymentCheckLoop()
     })
     void enableDomainOpenTracking()
     // Pick up any breakdown runs that were killed by the previous

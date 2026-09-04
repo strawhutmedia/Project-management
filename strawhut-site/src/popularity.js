@@ -167,6 +167,61 @@ export async function downloadsBySlug(store, { log = () => {} } = {}) {
   return map;
 }
 
+/**
+ * Diagnostic: pull everything Megaphone (CMS API + S3 export) will tell us about
+ * the Wicked podcast, so the standalone Wicked dashboard can be refreshed with
+ * real numbers. Read-only. Returns aggregate download figures only — no tokens,
+ * no PII — the same numbers we publish in the public case study. Cached by the
+ * caller; safe to expose as read-only JSON.
+ */
+export async function showMegaphoneStats({ match = 'wicked', log = () => {} } = {}) {
+  if (!megaphoneConfigured()) return { configured: false, reason: 'Megaphone API not configured' };
+  const pods = await listPodcasts();
+  const needle = norm(match);
+  const show = pods.find((p) => norm(p.title).includes(needle));
+  if (!show) return { configured: true, found: false, match, networkPodcasts: pods.length };
+  const id = show.id || show.uid;
+  const out = {
+    configured: true,
+    found: true,
+    title: show.title,
+    id,
+    podcastFields: {},
+    extractedDownloads: extractDownloads(show),
+  };
+  const wicked = show; // reuse below without renaming every reference
+  for (const f of DL_FIELDS) if (wicked[f] != null) out.podcastFields[f] = wicked[f];
+  // Per-podcast analytics (often a rolling window, not lifetime — we surface it raw).
+  try {
+    const { json } = await mg(`/networks/${NETWORK_ID}/podcasts/${id}/analytics`);
+    out.analytics = json;
+    out.analyticsDownloads = Array.isArray(json)
+      ? json.reduce((s, r) => s + (extractDownloads(r) || 0), 0)
+      : extractDownloads(json);
+  } catch (e) { out.analyticsError = e.message; }
+  // Episode-level count (helps confirm the show + gives per-episode if present).
+  try {
+    const { json } = await mg(`/networks/${NETWORK_ID}/podcasts/${id}/episodes`, { per_page: 50 });
+    if (Array.isArray(json)) {
+      out.episodeCount = json.length;
+      out.episodes = json.map((e) => ({ title: e.title, downloads: extractDownloads(e) }));
+    }
+  } catch (e) { out.episodesError = e.message; }
+  // Recent-days downloads from the S3 IAB export (authoritative, but only recent days).
+  try {
+    if (s3Configured()) {
+      const byPid = await downloadsByPodcastId({ log });
+      out.s3RecentDownloads = byPid ? byPid.get(String(id)) ?? null : null;
+    }
+  } catch (e) { out.s3Error = e.message; }
+  return out;
+}
+
+/** Back-compat wrapper: the Wicked-specific stats endpoint. */
+export async function wickedStats(opts = {}) {
+  return showMegaphoneStats({ ...opts, match: 'wicked' });
+}
+
 /** Rank shows by real Megaphone downloads (S3 export) and feature the top N. */
 export async function applyPopularSpotlight(store, { count = spotlightCount(), log = () => {} } = {}) {
   if (!s3Configured()) return { applied: false, reason: 'S3 download export not configured' };

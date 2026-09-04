@@ -15,6 +15,141 @@
 
 export const POSTS = [
   {
+    slug: 'wicked-official-podcast-case-study',
+    title: 'Case Study: Wicked — The Official Podcast, Built to 11.7M in 11 Weeks',
+    description:
+      'How Straw Hut Media wrote, produced, edited, and distributed Wicked: The Official Podcast — reaching 11.7 million across platforms in its first 11 weeks with zero paid promotion, a 4.9-star Spotify rating (top 2% of all shows), and watch-through rates that doubled the industry norm.',
+    category: 'Case Study',
+    dek: 'A full-service companion podcast for one of the biggest films of the year — built from the ground up, and the numbers to show for it.',
+    keywords: ['branded podcast case study', 'official companion podcast', 'podcast production case study', 'Wicked podcast', 'full-service podcast production', 'branded podcast results'],
+    published: '2026-08-25',
+    updated: '2026-08-25',
+    readingTime: '4 min read',
+    body_html: `
+<p>When a film reaches the scale of <strong>Wicked</strong>, the companion podcast can't be an afterthought — it has to feel like part of the event. <strong>Straw Hut Media produced <em>Wicked: The Official Podcast</em> end to end</strong>: we developed it, wrote and scripted it, ran the recordings, handled all of post-production, built the key art, and distributed it across every major platform. Hosted by <em>Vanity Fair</em>'s Chris Murphy, the series took listeners behind the curtain of Jon M. Chu's <em>Wicked: For Good</em> with the people who made it — Cynthia Erivo, Ariana Grande, director Jon M. Chu, producer Marc Platt, and composer Stephen Schwartz among them.</p>
+
+<h2>The brief</h2>
+<p>Launch an official companion podcast from zero, timed to a global theatrical release, at a level of polish worthy of the franchise — and do it fast enough to ride the film's release window, when attention is at its absolute peak.</p>
+
+<h2>What we did</h2>
+<p>This is what "full-service" actually means in practice:</p>
+<ul>
+<li><strong>Development &amp; writing</strong> — the concept, the episode arc, and the scripts that gave each conversation shape.</li>
+<li><strong>Recording</strong> — remote sessions with the cast and creative team, directed and captured at broadcast quality.</li>
+<li><strong>Full post-production</strong> — editing, sound design, mix, and master on all eight episodes.</li>
+<li><strong>Key art &amp; assets</strong> — cover art, episode thumbnails, and a run of short-form clips for social.</li>
+<li><strong>Distribution</strong> — published across Apple, Spotify, YouTube, and every major platform, then promoted through clips built to travel.</li>
+</ul>
+
+<h2>The results — first 11 weeks, zero paid promotion</h2>
+<p>Every number below is organic. Nothing here was bought.</p>
+<ul>
+<li><strong>11.7M+ combined reach</strong> across podcast, YouTube, Instagram, and TikTok — in just 11 weeks.</li>
+<li><strong>717,404 plays on the show itself</strong> — 186,193 podcast downloads plus 531,211 YouTube views.</li>
+<li><strong>5.6M Instagram + 5.4M TikTok views</strong> on the clips we cut from each episode.</li>
+<li><strong>1.46M average views per episode</strong> across platforms.</li>
+<li><strong>4.9 / 5.0 on Spotify</strong> — the top 2% of all shows — and <strong>4.6 / 5.0 on Apple</strong>.</li>
+<li><strong>57% average watch-through on Spotify video</strong>, peaking at <strong>81%</strong> — against an industry norm of 35–45%.</li>
+<li><strong>20+ minutes average listen time</strong> per episode, on 40–50 minute shows.</li>
+<li><strong>97% of listeners</strong> landed squarely in the film's core 18–54 demographic.</li>
+</ul>
+
+<h2>Why it worked</h2>
+<p>Three things, in order. <strong>Quality</strong> — the show sounded and felt like a premium production because it was one, and audiences reward that with the kind of watch-through most podcasts never see. <strong>Full-service speed</strong> — because one team handled development through distribution, we moved fast enough to launch inside the release window instead of missing it. And <strong>fandom</strong> — scripts and clips built for how <em>Wicked</em> fans actually watch and share turned a companion podcast into a destination of its own.</p>
+
+<p>That's the whole idea of full-service production: you hand us the vision, and we return a finished show — and the audience to go with it.</p>
+`,
+    faq: [
+      ['Did Straw Hut Media produce Wicked: The Official Podcast?', 'Yes. Straw Hut Media produced Wicked: The Official Podcast end to end — development, writing and scripting, recording, full post-production (edit, sound design, mix, and master), key art, and distribution across every major platform.'],
+      ['How big did the podcast get?', 'In its first 11 weeks, with zero paid promotion, the series reached more than 11.7 million across podcast, YouTube, Instagram, and TikTok — including 717,404 plays on the show itself (186,193 podcast downloads and 531,211 YouTube views), a 4.9 out of 5 rating on Spotify (top 2% of all shows), and a 57% average watch-through that peaked at 81%.'],
+      ['What does full-service podcast production include?', 'Full-service means one team handles everything: concept and development, writing, recording and direction, editing and sound design, mixing and mastering, cover art and thumbnails, short-form social clips, and distribution and optimization across every platform — so the host or brand just shows up and does the part only they can do.'],
+      ['Can Straw Hut Media build a companion or branded podcast for us?', 'Yes. Straw Hut Media builds official companion podcasts and branded shows for films, studios, brands, and businesses — from first idea to launch and growth. Book a quick call and we will map out exactly what your show would take.'],
+    ],
+  },
+  {
+    slug: 'seen-on-the-screen-case-study',
+    title: 'Case Study: Seen on the Screen — From a Standing Start to a Studio-Backed Franchise',
+    description:
+      'How Straw Hut Media developed and produced Seen on the Screen with Rotten Tomatoes’ Jacqueline Coley — building it from launch into a film-world podcast that drew a Universal Pictures rebrand and a Fandango partnership.',
+    category: 'Case Study',
+    dek: 'Start a show from zero, make it good enough that a major studio wants its name on it.',
+    keywords: ['podcast case study', 'entertainment podcast production', 'branded podcast', 'Seen on the Screen', 'full-service podcast production', 'grow a podcast from scratch'],
+    published: '2026-08-25',
+    updated: '2026-08-25',
+    readingTime: '4 min read',
+    body_html: `
+<p><strong>Seen on the Screen</strong> is an intimate interview show about how film shapes the people who make it and the people who love it — hosted by <strong>Jacqueline Coley</strong>, the awards editor at Rotten Tomatoes. <strong>Straw Hut Media is the production company behind it</strong>, and has been from day one: we build the show flows, prep the guests and talent, shoot the episodes, edit them, and create the marketing deliverables that carry them.</p>
+
+<h2>The brief</h2>
+<p>Launch a credible film-and-entertainment podcast from nothing, with a host respected inside the industry, and grow it into something the film world takes seriously — not just another interview show.</p>
+
+<h2>What we do</h2>
+<ul>
+<li><strong>Show flows &amp; development</strong> — we design the arc of every episode around Jacqueline Coley’s authority as an awards journalist, so each conversation carries weight.</li>
+<li><strong>Guest &amp; talent prep</strong> — we prep the guests and the host so the tape is great before a single edit.</li>
+<li><strong>We shoot it</strong> — full video-and-audio capture at a broadcast standard.</li>
+<li><strong>We edit it</strong> — editing, sound design, and packaging on every episode.</li>
+<li><strong>Marketing deliverables</strong> — the clips, art, and assets that give each episode a life beyond the feed — plus distribution everywhere.</li>
+</ul>
+
+<h2>The result</h2>
+<p>The show didn’t just find an audience — it earned the attention of the industry it covers. <strong>Seen on the Screen grew from a launch with no audience into a franchise that drew a partnership with Universal Pictures and Fandango</strong>, and coverage from Rotten Tomatoes itself. That’s the clearest proof a production works: when the biggest names in the category want to attach themselves to something you built from zero.</p>
+<ul>
+<li><strong>More than 12 million YouTube views</strong> across the series — the most-watched episode (Monica Barbaro and Callum Turner) topping 2.8 million on its own, with several others past a million.</li>
+<li><strong>A Universal Pictures rebrand and a Fandango partnership</strong> — the film world attaching its biggest names to a show we built from a standing start.</li>
+</ul>
+
+<h2>Why it worked</h2>
+<p>The right host, positioned right, is worth more than any growth hack. Jacqueline Coley’s credibility plus a production that matched it meant the show read as a premium property from episode one — and premium properties attract premium partners. Straw Hut handled everything around her so the show sounded, looked, and traveled like it belonged next to the movies it was talking about.</p>
+
+<p>That’s what full-service production buys you: not just a show, but one good enough to grow into something bigger than where it started.</p>
+`,
+    faq: [
+      ['Who produces Seen on the Screen?', 'Straw Hut Media developed and produced Seen on the Screen, hosted by Rotten Tomatoes’ awards editor Jacqueline Coley, and grew it from launch into a film-world podcast that drew a Universal Pictures rebrand and a Fandango partnership.'],
+      ['What did Straw Hut Media actually do on the show?', 'Everything around the host: concept and development, guest booking, recording, editing and sound design, cover art and clips, and distribution and growth across every platform.'],
+      ['Can Straw Hut Media build a show like this for us?', 'Yes. Straw Hut Media develops and produces original and branded podcasts from first idea to launch and growth — for creators, brands, studios, and businesses. Book a quick call and we’ll map out what your show would take.'],
+    ],
+  },
+  {
+    slug: 'soul-and-science-case-study',
+    title: 'Case Study: Soul & Science — The Podcast That Doubles as a Business-Development Engine',
+    description:
+      'How Straw Hut Media produces Soul & Science for Mekanism CEO Jason Harris — a fast-growing CMO interview show that turns guests into relationships and relationships into business.',
+    category: 'Case Study',
+    dek: 'The smartest reason to start a branded podcast isn’t downloads. It’s who you get to invite on.',
+    keywords: ['branded podcast case study', 'B2B podcast', 'podcast for business development', 'Soul and Science', 'Jason Harris Mekanism', 'branded podcast strategy'],
+    published: '2026-08-25',
+    updated: '2026-08-25',
+    readingTime: '4 min read',
+    body_html: `
+<p><strong>Soul &amp; Science: Fast Forward Your Marketing Mind</strong> is a show where the best marketers alive explain how breakthrough brands actually get built — the balance of brand (soul) and performance (science). It’s hosted by <strong>Jason Harris</strong>, co-founder and CEO of the creative agency Mekanism and The Drum’s CEO of the Year, and <strong>produced by Straw Hut Media</strong>.</p>
+
+<h2>The brief</h2>
+<p>Build a marketing podcast worthy of a top-tier agency’s name — and quietly, make it one of the most effective business-development tools that agency has.</p>
+
+<h2>The strategy hiding in plain sight</h2>
+<p>Here’s the move most brands miss. The guest list <em>is</em> the strategy. Soul &amp; Science brings on the exact people a creative agency most wants to know — CMOs and marketing leaders from brands like <strong>Mastercard, Proximo Spirits, and the Forbes CMO Network</strong>. An interview isn’t a cold pitch; it’s a genuine, flattering, hour-long conversation about the guest’s own work. What senior marketer says no to that — and who walks away from it without a real relationship?</p>
+<p>The show has grown steadily — <strong>more than 1.9 million YouTube views across 150+ episodes</strong>, on top of its podcast audience — but the audience was never the whole point. <strong>The relationships it builds — guest by guest — turn into pipeline.</strong> That’s the part a download chart never shows, and it’s the reason a branded podcast can pay for itself many times over.</p>
+
+<h2>What we did</h2>
+<ul>
+<li><strong>Production end to end</strong> — booking support, recording, editing and sound design, and distribution, so the host does the one thing only he can: have great conversations.</li>
+<li><strong>A premium standard</strong> — the show sounds like the agency behind it, which is the whole point when your guests are the people you most want to impress.</li>
+<li><strong>Consistency</strong> — a steady cadence that compounds both audience and relationships over time.</li>
+</ul>
+
+<h2>Why it worked</h2>
+<p>Because it was built on the right insight: a branded podcast’s highest return often isn’t advertising or downloads — it’s access. The right guests, a genuinely great conversation, and a production polished enough to honor both. Straw Hut runs the machine so the show stays great and the host stays focused on the room.</p>
+
+<p>If you’re a brand or an agency wondering whether a podcast is worth it, this is the case to study: the show that grows an audience <em>and</em> opens the doors you actually care about.</p>
+`,
+    faq: [
+      ['Who produces Soul & Science?', 'Straw Hut Media produces Soul & Science: Fast Forward Your Marketing Mind, hosted by Mekanism co-founder and CEO Jason Harris — handling booking support, recording, editing and sound design, and distribution.'],
+      ['How can a podcast help business development?', 'A branded podcast lets you invite the exact people you most want a relationship with — as guests. A great, flattering conversation about their own work builds a genuine relationship no cold outreach can match. Soul & Science does this with CMOs and marketing leaders, turning guests into pipeline while growing an audience.'],
+      ['Can Straw Hut Media build a branded podcast for our brand?', 'Yes. Straw Hut Media develops and produces branded podcasts for brands, agencies, and businesses — designed around your goals, whether that’s audience, authority, or business development. Book a quick call and we’ll map it out.'],
+    ],
+  },
+  {
     slug: 'how-to-start-a-podcast',
     title: 'How to Start a Podcast in 2026: A Complete Step-by-Step Guide',
     description:
@@ -26,6 +161,7 @@ export const POSTS = [
     updated: '2026-08-15',
     readingTime: '11 min read',
     body_html: `
+<p style="background:rgba(0,204,142,0.10);border:1px solid rgba(0,204,142,0.35);border-radius:12px;padding:14px 16px;margin:0 0 22px">🎧 <strong>Would you rather be walked through it?</strong> We built a <a href="/podcast-primer">free podcasting course</a> that covers everything below, step by step — plus a community where you can ask our team questions. No cost, no catch.</p>
 <p>Starting a podcast is easy. Starting one people actually listen to — that they finish, come back to, and don't quietly abandon at episode four — is a different animal entirely. We've been making podcasts since 2018 (and keeping our houseplants mostly alive the whole time), so consider this the version we'd give a friend over coffee: what actually matters, what really doesn't, and the parts worth handing to someone who does this all day.</p>
 
 <h2>1. Start with a sharp idea, not a broad one</h2>

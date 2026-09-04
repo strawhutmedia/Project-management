@@ -3,3 +3,7 @@ data/
 .env
 .models/
 *.log
+
+# Throwaway local scratch scripts (mobile-audit shots, one-off counters)
+_*.mjs
+_*.js
