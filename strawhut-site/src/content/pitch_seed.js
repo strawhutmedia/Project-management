@@ -282,7 +282,7 @@ export const TRADE_WINDS_PITCH = {
   slug: 'trade-winds',
   title: 'Trade Winds',
   working_title: true,
-  theme: 'expedition',
+  theme: 'briefing',
   eyebrow: 'Straw Hut Media × Bruce Poon Tip · A weekly podcast',
   logline: 'The weekly briefing for the people who sell travel — hosted by Bruce Poon Tip.',
   meta_tags: 'Weekly · 35–45 min, B2B travel trade, Hosted by Bruce Poon Tip',

@@ -61,6 +61,29 @@ export const PITCH_THEMES = {
       card: '#16231D', 'card-border': '#2C3A32', 'tag-bg': '#1E2D25',
     },
   },
+  briefing: {
+    label: 'Briefing (trade-desk modern, slate, orange & sky blue)',
+    fontsHref:
+      'https://fonts.googleapis.com/css2?family=Libre+Franklin:wght@500;600;700;800&family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;1,6..72,400&display=swap',
+    fontDisplay: '"Libre Franklin",system-ui,-apple-system,sans-serif',
+    fontBody: 'Newsreader,Georgia,serif',
+    fontLabel: '"Libre Franklin",system-ui,-apple-system,sans-serif',
+    displayWeight: '800',
+    displayTracking: '-.015em',
+    mark: 'wind',
+    light: {
+      paper: '#F7F5F0', 'paper-raised': '#FDFCF9', ink: '#1D2833', 'ink-soft': '#55616C',
+      pine: '#33678C', 'pine-deep': '#24506F', brass: '#C05621',
+      line: '#DAD5CA', 'line-soft': '#E6E2D8', route: '#C4BFB2',
+      card: '#FDFCF9', 'card-border': '#DAD5CA', 'tag-bg': '#EDE9DE',
+    },
+    dark: {
+      paper: '#101820', 'paper-raised': '#18222C', ink: '#EDEBE4', 'ink-soft': '#9DA7B0',
+      pine: '#6FA3C7', 'pine-deep': '#8FBBD9', brass: '#E8834A',
+      line: '#2C3947', 'line-soft': '#233040', route: '#3A4654',
+      card: '#18222C', 'card-border': '#2C3947', 'tag-bg': '#1F2C39',
+    },
+  },
   pride: {
     label: 'Pride (Rainbow Media Co — pink, sky blue & rainbow)',
     fontsHref:
@@ -240,6 +263,13 @@ const tokenBlock = (vars) =>
   Object.entries(vars).map(([k, v]) => `--${k}:${v};`).join('');
 
 function coverMark(kind) {
+  if (kind === 'wind') {
+    return `<svg class="mark" viewBox="0 0 64 48" role="img" aria-label="Trade winds">
+    <path d="M6 16 H37 a7 7 0 1 0 -7 -7" fill="none" stroke="var(--pine)" stroke-width="3.5" stroke-linecap="round"/>
+    <path d="M6 27 H50 a7.5 7.5 0 1 1 -7.5 7.5" fill="none" stroke="var(--brass)" stroke-width="3.5" stroke-linecap="round"/>
+    <path d="M6 38 H28" fill="none" stroke="var(--route)" stroke-width="3.5" stroke-linecap="round"/>
+  </svg>`;
+  }
   if (kind === 'rainbow') {
     const stripes = ['#FF4338', '#FF6B00', '#E5A81B', '#2FB673', '#4DB2EC', '#B44FD6'];
     const arcs = stripes
