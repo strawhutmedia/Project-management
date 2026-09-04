@@ -100,41 +100,25 @@ export async function requireAdmin(req: Request, res: Response, next: NextFuncti
   next()
 }
 
-// The invoicing / payroll tool is locked to a SINGLE owner account — not
-// just any admin. Contractor pay is nobody else's business. Defaults to
-// Ryan; override with the INVOICING_OWNER_EMAIL env var if ownership moves.
+// The invoicing / payroll tool is locked to owner accounts — not just any
+// admin. Defaults to Ryan (override with INVOICING_OWNER_EMAIL if
+// ownership moves), PLUS anyone flagged `is_invoicing_owner` in the DB
+// (see migration 136) — currently Caroline, given the exact same access
+// as Ryan across invoicing/payroll, Cash Flow, and QuickBooks, per his
+// explicit instruction. To grant this same full access to someone else
+// later, set their `is_invoicing_owner` flag the same way (034/136
+// pattern) rather than hardcoding another email here.
 export function ownerEmail(): string {
   return (process.env.INVOICING_OWNER_EMAIL || 'ryan@strawhutmedia.com').trim().toLowerCase()
 }
 
-export function isOwner(user: { email: string }): boolean {
-  return (user.email || '').trim().toLowerCase() === ownerEmail()
+export function isOwner(user: { email: string; is_invoicing_owner?: boolean }): boolean {
+  return (user.email || '').trim().toLowerCase() === ownerEmail() || Boolean(user.is_invoicing_owner)
 }
 
 export async function requireOwner(req: Request, res: Response, next: NextFunction) {
   const u = await getSessionUser(req)
   if (!u || !isOwner(u)) {
-    res.status(403).json({ error: 'forbidden' })
-    return
-  }
-  ;(req as Request & { user: SessionUser }).user = u
-  next()
-}
-
-// A narrow, named second seat on the CLIENT (AR) side of invoicing —
-// QuickBooks connection + Client Invoices — granted via the
-// `is_invoicing_owner` flag (see migration 136). Ryan asked for Caroline
-// specifically to have this, since she's the one who edits/sends client
-// invoices day to day. Deliberately NOT wired into requireOwner/isOwner
-// themselves, so it does not also widen Cash Flow or contractor
-// payroll/W9 (TIN) access — those stay locked to the single owner.
-export function isInvoicingCoOwner(user: { is_invoicing_owner?: boolean }): boolean {
-  return Boolean(user.is_invoicing_owner)
-}
-
-export async function requireInvoicingAccess(req: Request, res: Response, next: NextFunction) {
-  const u = await getSessionUser(req)
-  if (!u || !(isOwner(u) || isInvoicingCoOwner(u))) {
     res.status(403).json({ error: 'forbidden' })
     return
   }

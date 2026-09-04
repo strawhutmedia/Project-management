@@ -85,19 +85,16 @@ function StatusChip({ status }: { status: string }) {
   )
 }
 
-// Full owner — must match the server's INVOICING_OWNER_EMAIL (defaults
-// to ryan@strawhutmedia.com). Sees everything: contractor payroll/W9,
-// Cash Flow, and the client (AR) side. A separate, narrower co-owner
-// seat (user.is_invoicing_owner — currently Caroline) gets ONLY the
-// QuickBooks/Client Invoices view below; the server enforces the same
-// split on every request.
+// Owner access — matches the server's INVOICING_OWNER_EMAIL (defaults to
+// ryan@strawhutmedia.com) OR the is_invoicing_owner flag (migration 136,
+// currently Caroline — same full access as Ryan, per his explicit
+// instruction: invoicing/payroll, Cash Flow, and QuickBooks alike).
 const OWNER_EMAIL = 'ryan@strawhutmedia.com'
 
 // ── main page ─────────────────────────────────────────────────────────
 export default function InvoicingPage() {
   const { user } = useAuth()
-  const isFullOwner = (user?.email || '').trim().toLowerCase() === OWNER_EMAIL
-  const isCoOwner = Boolean(user?.is_invoicing_owner)
+  const isOwner = (user?.email || '').trim().toLowerCase() === OWNER_EMAIL || Boolean(user?.is_invoicing_owner)
   const [tab, setTab] = useState<Tab>('dashboard')
   const [settings, setSettings] = useState<ApiInvoiceSettings | null>(null)
   const [contractors, setContractors] = useState<ApiContractor[]>([])
@@ -118,34 +115,14 @@ export default function InvoicingPage() {
     setSettings(s.settings); setContractors(c.contractors); setInvoices(iv.invoices)
   }, [])
 
-  // Contractor payroll/W9 data is owner-only server-side — a co-owner
-  // (Caroline) would just get 403s, so don't even ask for it.
   useEffect(() => {
-    if (!isFullOwner) { setLoading(false); return }
+    if (!isOwner) { setLoading(false); return }
     void reload().finally(() => setLoading(false))
-  }, [reload, isFullOwner])
+  }, [reload, isOwner])
 
   if (!user) return null
-  if (!isFullOwner && !isCoOwner) {
+  if (!isOwner) {
     return <div className="max-w-2xl"><div className={`${card} p-8 text-center text-muted`}>This section is private.</div></div>
-  }
-  if (!isFullOwner) {
-    // Co-owner: Client Invoices / QuickBooks only.
-    return (
-      <div className="space-y-6 max-w-2xl">
-        <div>
-          <h1 className="font-display text-5xl text-rainbow">Client Invoices</h1>
-          <p className="text-muted text-sm mt-1">Draft, edit, and send client invoices via QuickBooks.</p>
-        </div>
-        <QuickBooksCard flash={flash} />
-        <ClientInvoicesCard flash={flash} />
-        {toast && (
-          <div className="fixed left-1/2 bottom-8 -translate-x-1/2 z-50 bg-text text-ink font-semibold text-sm px-4 py-2.5 rounded-full shadow-2xl">
-            {toast}
-          </div>
-        )}
-      </div>
-    )
   }
   if (loading || !settings) return <div className="text-muted text-sm">Loading invoicing…</div>
 
