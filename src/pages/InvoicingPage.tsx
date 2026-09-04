@@ -841,14 +841,27 @@ function ClientInvoicesCard({ flash }: { flash: (m: string) => void }) {
 
   const [invoices, setInvoices] = useState<ApiQbInvoice[]>([])
   const [loadingList, setLoadingList] = useState(false)
+  // A failed fetch must never look like "no invoices" — that's what sent
+  // Caroline hunting for an invoice that was actually just hidden behind
+  // a silent QuickBooks API error.
+  const [listError, setListError] = useState('')
   const reload = useCallback(() => {
     setLoadingList(true)
-    api.qbListInvoices().then((r) => setInvoices(r.invoices)).catch(() => {}).finally(() => setLoadingList(false))
+    setListError('')
+    api.qbListInvoices().then((r) => setInvoices(r.invoices))
+      .catch((err) => setListError(err instanceof Error ? err.message : 'Failed to load invoices'))
+      .finally(() => setLoadingList(false))
   }, [])
   useEffect(() => { if (connected) reload() }, [connected, reload])
 
   const [items, setItems] = useState<ApiQbItem[]>([])
-  useEffect(() => { if (connected) api.qbItems().then((r) => setItems(r.items)).catch(() => {}) }, [connected])
+  const [itemsError, setItemsError] = useState('')
+  useEffect(() => {
+    if (!connected) return
+    setItemsError('')
+    api.qbItems().then((r) => setItems(r.items))
+      .catch((err) => setItemsError(err instanceof Error ? err.message : 'Failed to load items'))
+  }, [connected])
 
   const [customerQuery, setCustomerQuery] = useState('')
   const [customerResults, setCustomerResults] = useState<ApiQbCustomer[]>([])
@@ -1014,6 +1027,12 @@ function ClientInvoicesCard({ flash }: { flash: (m: string) => void }) {
 
             <div className="space-y-2">
               <span className={labelCls}>Line items</span>
+              {itemsError && (
+                <div className="rounded-xl border border-urgent/40 bg-urgent/10 p-3 text-sm">
+                  <b className="text-urgent">Couldn't load QuickBooks items.</b>{' '}
+                  <span className="text-muted">{itemsError}</span>
+                </div>
+              )}
               {lines.map((l, i) => (
                 <div key={i} className="flex flex-wrap gap-2 items-center">
                   <select
@@ -1063,7 +1082,13 @@ function ClientInvoicesCard({ flash }: { flash: (m: string) => void }) {
           <span className={labelCls}>Recent invoices</span>
           <Btn variant="ghost" onClick={reload}>{loadingList ? 'Loading…' : 'Refresh'}</Btn>
         </div>
-        {invoices.length === 0 && <p className="text-sm text-muted">No invoices yet.</p>}
+        {listError && (
+          <div className="rounded-xl border border-urgent/40 bg-urgent/10 p-3 text-sm">
+            <b className="text-urgent">Couldn't load invoices from QuickBooks.</b>{' '}
+            <span className="text-muted">{listError}</span>
+          </div>
+        )}
+        {!listError && invoices.length === 0 && <p className="text-sm text-muted">No invoices yet.</p>}
         {invoices.map((inv) => (
           <div key={inv.id} className="rounded-xl border border-line p-3 space-y-2">
             <div className="flex items-center justify-between flex-wrap gap-2">
