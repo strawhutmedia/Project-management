@@ -18,15 +18,16 @@
 //                                      in the UI — no automated code path
 //                                      in this app calls it.
 //
-// Owner-only throughout, matching the rest of the QuickBooks/invoicing
-// surface (requireOwner from ../auth).
+// Owner OR the named invoicing co-owner (Caroline — see migration 136 and
+// requireInvoicingAccess in ../auth). This is the client-facing (AR) side
+// specifically; contractor payroll/W9 and Cash Flow stay owner-only.
 import { Router } from 'express'
-import { requireOwner } from '../auth'
+import { requireInvoicingAccess } from '../auth'
 import { logError, logInfo } from '../diag'
 import { qbFetch } from '../quickbooks'
 
 export const qbInvoicesRouter = Router()
-qbInvoicesRouter.use(requireOwner)
+qbInvoicesRouter.use(requireInvoicingAccess)
 
 // Escape a value for QBO's SQL-like query language (single quotes only —
 // this is not a real SQL injection surface since qbFetch requires an

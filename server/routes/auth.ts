@@ -84,7 +84,7 @@ authRouter.post('/verify', async (req, res) => {
   await pool.query('UPDATE magic_tokens SET used_at = now() WHERE token = $1', [token])
 
   const userRes = await pool.query(
-    'SELECT id, email, name, role, timezone FROM users WHERE email = $1',
+    'SELECT id, email, name, role, timezone, is_invoicing_owner FROM users WHERE email = $1',
     [row.email],
   )
   if (userRes.rows.length === 0) {

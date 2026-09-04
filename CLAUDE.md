@@ -99,13 +99,25 @@ default.
 | `QB_CLIENT_ID` / `QB_CLIENT_SECRET` | QuickBooks Online OAuth app credentials (from an Intuit Developer app). Powers the AR side — connect + draft/send client estimates & invoices. See `server/quickbooks.ts`. |
 | `QB_ENV` | `sandbox` (default) or `production`. Redirect URI is `${APP_BASE_URL}/api/qb/callback` — must be registered in the Intuit app. |
 
-## Invoicing / payroll (admin owner-only)
+## Invoicing / payroll (owner-only, plus one named client-invoicing seat)
 
-The `/invoicing` section + `/api/invoicing/*` are locked to a single owner
-(`INVOICING_OWNER_EMAIL`, default Ryan) — not just any admin. Contractors submit
-their W9 + address via a private, expiring, token link (`/vendor/:token`,
-public route, `/api/intake/:token`). The TIN is stored encrypted
-(`server/crypto_vault.ts`); bank details are collected in Melio, not here.
+The `/invoicing` section + `/api/invoicing/*` (contractor payroll, W9 intake)
+and `/cashflow` are locked to a single owner (`INVOICING_OWNER_EMAIL`, default
+Ryan) — not just any admin. Contractors submit their W9 + address via a
+private, expiring, token link (`/vendor/:token`, public route,
+`/api/intake/:token`). The TIN is stored encrypted (`server/crypto_vault.ts`);
+bank details are collected in Melio, not here.
+
+**Caroline has a separate, narrower seat on just the client (AR) side** —
+QuickBooks connection status + the Client Invoices card (`/api/qb/*`,
+gated by `requireInvoicingAccess` in `server/auth.ts`, not the stricter
+`requireOwner`) — via the `users.is_invoicing_owner` flag (migration 136).
+This does NOT extend to contractor payroll/W9, Cash Flow, or connecting/
+disconnecting the actual QuickBooks account (still owner-only). Ryan asked
+for this explicitly since Caroline is the one actually drafting/editing/
+sending client invoices day to day. If someone else needs this same seat,
+set their `is_invoicing_owner` flag the same way — don't widen `requireOwner`
+itself, that would also open Cash Flow and contractor W9/TIN data.
 
 ## Pipeline (album default)
 

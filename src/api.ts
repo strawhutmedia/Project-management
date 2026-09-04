@@ -15,6 +15,9 @@ export type ApiUser = {
   display_name: string | null
   role: 'admin' | 'user' | 'viewer'
   timezone: string
+  // Named second seat on the client (AR) side of Invoicing — QuickBooks
+  // connection + Client Invoices only, not contractor payroll/W9 or Cash Flow.
+  is_invoicing_owner: boolean
 }
 
 export type ApiComment = {
