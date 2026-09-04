@@ -99,23 +99,30 @@ default.
 | `QB_CLIENT_ID` / `QB_CLIENT_SECRET` | QuickBooks Online OAuth app credentials (from an Intuit Developer app). Powers the AR side — connect + draft/send client estimates & invoices. See `server/quickbooks.ts`. |
 | `QB_ENV` | `sandbox` (default) or `production`. Redirect URI is `${APP_BASE_URL}/api/qb/callback` — must be registered in the Intuit app. |
 
-## Invoicing / payroll (owner-only — two named accounts)
+## Invoicing / payroll (owner-only) + Caroline's separate client-invoicing seat
 
-The `/invoicing` section + `/api/invoicing/*` (contractor payroll, W9 intake,
-TIN data) and `/cashflow` are locked to owner accounts, not just any admin:
-`INVOICING_OWNER_EMAIL` (default Ryan), PLUS any user flagged
-`is_invoicing_owner` in the DB (migration 136) — currently **Caroline, who
-has the exact same full access as Ryan** across invoicing/payroll, Cash
-Flow, and QuickBooks, per his explicit instruction. `requireOwner` in
-`server/auth.ts` checks both; there is no narrower/separate tier. Contractors
-submit their W9 + address via a private, expiring, token link
-(`/vendor/:token`, public route, `/api/intake/:token`). The TIN is stored
-encrypted (`server/crypto_vault.ts`); bank details are collected in Melio,
-not here.
+The `/invoicing` section's contractor payroll/W9 tabs, `/api/invoicing/*`
+(contractor payroll, W9 intake, TIN data), and `/cashflow` are locked to a
+**single owner** (`INVOICING_OWNER_EMAIL`, default Ryan) — `requireOwner` in
+`server/auth.ts`, not just any admin. Contractors submit their W9 + address
+via a private, expiring, token link (`/vendor/:token`, public route,
+`/api/intake/:token`). The TIN is stored encrypted (`server/crypto_vault.ts`);
+bank details are collected in Melio, not here.
 
-To grant this same full access to someone else later, set their
-`is_invoicing_owner` flag the same way (see migrations 034/136 for the
-name-match pattern) rather than adding another hardcoded email.
+**Caroline has a separate, narrower seat on just the client (AR) side** —
+QuickBooks connection status + the Client Invoices card (`/api/qb/*`, gated
+by `requireInvoicingAccess`, not `requireOwner`) — via the
+`users.is_invoicing_owner` flag (migration 136). This is deliberately
+**not** the same as owner access: it does NOT extend to contractor
+payroll/W9/TIN or Cash Flow — Ryan was explicit she should see neither.
+She gets a dedicated Client-Invoices-only view of `/invoicing` (no
+Dashboard/Contractor Invoices/Contractors/Settings tabs), reached because
+her flag also unlocks the "Invoices" nav link — but not the "Cash Flow" one.
+
+If someone else needs this same narrow seat later, set their
+`is_invoicing_owner` flag the same way (034/136 name-match pattern) — don't
+widen `requireOwner`/`isOwner` themselves, that would also open Cash Flow
+and contractor W9/TIN data.
 
 ## Pipeline (album default)
 
