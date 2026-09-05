@@ -524,6 +524,7 @@ export default function PrompterPage() {
           onOpenRemote={startRemote}
           remoteActive={Boolean(remoteCode)}
           command={runnerCmd}
+          onEditHtml={updateCurrentHtml}
         />
         {remoteOverlay}
       </>
@@ -1164,6 +1165,7 @@ function Runner({
   onOpenRemote,
   remoteActive,
   command,
+  onEditHtml,
 }: {
   session: Session
   settings: Settings
@@ -1172,6 +1174,7 @@ function Runner({
   onOpenRemote: () => void
   remoteActive: boolean
   command: { action: string; n: number }
+  onEditHtml: (html: string) => void
 }) {
   const scrollRef = useRef<HTMLDivElement>(null)
   const [playing, setPlaying] = useState(false)
@@ -1180,6 +1183,7 @@ function Runner({
   const [progress, setProgress] = useState(0)
   const [remaining, setRemaining] = useState(0)
   const [isFs, setIsFs] = useState(false)
+  const [editing, setEditing] = useState(false)
 
   const isTouch = useMemo(() => typeof window !== 'undefined' && window.matchMedia?.('(pointer: coarse)').matches, [])
 
@@ -1391,12 +1395,21 @@ function Runner({
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
+      // While the quick-edit overlay is open, let every key go to the editor
+      // (typing, paste, arrows) instead of driving the prompter.
+      if (editing) return
       switch (e.key) {
         case ' ':
         case 'Spacebar':
         case 'Enter': // many Bluetooth clicker remotes send Enter/Return
           e.preventDefault()
           togglePlay()
+          break
+        case 'e':
+        case 'E':
+          e.preventDefault()
+          setPlaying(false)
+          setEditing(true)
           break
         case 'ArrowUp':
           e.preventDefault()
@@ -1441,7 +1454,7 @@ function Runner({
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [settings, setSettings, togglePlay, restart, jump, toggleFullscreen, handleExit])
+  }, [settings, setSettings, togglePlay, restart, jump, toggleFullscreen, handleExit, editing])
 
   const transform = `${settings.mirrorX ? 'scaleX(-1)' : ''} ${settings.flipY ? 'scaleY(-1)' : ''}`.trim()
 
@@ -1628,16 +1641,61 @@ function Runner({
                 📱 Phone
               </button>
             )}
+            {/* Edit stays available in full screen — quick paste/tweak is the
+                whole point, so it must be reachable mid-read. */}
+            <button
+              onClick={() => {
+                setPlaying(false)
+                setEditing(true)
+              }}
+              className={`rounded-lg border border-white/15 text-white/70 hover:text-white transition ${
+                isFs ? 'text-[10px] px-2 py-1' : 'text-[11px] px-2.5 py-1.5'
+              }`}
+              title="Edit or paste the script without leaving full screen (E)"
+            >
+              ✎ Edit
+            </button>
             <span className={`text-white/40 tabular-nums px-1 ${isFs ? 'text-[10px]' : 'text-[11px]'}`}>{formatClock(remaining)} left</span>
           </div>
 
           {!isTouch && showControls && !isFs && (
             <p className="text-center text-[10px] text-white/30 mt-1.5">
-              Space play/pause · ↑↓ speed · ←→ size · M mirror · R restart · F fullscreen · Esc exit
+              Space play/pause · ↑↓ speed · ←→ size · E edit · M mirror · R restart · F fullscreen · Esc exit
             </p>
           )}
         </div>
       </div>
+
+      {/* Quick edit — paste or tweak the script without leaving full screen. */}
+      {editing && (
+        <div className="absolute inset-0 z-[60] bg-ink/95 backdrop-blur flex flex-col p-4 sm:p-6 text-text">
+          <div className="flex items-center justify-between mb-3 w-full max-w-3xl mx-auto">
+            <div>
+              <p className="text-[10px] uppercase tracking-[0.3em] text-muted">Quick edit</p>
+              <p className="text-sm text-text">{sessionTitle(session)}</p>
+            </div>
+            <button
+              onClick={() => setEditing(false)}
+              className="rounded-xl bg-gradient-to-r from-stage-producing to-stage-mastering text-white font-bold uppercase tracking-wider text-sm px-5 py-3"
+            >
+              Done
+            </button>
+          </div>
+          <div className="w-full max-w-3xl mx-auto flex-1 min-h-0">
+            <RichEditor
+              key={`run-edit-${session.id}`}
+              initialHtml={session.html}
+              onChange={onEditHtml}
+              background={settings.background}
+              fontStack={FONTS[settings.fontFamily].stack}
+            />
+          </div>
+          <p className="text-[11px] text-muted text-center mt-3 max-w-3xl mx-auto">
+            Paste with ⌘V (or long-press → Paste on iPad). Changes save automatically and show in the prompter when you tap
+            Done. Scrolling is paused while you edit.
+          </p>
+        </div>
+      )}
     </div>
   )
 }
