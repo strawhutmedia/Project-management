@@ -16,7 +16,7 @@
 
 import { Router } from 'express'
 import crypto from 'crypto'
-import { Resend } from 'resend'
+import { Resend } from '../mailTransport'
 import { pool } from '../db'
 import { requireUser, type SessionUser } from '../auth'
 import { assertWriter } from '../permissions'
