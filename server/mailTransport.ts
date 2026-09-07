@@ -1,0 +1,122 @@
+// Resend-compatible Amazon SES transport for Slate's transactional email.
+//
+// Drop-in for `import { Resend } from 'resend'` on the `.emails.send(...)` path
+// (magic-link sign-ins, invites, admin alerts, invoices, outreach follow-ups).
+// Routes to Amazon SES when SES credentials are present; otherwise delegates to
+// the real `resend` package. Reversible: with no SES env vars set, behavior is
+// exactly as before. Sends carry SES message tags (app=slate + any caller tags)
+// so email stays categorized after the move off Resend.
+//
+// Only the transactional send path is handled here. Resend's Audiences /
+// Contacts APIs (server/audience_resend.ts) have no SES equivalent and keep
+// importing the real `resend` package; they already no-op when the key is unset.
+import { Resend as RealResend } from 'resend'
+import { SESv2Client, SendEmailCommand } from '@aws-sdk/client-sesv2'
+
+function sesConfigured(): boolean {
+  return Boolean(
+    (process.env.SES_ACCESS_KEY_ID || process.env.AWS_ACCESS_KEY_ID) &&
+      (process.env.SES_SECRET_ACCESS_KEY || process.env.AWS_SECRET_ACCESS_KEY),
+  )
+}
+
+let sesClient: SESv2Client | null = null
+function ses(): SESv2Client {
+  if (sesClient) return sesClient
+  sesClient = new SESv2Client({
+    region: process.env.SES_REGION || process.env.AWS_REGION || 'us-east-1',
+    credentials: {
+      accessKeyId: (process.env.SES_ACCESS_KEY_ID || process.env.AWS_ACCESS_KEY_ID) as string,
+      secretAccessKey: (process.env.SES_SECRET_ACCESS_KEY || process.env.AWS_SECRET_ACCESS_KEY) as string,
+    },
+  })
+  return sesClient
+}
+
+const cleanTag = (s: unknown): string =>
+  String(s == null ? '' : s).replace(/[^A-Za-z0-9_-]/g, '_').slice(0, 256) || 'na'
+
+type SendPayload = {
+  from: string
+  to: string | string[]
+  subject?: string
+  html?: string
+  text?: string
+  replyTo?: string | string[]
+  reply_to?: string | string[]
+  tags?: Array<{ name: string; value: string }>
+  [k: string]: unknown
+}
+
+type SendResult = {
+  data: { id: string } | null
+  error: { name?: string; message: string } | null
+}
+
+export class Resend {
+  private real: RealResend | null
+  constructor(apiKey?: string) {
+    this.real = apiKey ? new RealResend(apiKey) : null
+  }
+
+  emails = {
+    send: async (payload: SendPayload): Promise<SendResult> => {
+      if (sesConfigured()) {
+        try {
+          const to = (Array.isArray(payload.to) ? payload.to : [payload.to]).filter(Boolean) as string[]
+          const replyRaw = payload.replyTo ?? payload.reply_to
+          const reply = replyRaw ? (Array.isArray(replyRaw) ? replyRaw : [replyRaw]) : undefined
+          const tags: Array<{ Name: string; Value: string }> = [{ Name: 'app', Value: 'slate' }]
+          for (const t of Array.isArray(payload.tags) ? payload.tags : []) {
+            if (t && t.name) tags.push({ Name: cleanTag(t.name), Value: cleanTag(t.value) })
+          }
+          const out = await ses().send(
+            new SendEmailCommand({
+              FromEmailAddress: payload.from,
+              Destination: { ToAddresses: to },
+              ...(reply ? { ReplyToAddresses: reply } : {}),
+              ...(process.env.SES_CONFIG_SET ? { ConfigurationSetName: process.env.SES_CONFIG_SET } : {}),
+              EmailTags: tags,
+              Content: {
+                Simple: {
+                  Subject: { Data: payload.subject || '', Charset: 'UTF-8' },
+                  Body: {
+                    ...(payload.html ? { Html: { Data: payload.html, Charset: 'UTF-8' } } : {}),
+                    ...(payload.text ? { Text: { Data: payload.text, Charset: 'UTF-8' } } : {}),
+                  },
+                },
+              },
+            }),
+          )
+          return { data: { id: out.MessageId || '' }, error: null }
+        } catch (err: unknown) {
+          const e = err as { name?: string; message?: string }
+          return { data: null, error: { name: e?.name || 'ses_error', message: e?.message || String(err) } }
+        }
+      }
+      if (!this.real) return { data: null, error: { message: 'no email transport configured' } }
+      const r = await this.real.emails.send(payload as Parameters<RealResend['emails']['send']>[0])
+      return r as unknown as SendResult
+    },
+  }
+
+  // Domain / audience / contact management have no Amazon SES equivalent, so they
+  // delegate to the real Resend when a key is present, and no-op safely when it is
+  // not (removing RESEND_API_KEY degrades these features instead of throwing).
+  private stub(): unknown {
+    const noop = async () => ({
+      data: null,
+      error: { message: 'feature unavailable: RESEND_API_KEY not set (Amazon SES has no equivalent)' },
+    })
+    return new Proxy({}, { get: () => noop })
+  }
+  get domains(): RealResend['domains'] {
+    return (this.real ? this.real.domains : this.stub()) as RealResend['domains']
+  }
+  get audiences(): RealResend['audiences'] {
+    return (this.real ? this.real.audiences : this.stub()) as RealResend['audiences']
+  }
+  get contacts(): RealResend['contacts'] {
+    return (this.real ? this.real.contacts : this.stub()) as RealResend['contacts']
+  }
+}

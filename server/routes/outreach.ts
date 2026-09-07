@@ -13,7 +13,7 @@
 // and shouldn't be exposed to producers/editors.
 
 import { Router } from 'express'
-import { Resend } from 'resend'
+import { Resend } from '../mailTransport'
 import { pool } from '../db'
 import { requireAdmin, type SessionUser } from '../auth'
 import { logError, logInfo } from '../diag'

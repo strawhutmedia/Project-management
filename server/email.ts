@@ -1,4 +1,4 @@
-import { Resend } from 'resend'
+import { Resend } from './mailTransport'
 import { pool } from './db'
 
 const apiKey = process.env.RESEND_API_KEY
