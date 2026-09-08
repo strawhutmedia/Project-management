@@ -1130,6 +1130,14 @@ export const api = {
     }),
   audienceResync: (projectId: string) =>
     request<{ ok: true; pushed: number }>(`/api/audience/projects/${projectId}/resync`, { method: 'POST' }),
+  // Broadcast to a show's fan list directly from Slate (SES today, Resend
+  // as fallback) — the in-app replacement for sending from the Resend
+  // dashboard. Never called automatically; only from an explicit click.
+  audienceBroadcast: (projectId: string, body: { subject: string; html: string; fromName?: string; fromEmail?: string }) =>
+    request<{ ok: true; sent: number; failed: number; failedEmails: string[] }>(
+      `/api/audience/projects/${projectId}/broadcast`,
+      { method: 'POST', body: JSON.stringify(body) },
+    ),
   // Lead follow-up drafts (sales-pipeline lists only)
   audienceFollowups: (projectId: string) =>
     request<{
@@ -1970,6 +1978,17 @@ export const api = {
         action: 'updated' | 'unchanged' | 'missing_in_resend';
       }>;
     }>('/api/admin/outreach/domains/sync-with-resend', { method: 'POST' }),
+  syncOutreachDomainsWithSes: () =>
+    request<{
+      ok: true;
+      changes: Array<{
+        name: string;
+        before: string;
+        after: string;
+        sesVisibility: 'not_added' | 'added_unverified' | 'verified';
+        action: 'updated' | 'unchanged';
+      }>;
+    }>('/api/admin/outreach/domains/sync-with-ses', { method: 'POST' }),
 
   // Notifications
   notifications: () => request<{ notifications: ApiNotification[]; unreadCount: number }>('/api/notifications'),

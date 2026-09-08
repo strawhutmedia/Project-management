@@ -96,6 +96,9 @@ type SendPayload = {
   replyTo?: string | string[]
   reply_to?: string | string[]
   tags?: Array<{ name: string; value: string }>
+  // Extra message headers (e.g. List-Unsubscribe for a bulk/fan send).
+  // Object form {Name: Value} — real Resend accepts this shape too.
+  headers?: Record<string, string>
   [k: string]: unknown
 }
 
@@ -121,6 +124,9 @@ export class Resend {
           for (const t of Array.isArray(payload.tags) ? payload.tags : []) {
             if (t && t.name) tags.push({ Name: cleanTag(t.name), Value: cleanTag(t.value) })
           }
+          const headers = payload.headers
+            ? Object.entries(payload.headers).map(([Name, Value]) => ({ Name, Value }))
+            : undefined
           const out = await ses().send(
             new SendEmailCommand({
               FromEmailAddress: payload.from,
@@ -135,6 +141,7 @@ export class Resend {
                     ...(payload.html ? { Html: { Data: payload.html, Charset: 'UTF-8' } } : {}),
                     ...(payload.text ? { Text: { Data: payload.text, Charset: 'UTF-8' } } : {}),
                   },
+                  ...(headers ? { Headers: headers } : {}),
                 },
               },
             }),

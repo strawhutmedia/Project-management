@@ -107,22 +107,44 @@ confirmed…` or `ses probe: SES account is still SANDBOXED` — in the status
 branch / `/api/_diag` `recentLog`. Check that before assuming SES is actually
 delivering to anyone outside the team.
 
-**Do NOT delete the Resend account — two things still depend on it, on
-purpose, with no drop-in SES equivalent:**
+**Update (2026-09-08): two of the three original Resend-only gaps are now
+closed with real SES equivalents. One remains and needs an AWS action from
+Ryan before Resend is fully safe to delete.**
 
-- **`server/routes/outreach_domains.ts`** — cold-outreach domain
-  verification/rotation is a Resend-specific concept (`sending_domains` +
-  Resend's own domain API + its bounce/complaint webhook). Porting this to
-  SES means verifying each rotation domain as a separate SES identity (real
-  DNS propagation time, not a same-day change) and rebuilding bounce/complaint
-  handling on SES→SNS instead of Resend's Svix webhook.
-- **`server/audience_resend.ts`** — per-show contact lists mirror into a
-  Resend Audience specifically so broadcasts can be sent from the **Resend
-  dashboard** (see the Audience CRM section below). AWS SES has no
-  dashboard-broadcast equivalent. `mailTransport.ts` already makes this
-  degrade gracefully instead of crashing if `RESEND_API_KEY` is ever unset
-  (`domains`/`audiences`/`contacts` return a clear "feature unavailable"
-  error) — but that's a degraded CRM feature, not a working replacement.
+- **Domain verification/rotation — CLOSED.** `server/routes/outreach_domains.ts`
+  now has a `POST /sync-with-ses` action (button: "🔄 Sync with SES" on
+  `/admin/outreach/domains`) alongside the original Resend one. Add a new
+  rotation domain via the **AWS SES console** ("Create identity" → add the
+  DKIM CNAMEs it gives you to DNS) instead of Resend's dashboard, then run
+  this sync to pull its real SES verification status into
+  `sending_domains.status` — no Resend involved. `mailTransport.ts` exports
+  `sesCheckIdentity(domain)` (`GetEmailIdentity`) for this.
+- **Fan-list broadcasts — CLOSED.** `POST /api/audience/projects/:id/broadcast`
+  (UI: the "📣 Broadcast to this list" panel on fan lists in `AudienceSection.tsx`,
+  hidden on lead-alert/sales lists) sends directly from Slate to everyone
+  in `audience_contacts` who hasn't unsubscribed — through the same
+  `mailTransport` shim as everything else, so it's on SES today. Every send
+  gets a real per-contact one-click unsubscribe link + `List-Unsubscribe`
+  header (`GET/POST /api/audience/unsub/:projectId/:contactId/:sig`, HMAC-signed
+  with `AUDIENCE_UNSUB_SECRET`, falls back to hashing `DATABASE_URL` if unset).
+  This replaces needing to log into the Resend dashboard to broadcast; the
+  old Resend-Audience mirror in `server/audience_resend.ts` still runs
+  best-effort but nothing depends on it sending anymore.
+- **Bounce/complaint auto-pause on the rotation pool — STILL Resend-only,
+  genuinely not closeable without an AWS action first.** `outreach_webhook.ts`'s
+  `maybePauseDomain()` (auto-pauses a rotation domain whose 7-day bounce+complaint
+  rate crosses 5%) is driven entirely by Resend's Svix webhook. The SES
+  equivalent needs an SES Configuration Set wired to publish bounce/complaint
+  events to an SNS topic, with a new public endpoint here subscribed to that
+  topic (the exact pattern `strawhut-site/src/mailSes.js` + `/api/ses/notify`
+  already uses for the newsletter — `SES_SNS_TOPIC_ARN` on that service).
+  Nobody has provisioned that SNS topic/subscription for Slate's own SES
+  usage yet, and doing so needs the AWS console (or CLI credentials this app
+  doesn't have) — not something fixable by a code change alone. Until it
+  exists, deleting Resend means losing the live auto-pause safety net for
+  the outreach rotation pool; sends themselves keep working fine (confirmed
+  all 4 domains verified in SES), there's just no automatic reaction if one
+  starts bouncing.
 
 ## Required env vars on the Railway "Project-management" service
 
