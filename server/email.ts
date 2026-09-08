@@ -60,6 +60,7 @@ export async function sendAdminAlert(subject: string, body: string, key?: string
       to: ADMIN_EMAIL,
       subject: `[Slate] ${subject}`,
       text: body,
+      tags: [{ name: 'stage', value: 'internal' }, { name: 'category', value: 'admin-alert' }],
       html: `
         <div style="font-family:system-ui,sans-serif;max-width:480px;margin:0 auto;padding:32px 24px;color:#0b0d12">
           <p style="font-size:11px;letter-spacing:0.3em;text-transform:uppercase;color:#7a8294;margin:0 0 8px">Straw Hut Media presents</p>
@@ -87,6 +88,7 @@ export async function sendInviteEmail(email: string, name: string, inviterName: 
     from: FROM,
     to: email,
     subject: `${inviterName} invited you to Slate`,
+    tags: [{ name: 'stage', value: 'team' }, { name: 'category', value: 'invite' }],
     html: `
       <div style="font-family:system-ui,sans-serif;max-width:480px;margin:0 auto;padding:32px 24px;color:#0b0d12">
         <p style="font-size:11px;letter-spacing:0.3em;text-transform:uppercase;color:#7a8294;margin:0 0 8px">Straw Hut Media presents</p>
@@ -120,6 +122,7 @@ export async function sendNotificationEmail(args: {
     from: FROM,
     to: args.to,
     subject: args.subject,
+    tags: [{ name: 'stage', value: 'team' }, { name: 'category', value: 'notification' }],
     html: `
       <div style="font-family:system-ui,sans-serif;max-width:480px;margin:0 auto;padding:32px 24px;color:#0b0d12">
         <p style="font-size:11px;letter-spacing:0.3em;text-transform:uppercase;color:#7a8294;margin:0 0 8px">Straw Hut Media presents</p>
@@ -158,6 +161,7 @@ export async function sendInvoiceEmail(args: {
     to: args.to,
     ...(args.replyTo ? { replyTo: args.replyTo } : {}),
     subject: `Invoice ${args.invoiceNumber} — ${args.companyName}`,
+    tags: [{ name: 'stage', value: 'vendor' }, { name: 'category', value: 'invoice' }],
     html: `
       <div style="font-family:system-ui,sans-serif;max-width:520px;margin:0 auto;padding:32px 24px;color:#0b0d12">
         <h1 style="font-family:Impact,sans-serif;font-size:30px;margin:0 0 16px;color:#A96B12">${escapeHtml(args.companyName)}</h1>
@@ -198,6 +202,7 @@ export async function sendMagicLink(email: string, link: string) {
     from: FROM,
     to: email,
     subject: 'Sign in to Slate',
+    tags: [{ name: 'stage', value: 'team' }, { name: 'category', value: 'login' }],
     html: `
       <div style="font-family:system-ui,sans-serif;max-width:480px;margin:0 auto;padding:32px 24px;color:#0b0d12">
         <p style="font-size:11px;letter-spacing:0.3em;text-transform:uppercase;color:#7a8294;margin:0 0 8px">Straw Hut Media presents</p>
