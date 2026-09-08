@@ -20,14 +20,21 @@ const resend = apiKey ? new Resend(apiKey) : null
 // winner's id (the orphan audience stays empty and harmless in Resend).
 async function ensureAudienceId(projectId: string): Promise<string | null> {
   if (!resend) return null
-  const { rows } = await pool.query<{ name: string; resend_audience_id: string | null }>(
-    `SELECT name, resend_audience_id FROM projects WHERE id = $1`,
+  const { rows } = await pool.query<{ name: string; resend_audience_id: string | null; audience_lead_alerts: boolean }>(
+    `SELECT name, resend_audience_id, audience_lead_alerts FROM projects WHERE id = $1`,
     [projectId],
   )
   if (rows.length === 0) return null
   if (rows[0].resend_audience_id) return rows[0].resend_audience_id
 
-  const created = await resend.audiences.create({ name: `Slate — ${rows[0].name}` })
+  // Fan lists and sales-pipeline lists (audience_lead_alerts) must read as
+  // different things from the Resend dashboard's flat audience list — not
+  // just distinguishable in Slate's own DB — so nobody mistakes a lead
+  // pipeline for a fan list (or broadcasts to one thinking it's the other).
+  // Also prefixed with "Slate —" since this Resend account is shared with
+  // Pod Booster/First 100; the product has to be legible at a glance too.
+  const label = rows[0].audience_lead_alerts ? `${rows[0].name} — Sales Leads` : rows[0].name
+  const created = await resend.audiences.create({ name: `Slate — ${label}` })
   if (created.error || !created.data) {
     logError('audience: resend audience create failed', {
       projectId, error: created.error?.message ?? 'no data',
