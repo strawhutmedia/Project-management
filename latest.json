@@ -1,16 +1,16 @@
 {
   "version": "0.2.2",
-  "now": "2026-09-08T20:17:59.405Z",
+  "now": "2026-09-08T20:28:12.278Z",
   "boot": {
-    "startedAt": "2026-09-08T20:17:58.802Z",
-    "completedAt": "2026-09-08T20:17:59.389Z",
+    "startedAt": "2026-09-08T20:28:11.768Z",
+    "completedAt": "2026-09-08T20:28:12.264Z",
     "error": null
   },
   "env": {
     "NODE_ENV": "production",
     "PORT": "8080",
     "HAS_DATABASE_URL": true,
-    "HAS_RESEND_API_KEY": true,
+    "HAS_RESEND_API_KEY": false,
     "HAS_GITHUB_TOKEN": true,
     "HAS_DEEPGRAM_API_KEY": true,
     "HAS_ANTHROPIC_API_KEY": true,
@@ -181,7 +181,7 @@
   "recentLog": [
     {
       "level": "info",
-      "ts": "2026-09-08T20:17:58.800Z",
+      "ts": "2026-09-08T20:28:11.767Z",
       "msg": "serving client from",
       "data": {
         "clientDir": "/app/dist"
@@ -189,23 +189,23 @@
     },
     {
       "level": "info",
-      "ts": "2026-09-08T20:17:58.802Z",
+      "ts": "2026-09-08T20:28:11.768Z",
       "msg": "boot starting",
       "data": {
         "cwd": "/app",
         "nodeEnv": "production",
         "hasDb": true,
-        "hasResend": true
+        "hasResend": false
       }
     },
     {
       "level": "info",
-      "ts": "2026-09-08T20:17:59.248Z",
+      "ts": "2026-09-08T20:28:12.130Z",
       "msg": "migrations complete"
     },
     {
       "level": "info",
-      "ts": "2026-09-08T20:17:59.375Z",
+      "ts": "2026-09-08T20:28:12.253Z",
       "msg": "wardrobe outfits: applied",
       "data": {
         "projectId": "12f53ed1-c6c7-4c11-8d7b-06d91744c9af",
@@ -216,7 +216,7 @@
     },
     {
       "level": "info",
-      "ts": "2026-09-08T20:17:59.376Z",
+      "ts": "2026-09-08T20:28:12.253Z",
       "msg": "BIYA seed: project already exists, ensured shoot days",
       "data": {
         "projectId": "12f53ed1-c6c7-4c11-8d7b-06d91744c9af"
@@ -224,17 +224,17 @@
     },
     {
       "level": "info",
-      "ts": "2026-09-08T20:17:59.389Z",
+      "ts": "2026-09-08T20:28:12.264Z",
       "msg": "listening on :8080"
     },
     {
       "level": "info",
-      "ts": "2026-09-08T20:17:59.389Z",
+      "ts": "2026-09-08T20:28:12.265Z",
       "msg": "scheduler started (every 5 min)"
     },
     {
       "level": "info",
-      "ts": "2026-09-08T20:17:59.391Z",
+      "ts": "2026-09-08T20:28:12.267Z",
       "msg": "autopilot: loop started",
       "data": {
         "tickMinutes": 10
@@ -242,7 +242,7 @@
     },
     {
       "level": "info",
-      "ts": "2026-09-08T20:17:59.391Z",
+      "ts": "2026-09-08T20:28:12.267Z",
       "msg": "cashflow payment check: loop started",
       "data": {
         "tickHours": 6
