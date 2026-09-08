@@ -11,7 +11,7 @@
 // Contacts APIs (server/audience_resend.ts) have no SES equivalent and keep
 // importing the real `resend` package; they already no-op when the key is unset.
 import { Resend as RealResend } from 'resend'
-import { SESv2Client, SendEmailCommand, GetAccountCommand } from '@aws-sdk/client-sesv2'
+import { SESv2Client, SendEmailCommand, GetAccountCommand, GetEmailIdentityCommand } from '@aws-sdk/client-sesv2'
 
 export function sesConfigured(): boolean {
   return Boolean(
@@ -40,6 +40,34 @@ export async function sesAccountStatus(): Promise<SesAccountStatus> {
     }
   } catch (err) {
     return { ok: false, error: err instanceof Error ? err.message : String(err) }
+  }
+}
+
+// SES requires the FROM domain of every send to be independently verified
+// as its own SES identity (DKIM records) — completely separate from
+// account-level production access above, AND separate from Resend's own
+// domain verification that Slate's sending_domains.status actually tracks.
+// A domain can show status='verified' in Slate (verified in Resend) while
+// being unverified in SES, in which case a send FROM it over this SES
+// transport fails outright. See boot_ses_probe.ts, which checks every
+// domain in Slate's outreach rotation pool against this.
+export type SesIdentityCheck =
+  | { domain: string; ok: true; verifiedForSending: boolean; dkimVerified: boolean }
+  | { domain: string; ok: false; error: string }
+
+export async function sesCheckIdentity(domain: string): Promise<SesIdentityCheck> {
+  try {
+    const out = await ses().send(new GetEmailIdentityCommand({ EmailIdentity: domain }))
+    return {
+      domain,
+      ok: true,
+      verifiedForSending: Boolean(out.VerifiedForSendingStatus),
+      dkimVerified: out.DkimAttributes?.Status === 'SUCCESS',
+    }
+  } catch (err) {
+    // NotFoundException means the domain was never added as an SES identity at all —
+    // the expected/common case for a rotation domain that only exists in Resend.
+    return { domain, ok: false, error: err instanceof Error ? err.message : String(err) }
   }
 }
 
