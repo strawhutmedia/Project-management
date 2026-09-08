@@ -81,7 +81,11 @@ async function maybePauseDomain(domainId: string): Promise<void> {
   }
 }
 
-async function handleNegativeEvent(type: string, messageId: string | null): Promise<void> {
+// Exported so server/routes/ses_notify.ts (the Amazon SES/SNS bounce-and-
+// complaint path) can drive the exact same matching-by-message-id, status
+// update, and domain auto-pause logic as this Resend webhook — the two are
+// just different transports feeding the same outreach_sends bookkeeping.
+export async function handleNegativeEvent(type: string, messageId: string | null): Promise<void> {
   if (!messageId) return
   const sendRes = await pool.query<{ id: string; prospect_id: string; sending_domain_id: string | null }>(
     `SELECT id, prospect_id, sending_domain_id

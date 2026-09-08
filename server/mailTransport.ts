@@ -72,7 +72,7 @@ export async function sesCheckIdentity(domain: string): Promise<SesIdentityCheck
 }
 
 let sesClient: SESv2Client | null = null
-function ses(): SESv2Client {
+export function ses(): SESv2Client {
   if (sesClient) return sesClient
   sesClient = new SESv2Client({
     region: process.env.SES_REGION || process.env.AWS_REGION || 'us-east-1',

@@ -1989,6 +1989,11 @@ export const api = {
         action: 'updated' | 'unchanged';
       }>;
     }>('/api/admin/outreach/domains/sync-with-ses', { method: 'POST' }),
+  syncOutreachBounceWebhook: () =>
+    request<
+      | { configured: false; reason: string }
+      | { configured: true; topicArn: string; eventDestinationName: string; action: 'created' | 'updated' | 'already_current' }
+    >('/api/admin/outreach/domains/bounce-webhook/sync', { method: 'POST' }),
 
   // Notifications
   notifications: () => request<{ notifications: ApiNotification[]; unreadCount: number }>('/api/notifications'),

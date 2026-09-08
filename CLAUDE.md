@@ -107,9 +107,9 @@ confirmed…` or `ses probe: SES account is still SANDBOXED` — in the status
 branch / `/api/_diag` `recentLog`. Check that before assuming SES is actually
 delivering to anyone outside the team.
 
-**Update (2026-09-08): two of the three original Resend-only gaps are now
-closed with real SES equivalents. One remains and needs an AWS action from
-Ryan before Resend is fully safe to delete.**
+**Update (2026-09-08): all three original Resend-only gaps have a real SES
+equivalent in code now. The last one still needs one small AWS-console
+action from whoever has console access before it actually turns on.**
 
 - **Domain verification/rotation — CLOSED.** `server/routes/outreach_domains.ts`
   now has a `POST /sync-with-ses` action (button: "🔄 Sync with SES" on
@@ -130,20 +130,33 @@ Ryan before Resend is fully safe to delete.**
   This replaces needing to log into the Resend dashboard to broadcast; the
   old Resend-Audience mirror in `server/audience_resend.ts` still runs
   best-effort but nothing depends on it sending anymore.
-- **Bounce/complaint auto-pause on the rotation pool — STILL Resend-only,
-  genuinely not closeable without an AWS action first.** `outreach_webhook.ts`'s
-  `maybePauseDomain()` (auto-pauses a rotation domain whose 7-day bounce+complaint
-  rate crosses 5%) is driven entirely by Resend's Svix webhook. The SES
-  equivalent needs an SES Configuration Set wired to publish bounce/complaint
-  events to an SNS topic, with a new public endpoint here subscribed to that
-  topic (the exact pattern `strawhut-site/src/mailSes.js` + `/api/ses/notify`
-  already uses for the newsletter — `SES_SNS_TOPIC_ARN` on that service).
-  Nobody has provisioned that SNS topic/subscription for Slate's own SES
-  usage yet, and doing so needs the AWS console (or CLI credentials this app
-  doesn't have) — not something fixable by a code change alone. Until it
-  exists, deleting Resend means losing the live auto-pause safety net for
-  the outreach rotation pool; sends themselves keep working fine (confirmed
-  all 4 domains verified in SES), there's just no automatic reaction if one
+- **Bounce/complaint auto-pause on the rotation pool — CODE IS DONE, needs
+  one AWS-console step to turn on.** `outreach_webhook.ts`'s `maybePauseDomain()`
+  (auto-pauses a rotation domain whose 7-day bounce+complaint rate crosses
+  5%) used to be driven entirely by Resend's Svix webhook. It now has a full
+  SES/SNS equivalent: `server/routes/ses_notify.ts` is a public endpoint
+  (`POST /api/ses/notify`) that verifies AWS's own SNS message signature,
+  auto-confirms the SNS subscription handshake, and feeds Bounce/Complaint
+  notifications into the exact same `handleNegativeEvent()` logic the Resend
+  webhook uses (matching by the SES `MessageId` already stored in
+  `outreach_sends.resend_message_id` — sends already go out via SES, so
+  that column already holds SES message IDs, not Resend ones). Every boot,
+  and on demand via the "🔌 Wire bounce webhook" button on
+  `/admin/outreach/domains` (`POST /api/admin/outreach/domains/bounce-webhook/sync`,
+  `server/ses_bounce_setup.ts`), Slate wires its `SES_CONFIG_SET` to publish
+  Bounce/Complaint events to `SES_SNS_TOPIC_ARN` — using the same
+  `SES_ACCESS_KEY_ID`/`SES_SECRET_ACCESS_KEY` Slate already sends mail with,
+  no new AWS credentials needed anywhere in this app.
+  **The one thing only a human with AWS console access can do:** create the
+  SNS topic itself and add an HTTPS subscription pointing at
+  `https://slate.strawhutmedia.com/api/ses/notify` (SNS's confirmation
+  handshake fires automatically once that subscription exists — nothing
+  else to click), then set `SES_SNS_TOPIC_ARN` to that topic's ARN as a
+  Railway env var on this service. The button above reports exactly what's
+  missing (`ses_sns_topic_arn_not_set`, etc.) until that's done. Until then,
+  deleting Resend means losing the live auto-pause safety net for the
+  outreach rotation pool; sends themselves keep working fine (confirmed all
+  4 domains verified in SES), there's just no automatic reaction if one
   starts bouncing.
 
 ## Required env vars on the Railway "Project-management" service
@@ -154,7 +167,8 @@ Ryan before Resend is fully safe to delete.**
 | `RESEND_API_KEY` | Fallback transport when SES isn't configured, plus the only transport for Outreach domain management and the Audience CRM's Resend dashboard broadcasts (see "Email transport" above). Same key as Pod Booster — don't delete this account. |
 | `SES_ACCESS_KEY_ID` / `SES_SECRET_ACCESS_KEY` | Amazon SES credentials — when both are set, `server/mailTransport.ts` sends transactional/outreach/lead-follow-up mail via SES instead of Resend. Falls back to `AWS_ACCESS_KEY_ID`/`AWS_SECRET_ACCESS_KEY` if the dedicated ones aren't set. |
 | `SES_REGION` | Region the SES identity lives in. Falls back to `AWS_REGION`, then `us-east-1`. |
-| `SES_CONFIG_SET` | Optional SES configuration set name (bounce/complaint tracking). |
+| `SES_CONFIG_SET` | SES configuration set name — required for bounce/complaint tracking (see below), otherwise optional. |
+| `SES_SNS_TOPIC_ARN` | ARN of the SNS topic subscribed to `/api/ses/notify`. Must be created once in the AWS console (topic + HTTPS subscription to this endpoint) — see "Email transport" above. Without it, bounce/complaint auto-pause on the outreach rotation pool has no way to hear about bounces. |
 | `GITHUB_TOKEN` | Fine-grained PAT, repo: this repo, contents: write — for status reporting |
 | `ADMIN_EMAIL` | Defaults to `ryan@strawhutmedia.com` if not set |
 | `APP_BASE_URL` | Defaults to `https://slate.strawhutmedia.com` if not set |

@@ -35,6 +35,8 @@ import { audienceRouter } from './routes/audience'
 import { quickbooksRouter } from './routes/quickbooks'
 import { qbInvoicesRouter } from './routes/qb_invoices'
 import { handleResendWebhook } from './routes/outreach_webhook'
+import { handleSesNotify } from './routes/ses_notify'
+import { scheduleBoot as scheduleSesBounceSetup } from './ses_bounce_setup'
 import { seedBackInYourArms } from './seeds/back_in_your_arms'
 import { seedMadelineInvite } from './seeds/invite_madeline'
 import { ensureRyanIsPodcastEp } from './routes/projects'
@@ -83,6 +85,14 @@ app.use((req, res, next) => {
 // verifies the signature instead.
 app.post('/api/outreach/resend-webhook', express.raw({ type: () => true }), (req, res) => {
   void handleResendWebhook(req, res)
+})
+
+// Amazon SES bounce/complaint receiver, delivered via SNS — the same idea
+// as the Resend webhook above, for mail sent through SES instead. Also
+// needs the raw body (to verify SNS's own message signature) ahead of the
+// JSON parser. Public: SNS can't authenticate as an admin.
+app.post('/api/ses/notify', express.raw({ type: () => true }), (req, res) => {
+  void handleSesNotify(req, res)
 })
 
 app.use(express.json({ limit: '20mb' }))
@@ -240,6 +250,7 @@ async function start() {
     scheduleBootTimeCoverSync()
     scheduleBootResendProbe()
     scheduleBootSesProbe()
+    scheduleSesBounceSetup()
     scheduleBootBiyaScriptDump()
     scheduleBootBudgetDump()
     scheduleBootLocationsDump()
