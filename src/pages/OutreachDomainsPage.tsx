@@ -31,6 +31,9 @@ export default function OutreachDomainsPage() {
   const [syncing, setSyncing] = useState(false)
   type SyncReport = Awaited<ReturnType<typeof api.syncOutreachDomainsWithResend>>
   const [syncReport, setSyncReport] = useState<SyncReport | null>(null)
+  type SesSyncReport = Awaited<ReturnType<typeof api.syncOutreachDomainsWithSes>>
+  const [sesSyncing, setSesSyncing] = useState(false)
+  const [sesSyncReport, setSesSyncReport] = useState<SesSyncReport | null>(null)
 
   async function load() {
     try {
@@ -86,6 +89,21 @@ export default function OutreachDomainsPage() {
       setError(err instanceof Error ? err.message : 'sync failed')
     } finally {
       setSyncing(false)
+    }
+  }
+
+  async function syncWithSes() {
+    setSesSyncing(true)
+    setError(null)
+    setSesSyncReport(null)
+    try {
+      const r = await api.syncOutreachDomainsWithSes()
+      setSesSyncReport(r)
+      await load()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'sync failed')
+    } finally {
+      setSesSyncing(false)
     }
   }
 
@@ -246,6 +264,59 @@ export default function OutreachDomainsPage() {
                 ))}
               </ul>
             </div>
+          </div>
+        )}
+      </section>
+
+      <section className="rounded-2xl border border-stage-mastering/40 bg-stage-mastering/5 p-4 space-y-3">
+        <div className="flex items-center justify-between gap-3 flex-wrap">
+          <div>
+            <h2 className="text-[11px] uppercase tracking-[0.2em] text-stage-mastering font-bold">Amazon SES cross-check</h2>
+            <p className="text-[11px] text-muted/70 mt-1 max-w-xl">
+              Sends already go out over SES for every domain here. Add a new one via the AWS SES console
+              (Create identity → add the DKIM CNAMEs it gives you to DNS) instead of Resend's dashboard,
+              then run this to pull its real SES verification status into Slate — no Resend involved.
+            </p>
+          </div>
+          <button
+            onClick={() => void syncWithSes()}
+            disabled={sesSyncing}
+            className="text-[10px] uppercase tracking-wider text-stage-mastering border border-stage-mastering/40 rounded-full px-3 py-1.5 hover:bg-stage-mastering/10 disabled:opacity-40 font-bold whitespace-nowrap"
+          >
+            {sesSyncing ? 'Checking…' : '🔄 Sync with SES'}
+          </button>
+        </div>
+        {sesSyncReport && (
+          <div className="rounded-lg border border-line bg-ink/40 p-3 text-[11px]">
+            <div className="text-[10px] uppercase tracking-wider text-muted font-bold mb-2">
+              Slate ↔ SES diff ({sesSyncReport.changes.length})
+            </div>
+            <ul className="space-y-1 font-mono">
+              {sesSyncReport.changes.map((c) => (
+                <li key={c.name} className="flex items-center gap-2 flex-wrap">
+                  <span className="font-bold">{c.name}</span>
+                  <span className="text-muted/60">Slate:</span>
+                  <span className={
+                    c.after === 'verified' ? 'text-emerald-300'
+                    : c.after === 'verifying' ? 'text-amber-300'
+                    : 'text-muted'
+                  }>
+                    {c.after}
+                  </span>
+                  <span className="text-muted/60">SES:</span>
+                  <span className={
+                    c.sesVisibility === 'verified' ? 'text-emerald-300'
+                      : c.sesVisibility === 'added_unverified' ? 'text-amber-300'
+                        : 'text-urgent'
+                  }>
+                    {c.sesVisibility === 'not_added' ? 'not added' : c.sesVisibility === 'added_unverified' ? 'pending DKIM' : 'verified'}
+                  </span>
+                  {c.action === 'updated' && (
+                    <span className="text-[9px] uppercase tracking-wider text-stage-mastering font-bold">← updated</span>
+                  )}
+                </li>
+              ))}
+            </ul>
           </div>
         )}
       </section>

@@ -112,6 +112,51 @@ audienceRouter.post('/hooks/:token', async (req, res) => {
   }
 })
 
+// One-click unsubscribe for Slate-originated fan broadcasts (see
+// /projects/:id/broadcast below). Signed with an HMAC so no session/login
+// is needed — the same shape as a Resend/Mailchimp unsubscribe link.
+// Registered here, before requireUser, so it stays public.
+function unsubSecret(): string {
+  return process.env.AUDIENCE_UNSUB_SECRET || process.env.DATABASE_URL || 'slate-audience-unsub-fallback'
+}
+function unsubSig(projectId: string, contactId: string): string {
+  return crypto.createHmac('sha256', unsubSecret()).update(`${projectId}:${contactId}`).digest('hex').slice(0, 32)
+}
+function unsubUrl(projectId: string, contactId: string): string {
+  const base = (process.env.APP_BASE_URL || 'https://slate.strawhutmedia.com').replace(/\/+$/, '')
+  return `${base}/api/audience/unsub/${projectId}/${contactId}/${unsubSig(projectId, contactId)}`
+}
+audienceRouter.get('/unsub/:projectId/:contactId/:sig', async (req, res) => {
+  const { projectId, contactId, sig } = req.params
+  const expected = unsubSig(projectId, contactId)
+  const a = Buffer.from(sig || '')
+  const b = Buffer.from(expected)
+  const valid = a.length === b.length && crypto.timingSafeEqual(a, b)
+  res.setHeader('Content-Type', 'text/html; charset=utf-8')
+  if (!valid) { res.status(400).send('<p>Invalid or expired unsubscribe link.</p>'); return }
+  await pool.query(
+    `UPDATE audience_contacts SET unsubscribed_at = now()
+      WHERE id = $1 AND project_id = $2 AND unsubscribed_at IS NULL`,
+    [contactId, projectId],
+  )
+  res.send('<p>You’ve been unsubscribed. You won’t receive any more emails from this list.</p>')
+})
+// POST variant for List-Unsubscribe-Post (one-click unsubscribe per RFC
+// 8058) — mail clients that support it call this instead of opening the link.
+audienceRouter.post('/unsub/:projectId/:contactId/:sig', async (req, res) => {
+  const { projectId, contactId, sig } = req.params
+  const expected = unsubSig(projectId, contactId)
+  const a = Buffer.from(sig || '')
+  const b = Buffer.from(expected)
+  if (a.length !== b.length || !crypto.timingSafeEqual(a, b)) { res.status(400).end(); return }
+  await pool.query(
+    `UPDATE audience_contacts SET unsubscribed_at = now()
+      WHERE id = $1 AND project_id = $2 AND unsubscribed_at IS NULL`,
+    [contactId, projectId],
+  )
+  res.status(200).end()
+})
+
 // ── Everything below requires a session ──────────────────────────────
 audienceRouter.use(requireUser)
 
@@ -244,6 +289,69 @@ audienceRouter.post('/projects/:projectId/resync', async (req, res) => {
   if (!await assertWriter(user, projectId, res)) return
   const pushed = await resyncProject(projectId)
   res.json({ ok: true, pushed })
+})
+
+// Broadcast to a show's fan list, sent directly from Slate (via the same
+// mailTransport shim as everything else — SES today) instead of requiring
+// someone to log into the Resend dashboard. Writer-gated, never called by
+// Claude: this is the explicit, human-triggered replacement for "send a
+// broadcast from Resend," not an automated send path. Every recipient gets
+// a real per-contact unsubscribe link + List-Unsubscribe header — required
+// for a bulk send Slate originates itself (Resend handled this before).
+audienceRouter.post('/projects/:projectId/broadcast', async (req, res) => {
+  const user = (req as typeof req & { user: SessionUser }).user
+  const projectId = req.params.projectId
+  if (!await assertWriter(user, projectId, res)) return
+  if (!resend) { res.status(503).json({ error: 'no_transport_configured' }); return }
+
+  const subject = cleanStr(req.body?.subject, 200)
+  const html = typeof req.body?.html === 'string' ? req.body.html : ''
+  if (!subject || !html.trim()) { res.status(400).json({ error: 'subject_and_html_required' }); return }
+  const fromName = cleanStr(req.body?.fromName, 80)
+  const fromEmail = cleanStr(req.body?.fromEmail, 200) || 'hello@strawhut.media'
+  if (!EMAIL_RE.test(fromEmail)) { res.status(400).json({ error: 'invalid_from_email' }); return }
+
+  const proj = await pool.query<{ name: string }>(`SELECT name FROM projects WHERE id = $1`, [projectId])
+  if (proj.rows.length === 0) { res.status(404).json({ error: 'not_found' }); return }
+  const from = `${fromName || proj.rows[0].name} <${fromEmail}>`
+
+  const { rows: contacts } = await pool.query<{ id: string; email: string }>(
+    `SELECT id, email FROM audience_contacts WHERE project_id = $1 AND unsubscribed_at IS NULL ORDER BY created_at`,
+    [projectId],
+  )
+  if (contacts.length === 0) { res.status(400).json({ error: 'no_recipients' }); return }
+
+  logInfo('audience: broadcast starting', { projectId, recipients: contacts.length, from })
+  let sent = 0
+  const failed: string[] = []
+  for (const c of contacts) {
+    const url = unsubUrl(projectId, c.id)
+    const bodyWithFooter = `${html}<p style="font-size:11px;color:#888;margin-top:32px">You're receiving this because you signed up for updates from ${escapeHtml(proj.rows[0].name)}. <a href="${url}">Unsubscribe</a></p>`
+    try {
+      const r = await resend.emails.send({
+        from,
+        to: c.email,
+        subject,
+        html: bodyWithFooter,
+        headers: {
+          'List-Unsubscribe': `<${url}>`,
+          'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click',
+        },
+        tags: [{ name: 'stage', value: 'fan' }, { name: 'category', value: 'broadcast' }, { name: 'show', value: proj.rows[0].name }],
+      })
+      if (r.error) { failed.push(c.email); logError('audience: broadcast send failed', { projectId, email: c.email, error: r.error.message }) }
+      else sent++
+    } catch (err) {
+      failed.push(c.email)
+      logError('audience: broadcast send threw', { projectId, email: c.email, error: err instanceof Error ? err.message : String(err) })
+    }
+    // Light pacing so a few-hundred-contact list doesn't hammer the
+    // transport in a tight loop — not a hard rate-limit guarantee, just
+    // spreads the batch out.
+    await new Promise((resolve) => setTimeout(resolve, 150))
+  }
+  logInfo('audience: broadcast complete', { projectId, sent, failed: failed.length })
+  res.json({ ok: true, sent, failed: failed.length, failedEmails: failed.slice(0, 20) })
 })
 
 // Toggle instant lead alerts — admin only. On = every NEW capture for

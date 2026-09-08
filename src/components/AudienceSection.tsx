@@ -2,8 +2,8 @@
 //
 // Shows list growth, the most recent captures, and (for writers) the
 // secret capture URL to paste into ManyChat's External Request action.
-// Slate never emails this list itself — broadcasts go out from the
-// Resend dashboard, from whatever verified from-address the team picks.
+// Fan-list broadcasts send directly from Slate (BroadcastPanel below,
+// SES today) — an explicit, human-triggered action, never automatic.
 import { useEffect, useState } from 'react'
 import { api } from '../api'
 
@@ -180,7 +180,107 @@ export default function AudienceSection({ projectId, canWrite }: {
       {note && <p className="text-[11px] text-muted">{note}</p>}
 
       {canWrite && data?.leadAlerts && <LeadFollowupsPanel projectId={projectId} />}
+      {canWrite && data && !data.leadAlerts && s && s.total > 0 && (
+        <BroadcastPanel projectId={projectId} subscriberCount={s.total} />
+      )}
     </section>
+  )
+}
+
+// Fan-list broadcast composer — sends directly from Slate (SES today,
+// Resend as fallback) instead of requiring someone to log into the Resend
+// dashboard. Only shown on fan lists (never lead-alert/sales lists, which
+// use the per-lead LeadFollowupsPanel instead). Nothing sends without the
+// explicit confirm below.
+function BroadcastPanel({ projectId, subscriberCount }: { projectId: string; subscriberCount: number }) {
+  const [subject, setSubject] = useState('')
+  const [body, setBody] = useState('')
+  const [fromName, setFromName] = useState('')
+  const [fromEmail, setFromEmail] = useState('hello@strawhut.media')
+  const [sending, setSending] = useState(false)
+  const [result, setResult] = useState<{ sent: number; failed: number } | null>(null)
+  const [error, setError] = useState<string | null>(null)
+
+  async function send() {
+    if (!subject.trim() || !body.trim()) return
+    if (!confirm(`Send this to all ${subscriberCount} subscriber${subscriberCount === 1 ? '' : 's'} on this list? This emails them right now.`)) return
+    setSending(true); setError(null); setResult(null)
+    try {
+      const r = await api.audienceBroadcast(projectId, {
+        subject: subject.trim(),
+        html: body,
+        fromName: fromName.trim() || undefined,
+        fromEmail: fromEmail.trim() || undefined,
+      })
+      setResult({ sent: r.sent, failed: r.failed })
+      if (r.failed === 0) { setSubject(''); setBody('') }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'send failed')
+    } finally {
+      setSending(false)
+    }
+  }
+
+  return (
+    <div className="rounded-xl border border-stage-stems/40 bg-stage-stems/5 p-4 space-y-3">
+      <div>
+        <p className="text-[10px] uppercase tracking-wider text-stage-stems font-bold">📣 Broadcast to this list</p>
+        <p className="text-[11px] text-muted/80 mt-1 leading-relaxed">
+          Sends straight from Slate to every subscriber who hasn't unsubscribed — an unsubscribe
+          link is added automatically. No Resend dashboard needed.
+        </p>
+      </div>
+      <div className="grid grid-cols-2 gap-2">
+        <label className="block">
+          <span className="text-[10px] uppercase tracking-wider text-muted/70 font-bold">From name (optional)</span>
+          <input
+            value={fromName}
+            onChange={(e) => setFromName(e.target.value)}
+            placeholder="Show name"
+            className="w-full mt-1 bg-ink/40 border border-line rounded px-2 py-1.5 text-xs text-text"
+          />
+        </label>
+        <label className="block">
+          <span className="text-[10px] uppercase tracking-wider text-muted/70 font-bold">From email</span>
+          <input
+            value={fromEmail}
+            onChange={(e) => setFromEmail(e.target.value)}
+            className="w-full mt-1 bg-ink/40 border border-line rounded px-2 py-1.5 text-xs text-text"
+          />
+        </label>
+      </div>
+      <label className="block">
+        <span className="text-[10px] uppercase tracking-wider text-muted/70 font-bold">Subject</span>
+        <input
+          value={subject}
+          onChange={(e) => setSubject(e.target.value)}
+          className="w-full mt-1 bg-ink/40 border border-line rounded px-2 py-1.5 text-xs text-text font-bold"
+        />
+      </label>
+      <label className="block">
+        <span className="text-[10px] uppercase tracking-wider text-muted/70 font-bold">Body (HTML)</span>
+        <textarea
+          value={body}
+          onChange={(e) => setBody(e.target.value)}
+          rows={8}
+          placeholder="<p>Hey! New episode is up...</p>"
+          className="w-full mt-1 bg-ink/40 border border-line rounded px-2 py-2 text-xs text-text font-mono"
+        />
+      </label>
+      <button
+        onClick={() => void send()}
+        disabled={sending || !subject.trim() || !body.trim()}
+        className="text-[10px] uppercase tracking-wider font-bold text-white bg-stage-stems rounded-full px-3 py-1.5 disabled:opacity-50"
+      >
+        {sending ? 'Sending…' : `Send to ${subscriberCount} subscriber${subscriberCount === 1 ? '' : 's'}`}
+      </button>
+      {result && (
+        <p className="text-[11px] text-muted">
+          Sent to {result.sent}{result.failed > 0 ? `, ${result.failed} failed` : ''}.
+        </p>
+      )}
+      {error && <p className="text-urgent text-xs">{error}</p>}
+    </div>
   )
 }
 
