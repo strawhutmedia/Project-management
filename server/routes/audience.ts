@@ -423,6 +423,12 @@ audienceRouter.post('/contacts/:contactId/followup/send', async (req, res) => {
   // it shares the domain.
   const senderName = user.display_name || user.name || 'Straw Hut Media'
   const LEADS_FROM_DOMAIN = process.env.LEADS_MAIL_DOMAIN || 'strawhutmedia.net'
+  // Lifecycle tag: sales-lead follow-ups carry the pipeline/show they belong to
+  // (so the stream stays sorted by show) and stage=sales.
+  const showRes = await pool.query<{ name: string }>(
+    `SELECT name FROM projects WHERE id = $1`, [lead.project_id],
+  )
+  const showName = showRes.rows[0]?.name || 'Straw Hut Media'
   try {
     const result = await resend.emails.send({
       from: `${senderName} at Straw Hut Media <hello@${LEADS_FROM_DOMAIN}>`,
@@ -430,6 +436,7 @@ audienceRouter.post('/contacts/:contactId/followup/send', async (req, res) => {
       to: lead.email,
       subject: lead.followup_draft_subject,
       text: lead.followup_draft_body,
+      tags: [{ name: 'show', value: showName }, { name: 'stage', value: 'sales' }, { name: 'category', value: 'lead-followup' }],
       html: `<div style="font-family:system-ui,sans-serif;font-size:15px;line-height:1.6;color:#0b0d12;white-space:pre-wrap">${escapeHtml(lead.followup_draft_body)}</div>`,
     })
     if (result.error) throw new Error(result.error.message || 'send_failed')

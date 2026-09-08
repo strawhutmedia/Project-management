@@ -739,6 +739,7 @@ async function sendOneProspect(prospectId: string): Promise<void> {
   try {
     const send = await resend.emails.send({
       from, to: p.email, subject, text: body, replyTo,
+      tags: [{ name: 'show', value: showName }, { name: 'stage', value: 'outreach' }, { name: 'category', value: 'outreach' }],
     })
     if (send.error) {
       const errorMsg = String(send.error.message ?? send.error).slice(0, 500)
@@ -890,7 +891,8 @@ async function sendFollowUp(prospectId: string): Promise<void> {
   const sendLogId = logRes.rows[0].id
 
   try {
-    const send = await resend.emails.send({ from, to: p.email, subject, text: body, replyTo })
+    const send = await resend.emails.send({ from, to: p.email, subject, text: body, replyTo,
+      tags: [{ name: 'show', value: showName }, { name: 'stage', value: 'outreach' }, { name: 'category', value: 'outreach-followup' }] })
     if (send.error) {
       const errorMsg = String(send.error.message ?? send.error).slice(0, 500)
       await pool.query(`UPDATE outreach_sends SET status = 'failed', error = $1 WHERE id = $2`, [errorMsg, sendLogId])
@@ -1723,6 +1725,7 @@ outreachRouter.post('/projects/:projectId/test-send', async (req, res) => {
       subject: `[TEST] ${subject}`,
       text: body,
       replyTo,
+      tags: [{ name: 'show', value: showName }, { name: 'stage', value: 'outreach' }, { name: 'category', value: 'outreach-test' }],
     })
     if (send.error) {
       logError('outreach test-send failed', { projectId, error: send.error })
@@ -2049,7 +2052,8 @@ outreachRouter.post('/projects/:projectId/followup/test-send', async (req, res) 
   const replyTo = parseReplyTo(tpl.reply_to)
 
   try {
-    const send = await resend.emails.send({ from, to, subject: `[TEST] ${subject}`, text: body, replyTo })
+    const send = await resend.emails.send({ from, to, subject: `[TEST] ${subject}`, text: body, replyTo,
+      tags: [{ name: 'show', value: showName }, { name: 'stage', value: 'outreach' }, { name: 'category', value: 'outreach-followup-test' }] })
     if (send.error) {
       const errorMsg = send.error.message ?? String(send.error)
       logError('outreach followup test-send failed', { projectId, error: send.error })
