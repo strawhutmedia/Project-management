@@ -11,13 +11,36 @@
 // Contacts APIs (server/audience_resend.ts) have no SES equivalent and keep
 // importing the real `resend` package; they already no-op when the key is unset.
 import { Resend as RealResend } from 'resend'
-import { SESv2Client, SendEmailCommand } from '@aws-sdk/client-sesv2'
+import { SESv2Client, SendEmailCommand, GetAccountCommand } from '@aws-sdk/client-sesv2'
 
-function sesConfigured(): boolean {
+export function sesConfigured(): boolean {
   return Boolean(
     (process.env.SES_ACCESS_KEY_ID || process.env.AWS_ACCESS_KEY_ID) &&
       (process.env.SES_SECRET_ACCESS_KEY || process.env.AWS_SECRET_ACCESS_KEY),
   )
+}
+
+// A brand-new (or not-yet-approved) SES account is SANDBOXED — it can only
+// deliver to individually verified addresses, so magic links, admin
+// alerts, and invoices to real people would silently fail to send while
+// this app quietly believes it's on SES. See boot_ses_probe.ts, which
+// logs this on every boot so that state is visible without hitting the
+// AWS console.
+export type SesAccountStatus =
+  | { ok: true; productionAccessEnabled: boolean; sendingEnabled: boolean }
+  | { ok: false; error: string }
+
+export async function sesAccountStatus(): Promise<SesAccountStatus> {
+  try {
+    const a = await ses().send(new GetAccountCommand({}))
+    return {
+      ok: true,
+      productionAccessEnabled: Boolean(a.ProductionAccessEnabled),
+      sendingEnabled: Boolean(a.SendingEnabled),
+    }
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : String(err) }
+  }
 }
 
 let sesClient: SESv2Client | null = null

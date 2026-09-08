@@ -83,12 +83,56 @@ default.
 - Status went healthy → degraded → admin email "Degraded"
 - Status went degraded → healthy → admin email "Recovered"
 
+## Email transport — Amazon SES via a Resend-compatible shim, Resend still live for two things
+
+Slate's transactional email (the four triggers above, plus invites,
+outreach/lead-follow-up sends, and contractor invoices) goes through
+`server/mailTransport.ts` — a drop-in `Resend`-shaped class that routes
+`.emails.send()` to **Amazon SES** when `SES_ACCESS_KEY_ID` +
+`SES_SECRET_ACCESS_KEY` are set, and falls back to the real Resend package
+otherwise. Every caller still does `import { Resend } from '...mailTransport'`
+and calls it exactly like the real SDK — `server/email.ts`,
+`server/routes/outreach.ts`, and `server/routes/audience.ts` all point at it.
+Sends carry SES message tags (`app=slate`, `stage=<outreach|sales|team|
+internal|vendor>`, `show=<project>` where applicable) so the SES/SNS event
+stream stays categorized.
+
+**Before trusting this for real traffic, confirm the SES account actually has
+production access.** A sandboxed SES account only delivers to individually
+verified addresses — magic links, invites, outreach, and invoices to real
+people would silently fail while Slate believes everything's fine.
+`server/boot_ses_probe.ts` (calls `sesAccountStatus()` in `mailTransport.ts`)
+checks this on every boot and logs the result — `ses probe: production access
+confirmed…` or `ses probe: SES account is still SANDBOXED` — in the status
+branch / `/api/_diag` `recentLog`. Check that before assuming SES is actually
+delivering to anyone outside the team.
+
+**Do NOT delete the Resend account — two things still depend on it, on
+purpose, with no drop-in SES equivalent:**
+
+- **`server/routes/outreach_domains.ts`** — cold-outreach domain
+  verification/rotation is a Resend-specific concept (`sending_domains` +
+  Resend's own domain API + its bounce/complaint webhook). Porting this to
+  SES means verifying each rotation domain as a separate SES identity (real
+  DNS propagation time, not a same-day change) and rebuilding bounce/complaint
+  handling on SES→SNS instead of Resend's Svix webhook.
+- **`server/audience_resend.ts`** — per-show contact lists mirror into a
+  Resend Audience specifically so broadcasts can be sent from the **Resend
+  dashboard** (see the Audience CRM section below). AWS SES has no
+  dashboard-broadcast equivalent. `mailTransport.ts` already makes this
+  degrade gracefully instead of crashing if `RESEND_API_KEY` is ever unset
+  (`domains`/`audiences`/`contacts` return a clear "feature unavailable"
+  error) — but that's a degraded CRM feature, not a working replacement.
+
 ## Required env vars on the Railway "Project-management" service
 
 | Var | Purpose |
 |---|---|
 | `DATABASE_URL` | Postgres connection (use `${{Postgres.DATABASE_URL}}`) |
-| `RESEND_API_KEY` | Email sending (same key as Pod Booster) |
+| `RESEND_API_KEY` | Fallback transport when SES isn't configured, plus the only transport for Outreach domain management and the Audience CRM's Resend dashboard broadcasts (see "Email transport" above). Same key as Pod Booster — don't delete this account. |
+| `SES_ACCESS_KEY_ID` / `SES_SECRET_ACCESS_KEY` | Amazon SES credentials — when both are set, `server/mailTransport.ts` sends transactional/outreach/lead-follow-up mail via SES instead of Resend. Falls back to `AWS_ACCESS_KEY_ID`/`AWS_SECRET_ACCESS_KEY` if the dedicated ones aren't set. |
+| `SES_REGION` | Region the SES identity lives in. Falls back to `AWS_REGION`, then `us-east-1`. |
+| `SES_CONFIG_SET` | Optional SES configuration set name (bounce/complaint tracking). |
 | `GITHUB_TOKEN` | Fine-grained PAT, repo: this repo, contents: write — for status reporting |
 | `ADMIN_EMAIL` | Defaults to `ryan@strawhutmedia.com` if not set |
 | `APP_BASE_URL` | Defaults to `https://slate.strawhutmedia.com` if not set |
