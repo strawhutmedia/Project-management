@@ -34,6 +34,9 @@ export default function OutreachDomainsPage() {
   type SesSyncReport = Awaited<ReturnType<typeof api.syncOutreachDomainsWithSes>>
   const [sesSyncing, setSesSyncing] = useState(false)
   const [sesSyncReport, setSesSyncReport] = useState<SesSyncReport | null>(null)
+  type BounceWebhookReport = Awaited<ReturnType<typeof api.syncOutreachBounceWebhook>>
+  const [bounceWiring, setBounceWiring] = useState(false)
+  const [bounceReport, setBounceReport] = useState<BounceWebhookReport | null>(null)
 
   async function load() {
     try {
@@ -104,6 +107,20 @@ export default function OutreachDomainsPage() {
       setError(err instanceof Error ? err.message : 'sync failed')
     } finally {
       setSesSyncing(false)
+    }
+  }
+
+  async function syncBounceWebhook() {
+    setBounceWiring(true)
+    setError(null)
+    setBounceReport(null)
+    try {
+      const r = await api.syncOutreachBounceWebhook()
+      setBounceReport(r)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'sync failed')
+    } finally {
+      setBounceWiring(false)
     }
   }
 
@@ -317,6 +334,47 @@ export default function OutreachDomainsPage() {
                 </li>
               ))}
             </ul>
+          </div>
+        )}
+      </section>
+
+      <section className="rounded-2xl border border-urgent/30 bg-urgent/5 p-4 space-y-3">
+        <div className="flex items-center justify-between gap-3 flex-wrap">
+          <div>
+            <h2 className="text-[11px] uppercase tracking-[0.2em] text-urgent font-bold">Bounce/complaint auto-pause</h2>
+            <p className="text-[11px] text-muted/70 mt-1 max-w-xl">
+              The safety net that auto-pauses a domain whose bounce/complaint rate crosses 5%. Needs an SNS topic
+              created once in the AWS console (subscribe it to <code className="font-mono">/api/ses/notify</code>),
+              with its ARN set as <code className="font-mono">SES_SNS_TOPIC_ARN</code> on Railway. Once that ARN
+              exists, this button (and every boot) wires SES's configuration set to publish Bounce/Complaint events
+              there — no other AWS access needed.
+            </p>
+          </div>
+          <button
+            onClick={() => void syncBounceWebhook()}
+            disabled={bounceWiring}
+            className="text-[10px] uppercase tracking-wider text-urgent border border-urgent/40 rounded-full px-3 py-1.5 hover:bg-urgent/10 disabled:opacity-40 font-bold whitespace-nowrap"
+          >
+            {bounceWiring ? 'Checking…' : '🔌 Wire bounce webhook'}
+          </button>
+        </div>
+        {bounceReport && (
+          <div className="rounded-lg border border-line bg-ink/40 p-3 text-[11px] font-mono">
+            {bounceReport.configured ? (
+              <div className="text-emerald-300">
+                ✓ wired — topic <span className="font-bold">{bounceReport.topicArn}</span> ({bounceReport.action})
+              </div>
+            ) : (
+              <div className="text-urgent">
+                ✗ not configured — {bounceReport.reason === 'ses_sns_topic_arn_not_set'
+                  ? 'SES_SNS_TOPIC_ARN is not set yet. Create the SNS topic + subscription in the AWS console first.'
+                  : bounceReport.reason === 'ses_config_set_not_set'
+                    ? 'SES_CONFIG_SET is not set on Railway.'
+                    : bounceReport.reason === 'ses_not_configured'
+                      ? 'SES credentials are not configured.'
+                      : bounceReport.reason}
+              </div>
+            )}
           </div>
         )}
       </section>

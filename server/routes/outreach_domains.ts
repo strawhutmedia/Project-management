@@ -15,6 +15,7 @@ import { pool } from '../db'
 import { requireAdmin } from '../auth'
 import { logError, logInfo } from '../diag'
 import { sesCheckIdentity, sesConfigured } from '../mailTransport'
+import { ensureSesBounceEventDestination } from '../ses_bounce_setup'
 
 export const outreachDomainsRouter = Router()
 outreachDomainsRouter.use(requireAdmin)
@@ -330,6 +331,26 @@ outreachDomainsRouter.post('/sync-with-ses', async (_req, res) => {
     verified: changes.filter((c) => c.sesVisibility === 'verified').length,
   })
   res.json({ ok: true, changes })
+})
+
+// The last Resend-only gap: bounce/complaint auto-pause for the rotation
+// pool. Requires SES_SNS_TOPIC_ARN to already exist — someone with AWS
+// console access creates the SNS topic + an HTTPS subscription pointing at
+// POST /api/ses/notify (SNS's SubscriptionConfirmation handshake is
+// auto-confirmed there), then sets that ARN as a Railway env var. Once the
+// ARN exists, this wires the SES configuration set's event destination to
+// it via ordinary SES API calls — same credentials Slate already sends
+// mail with, no separate AWS access needed. Safe to call repeatedly
+// (idempotent) and already runs once on every boot; this route exists so
+// it can be triggered on demand instead of waiting for a redeploy.
+outreachDomainsRouter.post('/bounce-webhook/sync', async (_req, res) => {
+  try {
+    const status = await ensureSesBounceEventDestination()
+    res.json(status)
+  } catch (err) {
+    logError('outreach: bounce webhook sync failed', { error: err instanceof Error ? err.message : String(err) })
+    res.status(502).json({ configured: false, reason: 'ses_api_error', detail: err instanceof Error ? err.message : String(err) })
+  }
 })
 
 outreachDomainsRouter.delete('/:id', async (req, res) => {
