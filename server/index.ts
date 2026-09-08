@@ -42,6 +42,7 @@ import { startScheduler } from './scheduler'
 import { scheduleBootTimeCoverSync, syncMissingCoversFromRss } from './rss_cover_sync'
 import { scheduleFlagshipSeed } from './seeds/flagship_podcasts'
 import { scheduleBootResendProbe } from './boot_resend_probe'
+import { scheduleBootSesProbe } from './boot_ses_probe'
 import { scheduleBootBiyaScriptDump } from './boot_biya_script_dump'
 import { scheduleBootBudgetDump } from './boot_budget_dump'
 import { scheduleBootLocationsDump } from './boot_locations_dump'
@@ -238,6 +239,7 @@ async function start() {
     scheduleFlagshipSeed()
     scheduleBootTimeCoverSync()
     scheduleBootResendProbe()
+    scheduleBootSesProbe()
     scheduleBootBiyaScriptDump()
     scheduleBootBudgetDump()
     scheduleBootLocationsDump()
