@@ -318,7 +318,7 @@ storageRouter.get('/transfers', async (_req, res) => {
   try {
     const { rows } = await pool.query(
       `SELECT name, raw, bytes_done, bytes_total, percent, speed, eta, files_done, files_total, errors, reported_at
-       FROM storage_transfer_reports ORDER BY reported_at DESC`,
+       FROM storage_transfer_reports WHERE name <> 'connection-test' ORDER BY reported_at DESC`,
     )
     res.json({
       transfers: rows.map((r) => ({
@@ -341,6 +341,7 @@ storageRouter.get('/transfers', async (_req, res) => {
             eta: m[4] || '',
           }))
           .filter((f) => f.name)
+          .filter((f, i, arr) => arr.findIndex((o) => o.name === f.name) === i)
           .slice(-8),
         reportedAt: r.reported_at as string,
       })),
