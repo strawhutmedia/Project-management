@@ -577,7 +577,9 @@ export default function OutreachSection({ projectId }: { projectId: string }) {
                   className="mt-1 w-full bg-ink/40 border border-line rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-stage-mastering"
                 />
                 <span className="block text-[10px] text-muted/70 mt-1 leading-snug">
-                  When a prospect replies, Slate emails this address the reply + a link back here. Leave blank to alert the admin instead.
+                  When a prospect replies, Slate emails this the reply + a link back here. Multiple addresses OK,
+                  comma or semicolon separated (e.g. <code>slate@strawhutmedia.com, caroline@strawhutmedia.com</code>).
+                  Leave blank to alert the admin instead.
                 </span>
               </label>
               <label className="block">
