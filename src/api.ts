@@ -665,6 +665,7 @@ export type ApiOutreachTemplate = {
   body: string
   from_name: string | null
   reply_to: string | null
+  notify_email: string | null
   location: string | null
   followup_subject: string | null
   followup_body: string | null
@@ -1892,8 +1893,8 @@ export const api = {
       { method: 'POST', body: JSON.stringify({ contactIds }) },
     ),
   outreachTemplate: (projectId: string) =>
-    request<{ template: ApiOutreachTemplate | null }>(`/api/outreach/projects/${projectId}/template`),
-  saveOutreachTemplate: (projectId: string, body: { subject: string; body: string; fromName?: string; replyTo?: string; location?: string }) =>
+    request<{ template: ApiOutreachTemplate | null; inboundCaptureAddress: string }>(`/api/outreach/projects/${projectId}/template`),
+  saveOutreachTemplate: (projectId: string, body: { subject: string; body: string; fromName?: string; replyTo?: string; notifyEmail?: string; location?: string }) =>
     request<{ ok: true }>(`/api/outreach/projects/${projectId}/template`, {
       method: 'PUT', body: JSON.stringify(body),
     }),

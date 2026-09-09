@@ -37,6 +37,7 @@ import { qbInvoicesRouter } from './routes/qb_invoices'
 import { storageRouter, handleTransferReport } from './routes/storage'
 import { handleResendWebhook } from './routes/outreach_webhook'
 import { handleSesNotify } from './routes/ses_notify'
+import { handleSesInboundReply } from './routes/ses_inbound_reply'
 import { scheduleBoot as scheduleSesBounceSetup } from './ses_bounce_setup'
 import { seedBackInYourArms } from './seeds/back_in_your_arms'
 import { seedMadelineInvite } from './seeds/invite_madeline'
@@ -94,6 +95,13 @@ app.post('/api/outreach/resend-webhook', express.raw({ type: () => true }), (req
 // JSON parser. Public: SNS can't authenticate as an admin.
 app.post('/api/ses/notify', express.raw({ type: () => true }), (req, res) => {
   void handleSesNotify(req, res)
+})
+
+// Inbound-reply receiver — outreach replies sent to a show's Slate-owned
+// capture address (p-<projectId>@<inbound domain>) instead of a real human
+// inbox. Same raw-body-before-JSON-parser requirement as the two above.
+app.post('/api/ses/inbound-reply', express.raw({ type: () => true }), (req, res) => {
+  void handleSesInboundReply(req, res)
 })
 
 app.use(express.json({ limit: '20mb' }))
