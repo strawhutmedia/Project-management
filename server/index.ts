@@ -34,6 +34,7 @@ import { intakeRouter } from './routes/intake'
 import { audienceRouter } from './routes/audience'
 import { quickbooksRouter } from './routes/quickbooks'
 import { qbInvoicesRouter } from './routes/qb_invoices'
+import { storageRouter, handleTransferReport } from './routes/storage'
 import { handleResendWebhook } from './routes/outreach_webhook'
 import { handleSesNotify } from './routes/ses_notify'
 import { handleSesInboundReply } from './routes/ses_inbound_reply'
@@ -106,6 +107,15 @@ app.post('/api/ses/inbound-reply', express.raw({ type: () => true }), (req, res)
 app.use(express.json({ limit: '20mb' }))
 app.use(cookieParser())
 
+// Live transfer stats POSTed by the reporter on the UGREEN NAS (text/plain
+// rclone log tail, token-gated via STORAGE_REPORT_TOKEN — the NAS has no
+// browser session). MUST be registered before the broad `app.use('/api', …)`
+// routers below: those apply requireUser to every /api/* request that
+// reaches them, which 401s the reporter's token-authenticated POSTs.
+app.post('/api/storage/transfer-report/:name', express.text({ type: '*/*', limit: '64kb' }), (req, res) => {
+  void handleTransferReport(req, res)
+})
+
 app.get('/api/health', (_req, res) => {
   res.json({ ok: true, ts: new Date().toISOString() })
 })
@@ -152,6 +162,10 @@ app.use('/api/intake', intakeRouter)
 app.use('/api/audience', audienceRouter)
 app.use('/api/qb', quickbooksRouter)
 app.use('/api/qb', qbInvoicesRouter)
+// Master Archive (S3 Deep Archive vault) browser — admin-only, read-only.
+// (The public transfer-report POST is registered near the top of this file,
+// ahead of the requireUser-wrapped /api routers.)
+app.use('/api/storage', storageRouter)
 
 // Public per-show one-sheet page (guest outreach). Mounted at the root
 // so URLs are /shows/<slug>, and BEFORE the SPA fallback so requests

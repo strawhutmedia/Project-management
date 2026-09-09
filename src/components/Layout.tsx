@@ -130,6 +130,9 @@ export default function Layout() {
                     )}
                     {user?.role === 'admin' && (
                       <>
+                        <NavMenuLink to="/storage" onClick={() => setNavOpen(false)}>
+                          🗄️ Storage
+                        </NavMenuLink>
                         <NavMenuLink to="/admin/outreach" onClick={() => setNavOpen(false)}>
                           ✉ Outreach
                         </NavMenuLink>
