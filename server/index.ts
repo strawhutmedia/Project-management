@@ -34,7 +34,7 @@ import { intakeRouter } from './routes/intake'
 import { audienceRouter } from './routes/audience'
 import { quickbooksRouter } from './routes/quickbooks'
 import { qbInvoicesRouter } from './routes/qb_invoices'
-import { storageRouter } from './routes/storage'
+import { storageRouter, handleTransferReport } from './routes/storage'
 import { handleResendWebhook } from './routes/outreach_webhook'
 import { handleSesNotify } from './routes/ses_notify'
 import { scheduleBoot as scheduleSesBounceSetup } from './ses_bounce_setup'
@@ -145,6 +145,12 @@ app.use('/api/intake', intakeRouter)
 app.use('/api/audience', audienceRouter)
 app.use('/api/qb', quickbooksRouter)
 app.use('/api/qb', qbInvoicesRouter)
+// Live transfer stats POSTed by the reporter on the UGREEN NAS (text/plain
+// rclone log tail, token-gated via STORAGE_REPORT_TOKEN — the NAS has no
+// browser session). Registered before the admin-gated storage router.
+app.post('/api/storage/transfer-report/:name', express.text({ type: '*/*', limit: '64kb' }), (req, res) => {
+  void handleTransferReport(req, res)
+})
 // Master Archive (S3 Deep Archive vault) browser — admin-only, read-only.
 app.use('/api/storage', storageRouter)
 

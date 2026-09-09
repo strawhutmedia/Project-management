@@ -798,6 +798,18 @@ export type ApiArchiveFile = {
 
 export type ApiArchivePrefixAgg = { prefix: string; objects: number; bytes: number }
 
+export type ApiArchiveTransfer = {
+  name: string
+  bytesDone: string
+  bytesTotal: string
+  percent: number | null
+  speed: string
+  eta: string
+  filesDone: number | null
+  filesTotal: number | null
+  reportedAt: string
+}
+
 export type ApiArchiveSummary = {
   bucket: string
   scannedAt: string
@@ -1016,6 +1028,8 @@ export const api = {
     request<{ configured: boolean; cached?: boolean; summary?: ApiArchiveSummary }>(
       `/api/storage/summary${force ? '?force=1' : ''}`,
     ),
+  storageTransfers: () =>
+    request<{ transfers: ApiArchiveTransfer[] }>('/api/storage/transfers'),
   storageList: (prefix: string) =>
     request<{
       configured: boolean

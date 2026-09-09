@@ -1,10 +1,12 @@
-import { Router } from 'express'
+import { Router, type Request, type Response } from 'express'
+import crypto from 'crypto'
 import {
   S3Client,
   ListObjectsV2Command,
   type _Object as S3Object,
 } from '@aws-sdk/client-s3'
 import { requireAdmin } from '../auth'
+import { pool } from '../db'
 import { logError } from '../diag'
 
 // Master Archive browser — read-only window into the S3 bucket that holds
@@ -236,5 +238,97 @@ storageRouter.get('/list', async (req, res) => {
       error: err instanceof Error ? err.message : String(err),
     })
     res.status(502).json({ error: 'archive_list_failed', detail: err instanceof Error ? err.message : String(err) })
+  }
+})
+
+// ── Live transfer reports from the NAS ────────────────────────────────
+// A tiny reporter container on the UGREEN tails each rclone job log every
+// minute and POSTs the tail here (text/plain). We parse rclone's periodic
+// stats block into progress/speed/ETA for the Storage page. Token-gated
+// (STORAGE_REPORT_TOKEN) because the NAS can't hold a browser session —
+// same pattern as INVOICING_SERVICE_TOKEN. Unset token = endpoint off.
+
+function safeEqual(a: string, b: string): boolean {
+  const ba = Buffer.from(a)
+  const bb = Buffer.from(b)
+  if (ba.length !== bb.length) return false
+  return crypto.timingSafeEqual(ba, bb)
+}
+
+// rclone INFO stats, logged once a minute, look like:
+//   Transferred:   208.293 GiB / 2.073 TiB, 10%, 245.5 MiB/s, ETA 2h13m
+//   Transferred:          123 / 1136, 11%
+function parseRcloneStats(raw: string) {
+  const bytesRe = /Transferred:\s+([\d.]+\s*\w+i?B) \/ ([\d.]+\s*\w+i?B), (\d+)%(?:, ([\d.]+\s*\w+i?B\/s))?(?:, ETA (\S+))?/g
+  const filesRe = /Transferred:\s+(\d+) \/ (\d+), \d+%/g
+  let bytes: RegExpExecArray | null = null
+  let files: RegExpExecArray | null = null
+  for (let m = bytesRe.exec(raw); m; m = bytesRe.exec(raw)) bytes = m
+  for (let m = filesRe.exec(raw); m; m = filesRe.exec(raw)) files = m
+  return {
+    bytesDone: bytes?.[1] ?? '',
+    bytesTotal: bytes?.[2] ?? '',
+    percent: bytes ? parseInt(bytes[3], 10) : null,
+    speed: bytes?.[4] ?? '',
+    eta: bytes?.[5] ?? '',
+    filesDone: files ? parseInt(files[1], 10) : null,
+    filesTotal: files ? parseInt(files[2], 10) : null,
+  }
+}
+
+// Exported for index.ts — mounted BEFORE the admin-gated router, with
+// express.text(), because the reporter authenticates by token, not session.
+export async function handleTransferReport(req: Request, res: Response): Promise<void> {
+  const expected = (process.env.STORAGE_REPORT_TOKEN || '').trim()
+  const got = typeof req.headers['x-storage-token'] === 'string' ? (req.headers['x-storage-token'] as string).trim() : ''
+  if (!expected || !got || !safeEqual(got, expected)) {
+    res.status(403).json({ error: 'forbidden' })
+    return
+  }
+  const name = String(req.params.name || '').replace(/[^A-Za-z0-9._-]/g, '').slice(0, 80)
+  if (!name) {
+    res.status(400).json({ error: 'bad_name' })
+    return
+  }
+  const raw = typeof req.body === 'string' ? req.body.slice(-8000) : ''
+  const p = parseRcloneStats(raw)
+  try {
+    await pool.query(
+      `INSERT INTO storage_transfer_reports (name, raw, bytes_done, bytes_total, percent, speed, eta, files_done, files_total, reported_at)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9, now())
+       ON CONFLICT (name) DO UPDATE SET
+         raw = EXCLUDED.raw, bytes_done = EXCLUDED.bytes_done, bytes_total = EXCLUDED.bytes_total,
+         percent = EXCLUDED.percent, speed = EXCLUDED.speed, eta = EXCLUDED.eta,
+         files_done = EXCLUDED.files_done, files_total = EXCLUDED.files_total, reported_at = now()`,
+      [name, raw, p.bytesDone, p.bytesTotal, p.percent, p.speed, p.eta, p.filesDone, p.filesTotal],
+    )
+    res.json({ ok: true })
+  } catch (err) {
+    logError('transfer report failed', { name, error: err instanceof Error ? err.message : String(err) })
+    res.status(500).json({ error: 'store_failed' })
+  }
+}
+
+storageRouter.get('/transfers', async (_req, res) => {
+  try {
+    const { rows } = await pool.query(
+      `SELECT name, bytes_done, bytes_total, percent, speed, eta, files_done, files_total, reported_at
+       FROM storage_transfer_reports ORDER BY reported_at DESC`,
+    )
+    res.json({
+      transfers: rows.map((r) => ({
+        name: r.name as string,
+        bytesDone: r.bytes_done as string,
+        bytesTotal: r.bytes_total as string,
+        percent: r.percent as number | null,
+        speed: r.speed as string,
+        eta: r.eta as string,
+        filesDone: r.files_done as number | null,
+        filesTotal: r.files_total as number | null,
+        reportedAt: r.reported_at as string,
+      })),
+    })
+  } catch (err) {
+    res.status(500).json({ error: 'transfers_failed', detail: err instanceof Error ? err.message : String(err) })
   }
 })

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useAuth } from '../auth'
-import { api, type ApiArchiveFile, type ApiArchiveSummary } from '../api'
+import { api, type ApiArchiveFile, type ApiArchiveSummary, type ApiArchiveTransfer } from '../api'
 
 // Master Archive — the read-only window into the S3 Deep Archive vault the
 // UGREEN NASes upload to (mirroring the Dropbox structure: 1_PODCASTS /
@@ -32,6 +32,40 @@ function ClassBadge({ storageClass }: { storageClass: string }) {
     <span title="In the vault (Deep Archive) — restorable in 12–48h" className="inline-flex items-center gap-1 rounded-full border border-line bg-ink/40 text-muted px-2 py-0.5 text-[11px] font-bold">☁ archived</span>
   ) : (
     <span title={storageClass} className="inline-flex items-center gap-1 rounded-full border border-stage-done/40 bg-stage-done/10 text-stage-done px-2 py-0.5 text-[11px] font-bold">● instant</span>
+  )
+}
+
+// Live transfer rows, reported once a minute by the NAS. Considered stale
+// (job finished, or the reporter/NAS is down) after 5 minutes of silence.
+function TransferRow({ t }: { t: ApiArchiveTransfer }) {
+  const ageMs = Date.now() - new Date(t.reportedAt).getTime()
+  const stale = ageMs > 5 * 60 * 1000
+  const done = (t.percent ?? 0) >= 100
+  const pct = Math.max(0, Math.min(100, t.percent ?? 0))
+  return (
+    <div className="py-2">
+      <div className="flex items-center gap-2 flex-wrap">
+        <span className="text-sm font-semibold">{done ? '✅' : stale ? '⚠️' : '📤'} {t.name}</span>
+        <span className="ml-auto text-xs text-muted tabular-nums">
+          {t.bytesDone && t.bytesTotal ? `${t.bytesDone} of ${t.bytesTotal}` : ''}
+          {!done && t.speed ? ` · ${t.speed}` : ''}
+          {!done && t.eta ? ` · ETA ${t.eta}` : ''}
+        </span>
+      </div>
+      <div className="mt-1.5 h-2 rounded-full bg-ink/60 overflow-hidden">
+        <div
+          className={`h-full rounded-full ${done ? 'bg-stage-done' : 'bg-gradient-to-r from-stage-producing to-stage-mastering'}`}
+          style={{ width: `${pct}%` }}
+        />
+      </div>
+      <div className="mt-1 text-[11px] text-muted">
+        {done
+          ? `Finished — ${t.filesTotal ? fmtCount(t.filesTotal) + ' files' : 'complete'}. Ready to verify.`
+          : stale
+            ? `No update in ${Math.round(ageMs / 60000)} min — the job may have just finished, or the reporter on the NAS stopped. Check Docker on RED if this persists.`
+            : `${t.filesDone != null && t.filesTotal != null ? `${fmtCount(t.filesDone)} of ${fmtCount(t.filesTotal)} files · ` : ''}updated ${Math.max(1, Math.round(ageMs / 1000))}s ago`}
+      </div>
+    </div>
   )
 }
 
@@ -130,6 +164,7 @@ function FolderRow({ prefix, depth, sizeLookup }: {
 export default function StoragePage() {
   const { user } = useAuth()
   const [summary, setSummary] = useState<ApiArchiveSummary | null>(null)
+  const [transfers, setTransfers] = useState<ApiArchiveTransfer[]>([])
   const [configured, setConfigured] = useState<boolean | null>(null)
   const [root, setRoot] = useState<Level | null>(null)
   const [loading, setLoading] = useState(true)
@@ -156,6 +191,23 @@ export default function StoragePage() {
     void load()
   }, [load])
 
+  // Poll live transfers every 30s — cheap (a DB read), and it's the whole
+  // point of the page while migration runs.
+  useEffect(() => {
+    let alive = true
+    const tick = async () => {
+      try {
+        const res = await api.storageTransfers()
+        if (alive) setTransfers(res.transfers)
+      } catch {
+        /* transfers are best-effort; the card just doesn't render */
+      }
+    }
+    void tick()
+    const id = setInterval(() => { void tick() }, 30_000)
+    return () => { alive = false; clearInterval(id) }
+  }, [])
+
   if (user?.role !== 'admin') {
     return <div className="max-w-2xl"><div className={`${card} p-8 text-center text-muted`}>This section is admin-only.</div></div>
   }
@@ -177,6 +229,17 @@ export default function StoragePage() {
           {refreshing ? 'Rescanning…' : '↻ Rescan'}
         </button>
       </div>
+
+      {transfers.length > 0 && (
+        <div className={`${card} p-4`}>
+          <div className={`${labelCls} mb-1`}>Transfers — NAS → vault</div>
+          <div className="divide-y divide-line/60">
+            {transfers.map((t) => (
+              <TransferRow key={t.name} t={t} />
+            ))}
+          </div>
+        </div>
+      )}
 
       {loading && <div className={`${card} p-8 text-center text-muted`}>Reading the vault…</div>}
 
