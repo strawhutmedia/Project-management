@@ -808,6 +808,7 @@ export type ApiArchiveTransfer = {
   filesDone: number | null
   filesTotal: number | null
   errors: number
+  currentFiles?: string[]
   reportedAt: string
 }
 

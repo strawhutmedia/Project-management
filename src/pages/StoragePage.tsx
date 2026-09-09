@@ -63,6 +63,11 @@ function TransferRow({ t }: { t: ApiArchiveTransfer }) {
           style={{ width: `${pct}%` }}
         />
       </div>
+      {!done && !stale && (t.currentFiles?.length ?? 0) > 0 && (
+        <div className="mt-1 text-[11px] text-muted truncate">
+          now uploading: {t.currentFiles!.join(' · ')}
+        </div>
+      )}
       <div className="mt-1 text-[11px] text-muted">
         {done
           ? `Finished — ${t.filesTotal ? fmtCount(t.filesTotal) + ' files' : 'complete'}. Ready to verify.`

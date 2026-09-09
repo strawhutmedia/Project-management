@@ -317,7 +317,7 @@ export async function handleTransferReport(req: Request, res: Response): Promise
 storageRouter.get('/transfers', async (_req, res) => {
   try {
     const { rows } = await pool.query(
-      `SELECT name, bytes_done, bytes_total, percent, speed, eta, files_done, files_total, errors, reported_at
+      `SELECT name, raw, bytes_done, bytes_total, percent, speed, eta, files_done, files_total, errors, reported_at
        FROM storage_transfer_reports ORDER BY reported_at DESC`,
     )
     res.json({
@@ -331,6 +331,12 @@ storageRouter.get('/transfers', async (_req, res) => {
         filesDone: r.files_done as number | null,
         filesTotal: r.files_total as number | null,
         errors: (r.errors as number | null) ?? 0,
+        // Files rclone reports as in-flight in the latest stats block, e.g.
+        //  * Episodes/Ep041_…/Cut 2.mp4: 43% /1.2Gi, 61.2Mi/s, 12s
+        currentFiles: [...(r.raw as string).matchAll(/^\s*\*\s+(.+?):\s+\d+% \/|^\s*\*\s+(.+?):\s+transferring/gm)]
+          .map((m) => (m[1] || m[2] || '').split('/').pop() || '')
+          .filter(Boolean)
+          .slice(-4),
         reportedAt: r.reported_at as string,
       })),
     })
