@@ -38,6 +38,7 @@ function ClassBadge({ storageClass }: { storageClass: string }) {
 // Live transfer rows, reported once a minute by the NAS. Considered stale
 // (job finished, or the reporter/NAS is down) after 5 minutes of silence.
 function TransferRow({ t }: { t: ApiArchiveTransfer }) {
+  const [filesOpen, setFilesOpen] = useState(false)
   const ageMs = Date.now() - new Date(t.reportedAt).getTime()
   const stale = ageMs > 5 * 60 * 1000
   const done = (t.percent ?? 0) >= 100
@@ -64,8 +65,31 @@ function TransferRow({ t }: { t: ApiArchiveTransfer }) {
         />
       </div>
       {!done && !stale && (t.currentFiles?.length ?? 0) > 0 && (
-        <div className="mt-1 text-[11px] text-muted truncate">
-          now uploading: {t.currentFiles!.join(' · ')}
+        <div className="mt-1.5">
+          <button
+            onClick={() => setFilesOpen((v) => !v)}
+            className="text-[11px] text-muted hover:text-text inline-flex items-center gap-1"
+          >
+            <span className="text-[9px]">{filesOpen ? '▾' : '▸'}</span>
+            now uploading {t.currentFiles!.length} file{t.currentFiles!.length === 1 ? '' : 's'}
+          </button>
+          {filesOpen && (
+            <div className="mt-1 space-y-0.5">
+              {t.currentFiles!.map((f, i) => {
+                const file = typeof f === 'string' ? { name: f, pct: null, speed: '', eta: '' } : f
+                return (
+                  <div key={i} className="flex items-center gap-2 text-[11px] text-muted pl-4">
+                    <span className="truncate min-w-0">🎬 {file.name}</span>
+                    <span className="ml-auto shrink-0 tabular-nums">
+                      {file.pct != null ? `${file.pct}%` : ''}
+                      {file.speed ? ` · ${file.speed}` : ''}
+                      {file.eta ? ` · ${file.eta} left` : ''}
+                    </span>
+                  </div>
+                )
+              })}
+            </div>
+          )}
         </div>
       )}
       <div className="mt-1 text-[11px] text-muted">

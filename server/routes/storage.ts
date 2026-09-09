@@ -332,11 +332,16 @@ storageRouter.get('/transfers', async (_req, res) => {
         filesTotal: r.files_total as number | null,
         errors: (r.errors as number | null) ?? 0,
         // Files rclone reports as in-flight in the latest stats block, e.g.
-        //  * Episodes/Ep041_…/Cut 2.mp4: 43% /1.2Gi, 61.2Mi/s, 12s
-        currentFiles: [...(r.raw as string).matchAll(/^\s*\*\s+(.+?):\s+\d+% \/|^\s*\*\s+(.+?):\s+transferring/gm)]
-          .map((m) => (m[1] || m[2] || '').split('/').pop() || '')
-          .filter(Boolean)
-          .slice(-4),
+        //  * Episodes/Ep041_…/Cut 2.mp4: 43% /1.19Gi, 8.145Mi/s, 3m9s
+        currentFiles: [...(r.raw as string).matchAll(/^\s*\*\s+(.+?):\s*(?:(\d+)% \/[\d.]+\w*,\s*([\d.]+\s*\w+\/s),\s*(\S+)|transferring)/gm)]
+          .map((m) => ({
+            name: (m[1] || '').split('/').pop() || '',
+            pct: m[2] != null ? parseInt(m[2], 10) : null,
+            speed: m[3] || '',
+            eta: m[4] || '',
+          }))
+          .filter((f) => f.name)
+          .slice(-8),
         reportedAt: r.reported_at as string,
       })),
     })
