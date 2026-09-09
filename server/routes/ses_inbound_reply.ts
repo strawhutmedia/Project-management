@@ -49,7 +49,10 @@ async function notifyOfReply(opts: {
     `SELECT notify_email FROM outreach_templates WHERE project_id = $1`,
     [opts.projectId],
   )
-  const to = tpl.rows[0]?.notify_email?.trim() || process.env.ADMIN_EMAIL || 'ryan@strawhutmedia.com'
+  // Comma/semicolon-separated, same convention as reply_to — so a reply
+  // can ping a shared address and a specific person at once.
+  const raw = tpl.rows[0]?.notify_email?.trim() || process.env.ADMIN_EMAIL || 'ryan@strawhutmedia.com'
+  const to = raw.split(/[,;]+/).map((s) => s.trim()).filter(Boolean)
   const baseUrl = (process.env.APP_BASE_URL || 'https://slate.strawhutmedia.com').replace(/\/+$/, '')
   const link = `${baseUrl}/admin/outreach/shows/${opts.projectId}`
   const subject = `Reply on ${opts.projectName}: ${opts.prospectName}`
