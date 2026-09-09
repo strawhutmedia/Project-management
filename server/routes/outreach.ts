@@ -131,12 +131,16 @@ outreachRouter.get('/template.csv', (_req, res) => {
 // ─── Templates ──────────────────────────────────────────────────────
 outreachRouter.get('/projects/:projectId/template', async (req, res) => {
   const { rows } = await pool.query(
-    `SELECT project_id, subject, body, from_name, reply_to, location,
+    `SELECT project_id, subject, body, from_name, reply_to, notify_email, location,
             followup_subject, followup_body, updated_at
        FROM outreach_templates WHERE project_id = $1`,
     [req.params.projectId],
   )
-  res.json({ template: rows[0] ?? null })
+  const inboundDomain = process.env.INBOUND_REPLY_DOMAIN || 'strawhutmedia.net'
+  res.json({
+    template: rows[0] ?? null,
+    inboundCaptureAddress: `p-${req.params.projectId}@${inboundDomain}`,
+  })
 })
 
 outreachRouter.put('/projects/:projectId/template', async (req, res) => {
@@ -148,20 +152,23 @@ outreachRouter.put('/projects/:projectId/template', async (req, res) => {
     ? req.body.fromName.trim() : null
   const replyTo = typeof req.body?.replyTo === 'string' && req.body.replyTo.trim()
     ? req.body.replyTo.trim() : null
+  const notifyEmail = typeof req.body?.notifyEmail === 'string' && req.body.notifyEmail.trim()
+    ? req.body.notifyEmail.trim() : null
   const location = LOCATION_LINES[req.body?.location] ? String(req.body.location) : 'either'
   await pool.query(
     `INSERT INTO outreach_templates
-       (project_id, subject, body, from_name, reply_to, location, updated_by, updated_at)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, now())
+       (project_id, subject, body, from_name, reply_to, notify_email, location, updated_by, updated_at)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, now())
      ON CONFLICT (project_id) DO UPDATE SET
        subject = EXCLUDED.subject,
        body = EXCLUDED.body,
        from_name = EXCLUDED.from_name,
        reply_to = EXCLUDED.reply_to,
+       notify_email = EXCLUDED.notify_email,
        location = EXCLUDED.location,
        updated_by = EXCLUDED.updated_by,
        updated_at = now()`,
-    [projectId, subject, body, fromName, replyTo, location, user.id],
+    [projectId, subject, body, fromName, replyTo, notifyEmail, location, user.id],
   )
   res.json({ ok: true })
 })
@@ -382,7 +389,7 @@ outreachRouter.patch('/prospects/:id', async (req, res) => {
 // Copy a prospect into the workspace Rolodex, deduped by email. Refreshes the
 // facts we know and tags them 'responded'. No email → nothing to dedup on, so
 // we skip (a contact with no address isn't reusable for a future blast).
-async function fileProspectInRolodex(prospectId: string): Promise<void> {
+export async function fileProspectInRolodex(prospectId: string): Promise<void> {
   const { rows } = await pool.query<{
     name: string; full_name: string | null; email: string | null;
     recipient_type: string | null; client_name: string | null; context: string | null;

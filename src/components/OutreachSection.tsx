@@ -59,6 +59,8 @@ export default function OutreachSection({ projectId }: { projectId: string }) {
   const [subject, setSubject] = useState('Guesting on our podcast — [name]')
   const [body, setBody] = useState(DEFAULT_TEMPLATE_BODY)
   const [replyTo, setReplyTo] = useState('booking@strawhutmedia.com')
+  const [notifyEmail, setNotifyEmail] = useState('')
+  const [inboundCaptureAddress, setInboundCaptureAddress] = useState<string | null>(null)
   const [location, setLocation] = useState('either')
   const [saving, setSaving] = useState(false)
   const [savedAt, setSavedAt] = useState<number | null>(null)
@@ -159,11 +161,13 @@ export default function OutreachSection({ projectId }: { projectId: string }) {
   async function loadTemplate() {
     try {
       const r = await api.outreachTemplate(projectId)
+      setInboundCaptureAddress(r.inboundCaptureAddress)
       if (r.template) {
         setTemplate(r.template)
         setSubject(r.template.subject || 'Guesting on our podcast — [name]')
         setBody(r.template.body || DEFAULT_TEMPLATE_BODY)
         setReplyTo(r.template.reply_to || 'booking@strawhutmedia.com')
+        setNotifyEmail(r.template.notify_email || '')
         setLocation(r.template.location || 'either')
       }
     } catch (err) {
@@ -218,7 +222,7 @@ export default function OutreachSection({ projectId }: { projectId: string }) {
     setSaving(true)
     setError(null)
     try {
-      await api.saveOutreachTemplate(projectId, { subject, body, replyTo, location })
+      await api.saveOutreachTemplate(projectId, { subject, body, replyTo, notifyEmail, location })
       setSavedAt(Date.now())
       await loadTemplate()
     } catch (err) {
@@ -544,6 +548,37 @@ export default function OutreachSection({ projectId }: { projectId: string }) {
                   onChange={(e) => setReplyTo(e.target.value)}
                   className="mt-1 w-full bg-ink/40 border border-line rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-stage-mastering"
                 />
+                {inboundCaptureAddress && (
+                  <div className="mt-1.5 flex items-center gap-2 flex-wrap">
+                    {replyTo === inboundCaptureAddress ? (
+                      <span className="text-[10px] text-emerald-300">
+                        ✓ Slate auto-detects replies here and emails whoever's set below — no human inbox involved.
+                      </span>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => setReplyTo(inboundCaptureAddress)}
+                        className="text-[10px] uppercase tracking-wider text-stage-mastering border border-stage-mastering/40 rounded-full px-2.5 py-1 hover:bg-stage-mastering/10 font-bold"
+                      >
+                        Use Slate inbox (auto-detect replies)
+                      </button>
+                    )}
+                  </div>
+                )}
+              </label>
+              <label className="block">
+                <span className="text-[10px] uppercase tracking-wider text-muted font-bold">
+                  Notify on reply <span className="text-stage-mastering">(only used with Slate inbox above)</span>
+                </span>
+                <input
+                  value={notifyEmail}
+                  onChange={(e) => setNotifyEmail(e.target.value)}
+                  placeholder="caroline@strawhutmedia.com"
+                  className="mt-1 w-full bg-ink/40 border border-line rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-stage-mastering"
+                />
+                <span className="block text-[10px] text-muted/70 mt-1 leading-snug">
+                  When a prospect replies, Slate emails this address the reply + a link back here. Leave blank to alert the admin instead.
+                </span>
               </label>
               <label className="block">
                 <span className="text-[10px] uppercase tracking-wider text-muted font-bold">Recording location <span className="text-stage-mastering">(fills [location])</span></span>
