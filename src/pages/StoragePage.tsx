@@ -240,16 +240,24 @@ export default function StoragePage() {
         </button>
       </div>
 
-      {transfers.length > 0 && (
-        <div className={`${card} p-4`}>
-          <div className={`${labelCls} mb-1`}>Transfers — NAS → vault</div>
+      <div className={`${card} p-4`}>
+        <div className={`${labelCls} mb-1`}>Transfers — NAS → vault</div>
+        {transfers.length > 0 ? (
           <div className="divide-y divide-line/60">
             {transfers.map((t) => (
               <TransferRow key={t.name} t={t} />
             ))}
           </div>
-        </div>
-      )}
+        ) : (
+          <div className="text-sm text-muted py-3">
+            No live transfer feed yet. The reporter on the NAS isn't running — it's the small
+            always-on container that reads each transfer's log once a minute and sends it here.
+            Start it on RED (the one-line <span className="font-mono">archive-reporter</span> paste)
+            and progress bars, speeds, and ETAs appear on this card within about a minute.
+            Files that have already arrived are always visible in the tree below either way.
+          </div>
+        )}
+      </div>
 
       {loading && <div className={`${card} p-8 text-center text-muted`}>Reading the vault…</div>}
 
