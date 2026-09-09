@@ -787,6 +787,28 @@ export type ApiCashflowOverview = {
   }
 }
 
+// ── Master Archive (S3 vault) browser ──
+export type ApiArchiveFile = {
+  key: string
+  name: string
+  size: number
+  storageClass: string
+  lastModified: string | null
+}
+
+export type ApiArchivePrefixAgg = { prefix: string; objects: number; bytes: number }
+
+export type ApiArchiveSummary = {
+  bucket: string
+  scannedAt: string
+  truncated: boolean
+  totals: { objects: number; bytes: number }
+  byClass: Array<{ storageClass: string; objects: number; bytes: number; estMonthlyUsd: number }>
+  estMonthlyUsd: number
+  topLevel: ApiArchivePrefixAgg[]
+  secondLevel: ApiArchivePrefixAgg[]
+}
+
 // ── Contractor invoicing (admin payroll tool) ──
 export type ApiInvoiceLineItem = {
   desc: string
@@ -986,6 +1008,22 @@ export const api = {
   }),
   qbSendInvoice: (id: string, sendTo: string) =>
     request<{ ok: true }>(`/api/qb/invoices/${id}/send`, { method: 'POST', body: JSON.stringify({ sendTo }) }),
+
+  // Master Archive (S3 Deep Archive vault) — admin-only, read-only browser.
+  storageStatus: () =>
+    request<{ configured: boolean; bucket: string; region: string }>('/api/storage/status'),
+  storageSummary: (force = false) =>
+    request<{ configured: boolean; cached?: boolean; summary?: ApiArchiveSummary }>(
+      `/api/storage/summary${force ? '?force=1' : ''}`,
+    ),
+  storageList: (prefix: string) =>
+    request<{
+      configured: boolean
+      prefix: string
+      folders: string[]
+      files: ApiArchiveFile[]
+      truncated: boolean
+    }>(`/api/storage/list?prefix=${encodeURIComponent(prefix)}`),
 
   // Teleprompter — shared sessions for the podcast team.
   teleprompterList: () => request<{ sessions: ApiTeleprompterSession[] }>('/api/teleprompter'),

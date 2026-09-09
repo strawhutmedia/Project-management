@@ -34,6 +34,7 @@ import { intakeRouter } from './routes/intake'
 import { audienceRouter } from './routes/audience'
 import { quickbooksRouter } from './routes/quickbooks'
 import { qbInvoicesRouter } from './routes/qb_invoices'
+import { storageRouter } from './routes/storage'
 import { handleResendWebhook } from './routes/outreach_webhook'
 import { handleSesNotify } from './routes/ses_notify'
 import { scheduleBoot as scheduleSesBounceSetup } from './ses_bounce_setup'
@@ -144,6 +145,8 @@ app.use('/api/intake', intakeRouter)
 app.use('/api/audience', audienceRouter)
 app.use('/api/qb', quickbooksRouter)
 app.use('/api/qb', qbInvoicesRouter)
+// Master Archive (S3 Deep Archive vault) browser — admin-only, read-only.
+app.use('/api/storage', storageRouter)
 
 // Public per-show one-sheet page (guest outreach). Mounted at the root
 // so URLs are /shows/<slug>, and BEFORE the SPA fallback so requests
