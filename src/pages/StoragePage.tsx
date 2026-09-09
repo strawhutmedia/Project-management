@@ -46,6 +46,11 @@ function TransferRow({ t }: { t: ApiArchiveTransfer }) {
     <div className="py-2">
       <div className="flex items-center gap-2 flex-wrap">
         <span className="text-sm font-semibold">{done ? '✅' : stale ? '⚠️' : '📤'} {t.name}</span>
+        {t.errors > 0 && (
+          <span className="inline-flex items-center rounded-full border border-urgent/40 bg-urgent/10 text-urgent px-2 py-0.5 text-[11px] font-bold">
+            {t.errors} error{t.errors === 1 ? '' : 's'} — auto-retrying; verify will catch anything missed
+          </span>
+        )}
         <span className="ml-auto text-xs text-muted tabular-nums">
           {t.bytesDone && t.bytesTotal ? `${t.bytesDone} of ${t.bytesTotal}` : ''}
           {!done && t.speed ? ` · ${t.speed}` : ''}

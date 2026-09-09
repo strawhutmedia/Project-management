@@ -261,10 +261,13 @@ function safeEqual(a: string, b: string): boolean {
 function parseRcloneStats(raw: string) {
   const bytesRe = /Transferred:\s+([\d.]+\s*\w+i?B) \/ ([\d.]+\s*\w+i?B), (\d+)%(?:, ([\d.]+\s*\w+i?B\/s))?(?:, ETA (\S+))?/g
   const filesRe = /Transferred:\s+(\d+) \/ (\d+), \d+%/g
+  const errorsRe = /Errors:\s+(\d+)/g
   let bytes: RegExpExecArray | null = null
   let files: RegExpExecArray | null = null
+  let errors: RegExpExecArray | null = null
   for (let m = bytesRe.exec(raw); m; m = bytesRe.exec(raw)) bytes = m
   for (let m = filesRe.exec(raw); m; m = filesRe.exec(raw)) files = m
+  for (let m = errorsRe.exec(raw); m; m = errorsRe.exec(raw)) errors = m
   return {
     bytesDone: bytes?.[1] ?? '',
     bytesTotal: bytes?.[2] ?? '',
@@ -273,6 +276,7 @@ function parseRcloneStats(raw: string) {
     eta: bytes?.[5] ?? '',
     filesDone: files ? parseInt(files[1], 10) : null,
     filesTotal: files ? parseInt(files[2], 10) : null,
+    errors: errors ? parseInt(errors[1], 10) : 0,
   }
 }
 
@@ -294,13 +298,14 @@ export async function handleTransferReport(req: Request, res: Response): Promise
   const p = parseRcloneStats(raw)
   try {
     await pool.query(
-      `INSERT INTO storage_transfer_reports (name, raw, bytes_done, bytes_total, percent, speed, eta, files_done, files_total, reported_at)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9, now())
+      `INSERT INTO storage_transfer_reports (name, raw, bytes_done, bytes_total, percent, speed, eta, files_done, files_total, errors, reported_at)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10, now())
        ON CONFLICT (name) DO UPDATE SET
          raw = EXCLUDED.raw, bytes_done = EXCLUDED.bytes_done, bytes_total = EXCLUDED.bytes_total,
          percent = EXCLUDED.percent, speed = EXCLUDED.speed, eta = EXCLUDED.eta,
-         files_done = EXCLUDED.files_done, files_total = EXCLUDED.files_total, reported_at = now()`,
-      [name, raw, p.bytesDone, p.bytesTotal, p.percent, p.speed, p.eta, p.filesDone, p.filesTotal],
+         files_done = EXCLUDED.files_done, files_total = EXCLUDED.files_total,
+         errors = EXCLUDED.errors, reported_at = now()`,
+      [name, raw, p.bytesDone, p.bytesTotal, p.percent, p.speed, p.eta, p.filesDone, p.filesTotal, p.errors],
     )
     res.json({ ok: true })
   } catch (err) {
@@ -312,7 +317,7 @@ export async function handleTransferReport(req: Request, res: Response): Promise
 storageRouter.get('/transfers', async (_req, res) => {
   try {
     const { rows } = await pool.query(
-      `SELECT name, bytes_done, bytes_total, percent, speed, eta, files_done, files_total, reported_at
+      `SELECT name, bytes_done, bytes_total, percent, speed, eta, files_done, files_total, errors, reported_at
        FROM storage_transfer_reports ORDER BY reported_at DESC`,
     )
     res.json({
@@ -325,6 +330,7 @@ storageRouter.get('/transfers', async (_req, res) => {
         eta: r.eta as string,
         filesDone: r.files_done as number | null,
         filesTotal: r.files_total as number | null,
+        errors: (r.errors as number | null) ?? 0,
         reportedAt: r.reported_at as string,
       })),
     })

@@ -807,6 +807,7 @@ export type ApiArchiveTransfer = {
   eta: string
   filesDone: number | null
   filesTotal: number | null
+  errors: number
   reportedAt: string
 }
 
