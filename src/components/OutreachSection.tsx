@@ -68,6 +68,8 @@ export default function OutreachSection({ projectId }: { projectId: string }) {
   const [error, setError] = useState<string | null>(null)
   const [addOpen, setAddOpen] = useState(false)
   const [bulkOpen, setBulkOpen] = useState(false)
+  const [findingProspects, setFindingProspects] = useState(false)
+  const [findResult, setFindResult] = useState<{ tone: 'success' | 'warn'; text: string } | null>(null)
   const [rolodexOpen, setRolodexOpen] = useState(false)
   const [listFilter, setListFilter] = useState<string>('all') // 'all' | 'replied' | a batch label
   const [oneSheetApproval, setOneSheetApproval] = useState<{ approvedAt: string | null; editedSinceApproval: boolean } | null>(null)
@@ -181,6 +183,27 @@ export default function OutreachSection({ projectId }: { projectId: string }) {
       setProspects(r.prospects)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'prospects load failed')
+    }
+  }
+
+  // The one-button version of "find me people to email" — no fields, no
+  // paste. Claude researches real similar shows + verified RSS contact
+  // emails and drops them in as their own batch, same review queue as
+  // everything else (nothing sends automatically).
+  async function findSimilarProspects() {
+    setFindingProspects(true)
+    setFindResult(null)
+    try {
+      const r = await api.findSimilarProspects(projectId)
+      setFindResult({
+        tone: 'success',
+        text: `Found ${r.imported} new prospect${r.imported === 1 ? '' : 's'} — saved as "${r.batchLabel}". Review and send whenever you're ready.`,
+      })
+      await loadProspects()
+    } catch (err) {
+      setFindResult({ tone: 'warn', text: err instanceof Error ? err.message : 'Search failed — try again.' })
+    } finally {
+      setFindingProspects(false)
     }
   }
 
@@ -702,6 +725,18 @@ export default function OutreachSection({ projectId }: { projectId: string }) {
             </div>
           )}
 
+          {findResult && (
+            <div
+              className={`rounded-lg border px-3 py-2 text-xs ${
+                findResult.tone === 'success'
+                  ? 'border-emerald-500/40 bg-emerald-500/10 text-emerald-100'
+                  : 'border-amber-500/40 bg-amber-500/10 text-amber-100'
+              }`}
+            >
+              {findResult.text}
+            </div>
+          )}
+
           {verifyResult && (
             <div
               className={`rounded-lg border px-3 py-2 text-xs ${
@@ -818,6 +853,14 @@ export default function OutreachSection({ projectId }: { projectId: string }) {
                   {generatingAll ? 'Working…' : `🔄 Regenerate all (${prospects.filter((p) => p.unique_sentence?.trim()).length})`}
                 </button>
               )}
+              <button
+                onClick={() => void findSimilarProspects()}
+                disabled={findingProspects}
+                className="text-[10px] uppercase tracking-wider text-ink bg-gradient-to-r from-amber-300 via-pink-300 to-violet-300 rounded-full px-3 py-1 hover:opacity-90 disabled:opacity-40 font-bold"
+                title="Claude finds real similar shows and their verified contact emails, and adds them as a new batch — no fields to fill in."
+              >
+                {findingProspects ? '🔍 Searching… (~1-2 min)' : '🔍 Find new prospects'}
+              </button>
               <button
                 onClick={() => { setBulkOpen((v) => !v); if (!bulkOpen) setAddOpen(false) }}
                 className={`text-[10px] uppercase tracking-wider border rounded-full px-3 py-1 font-bold ${

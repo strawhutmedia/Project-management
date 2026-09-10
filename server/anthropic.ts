@@ -2394,6 +2394,114 @@ export async function generateUniqueSentence(input: UniqueSentenceInput): Promis
 }
 
 // ─────────────────────────────────────────────────────────────────────
+// Find real, similar shows to pitch as guests/cross-promotion — the
+// self-serve replacement for a paid similar-shows API (Rephonic etc).
+// Claude does its own web research + fetches real RSS feeds; nothing here
+// is invented — every returned row must come from a page Claude actually
+// looked at. Caller is responsible for import/dedup; this only researches.
+// ─────────────────────────────────────────────────────────────────────
+
+const SIMILAR_SHOWS_MODEL = 'claude-opus-5'
+
+export type SimilarShowProspect = {
+  name: string
+  email: string | null
+  context: string
+}
+
+const SIMILAR_SHOWS_SYSTEM = `You are a podcast booking researcher finding real shows similar to a
+given one, for cold-outreach cross-promotion (guest swaps).
+
+Process:
+1. Search the web to understand the target show's genre/format/audience.
+2. Search for other REAL, currently-active podcasts in the same genre/format —
+   aim for around 20-25 good candidates. Prefer shows with a clear host/brand,
+   not generic SEO-spam titles.
+3. For each candidate, find its actual RSS feed (podcast directories and
+   search results usually surface this, or the show's own website) and fetch
+   it directly. Look for a contact email in these tags, in priority order:
+   <itunes:owner><itunes:email>, <managingEditor>, <webMaster>. If a feed has
+   no such tag, the email is null — do not guess or invent one.
+4. NEVER invent a show, a feed URL, or an email. Every row must come from a
+   page you actually fetched. If you can't find a real RSS feed for a
+   candidate, drop it rather than guess.
+
+Output ONLY a JSON array (no markdown fences, no prose before or after), one
+object per show:
+[{"name": "Show Name (Host Name)", "email": "real@email.com" or null, "context": "one short phrase: genre/format fit"}]`
+
+function similarShowsUserBlock(showName: string, showDescription: string | null): string {
+  return [
+    `Target show: ${showName}`,
+    showDescription ? `Description: ${showDescription}` : null,
+    '',
+    'Find ~20-25 real similar podcasts and their verified contact emails, per your instructions.',
+  ].filter((l): l is string => l !== null).join('\n')
+}
+
+export async function findSimilarShowProspects(
+  showName: string,
+  showDescription: string | null,
+): Promise<SimilarShowProspect[]> {
+  logInfo('outreach: finding similar shows', { showName })
+  const messages: Anthropic.MessageParam[] = [{
+    role: 'user',
+    content: [{ type: 'text', text: similarShowsUserBlock(showName, showDescription) }],
+  }]
+  const params = (): Anthropic.MessageCreateParamsNonStreaming => ({
+    model: SIMILAR_SHOWS_MODEL,
+    max_tokens: 16000,
+    system: SIMILAR_SHOWS_SYSTEM,
+    messages,
+    tools: [
+      { type: 'web_search_20260209', name: 'web_search', max_uses: 30 },
+      { type: 'web_fetch_20260209', name: 'web_fetch', max_uses: 40 },
+    ],
+  })
+
+  let response = await createWithRetry(params())
+  // Same server-side tool loop as generateUniqueSentence above — a research
+  // task this size routinely needs more searches than fit in one internal
+  // iteration cap, so resume on pause_turn. Bounded so a misbehaving turn
+  // can't loop forever (this task needs more headroom than a one-line
+  // sentence, hence the higher guard than the unique-sentence version).
+  let guard = 0
+  while (response.stop_reason === 'pause_turn' && guard < 15) {
+    guard += 1
+    messages.push({ role: 'assistant', content: response.content })
+    response = await createWithRetry(params())
+  }
+
+  const texts = response.content.filter((b): b is Anthropic.TextBlock => b.type === 'text')
+  const raw = (texts.length ? texts[texts.length - 1].text : '').trim()
+  const start = raw.indexOf('[')
+  const end = raw.lastIndexOf(']')
+  if (start === -1 || end === -1 || end < start) {
+    logError('outreach: similar-shows response had no JSON array', { showName, rawSnippet: raw.slice(0, 300) })
+    throw new Error('no_results')
+  }
+  let parsed: unknown
+  try {
+    parsed = JSON.parse(raw.slice(start, end + 1))
+  } catch (err) {
+    logError('outreach: similar-shows JSON parse failed', { showName, error: err instanceof Error ? err.message : String(err) })
+    throw new Error('bad_json')
+  }
+  if (!Array.isArray(parsed)) throw new Error('bad_json')
+  const results: SimilarShowProspect[] = []
+  for (const row of parsed as unknown[]) {
+    const r = row as Record<string, unknown>
+    const name = typeof r?.name === 'string' ? r.name.trim() : ''
+    if (!name) continue
+    const email = typeof r?.email === 'string' && r.email.trim() ? r.email.trim().toLowerCase() : null
+    const context = typeof r?.context === 'string' ? r.context.trim() : ''
+    results.push({ name, email, context })
+  }
+  logInfo('outreach: similar shows found', { showName, count: results.length, withEmail: results.filter((r) => r.email).length })
+  return results
+}
+
+// ─────────────────────────────────────────────────────────────────────
 // Auto-populate a show's one-sheet from its episode list
 // ─────────────────────────────────────────────────────────────────────
 //
