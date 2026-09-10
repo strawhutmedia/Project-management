@@ -25,8 +25,14 @@ import { sendAdminAlert } from '../email'
 import { hasAnthropicKey, generateLeadFollowup } from '../anthropic'
 import { syncContactToResend, resyncProject } from '../audience_resend'
 
+// BUG FIX (2026-09-10): always construct the shim — mailTransport's Resend
+// class routes .emails.send() through SES regardless of whether a Resend
+// key was passed in. Gating construction on RESEND_API_KEY made `resend`
+// null (and every `if (!resend)` guard below refuse to send) the moment
+// Resend was deleted, even though SES works fine. This silently broke the
+// fan-list broadcast feature entirely.
 const resendApiKey = process.env.RESEND_API_KEY
-const resend = resendApiKey ? new Resend(resendApiKey) : null
+const resend = new Resend(resendApiKey)
 
 function escapeHtml(s: string): string {
   return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')

@@ -1,8 +1,14 @@
 import { Resend } from './mailTransport'
 import { pool } from './db'
 
+// BUG FIX (2026-09-10): always construct the shim. mailTransport's Resend
+// class routes .emails.send() through SES regardless of whether a Resend
+// key was passed in — gating construction on RESEND_API_KEY made `resend`
+// null (and every `if (!resend)` guard below silently no-op instead of
+// sending) the moment Resend was deleted, even though SES works fine. This
+// silently broke magic-link sign-in, invites, and admin alerts.
 const apiKey = process.env.RESEND_API_KEY
-const resend = apiKey ? new Resend(apiKey) : null
+const resend = new Resend(apiKey)
 
 // System email (magic links, invites, alerts, notifications) sends from a
 // domain that must be VERIFIED under RESEND_API_KEY's Resend team. The

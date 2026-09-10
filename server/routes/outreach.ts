@@ -23,8 +23,19 @@ import { syncMissingCoversFromRss } from '../rss_cover_sync'
 import { seedFlagshipPodcasts } from '../seeds/flagship_podcasts'
 import { checkEmail } from '../email_verify'
 
+// BUG FIX (2026-09-10): this used to be `resendKey ? new Resend(resendKey) : null`,
+// which made `resend` null — and every `if (!resend)` guard below refuse to
+// send — the moment RESEND_API_KEY was unset, even though mailTransport's
+// Resend shim routes .emails.send() through SES regardless of whether a
+// Resend key was passed to its constructor. That silently broke the entire
+// campaign sender, follow-up sender, test-send, and send-campaign trigger
+// the moment Resend was deleted, despite SES working fine. Always construct
+// it — only .domains.list()/.update() (Resend-only, no SES equivalent, used
+// solely by the open-tracking toggle below) actually need a real Resend key,
+// and those already degrade gracefully via mailTransport's stub instead of
+// throwing.
 const resendKey = process.env.RESEND_API_KEY
-const resend = resendKey ? new Resend(resendKey) : null
+const resend = new Resend(resendKey)
 
 export const outreachRouter = Router()
 outreachRouter.use(requireAdmin)
