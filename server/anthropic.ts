@@ -2314,6 +2314,33 @@ async function createWithRetry(
   throw lastErr
 }
 
+// Same transient-error retry policy as createWithRetry, but via the
+// streaming API — for calls expected to run long enough (multi-minute
+// agentic tool use) that a non-streaming request risks a client-side
+// timeout while waiting silently for the response.
+async function createWithRetryStream(
+  params: Omit<Anthropic.MessageCreateParamsNonStreaming, 'stream'>,
+  maxAttempts = 4,
+): Promise<Anthropic.Message> {
+  let lastErr: unknown
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      return await client.messages.stream(params).finalMessage()
+    } catch (err) {
+      lastErr = err
+      const status = (err as { status?: number })?.status
+      const msg = (err instanceof Error ? err.message : String(err)).toLowerCase()
+      const transient = status === 429 || status === 529 || status === 500 || status === 503
+        || msg.includes('overloaded') || msg.includes('rate limit') || msg.includes('rate_limit')
+      if (!transient || attempt === maxAttempts) throw err
+      const delay = 1000 * 2 ** (attempt - 1) + Math.floor(Math.random() * 500) // ~1s, 2s, 4s + jitter
+      logInfo('anthropic: transient error, retrying (stream)', { attempt, status, delayMs: delay })
+      await new Promise((r) => setTimeout(r, delay))
+    }
+  }
+  throw lastErr
+}
+
 export async function generateUniqueSentence(input: UniqueSentenceInput): Promise<UniqueSentenceResult> {
   logInfo('outreach: generating unique sentence', {
     show: input.show.name,
@@ -2415,8 +2442,8 @@ given one, for cold-outreach cross-promotion (guest swaps).
 Process:
 1. Search the web to understand the target show's genre/format/audience.
 2. Search for other REAL, currently-active podcasts in the same genre/format —
-   aim for around 20-25 good candidates. Prefer shows with a clear host/brand,
-   not generic SEO-spam titles.
+   aim for around 12-15 good candidates. Prefer shows with a clear host/brand,
+   not generic SEO-spam titles. Fewer, verified candidates beat a longer list.
 3. For each candidate, find its actual RSS feed (podcast directories and
    search results usually surface this, or the show's own website) and fetch
    it directly. Look for a contact email in these tags, in priority order:
@@ -2425,6 +2452,8 @@ Process:
 4. NEVER invent a show, a feed URL, or an email. Every row must come from a
    page you actually fetched. If you can't find a real RSS feed for a
    candidate, drop it rather than guess.
+5. Work efficiently — once you have ~12-15 verified candidates, stop
+   searching and output the results. Don't keep researching past that.
 
 Output ONLY a JSON array (no markdown fences, no prose before or after), one
 object per show:
@@ -2435,7 +2464,7 @@ function similarShowsUserBlock(showName: string, showDescription: string | null)
     `Target show: ${showName}`,
     showDescription ? `Description: ${showDescription}` : null,
     '',
-    'Find ~20-25 real similar podcasts and their verified contact emails, per your instructions.',
+    'Find ~12-15 real similar podcasts and their verified contact emails, per your instructions.',
   ].filter((l): l is string => l !== null).join('\n')
 }
 
@@ -2448,28 +2477,34 @@ export async function findSimilarShowProspects(
     role: 'user',
     content: [{ type: 'text', text: similarShowsUserBlock(showName, showDescription) }],
   }]
-  const params = (): Anthropic.MessageCreateParamsNonStreaming => ({
+  const params = (): Omit<Anthropic.MessageCreateParamsNonStreaming, 'stream'> => ({
     model: SIMILAR_SHOWS_MODEL,
     max_tokens: 16000,
     system: SIMILAR_SHOWS_SYSTEM,
     messages,
     tools: [
-      { type: 'web_search_20260209', name: 'web_search', max_uses: 30 },
-      { type: 'web_fetch_20260209', name: 'web_fetch', max_uses: 40 },
+      { type: 'web_search_20260209', name: 'web_search', max_uses: 18 },
+      { type: 'web_fetch_20260209', name: 'web_fetch', max_uses: 25 },
     ],
   })
 
-  let response = await createWithRetry(params())
+  // This research task can easily run several minutes of server-side
+  // agentic search before producing any output. A non-streaming request
+  // sits silently waiting for that whole time and can trip the SDK's
+  // client-side request timeout (confirmed in production: a real run took
+  // ~15 min and was killed with "Request timed out."). Streaming keeps the
+  // connection open with incremental events the whole time, so it survives
+  // long searches; we only care about the assembled final message.
+  let response = await createWithRetryStream(params())
   // Same server-side tool loop as generateUniqueSentence above — a research
   // task this size routinely needs more searches than fit in one internal
   // iteration cap, so resume on pause_turn. Bounded so a misbehaving turn
-  // can't loop forever (this task needs more headroom than a one-line
-  // sentence, hence the higher guard than the unique-sentence version).
+  // can't loop forever.
   let guard = 0
-  while (response.stop_reason === 'pause_turn' && guard < 15) {
+  while (response.stop_reason === 'pause_turn' && guard < 8) {
     guard += 1
     messages.push({ role: 'assistant', content: response.content })
-    response = await createWithRetry(params())
+    response = await createWithRetryStream(params())
   }
 
   const texts = response.content.filter((b): b is Anthropic.TextBlock => b.type === 'text')
