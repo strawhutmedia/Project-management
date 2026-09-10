@@ -89,7 +89,11 @@ function TransferRow({ t, onCommand }: { t: ApiArchiveTransfer; onCommand: (name
           <button
             onClick={() => { void sendCommand(paused ? 'resume' : 'pause') }}
             disabled={sending}
-            className="inline-flex items-center gap-1 rounded-full border border-line bg-panel hover:bg-line/40 px-2.5 py-0.5 text-[11px] font-bold disabled:opacity-50"
+            className={`inline-flex items-center gap-1 rounded-full border px-3 py-1 text-xs font-bold disabled:opacity-50 ${
+              paused
+                ? 'border-stage-done/60 bg-stage-done/15 text-stage-done hover:bg-stage-done/30'
+                : 'border-stage-tracking/60 bg-stage-tracking/15 text-stage-tracking hover:bg-stage-tracking/30'
+            }`}
             title={paused ? 'Start this job again — it resumes exactly where it stopped' : 'Stop this job cleanly — progress is kept, resume any time'}
           >
             {paused ? '▶ Resume' : '⏸ Pause'}
@@ -272,6 +276,23 @@ export default function StoragePage() {
     void load()
   }, [load])
 
+  const [autoQueue, setAutoQueue] = useState<boolean | null>(null)
+
+  useEffect(() => {
+    api.storageAutoQueue().then((r) => setAutoQueue(r.on)).catch(() => {})
+  }, [])
+
+  const toggleAutoQueue = useCallback(async () => {
+    if (autoQueue === null) return
+    const next = !autoQueue
+    setAutoQueue(next)
+    try {
+      await api.storageSetAutoQueue(next)
+    } catch {
+      setAutoQueue(!next) // revert on failure
+    }
+  }, [autoQueue])
+
   const onCommand = useCallback(async (name: string, action: 'pause' | 'resume') => {
     await api.storageTransferCommand(name, action)
     try {
@@ -315,7 +336,29 @@ export default function StoragePage() {
       </div>
 
       <div className={`${card} p-4`}>
-        <div className={`${labelCls} mb-1`}>Transfers — NAS → vault</div>
+        <div className="flex items-center gap-3 mb-1">
+          <div className={labelCls}>Transfers — NAS → vault</div>
+          {autoQueue !== null && (
+            <button
+              onClick={() => { void toggleAutoQueue() }}
+              className={`ml-auto inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-[11px] font-bold ${
+                autoQueue
+                  ? 'border-stage-done/60 bg-stage-done/15 text-stage-done hover:bg-stage-done/30'
+                  : 'border-line bg-panel text-muted hover:bg-line/40'
+              }`}
+              title={autoQueue
+                ? 'When a box finishes everything it was doing, its next paused job starts by itself. Click to turn off (e.g. on editing days).'
+                : 'Paused jobs stay paused until you press Resume yourself. Click to turn auto-queue back on.'}
+            >
+              {autoQueue ? '⚡ Auto-queue on' : '💤 Auto-queue off'}
+            </button>
+          )}
+        </div>
+        {autoQueue && transfers.length > 0 && (
+          <div className="text-[11px] text-muted mb-2">
+            When a box goes idle, its next paused job starts automatically. A job you paused yourself is left alone for an hour.
+          </div>
+        )}
         {transfers.length > 0 ? (
           <div className="divide-y divide-line/60">
             {transfers.map((t) => (

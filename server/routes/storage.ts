@@ -7,7 +7,7 @@ import {
 } from '@aws-sdk/client-s3'
 import { requireAdmin } from '../auth'
 import { pool } from '../db'
-import { logError } from '../diag'
+import { logError, logInfo } from '../diag'
 
 // Master Archive browser — read-only window into the S3 bucket that holds
 // Straw Hut's Deep Archive vault (masters uploaded from the UGREEN NASes,
@@ -309,6 +309,7 @@ export async function handleTransferReport(req: Request, res: Response): Promise
          errors = EXCLUDED.errors, reported_at = now()`,
       [name, raw, p.bytesDone, p.bytesTotal, p.percent, p.speed, p.eta, p.filesDone, p.filesTotal, p.errors],
     )
+    void maybeAutoQueue()
     res.json({ ok: true })
   } catch (err) {
     logError('transfer report failed', { name, error: err instanceof Error ? err.message : String(err) })
@@ -392,6 +393,109 @@ export async function handleAgentAck(req: Request, res: Response): Promise<void>
     res.status(500).json({ error: 'ack_failed' })
   }
 }
+
+// ── Auto-queue ─────────────────────────────────────────────────────────
+// "If nothing is going and something is paused, start it." Runs on every
+// transfer report (throttled to once a minute). A box is RED unless the
+// transfer name carries the BLUE- prefix — the naming convention the
+// migration jobs already follow. Safety rules:
+//  • only acts on a box that is reporting (reporter alive) and fully idle
+//  • never acts while any command on that box is pending or <15 min old
+//  • never restarts a job whose own Pause was clicked within the last hour
+//  • global on/off switch (storage_settings.auto_queue), default on
+const boxOf = (name: string) => (name.startsWith('BLUE-') ? 'blue' : 'red')
+
+async function autoQueueEnabled(): Promise<boolean> {
+  const { rows } = await pool.query(`SELECT value FROM storage_settings WHERE key = 'auto_queue'`)
+  return (rows[0]?.value ?? 'on') === 'on'
+}
+
+let lastAutoQueueAt = 0
+export async function maybeAutoQueue(): Promise<void> {
+  if (Date.now() - lastAutoQueueAt < 60_000) return
+  lastAutoQueueAt = Date.now()
+  try {
+    if (!(await autoQueueEnabled())) return
+    const { rows } = await pool.query(
+      `SELECT r.name, r.percent, r.reported_at, r.last_progress_at,
+              c.action AS cmd_action, c.requested_at AS cmd_requested_at, c.executed_at AS cmd_executed_at
+       FROM storage_transfer_reports r
+       LEFT JOIN storage_transfer_commands c ON c.name = r.name
+       WHERE r.name <> 'connection-test'`,
+    )
+    const now = Date.now()
+    const age = (ts: unknown) => now - new Date(ts as string).getTime()
+    const boxes = new Map<string, typeof rows>()
+    for (const r of rows) {
+      const b = boxOf(r.name as string)
+      boxes.set(b, [...(boxes.get(b) ?? []), r])
+    }
+    for (const [box, all] of boxes) {
+      const reporting = all.filter((r) => age(r.reported_at) < 5 * 60_000)
+      if (reporting.length === 0) continue // box dark — reporter down, don't guess
+      const isDone = (r: (typeof rows)[number]) => (r.percent as number | null ?? 0) >= 100
+      // "Idle" means NO progress anywhere on the box for a full 30 minutes —
+      // deliberately much stricter than the UI's 10-minute paused label.
+      // (2026-09-10: with a 10-minute window a transient log lull on a
+      // running job made RED look idle overnight and auto-queue started a
+      // second job alongside it.)
+      const running = reporting.some((r) => !isDone(r) && age(r.last_progress_at) < 30 * 60_000)
+      if (running) continue
+      if (all.some((r) => r.cmd_action && !r.cmd_executed_at)) continue // command in flight
+      if (all.some((r) => r.cmd_requested_at && age(r.cmd_requested_at) < 15 * 60_000)) continue // recent human action
+      const next = reporting
+        .filter((r) => !isDone(r))
+        // an explicit Pause clicked < 1h ago stays respected
+        .filter((r) => !(r.cmd_action === 'stop' && r.cmd_executed_at && age(r.cmd_executed_at) < 60 * 60_000))
+        .sort((a, b) => (a.name as string).localeCompare(b.name as string))[0]
+      if (!next) continue
+      await pool.query(
+        `INSERT INTO storage_transfer_commands (name, action, requested_at, executed_at)
+         VALUES ($1, 'start', now(), NULL)
+         ON CONFLICT (name) DO UPDATE SET action = 'start', requested_at = now(), executed_at = NULL`,
+        [next.name],
+      )
+      logInfo('storage auto-queue: box idle, starting next paused job', {
+        box,
+        starting: next.name,
+        boxState: all.map((r) => ({
+          name: r.name,
+          percent: r.percent,
+          reportAgeSec: Math.round(age(r.reported_at) / 1000),
+          progressAgeSec: Math.round(age(r.last_progress_at) / 1000),
+        })),
+      })
+    }
+  } catch (err) {
+    logError('storage auto-queue failed', { error: err instanceof Error ? err.message : String(err) })
+  }
+}
+
+storageRouter.get('/auto-queue', async (_req, res) => {
+  try {
+    res.json({ on: await autoQueueEnabled() })
+  } catch (err) {
+    res.status(500).json({ error: 'settings_failed', detail: err instanceof Error ? err.message : String(err) })
+  }
+})
+
+storageRouter.post('/auto-queue', async (req, res) => {
+  const on = req.body?.on
+  if (typeof on !== 'boolean') {
+    res.status(400).json({ error: 'bad_request' })
+    return
+  }
+  try {
+    await pool.query(
+      `INSERT INTO storage_settings (key, value) VALUES ('auto_queue', $1)
+       ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value`,
+      [on ? 'on' : 'off'],
+    )
+    res.json({ ok: true, on })
+  } catch (err) {
+    res.status(500).json({ error: 'settings_failed', detail: err instanceof Error ? err.message : String(err) })
+  }
+})
 
 storageRouter.get('/transfers', async (_req, res) => {
   try {
