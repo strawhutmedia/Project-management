@@ -34,7 +34,7 @@ import { intakeRouter } from './routes/intake'
 import { audienceRouter } from './routes/audience'
 import { quickbooksRouter } from './routes/quickbooks'
 import { qbInvoicesRouter } from './routes/qb_invoices'
-import { storageRouter, handleTransferReport } from './routes/storage'
+import { storageRouter, handleTransferReport, handleAgentCommands, handleAgentAck } from './routes/storage'
 import { handleResendWebhook } from './routes/outreach_webhook'
 import { handleSesNotify } from './routes/ses_notify'
 import { handleSesInboundReply } from './routes/ses_inbound_reply'
@@ -114,6 +114,16 @@ app.use(cookieParser())
 // reaches them, which 401s the reporter's token-authenticated POSTs.
 app.post('/api/storage/transfer-report/:name', express.text({ type: '*/*', limit: '64kb' }), (req, res) => {
   void handleTransferReport(req, res)
+})
+
+// Pause/Resume agent on each NAS: polls pending commands, runs docker
+// stop/start on the matching rclone container, then acks. Same token gate
+// and same must-be-before-requireUser reasoning as the transfer report.
+app.get('/api/storage/agent/commands', (req, res) => {
+  void handleAgentCommands(req, res)
+})
+app.post('/api/storage/agent/ack/:name', (req, res) => {
+  void handleAgentAck(req, res)
 })
 
 app.get('/api/health', (_req, res) => {

@@ -809,8 +809,10 @@ export type ApiArchiveTransfer = {
   filesDone: number | null
   filesTotal: number | null
   errors: number
+  lastProgressAt?: string
   currentFiles?: Array<{ name: string; pct: number | null; speed: string; eta: string }>
   reportedAt: string
+  command?: { action: 'stop' | 'start'; requestedAt: string; executedAt: string | null } | null
 }
 
 export type ApiArchiveSummary = {
@@ -1033,6 +1035,11 @@ export const api = {
     ),
   storageTransfers: () =>
     request<{ transfers: ApiArchiveTransfer[] }>('/api/storage/transfers'),
+  storageTransferCommand: (name: string, action: 'pause' | 'resume') =>
+    request<{ ok: boolean; action: 'stop' | 'start' }>(`/api/storage/transfers/${encodeURIComponent(name)}/command`, {
+      method: 'POST',
+      body: JSON.stringify({ action }),
+    }),
   storageList: (prefix: string) =>
     request<{
       configured: boolean

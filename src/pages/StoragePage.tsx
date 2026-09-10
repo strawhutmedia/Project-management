@@ -37,16 +37,64 @@ function ClassBadge({ storageClass }: { storageClass: string }) {
 
 // Live transfer rows, reported once a minute by the NAS. Considered stale
 // (job finished, or the reporter/NAS is down) after 5 minutes of silence.
-function TransferRow({ t }: { t: ApiArchiveTransfer }) {
+function TransferRow({ t, onCommand }: { t: ApiArchiveTransfer; onCommand: (name: string, action: 'pause' | 'resume') => Promise<void> }) {
   const [filesOpen, setFilesOpen] = useState(false)
+  const [sending, setSending] = useState(false)
   const ageMs = Date.now() - new Date(t.reportedAt).getTime()
   const stale = ageMs > 5 * 60 * 1000
   const done = (t.percent ?? 0) >= 100
+  const progressAgeMs = Date.now() - new Date(t.lastProgressAt ?? t.reportedAt).getTime()
+  // Paused when the Pause button's command was executed on the NAS, or —
+  // fallback heuristic — when the reporter still posts but the log content
+  // hasn't changed for 10+ min (a docker stop done from a terminal).
+  const cmd = t.command
+  const cmdPending = Boolean(cmd && !cmd.executedAt)
+  const pausedByButton = !done && cmd?.action === 'stop' && Boolean(cmd.executedAt)
+  // Just resumed: give rclone up to 10 min to produce fresh log lines before
+  // the no-progress heuristic is allowed to call it paused again.
+  const resuming =
+    !done && cmd?.action === 'start' && Boolean(cmd.executedAt) &&
+    progressAgeMs > 10 * 60 * 1000 &&
+    Date.now() - new Date(cmd.executedAt as string).getTime() < 10 * 60 * 1000
+  const paused = !done && !stale && !resuming && (pausedByButton || progressAgeMs > 10 * 60 * 1000)
   const pct = Math.max(0, Math.min(100, t.percent ?? 0))
+  const sendCommand = async (action: 'pause' | 'resume') => {
+    setSending(true)
+    try {
+      await onCommand(t.name, action)
+    } finally {
+      setSending(false)
+    }
+  }
   return (
     <div className="py-2">
       <div className="flex items-center gap-2 flex-wrap">
-        <span className="text-sm font-semibold">{done ? '✅' : stale ? '⚠️' : '📤'} {t.name}</span>
+        <span className="text-sm font-semibold">{done ? '✅' : stale ? '⚠️' : paused ? '⏸' : '📤'} {t.name}</span>
+        {paused && (
+          <span className="inline-flex items-center rounded-full border border-line bg-ink/40 text-muted px-2 py-0.5 text-[11px] font-bold">
+            {pausedByButton ? 'paused' : 'paused — waiting its turn'}
+          </span>
+        )}
+        {cmdPending && (
+          <span className="inline-flex items-center rounded-full border border-line bg-ink/40 text-muted px-2 py-0.5 text-[11px] font-bold">
+            {cmd?.action === 'stop' ? 'pausing…' : 'resuming…'} the NAS picks this up within ~30s
+          </span>
+        )}
+        {resuming && !cmdPending && (
+          <span className="inline-flex items-center rounded-full border border-line bg-ink/40 text-muted px-2 py-0.5 text-[11px] font-bold">
+            resuming — first progress lines coming up
+          </span>
+        )}
+        {!done && !stale && !cmdPending && (
+          <button
+            onClick={() => { void sendCommand(paused ? 'resume' : 'pause') }}
+            disabled={sending}
+            className="inline-flex items-center gap-1 rounded-full border border-line bg-panel hover:bg-line/40 px-2.5 py-0.5 text-[11px] font-bold disabled:opacity-50"
+            title={paused ? 'Start this job again — it resumes exactly where it stopped' : 'Stop this job cleanly — progress is kept, resume any time'}
+          >
+            {paused ? '▶ Resume' : '⏸ Pause'}
+          </button>
+        )}
         {t.errors > 0 && (
           <span className="inline-flex items-center rounded-full border border-urgent/40 bg-urgent/10 text-urgent px-2 py-0.5 text-[11px] font-bold">
             {t.errors} error{t.errors === 1 ? '' : 's'} — auto-retrying; verify will catch anything missed
@@ -64,7 +112,7 @@ function TransferRow({ t }: { t: ApiArchiveTransfer }) {
           style={{ width: `${pct}%` }}
         />
       </div>
-      {!done && !stale && (t.currentFiles?.length ?? 0) > 0 && (
+      {!done && !stale && !paused && (t.currentFiles?.length ?? 0) > 0 && (
         <div className="mt-1.5">
           <button
             onClick={() => setFilesOpen((v) => !v)}
@@ -97,7 +145,9 @@ function TransferRow({ t }: { t: ApiArchiveTransfer }) {
           ? `Finished — ${t.filesTotal ? fmtCount(t.filesTotal) + ' files' : 'complete'}. Ready to verify.`
           : stale
             ? `No update in ${Math.round(ageMs / 60000)} min — the job may have just finished, or the reporter on the NAS stopped. Check Docker on RED if this persists.`
-            : `${t.filesDone != null && t.filesTotal != null ? `${fmtCount(t.filesDone)} of ${fmtCount(t.filesTotal)} files · ` : ''}updated ${Math.max(1, Math.round(ageMs / 1000))}s ago`}
+            : paused
+              ? `Held where it stopped (${t.filesDone != null && t.filesTotal != null ? `${fmtCount(t.filesDone)} of ${fmtCount(t.filesTotal)} files` : 'progress kept'}) — resumes exactly here when its box frees up.`
+              : `${t.filesDone != null && t.filesTotal != null ? `${fmtCount(t.filesDone)} of ${fmtCount(t.filesTotal)} files · ` : ''}updated ${Math.max(1, Math.round(ageMs / 1000))}s ago`}
       </div>
     </div>
   )
@@ -202,14 +252,12 @@ export default function StoragePage() {
   const [configured, setConfigured] = useState<boolean | null>(null)
   const [root, setRoot] = useState<Level | null>(null)
   const [loading, setLoading] = useState(true)
-  const [refreshing, setRefreshing] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  const load = useCallback(async (force = false) => {
+  const load = useCallback(async () => {
     setError(null)
-    if (force) setRefreshing(true)
     try {
-      const [s, r] = await Promise.all([api.storageSummary(force), api.storageList('')])
+      const [s, r] = await Promise.all([api.storageSummary(false), api.storageList('')])
       setConfigured(Boolean(s.configured && r.configured))
       setSummary(s.summary ?? null)
       setRoot(r.configured ? { folders: r.folders, files: r.files, truncated: r.truncated } : null)
@@ -217,13 +265,22 @@ export default function StoragePage() {
       setError(err instanceof Error ? err.message : String(err))
     } finally {
       setLoading(false)
-      setRefreshing(false)
     }
   }, [])
 
   useEffect(() => {
     void load()
   }, [load])
+
+  const onCommand = useCallback(async (name: string, action: 'pause' | 'resume') => {
+    await api.storageTransferCommand(name, action)
+    try {
+      const res = await api.storageTransfers()
+      setTransfers(res.transfers)
+    } catch {
+      /* next 30s poll will catch up */
+    }
+  }, [])
 
   // Poll live transfers every 30s — cheap (a DB read), and it's the whole
   // point of the page while migration runs.
@@ -255,13 +312,6 @@ export default function StoragePage() {
       <div className="flex items-center gap-3 flex-wrap">
         <h1 className="text-2xl font-bold">🗄️ Master Archive</h1>
         <span className="text-sm text-muted">{summary ? `bucket: ${summary.bucket}` : ''}</span>
-        <button
-          onClick={() => { void load(true) }}
-          disabled={refreshing}
-          className="ml-auto inline-flex items-center gap-1.5 rounded-full px-3.5 py-2 text-sm font-semibold border border-line bg-panel hover:bg-line/40 text-text disabled:opacity-50"
-        >
-          {refreshing ? 'Rescanning…' : '↻ Rescan'}
-        </button>
       </div>
 
       <div className={`${card} p-4`}>
@@ -269,7 +319,7 @@ export default function StoragePage() {
         {transfers.length > 0 ? (
           <div className="divide-y divide-line/60">
             {transfers.map((t) => (
-              <TransferRow key={t.name} t={t} />
+              <TransferRow key={t.name} t={t} onCommand={onCommand} />
             ))}
           </div>
         ) : (
