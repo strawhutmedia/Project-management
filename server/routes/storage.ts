@@ -7,7 +7,7 @@ import {
 } from '@aws-sdk/client-s3'
 import { requireAdmin } from '../auth'
 import { pool } from '../db'
-import { logError } from '../diag'
+import { logError, logInfo } from '../diag'
 
 // Master Archive browser — read-only window into the S3 bucket that holds
 // Straw Hut's Deep Archive vault (masters uploaded from the UGREEN NASes,
@@ -434,7 +434,12 @@ export async function maybeAutoQueue(): Promise<void> {
       const reporting = all.filter((r) => age(r.reported_at) < 5 * 60_000)
       if (reporting.length === 0) continue // box dark — reporter down, don't guess
       const isDone = (r: (typeof rows)[number]) => (r.percent as number | null ?? 0) >= 100
-      const running = reporting.some((r) => !isDone(r) && age(r.last_progress_at) < 10 * 60_000)
+      // "Idle" means NO progress anywhere on the box for a full 30 minutes —
+      // deliberately much stricter than the UI's 10-minute paused label.
+      // (2026-09-10: with a 10-minute window a transient log lull on a
+      // running job made RED look idle overnight and auto-queue started a
+      // second job alongside it.)
+      const running = reporting.some((r) => !isDone(r) && age(r.last_progress_at) < 30 * 60_000)
       if (running) continue
       if (all.some((r) => r.cmd_action && !r.cmd_executed_at)) continue // command in flight
       if (all.some((r) => r.cmd_requested_at && age(r.cmd_requested_at) < 15 * 60_000)) continue // recent human action
@@ -450,7 +455,16 @@ export async function maybeAutoQueue(): Promise<void> {
          ON CONFLICT (name) DO UPDATE SET action = 'start', requested_at = now(), executed_at = NULL`,
         [next.name],
       )
-      console.log(`[storage] auto-queue: box ${box} idle, starting ${next.name}`)
+      logInfo('storage auto-queue: box idle, starting next paused job', {
+        box,
+        starting: next.name,
+        boxState: all.map((r) => ({
+          name: r.name,
+          percent: r.percent,
+          reportAgeSec: Math.round(age(r.reported_at) / 1000),
+          progressAgeSec: Math.round(age(r.last_progress_at) / 1000),
+        })),
+      })
     }
   } catch (err) {
     logError('storage auto-queue failed', { error: err instanceof Error ? err.message : String(err) })
