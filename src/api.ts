@@ -1987,6 +1987,11 @@ export const api = {
       `/api/outreach/projects/${projectId}/prospects/bulk`,
       { method: 'POST', body: JSON.stringify({ rows, batchLabel }) },
     ),
+  findSimilarProspects: (projectId: string) =>
+    request<{ imported: number; failed: number; duplicates: number; batchLabel: string }>(
+      `/api/outreach/projects/${projectId}/prospects/find-similar`,
+      { method: 'POST' },
+    ),
   updateOutreachProspect: (id: string, patch: Partial<{
     name: string; fullName: string | null; email: string | null;
     recipientType: 'person' | 'agent' | 'manager' | 'other';
