@@ -298,9 +298,11 @@ export async function handleTransferReport(req: Request, res: Response): Promise
   const p = parseRcloneStats(raw)
   try {
     await pool.query(
-      `INSERT INTO storage_transfer_reports (name, raw, bytes_done, bytes_total, percent, speed, eta, files_done, files_total, errors, reported_at)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10, now())
+      `INSERT INTO storage_transfer_reports (name, raw, bytes_done, bytes_total, percent, speed, eta, files_done, files_total, errors, reported_at, last_progress_at)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10, now(), now())
        ON CONFLICT (name) DO UPDATE SET
+         last_progress_at = CASE WHEN storage_transfer_reports.raw IS DISTINCT FROM EXCLUDED.raw
+                                 THEN now() ELSE storage_transfer_reports.last_progress_at END,
          raw = EXCLUDED.raw, bytes_done = EXCLUDED.bytes_done, bytes_total = EXCLUDED.bytes_total,
          percent = EXCLUDED.percent, speed = EXCLUDED.speed, eta = EXCLUDED.eta,
          files_done = EXCLUDED.files_done, files_total = EXCLUDED.files_total,
@@ -317,7 +319,7 @@ export async function handleTransferReport(req: Request, res: Response): Promise
 storageRouter.get('/transfers', async (_req, res) => {
   try {
     const { rows } = await pool.query(
-      `SELECT name, raw, bytes_done, bytes_total, percent, speed, eta, files_done, files_total, errors, reported_at
+      `SELECT name, raw, bytes_done, bytes_total, percent, speed, eta, files_done, files_total, errors, reported_at, last_progress_at
        FROM storage_transfer_reports WHERE name <> 'connection-test' ORDER BY reported_at DESC`,
     )
     res.json({
@@ -331,6 +333,7 @@ storageRouter.get('/transfers', async (_req, res) => {
         filesDone: r.files_done as number | null,
         filesTotal: r.files_total as number | null,
         errors: (r.errors as number | null) ?? 0,
+        lastProgressAt: (r.last_progress_at as string | null) ?? (r.reported_at as string),
         // Files rclone reports as in-flight in the latest stats block, e.g.
         //  * Episodes/Ep041_…/Cut 2.mp4: 43% /1.19Gi, 8.145Mi/s, 3m9s
         currentFiles: [...(r.raw as string).matchAll(/^\s*\*\s+(.+?):\s*(?:(\d+)% \/[\d.]+\w*,\s*([\d.]+\s*\w+\/s),\s*(\S+)|transferring)/gm)]

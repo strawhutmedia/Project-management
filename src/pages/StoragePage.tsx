@@ -42,11 +42,20 @@ function TransferRow({ t }: { t: ApiArchiveTransfer }) {
   const ageMs = Date.now() - new Date(t.reportedAt).getTime()
   const stale = ageMs > 5 * 60 * 1000
   const done = (t.percent ?? 0) >= 100
+  // Reporter still posting but content unchanged for 10+ min = the job is
+  // stopped/paused (docker stop) — say so instead of looking active.
+  const progressAgeMs = Date.now() - new Date(t.lastProgressAt ?? t.reportedAt).getTime()
+  const paused = !done && !stale && progressAgeMs > 10 * 60 * 1000
   const pct = Math.max(0, Math.min(100, t.percent ?? 0))
   return (
     <div className="py-2">
       <div className="flex items-center gap-2 flex-wrap">
-        <span className="text-sm font-semibold">{done ? '✅' : stale ? '⚠️' : '📤'} {t.name}</span>
+        <span className="text-sm font-semibold">{done ? '✅' : stale ? '⚠️' : paused ? '⏸' : '📤'} {t.name}</span>
+        {paused && (
+          <span className="inline-flex items-center rounded-full border border-line bg-ink/40 text-muted px-2 py-0.5 text-[11px] font-bold">
+            paused — waiting its turn
+          </span>
+        )}
         {t.errors > 0 && (
           <span className="inline-flex items-center rounded-full border border-urgent/40 bg-urgent/10 text-urgent px-2 py-0.5 text-[11px] font-bold">
             {t.errors} error{t.errors === 1 ? '' : 's'} — auto-retrying; verify will catch anything missed
@@ -64,7 +73,7 @@ function TransferRow({ t }: { t: ApiArchiveTransfer }) {
           style={{ width: `${pct}%` }}
         />
       </div>
-      {!done && !stale && (t.currentFiles?.length ?? 0) > 0 && (
+      {!done && !stale && !paused && (t.currentFiles?.length ?? 0) > 0 && (
         <div className="mt-1.5">
           <button
             onClick={() => setFilesOpen((v) => !v)}
@@ -97,7 +106,9 @@ function TransferRow({ t }: { t: ApiArchiveTransfer }) {
           ? `Finished — ${t.filesTotal ? fmtCount(t.filesTotal) + ' files' : 'complete'}. Ready to verify.`
           : stale
             ? `No update in ${Math.round(ageMs / 60000)} min — the job may have just finished, or the reporter on the NAS stopped. Check Docker on RED if this persists.`
-            : `${t.filesDone != null && t.filesTotal != null ? `${fmtCount(t.filesDone)} of ${fmtCount(t.filesTotal)} files · ` : ''}updated ${Math.max(1, Math.round(ageMs / 1000))}s ago`}
+            : paused
+              ? `Held where it stopped (${t.filesDone != null && t.filesTotal != null ? `${fmtCount(t.filesDone)} of ${fmtCount(t.filesTotal)} files` : 'progress kept'}) — resumes exactly here when its box frees up.`
+              : `${t.filesDone != null && t.filesTotal != null ? `${fmtCount(t.filesDone)} of ${fmtCount(t.filesTotal)} files · ` : ''}updated ${Math.max(1, Math.round(ageMs / 1000))}s ago`}
       </div>
     </div>
   )
