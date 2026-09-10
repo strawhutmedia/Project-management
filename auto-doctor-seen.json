@@ -464,5 +464,11 @@
     "outcome": "no_tool_call",
     "summary": "agent stopped without calling a terminal tool",
     "iterations": 9
+  },
+  "outreach: find-similar failed::{\"projectId\":\"c3227529-8bc9-43d9-995f-5d65a7bdbf9c\",\"error\":\"Request timed out.\"": {
+    "attemptedAt": "2026-09-10T20:52:07.036Z",
+    "outcome": "gave_up",
+    "summary": "hit max iterations (20)",
+    "iterations": 20
   }
 }
