@@ -252,14 +252,12 @@ export default function StoragePage() {
   const [configured, setConfigured] = useState<boolean | null>(null)
   const [root, setRoot] = useState<Level | null>(null)
   const [loading, setLoading] = useState(true)
-  const [refreshing, setRefreshing] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  const load = useCallback(async (force = false) => {
+  const load = useCallback(async () => {
     setError(null)
-    if (force) setRefreshing(true)
     try {
-      const [s, r] = await Promise.all([api.storageSummary(force), api.storageList('')])
+      const [s, r] = await Promise.all([api.storageSummary(false), api.storageList('')])
       setConfigured(Boolean(s.configured && r.configured))
       setSummary(s.summary ?? null)
       setRoot(r.configured ? { folders: r.folders, files: r.files, truncated: r.truncated } : null)
@@ -267,7 +265,6 @@ export default function StoragePage() {
       setError(err instanceof Error ? err.message : String(err))
     } finally {
       setLoading(false)
-      setRefreshing(false)
     }
   }, [])
 
@@ -315,13 +312,6 @@ export default function StoragePage() {
       <div className="flex items-center gap-3 flex-wrap">
         <h1 className="text-2xl font-bold">🗄️ Master Archive</h1>
         <span className="text-sm text-muted">{summary ? `bucket: ${summary.bucket}` : ''}</span>
-        <button
-          onClick={() => { void load(true) }}
-          disabled={refreshing}
-          className="ml-auto inline-flex items-center gap-1.5 rounded-full px-3.5 py-2 text-sm font-semibold border border-line bg-panel hover:bg-line/40 text-text disabled:opacity-50"
-        >
-          {refreshing ? 'Rescanning…' : '↻ Rescan'}
-        </button>
       </div>
 
       <div className={`${card} p-4`}>
