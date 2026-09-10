@@ -59,6 +59,8 @@ export default function OutreachSection({ projectId }: { projectId: string }) {
   const [subject, setSubject] = useState('Guesting on our podcast — [name]')
   const [body, setBody] = useState(DEFAULT_TEMPLATE_BODY)
   const [replyTo, setReplyTo] = useState('booking@strawhutmedia.com')
+  const [notifyEmail, setNotifyEmail] = useState('')
+  const [inboundCaptureAddress, setInboundCaptureAddress] = useState<string | null>(null)
   const [location, setLocation] = useState('either')
   const [saving, setSaving] = useState(false)
   const [savedAt, setSavedAt] = useState<number | null>(null)
@@ -66,6 +68,8 @@ export default function OutreachSection({ projectId }: { projectId: string }) {
   const [error, setError] = useState<string | null>(null)
   const [addOpen, setAddOpen] = useState(false)
   const [bulkOpen, setBulkOpen] = useState(false)
+  const [findingProspects, setFindingProspects] = useState(false)
+  const [findResult, setFindResult] = useState<{ tone: 'success' | 'warn'; text: string } | null>(null)
   const [rolodexOpen, setRolodexOpen] = useState(false)
   const [listFilter, setListFilter] = useState<string>('all') // 'all' | 'replied' | a batch label
   const [oneSheetApproval, setOneSheetApproval] = useState<{ approvedAt: string | null; editedSinceApproval: boolean } | null>(null)
@@ -159,11 +163,13 @@ export default function OutreachSection({ projectId }: { projectId: string }) {
   async function loadTemplate() {
     try {
       const r = await api.outreachTemplate(projectId)
+      setInboundCaptureAddress(r.inboundCaptureAddress)
       if (r.template) {
         setTemplate(r.template)
         setSubject(r.template.subject || 'Guesting on our podcast — [name]')
         setBody(r.template.body || DEFAULT_TEMPLATE_BODY)
         setReplyTo(r.template.reply_to || 'booking@strawhutmedia.com')
+        setNotifyEmail(r.template.notify_email || '')
         setLocation(r.template.location || 'either')
       }
     } catch (err) {
@@ -177,6 +183,27 @@ export default function OutreachSection({ projectId }: { projectId: string }) {
       setProspects(r.prospects)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'prospects load failed')
+    }
+  }
+
+  // The one-button version of "find me people to email" — no fields, no
+  // paste. Claude researches real similar shows + verified RSS contact
+  // emails and drops them in as their own batch, same review queue as
+  // everything else (nothing sends automatically).
+  async function findSimilarProspects() {
+    setFindingProspects(true)
+    setFindResult(null)
+    try {
+      const r = await api.findSimilarProspects(projectId)
+      setFindResult({
+        tone: 'success',
+        text: `Found ${r.imported} new prospect${r.imported === 1 ? '' : 's'} — saved as "${r.batchLabel}". Review and send whenever you're ready.`,
+      })
+      await loadProspects()
+    } catch (err) {
+      setFindResult({ tone: 'warn', text: err instanceof Error ? err.message : 'Search failed — try again.' })
+    } finally {
+      setFindingProspects(false)
     }
   }
 
@@ -218,7 +245,7 @@ export default function OutreachSection({ projectId }: { projectId: string }) {
     setSaving(true)
     setError(null)
     try {
-      await api.saveOutreachTemplate(projectId, { subject, body, replyTo, location })
+      await api.saveOutreachTemplate(projectId, { subject, body, replyTo, notifyEmail, location })
       setSavedAt(Date.now())
       await loadTemplate()
     } catch (err) {
@@ -544,6 +571,39 @@ export default function OutreachSection({ projectId }: { projectId: string }) {
                   onChange={(e) => setReplyTo(e.target.value)}
                   className="mt-1 w-full bg-ink/40 border border-line rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-stage-mastering"
                 />
+                {inboundCaptureAddress && (
+                  <div className="mt-1.5 flex items-center gap-2 flex-wrap">
+                    {replyTo === inboundCaptureAddress ? (
+                      <span className="text-[10px] text-emerald-300">
+                        ✓ Slate auto-detects replies here and emails whoever's set below — no human inbox involved.
+                      </span>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => setReplyTo(inboundCaptureAddress)}
+                        className="text-[10px] uppercase tracking-wider text-stage-mastering border border-stage-mastering/40 rounded-full px-2.5 py-1 hover:bg-stage-mastering/10 font-bold"
+                      >
+                        Use Slate inbox (auto-detect replies)
+                      </button>
+                    )}
+                  </div>
+                )}
+              </label>
+              <label className="block">
+                <span className="text-[10px] uppercase tracking-wider text-muted font-bold">
+                  Notify on reply <span className="text-stage-mastering">(only used with Slate inbox above)</span>
+                </span>
+                <input
+                  value={notifyEmail}
+                  onChange={(e) => setNotifyEmail(e.target.value)}
+                  placeholder="caroline@strawhutmedia.com"
+                  className="mt-1 w-full bg-ink/40 border border-line rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-stage-mastering"
+                />
+                <span className="block text-[10px] text-muted/70 mt-1 leading-snug">
+                  When a prospect replies, Slate emails this the reply + a link back here. Multiple addresses OK,
+                  comma or semicolon separated (e.g. <code>slate@strawhutmedia.com, caroline@strawhutmedia.com</code>).
+                  Leave blank to alert the admin instead.
+                </span>
               </label>
               <label className="block">
                 <span className="text-[10px] uppercase tracking-wider text-muted font-bold">Recording location <span className="text-stage-mastering">(fills [location])</span></span>
@@ -665,6 +725,18 @@ export default function OutreachSection({ projectId }: { projectId: string }) {
             </div>
           )}
 
+          {findResult && (
+            <div
+              className={`rounded-lg border px-3 py-2 text-xs ${
+                findResult.tone === 'success'
+                  ? 'border-emerald-500/40 bg-emerald-500/10 text-emerald-100'
+                  : 'border-amber-500/40 bg-amber-500/10 text-amber-100'
+              }`}
+            >
+              {findResult.text}
+            </div>
+          )}
+
           {verifyResult && (
             <div
               className={`rounded-lg border px-3 py-2 text-xs ${
@@ -781,6 +853,14 @@ export default function OutreachSection({ projectId }: { projectId: string }) {
                   {generatingAll ? 'Working…' : `🔄 Regenerate all (${prospects.filter((p) => p.unique_sentence?.trim()).length})`}
                 </button>
               )}
+              <button
+                onClick={() => void findSimilarProspects()}
+                disabled={findingProspects}
+                className="text-[10px] uppercase tracking-wider text-ink bg-gradient-to-r from-amber-300 via-pink-300 to-violet-300 rounded-full px-3 py-1 hover:opacity-90 disabled:opacity-40 font-bold"
+                title="Claude finds real similar shows and their verified contact emails, and adds them as a new batch — no fields to fill in."
+              >
+                {findingProspects ? '🔍 Searching… (~1-2 min)' : '🔍 Find new prospects'}
+              </button>
               <button
                 onClick={() => { setBulkOpen((v) => !v); if (!bulkOpen) setAddOpen(false) }}
                 className={`text-[10px] uppercase tracking-wider border rounded-full px-3 py-1 font-bold ${

@@ -159,6 +159,54 @@ action from whoever has console access before it actually turns on.**
   4 domains verified in SES), there's just no automatic reaction if one
   starts bouncing.
 
+## Outreach reply capture (inbound email) — replies go to Slate, not a human inbox
+
+A show's outreach template (`outreach_templates.reply_to`) can point at a
+**Slate-owned capture address** instead of a real person's mailbox:
+`p-<projectId>@<INBOUND_REPLY_DOMAIN>` (e.g.
+`p-3f77d190-30b4-11f1-9870-3bb0f3631011@strawhutmedia.net`). The Outreach
+template editor shows this exact address per show and has a one-click
+"Use Slate inbox (auto-detect replies)" button that fills reply-to with it.
+
+When a prospect replies to that address, Amazon SES receives the mail,
+publishes it to an SNS topic, and `server/routes/ses_inbound_reply.ts`
+(public endpoint `POST /api/ses/inbound-reply`, SNS-signature-verified like
+`ses_notify.ts` — the two share `server/sns_verify.ts`) parses it with
+`mailparser`, matches the sender's address against that show's
+`outreach_prospects`, and:
+1. Marks the prospect `status = 'replied'` (same bookkeeping as the manual
+   "mark as replied" button — auto-files them into the Rolodex too).
+2. Emails whoever's in that show's `outreach_templates.notify_email`
+   (editable in the same template editor, "Notify on reply" field; falls
+   back to `ADMIN_EMAIL` if blank) the reply's subject/body and a link
+   straight to that show's Outreach page in Slate.
+
+Nobody's real inbox needs to touch AWS for this to work — only relevant if
+a show's reply-to is actually set to the `p-<projectId>@…` capture address;
+any show that keeps a normal human reply-to (e.g. `booking@…`) is
+unaffected, replies just land there the ordinary way as before.
+
+**The one thing that needs an AWS-console + DNS action first, same shape as
+the bounce/complaint setup:** `INBOUND_REPLY_DOMAIN` must be a domain (or
+subdomain) where **nobody has a real mailbox** — MX records are domain-wide,
+so pointing MX at SES for a domain real humans read mail on would break
+their mail entirely. `strawhutmedia.net` (the default) is a good fit since
+CLAUDE.md already treats it as system-only (`slate@strawhutmedia.net` is for
+alerts, not a person). To turn this on for a show:
+1. Confirm nobody receives real mail at `INBOUND_REPLY_DOMAIN`'s domain.
+2. AWS SES console → Email receiving → verify the domain for receiving,
+   add its MX record in DNS (GoDaddy) pointing at
+   `inbound-smtp.<region>.amazonaws.com`.
+3. Create a receipt rule (recipient: the whole domain, or specific
+   `p-*@…` addresses) with action **SNS**, "include original message
+   content" — needed for the full email to arrive inline (this endpoint
+   doesn't implement an S3 fallback for oversized messages).
+4. Create/reuse an SNS topic, subscribe it (HTTPS) to
+   `https://slate.strawhutmedia.com/api/ses/inbound-reply` — same
+   auto-confirm handshake as the bounce/complaint topic.
+5. Set that show's reply-to to the `p-<projectId>@…` address shown in its
+   template editor, and set `notify_email` to whoever should get pinged.
+
 ## Required env vars on the Railway "Project-management" service
 
 | Var | Purpose |
@@ -169,6 +217,7 @@ action from whoever has console access before it actually turns on.**
 | `SES_REGION` | Region the SES identity lives in. Falls back to `AWS_REGION`, then `us-east-1`. |
 | `SES_CONFIG_SET` | SES configuration set name — required for bounce/complaint tracking (see below), otherwise optional. |
 | `SES_SNS_TOPIC_ARN` | ARN of the SNS topic subscribed to `/api/ses/notify`. Must be created once in the AWS console (topic + HTTPS subscription to this endpoint) — see "Email transport" above. Without it, bounce/complaint auto-pause on the outreach rotation pool has no way to hear about bounces. |
+| `INBOUND_REPLY_DOMAIN` | Domain used for Slate's per-show outreach-reply capture addresses (`p-<projectId>@<this>`) — see "Outreach reply capture" above. Defaults to `strawhutmedia.net`. Must be a domain with no real human mailboxes (MX is domain-wide). |
 | `GITHUB_TOKEN` | Fine-grained PAT, repo: this repo, contents: write — for status reporting |
 | `ADMIN_EMAIL` | Defaults to `ryan@strawhutmedia.com` if not set |
 | `APP_BASE_URL` | Defaults to `https://slate.strawhutmedia.com` if not set |

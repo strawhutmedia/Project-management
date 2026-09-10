@@ -10,7 +10,7 @@ const resend = apiKey ? new Resend(apiKey) : null
 // the default sends from strawhutmedia.net — sending from an unverified
 // domain fails the send and locks everyone out of magic-link sign-in.
 // Override with MAIL_FROM only if that address's domain is verified too.
-const FROM = process.env.MAIL_FROM || 'Slate <slate@strawhutmedia.net>'
+export const FROM = process.env.MAIL_FROM || 'Slate <slate@strawhutmedia.net>'
 const ADMIN_EMAIL = process.env.ADMIN_EMAIL || 'ryan@strawhutmedia.com'
 
 // Persistent admin-alert dedupe via the sent_admin_alerts table. An
@@ -184,7 +184,7 @@ export async function sendInvoiceEmail(args: {
   }
 }
 
-function escapeHtml(s: string): string {
+export function escapeHtml(s: string): string {
   return s
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
