@@ -368,7 +368,9 @@ export async function handleAgentCommands(req: Request, res: Response): Promise<
     const { rows } = await pool.query(
       `SELECT name, action FROM storage_transfer_commands WHERE executed_at IS NULL ORDER BY requested_at`,
     )
-    res.type('text/plain').send(rows.map((r) => `${r.name} ${r.action}`).join('\n'))
+    // Trailing newline matters: the agent parses this with `while read`,
+    // which drops a final line that isn't newline-terminated.
+    res.type('text/plain').send(rows.map((r) => `${r.name} ${r.action}\n`).join(''))
   } catch (err) {
     logError('agent commands read failed', { error: err instanceof Error ? err.message : String(err) })
     res.status(500).type('text/plain').send('')
