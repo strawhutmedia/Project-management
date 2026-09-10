@@ -37,24 +37,63 @@ function ClassBadge({ storageClass }: { storageClass: string }) {
 
 // Live transfer rows, reported once a minute by the NAS. Considered stale
 // (job finished, or the reporter/NAS is down) after 5 minutes of silence.
-function TransferRow({ t }: { t: ApiArchiveTransfer }) {
+function TransferRow({ t, onCommand }: { t: ApiArchiveTransfer; onCommand: (name: string, action: 'pause' | 'resume') => Promise<void> }) {
   const [filesOpen, setFilesOpen] = useState(false)
+  const [sending, setSending] = useState(false)
   const ageMs = Date.now() - new Date(t.reportedAt).getTime()
   const stale = ageMs > 5 * 60 * 1000
   const done = (t.percent ?? 0) >= 100
-  // Reporter still posting but content unchanged for 10+ min = the job is
-  // stopped/paused (docker stop) — say so instead of looking active.
   const progressAgeMs = Date.now() - new Date(t.lastProgressAt ?? t.reportedAt).getTime()
-  const paused = !done && !stale && progressAgeMs > 10 * 60 * 1000
+  // Paused when the Pause button's command was executed on the NAS, or —
+  // fallback heuristic — when the reporter still posts but the log content
+  // hasn't changed for 10+ min (a docker stop done from a terminal).
+  const cmd = t.command
+  const cmdPending = Boolean(cmd && !cmd.executedAt)
+  const pausedByButton = !done && cmd?.action === 'stop' && Boolean(cmd.executedAt)
+  // Just resumed: give rclone up to 10 min to produce fresh log lines before
+  // the no-progress heuristic is allowed to call it paused again.
+  const resuming =
+    !done && cmd?.action === 'start' && Boolean(cmd.executedAt) &&
+    progressAgeMs > 10 * 60 * 1000 &&
+    Date.now() - new Date(cmd.executedAt as string).getTime() < 10 * 60 * 1000
+  const paused = !done && !stale && !resuming && (pausedByButton || progressAgeMs > 10 * 60 * 1000)
   const pct = Math.max(0, Math.min(100, t.percent ?? 0))
+  const sendCommand = async (action: 'pause' | 'resume') => {
+    setSending(true)
+    try {
+      await onCommand(t.name, action)
+    } finally {
+      setSending(false)
+    }
+  }
   return (
     <div className="py-2">
       <div className="flex items-center gap-2 flex-wrap">
         <span className="text-sm font-semibold">{done ? '✅' : stale ? '⚠️' : paused ? '⏸' : '📤'} {t.name}</span>
         {paused && (
           <span className="inline-flex items-center rounded-full border border-line bg-ink/40 text-muted px-2 py-0.5 text-[11px] font-bold">
-            paused — waiting its turn
+            {pausedByButton ? 'paused' : 'paused — waiting its turn'}
           </span>
+        )}
+        {cmdPending && (
+          <span className="inline-flex items-center rounded-full border border-line bg-ink/40 text-muted px-2 py-0.5 text-[11px] font-bold">
+            {cmd?.action === 'stop' ? 'pausing…' : 'resuming…'} the NAS picks this up within ~30s
+          </span>
+        )}
+        {resuming && !cmdPending && (
+          <span className="inline-flex items-center rounded-full border border-line bg-ink/40 text-muted px-2 py-0.5 text-[11px] font-bold">
+            resuming — first progress lines coming up
+          </span>
+        )}
+        {!done && !stale && !cmdPending && (
+          <button
+            onClick={() => { void sendCommand(paused ? 'resume' : 'pause') }}
+            disabled={sending}
+            className="inline-flex items-center gap-1 rounded-full border border-line bg-panel hover:bg-line/40 px-2.5 py-0.5 text-[11px] font-bold disabled:opacity-50"
+            title={paused ? 'Start this job again — it resumes exactly where it stopped' : 'Stop this job cleanly — progress is kept, resume any time'}
+          >
+            {paused ? '▶ Resume' : '⏸ Pause'}
+          </button>
         )}
         {t.errors > 0 && (
           <span className="inline-flex items-center rounded-full border border-urgent/40 bg-urgent/10 text-urgent px-2 py-0.5 text-[11px] font-bold">
@@ -236,6 +275,16 @@ export default function StoragePage() {
     void load()
   }, [load])
 
+  const onCommand = useCallback(async (name: string, action: 'pause' | 'resume') => {
+    await api.storageTransferCommand(name, action)
+    try {
+      const res = await api.storageTransfers()
+      setTransfers(res.transfers)
+    } catch {
+      /* next 30s poll will catch up */
+    }
+  }, [])
+
   // Poll live transfers every 30s — cheap (a DB read), and it's the whole
   // point of the page while migration runs.
   useEffect(() => {
@@ -280,7 +329,7 @@ export default function StoragePage() {
         {transfers.length > 0 ? (
           <div className="divide-y divide-line/60">
             {transfers.map((t) => (
-              <TransferRow key={t.name} t={t} />
+              <TransferRow key={t.name} t={t} onCommand={onCommand} />
             ))}
           </div>
         ) : (

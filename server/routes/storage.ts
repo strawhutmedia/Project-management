@@ -316,11 +316,90 @@ export async function handleTransferReport(req: Request, res: Response): Promise
   }
 }
 
+// ── Pause / Resume commands ───────────────────────────────────────────
+// The Storage page writes the desired action here; the archive-commander
+// container on each NAS polls GET /api/storage/agent/commands (token-gated,
+// registered public in index.ts like the transfer report), runs docker
+// stop/start on the container mapped in that box's containers.map, and acks.
+// A box only acts on transfer names in its own map, so RED and BLUE can
+// share one command list safely.
+
+storageRouter.post('/transfers/:name/command', async (req, res) => {
+  const name = String(req.params.name || '').replace(/[^A-Za-z0-9._-]/g, '').slice(0, 80)
+  const wanted = req.body?.action
+  const action = wanted === 'pause' ? 'stop' : wanted === 'resume' ? 'start' : null
+  if (!name || !action) {
+    res.status(400).json({ error: 'bad_request' })
+    return
+  }
+  try {
+    const known = await pool.query(`SELECT 1 FROM storage_transfer_reports WHERE name = $1`, [name])
+    if (known.rowCount === 0) {
+      res.status(404).json({ error: 'unknown_transfer' })
+      return
+    }
+    await pool.query(
+      `INSERT INTO storage_transfer_commands (name, action, requested_at, executed_at)
+       VALUES ($1, $2, now(), NULL)
+       ON CONFLICT (name) DO UPDATE SET action = EXCLUDED.action, requested_at = now(), executed_at = NULL`,
+      [name, action],
+    )
+    res.json({ ok: true, action })
+  } catch (err) {
+    logError('transfer command failed', { name, error: err instanceof Error ? err.message : String(err) })
+    res.status(500).json({ error: 'command_failed' })
+  }
+})
+
+function agentAuthorized(req: Request): boolean {
+  const expected = (process.env.STORAGE_REPORT_TOKEN || '').trim()
+  const got = typeof req.headers['x-storage-token'] === 'string' ? (req.headers['x-storage-token'] as string).trim() : ''
+  return Boolean(expected && got && safeEqual(got, expected))
+}
+
+// Exported for index.ts — plain-text list of pending commands, one per line:
+//   PODCASTS stop
+export async function handleAgentCommands(req: Request, res: Response): Promise<void> {
+  if (!agentAuthorized(req)) {
+    res.status(403).json({ error: 'forbidden' })
+    return
+  }
+  try {
+    const { rows } = await pool.query(
+      `SELECT name, action FROM storage_transfer_commands WHERE executed_at IS NULL ORDER BY requested_at`,
+    )
+    res.type('text/plain').send(rows.map((r) => `${r.name} ${r.action}`).join('\n'))
+  } catch (err) {
+    logError('agent commands read failed', { error: err instanceof Error ? err.message : String(err) })
+    res.status(500).type('text/plain').send('')
+  }
+}
+
+// Exported for index.ts — the NAS confirms it ran the command.
+export async function handleAgentAck(req: Request, res: Response): Promise<void> {
+  if (!agentAuthorized(req)) {
+    res.status(403).json({ error: 'forbidden' })
+    return
+  }
+  const name = String(req.params.name || '').replace(/[^A-Za-z0-9._-]/g, '').slice(0, 80)
+  try {
+    await pool.query(`UPDATE storage_transfer_commands SET executed_at = now() WHERE name = $1 AND executed_at IS NULL`, [name])
+    res.json({ ok: true })
+  } catch (err) {
+    logError('agent ack failed', { name, error: err instanceof Error ? err.message : String(err) })
+    res.status(500).json({ error: 'ack_failed' })
+  }
+}
+
 storageRouter.get('/transfers', async (_req, res) => {
   try {
     const { rows } = await pool.query(
-      `SELECT name, raw, bytes_done, bytes_total, percent, speed, eta, files_done, files_total, errors, reported_at, last_progress_at
-       FROM storage_transfer_reports WHERE name <> 'connection-test' ORDER BY reported_at DESC`,
+      `SELECT r.name, r.raw, r.bytes_done, r.bytes_total, r.percent, r.speed, r.eta, r.files_done, r.files_total,
+              r.errors, r.reported_at, r.last_progress_at,
+              c.action AS cmd_action, c.requested_at AS cmd_requested_at, c.executed_at AS cmd_executed_at
+       FROM storage_transfer_reports r
+       LEFT JOIN storage_transfer_commands c ON c.name = r.name
+       WHERE r.name <> 'connection-test' ORDER BY r.reported_at DESC`,
     )
     res.json({
       transfers: rows.map((r) => ({
@@ -347,6 +426,13 @@ storageRouter.get('/transfers', async (_req, res) => {
           .filter((f, i, arr) => arr.findIndex((o) => o.name === f.name) === i)
           .slice(-8),
         reportedAt: r.reported_at as string,
+        command: r.cmd_action
+          ? {
+              action: r.cmd_action as 'stop' | 'start',
+              requestedAt: r.cmd_requested_at as string,
+              executedAt: (r.cmd_executed_at as string | null) ?? null,
+            }
+          : null,
       })),
     })
   } catch (err) {
