@@ -261,15 +261,15 @@ Media Arts Program
 ~$28,000–$35,000 · per cohort
 The full 12-week track for one cohort, instruction and curriculum included. $84–105K if run as three cohorts a year.
 
-Year one, all-in
+First cohort, all-in
 ~≈ $53,000–60,000
-Build-out plus a first cohort — squarely in vocational-grant range, with the space already paid for every year after.`,
+Build-out plus the first cohort — squarely in vocational-grant range. A full year at three cohorts runs $109,000–130,000 all-in, with the space already paid for every year after.`,
     },
     {
       kind: 'text',
       eyebrow: 'Next step',
       heading: "Let's see if this fits.",
-      body: `Happy to walk your vocational programs team through this in person, adjust the structure to whatever's realistic for your space and students, and talk timeline.`,
+      body: `We'd plan toward a 2027 start, on whatever timeline works around everything the Center already has going. Happy to walk your vocational programs team through this in person, adjust the structure to whatever's realistic for your space and students, and find the right window.`,
     },
   ],
 };
