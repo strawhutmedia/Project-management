@@ -1035,6 +1035,9 @@ export const api = {
     ),
   storageTransfers: () =>
     request<{ transfers: ApiArchiveTransfer[] }>('/api/storage/transfers'),
+  storageAutoQueue: () => request<{ on: boolean }>('/api/storage/auto-queue'),
+  storageSetAutoQueue: (on: boolean) =>
+    request<{ ok: boolean; on: boolean }>('/api/storage/auto-queue', { method: 'POST', body: JSON.stringify({ on }) }),
   storageTransferCommand: (name: string, action: 'pause' | 'resume') =>
     request<{ ok: boolean; action: 'stop' | 'start' }>(`/api/storage/transfers/${encodeURIComponent(name)}/command`, {
       method: 'POST',
