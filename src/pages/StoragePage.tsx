@@ -89,7 +89,11 @@ function TransferRow({ t, onCommand }: { t: ApiArchiveTransfer; onCommand: (name
           <button
             onClick={() => { void sendCommand(paused ? 'resume' : 'pause') }}
             disabled={sending}
-            className="inline-flex items-center gap-1 rounded-full border border-line bg-panel hover:bg-line/40 px-2.5 py-0.5 text-[11px] font-bold disabled:opacity-50"
+            className={`inline-flex items-center gap-1 rounded-full border px-3 py-1 text-xs font-bold disabled:opacity-50 ${
+              paused
+                ? 'border-stage-done/60 bg-stage-done/15 text-stage-done hover:bg-stage-done/30'
+                : 'border-stage-tracking/60 bg-stage-tracking/15 text-stage-tracking hover:bg-stage-tracking/30'
+            }`}
             title={paused ? 'Start this job again — it resumes exactly where it stopped' : 'Stop this job cleanly — progress is kept, resume any time'}
           >
             {paused ? '▶ Resume' : '⏸ Pause'}
