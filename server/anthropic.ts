@@ -2325,7 +2325,9 @@ async function createWithRetryStream(
   let lastErr: unknown
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     try {
-      return await client.messages.stream(params).finalMessage()
+      // Default per-request timeout is 10 minutes — not enough headroom
+      // for a single turn of a 30+-show research pass. Give it 20.
+      return await client.messages.stream(params, { timeout: 20 * 60 * 1000 }).finalMessage()
     } catch (err) {
       lastErr = err
       const status = (err as { status?: number })?.status
@@ -2442,8 +2444,9 @@ given one, for cold-outreach cross-promotion (guest swaps).
 Process:
 1. Search the web to understand the target show's genre/format/audience.
 2. Search for other REAL, currently-active podcasts in the same genre/format —
-   aim for around 12-15 good candidates. Prefer shows with a clear host/brand,
-   not generic SEO-spam titles. Fewer, verified candidates beat a longer list.
+   aim for 30+ good candidates. Cast a wide net across sub-niches and
+   adjacent formats rather than stopping at the first obvious cluster.
+   Prefer shows with a clear host/brand, not generic SEO-spam titles.
 3. For each candidate, find its actual RSS feed (podcast directories and
    search results usually surface this, or the show's own website) and fetch
    it directly. Look for a contact email in these tags, in priority order:
@@ -2452,8 +2455,9 @@ Process:
 4. NEVER invent a show, a feed URL, or an email. Every row must come from a
    page you actually fetched. If you can't find a real RSS feed for a
    candidate, drop it rather than guess.
-5. Work efficiently — once you have ~12-15 verified candidates, stop
-   searching and output the results. Don't keep researching past that.
+5. Keep searching and verifying until you have 30+ verified candidates (or
+   have genuinely exhausted the space) before you output the results —
+   don't settle for a small list.
 
 Output ONLY a JSON array (no markdown fences, no prose before or after), one
 object per show:
@@ -2464,7 +2468,7 @@ function similarShowsUserBlock(showName: string, showDescription: string | null)
     `Target show: ${showName}`,
     showDescription ? `Description: ${showDescription}` : null,
     '',
-    'Find ~12-15 real similar podcasts and their verified contact emails, per your instructions.',
+    'Find 30+ real similar podcasts and their verified contact emails, per your instructions.',
   ].filter((l): l is string => l !== null).join('\n')
 }
 
@@ -2483,25 +2487,29 @@ export async function findSimilarShowProspects(
     system: SIMILAR_SHOWS_SYSTEM,
     messages,
     tools: [
-      { type: 'web_search_20260209', name: 'web_search', max_uses: 18 },
-      { type: 'web_fetch_20260209', name: 'web_fetch', max_uses: 25 },
+      { type: 'web_search_20260209', name: 'web_search', max_uses: 45 },
+      { type: 'web_fetch_20260209', name: 'web_fetch', max_uses: 60 },
     ],
   })
 
-  // This research task can easily run several minutes of server-side
-  // agentic search before producing any output. A non-streaming request
-  // sits silently waiting for that whole time and can trip the SDK's
-  // client-side request timeout (confirmed in production: a real run took
-  // ~15 min and was killed with "Request timed out."). Streaming keeps the
-  // connection open with incremental events the whole time, so it survives
-  // long searches; we only care about the assembled final message.
+  // This research task easily runs 10+ minutes of server-side agentic
+  // search for a 30+-show target. A non-streaming request sits silently
+  // waiting for that whole time and can trip the SDK's client-side request
+  // timeout (confirmed in production: a real run took ~15 min and was
+  // killed with "Request timed out."). Streaming keeps the connection open
+  // with incremental events the whole time, so it survives long searches;
+  // we only care about the assembled final message. The route calling this
+  // also sends its own heartbeat bytes to the browser so Railway's edge
+  // (which closes a request after 5 min of no data transferred) doesn't
+  // kill the outer connection either.
   let response = await createWithRetryStream(params())
   // Same server-side tool loop as generateUniqueSentence above — a research
   // task this size routinely needs more searches than fit in one internal
   // iteration cap, so resume on pause_turn. Bounded so a misbehaving turn
-  // can't loop forever.
+  // can't loop forever (higher guard than that one — a 30+-show target
+  // needs more resumes).
   let guard = 0
-  while (response.stop_reason === 'pause_turn' && guard < 8) {
+  while (response.stop_reason === 'pause_turn' && guard < 20) {
     guard += 1
     messages.push({ role: 'assistant', content: response.content })
     response = await createWithRetryStream(params())

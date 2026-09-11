@@ -859,7 +859,7 @@ export default function OutreachSection({ projectId }: { projectId: string }) {
                 className="text-[10px] uppercase tracking-wider text-ink bg-gradient-to-r from-amber-300 via-pink-300 to-violet-300 rounded-full px-3 py-1 hover:opacity-90 disabled:opacity-40 font-bold"
                 title="Claude finds real similar shows and their verified contact emails, and adds them as a new batch — no fields to fill in."
               >
-                {findingProspects ? '🔍 Searching… (~3-5 min, hang tight)' : '🔍 Find new prospects'}
+                {findingProspects ? '🔍 Searching… (~10-15 min, hang tight)' : '🔍 Find new prospects'}
               </button>
               <button
                 onClick={() => { setBulkOpen((v) => !v); if (!bulkOpen) setAddOpen(false) }}
