@@ -497,6 +497,26 @@ storageRouter.post('/auto-queue', async (req, res) => {
   }
 })
 
+// Manual clear for a finished/stale row. Hidden as of now; any NEW progress
+// on the same name (e.g. the drive comes back next month) re-surfaces it.
+storageRouter.post('/transfers/:name/dismiss', async (req, res) => {
+  const name = String(req.params.name || '').replace(/[^A-Za-z0-9._-]/g, '').slice(0, 80)
+  if (!name) {
+    res.status(400).json({ error: 'bad_name' })
+    return
+  }
+  try {
+    await pool.query(
+      `INSERT INTO storage_transfer_dismissals (name, dismissed_at) VALUES ($1, now())
+       ON CONFLICT (name) DO UPDATE SET dismissed_at = now()`,
+      [name],
+    )
+    res.json({ ok: true })
+  } catch (err) {
+    res.status(500).json({ error: 'dismiss_failed', detail: err instanceof Error ? err.message : String(err) })
+  }
+})
+
 storageRouter.get('/transfers', async (_req, res) => {
   try {
     const { rows } = await pool.query(
@@ -505,6 +525,7 @@ storageRouter.get('/transfers', async (_req, res) => {
               c.action AS cmd_action, c.requested_at AS cmd_requested_at, c.executed_at AS cmd_executed_at
        FROM storage_transfer_reports r
        LEFT JOIN storage_transfer_commands c ON c.name = r.name
+       LEFT JOIN storage_transfer_dismissals d ON d.name = r.name
        WHERE r.name <> 'connection-test'
          -- verification diaries (rclone check logs) are audits, not transfers:
          -- they'd render as bogus paused rows with Resume buttons that map to
@@ -512,6 +533,8 @@ storageRouter.get('/transfers', async (_req, res) => {
          AND r.name NOT ILIKE '%.check'
          -- finished rows linger a week as a receipt, then clear themselves
          AND NOT (COALESCE(r.percent, 0) >= 100 AND r.last_progress_at < now() - interval '7 days')
+         -- manually cleared rows stay hidden until they show NEW progress
+         AND (d.dismissed_at IS NULL OR r.last_progress_at > d.dismissed_at)
        ORDER BY r.reported_at DESC`,
     )
     res.json({

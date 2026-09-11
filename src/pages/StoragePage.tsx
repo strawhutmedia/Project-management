@@ -37,7 +37,11 @@ function ClassBadge({ storageClass }: { storageClass: string }) {
 
 // Live transfer rows, reported once a minute by the NAS. Considered stale
 // (job finished, or the reporter/NAS is down) after 5 minutes of silence.
-function TransferRow({ t, onCommand }: { t: ApiArchiveTransfer; onCommand: (name: string, action: 'pause' | 'resume') => Promise<void> }) {
+function TransferRow({ t, onCommand, onDismiss }: {
+  t: ApiArchiveTransfer
+  onCommand: (name: string, action: 'pause' | 'resume') => Promise<void>
+  onDismiss: (name: string) => Promise<void>
+}) {
   const [filesOpen, setFilesOpen] = useState(false)
   const [sending, setSending] = useState(false)
   const ageMs = Date.now() - new Date(t.reportedAt).getTime()
@@ -84,6 +88,15 @@ function TransferRow({ t, onCommand }: { t: ApiArchiveTransfer; onCommand: (name
           <span className="inline-flex items-center rounded-full border border-line bg-ink/40 text-muted px-2 py-0.5 text-[11px] font-bold">
             resuming — first progress lines coming up
           </span>
+        )}
+        {(done || stale) && (
+          <button
+            onClick={() => { void onDismiss(t.name) }}
+            className="inline-flex items-center gap-1 rounded-full border border-line bg-panel hover:bg-line/40 px-2.5 py-0.5 text-[11px] font-bold text-muted"
+            title="Clear this row from the card. If this job ever runs again, it reappears on its own."
+          >
+            ✕ Clear
+          </button>
         )}
         {!done && !stale && !cmdPending && (
           <button
@@ -301,6 +314,11 @@ export default function StoragePage() {
     }
   }, [autoQueue])
 
+  const onDismiss = useCallback(async (name: string) => {
+    await api.storageTransferDismiss(name)
+    setTransfers((prev) => prev.filter((t) => t.name !== name))
+  }, [])
+
   const onCommand = useCallback(async (name: string, action: 'pause' | 'resume') => {
     await api.storageTransferCommand(name, action)
     try {
@@ -370,7 +388,7 @@ export default function StoragePage() {
         {transfers.length > 0 ? (
           <div className="divide-y divide-line/60">
             {transfers.map((t) => (
-              <TransferRow key={t.name} t={t} onCommand={onCommand} />
+              <TransferRow key={t.name} t={t} onCommand={onCommand} onDismiss={onDismiss} />
             ))}
           </div>
         ) : (
