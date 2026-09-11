@@ -1,8 +1,8 @@
 {
-  "generatedAt": "2026-09-11T18:23:45.292Z",
+  "generatedAt": "2026-09-11T18:28:45.267Z",
   "note": "Read-only operational snapshot. Emails are masked; no full contact list is stored here.",
   "summary": {
-    "showsWithOutreach": 1,
+    "showsWithOutreach": 2,
     "totalEligibleForFollowup": 14,
     "totalFollowupQueued": 0,
     "totalFollowupSent": 74
@@ -154,6 +154,58 @@
         "failed": 0,
         "opensEver": 0,
         "likelyOpenTrackingOff": true
+      }
+    },
+    {
+      "projectId": "e356a418-e213-485a-9a09-aa785e11f9be",
+      "name": "Private Talk with Alexis Texas",
+      "outreach": {
+        "total": 15,
+        "needsEmail": 2,
+        "ready": 13,
+        "queued": 0,
+        "sent": 0,
+        "replied": 0,
+        "bounced": 0,
+        "optedOut": 0,
+        "failed": 0
+      },
+      "followup": {
+        "minDaysUsed": 4,
+        "eligibleNow": 0,
+        "queued": 0,
+        "alreadySent": 0,
+        "truncated": false,
+        "people": []
+      },
+      "readiness": {
+        "canSend": false,
+        "followupTemplateSaved": false,
+        "oneSheetApproved": false,
+        "hasVerifiedDomain": true,
+        "verifiedDomains": [
+          "strawhut.media",
+          "strawhutmedia.net",
+          "strawhutshows.com",
+          "strawhutpodcasts.com"
+        ],
+        "blockers": [
+          "follow-up message not written/saved yet",
+          "one-sheet not approved"
+        ]
+      },
+      "dataQuality": {
+        "duplicatedAddresses": 0,
+        "duplicateExtraRows": 0
+      },
+      "delivery": {
+        "attempts": 0,
+        "accepted": 0,
+        "bounced": 0,
+        "complained": 0,
+        "failed": 0,
+        "opensEver": 0,
+        "likelyOpenTrackingOff": false
       }
     }
   ]
