@@ -1997,11 +1997,24 @@ export const api = {
       `/api/outreach/projects/${projectId}/prospects/bulk`,
       { method: 'POST', body: JSON.stringify({ rows, batchLabel }) },
     ),
-  findSimilarProspects: (projectId: string) =>
-    request<{ imported: number; failed: number; duplicates: number; batchLabel: string }>(
-      `/api/outreach/projects/${projectId}/prospects/find-similar`,
-      { method: 'POST' },
-    ),
+  // Not routed through the shared `request()` helper: this call can run
+  // several minutes, so the server sends heartbeat bytes and always
+  // responds 200 (it can't change the status code after streaming has
+  // started) — success/failure is encoded in the JSON body itself instead
+  // of the HTTP status.
+  findSimilarProspects: async (projectId: string) => {
+    const res = await fetch(`/api/outreach/projects/${projectId}/prospects/find-similar`, {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+    })
+    const body = await res.json().catch(() => ({ error: 'unknown' }))
+    if (!res.ok || body.error) {
+      const code = body.error ?? `HTTP ${res.status}`
+      throw new Error(body.detail ? `${code}: ${body.detail}` : code)
+    }
+    return body as { imported: number; failed: number; duplicates: number; batchLabel: string }
+  },
   updateOutreachProspect: (id: string, patch: Partial<{
     name: string; fullName: string | null; email: string | null;
     recipientType: 'person' | 'agent' | 'manager' | 'other';

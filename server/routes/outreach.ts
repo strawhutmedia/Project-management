@@ -324,20 +324,38 @@ outreachRouter.post('/projects/:projectId/prospects/find-similar', async (req, r
     res.status(404).json({ error: 'not_found' })
     return
   }
+
+  // This research call routinely runs multiple minutes. Railway's edge
+  // closes an HTTP request after 5 minutes with *no data transferred*
+  // (it allows up to 15 minutes as long as something keeps moving) — so
+  // once we commit to the long call, send a heartbeat byte every 20s to
+  // keep the connection alive. That means the status code can't change
+  // after this point (headers are already sent as 200), so every outcome
+  // below — success or failure — is encoded in the JSON body instead; the
+  // client checks `body.error`, not just `res.ok`. A run of whitespace
+  // bytes before the real JSON payload is still valid JSON (JSON.parse
+  // ignores leading/trailing whitespace).
+  res.writeHead(200, { 'Content-Type': 'application/json' })
+  const heartbeat = setInterval(() => res.write(' '), 20000)
+  const finish = (body: unknown) => {
+    clearInterval(heartbeat)
+    res.end(JSON.stringify(body))
+  }
+
   try {
     const found = await findSimilarShowProspects(proj.rows[0].name, null)
     if (found.length === 0) {
-      res.status(502).json({ error: 'no_results', detail: 'Claude found no verifiable similar shows this run — try again.' })
+      finish({ error: 'no_results', detail: 'Claude found no verifiable similar shows this run — try again.' })
       return
     }
     const today = new Date().toISOString().slice(0, 10)
     const rows: BulkRow[] = found.map((f) => ({ name: f.name, email: f.email, context: f.context }))
     const result = await insertProspectRows(projectId, rows, `Similar shows — AI research ${today}`, user.id)
     logInfo('outreach: find-similar complete', { projectId, found: found.length, imported: result.imported })
-    res.json(result)
+    finish(result)
   } catch (err) {
     logError('outreach: find-similar failed', { projectId, error: err instanceof Error ? err.message : String(err) })
-    res.status(502).json({ error: 'find_similar_failed', detail: err instanceof Error ? err.message : String(err) })
+    finish({ error: 'find_similar_failed', detail: err instanceof Error ? err.message : String(err) })
   }
 })
 
