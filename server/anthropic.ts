@@ -2320,6 +2320,7 @@ async function createWithRetry(
 // timeout while waiting silently for the response.
 async function createWithRetryStream(
   params: Omit<Anthropic.MessageCreateParamsNonStreaming, 'stream'>,
+  onContentBlock?: (block: Anthropic.ContentBlock) => void,
   maxAttempts = 4,
 ): Promise<Anthropic.Message> {
   let lastErr: unknown
@@ -2327,7 +2328,15 @@ async function createWithRetryStream(
     try {
       // Default per-request timeout is 10 minutes — not enough headroom
       // for a single turn of a 30+-show research pass. Give it 20.
-      return await client.messages.stream(params, { timeout: 20 * 60 * 1000 }).finalMessage()
+      const stream = client.messages.stream(params, { timeout: 20 * 60 * 1000 })
+      // A single call's tool-use loop can itself run for many minutes
+      // without ever hitting pause_turn (the model just keeps searching
+      // inside one continuous stream) — reporting progress only when a
+      // whole call resolves would then report nothing for the entire run.
+      // `contentBlock` fires as each block completes mid-stream, so a
+      // caller can get live search/fetch counts instead.
+      if (onContentBlock) stream.on('contentBlock', onContentBlock)
+      return await stream.finalMessage()
     } catch (err) {
       lastErr = err
       const status = (err as { status?: number })?.status
@@ -2512,11 +2521,22 @@ export async function findSimilarShowProspects(
   // also sends its own heartbeat bytes to the browser so Railway's edge
   // (which closes a request after 5 min of no data transferred) doesn't
   // kill the outer connection either.
-  let response = await createWithRetryStream(params())
-  let searches = response.usage.server_tool_use?.web_search_requests ?? 0
-  let fetches = response.usage.server_tool_use?.web_fetch_requests ?? 0
+  let searches = 0
+  let fetches = 0
   let guard = 0
-  onProgress?.({ iteration: guard, maxIterations: SIMILAR_SHOWS_MAX_ITERATIONS, searches, fetches })
+  // Counted live as each tool-use block completes mid-stream (see
+  // createWithRetryStream) — a single call can run the entire research
+  // pass without ever hitting pause_turn, so this is the only way to get
+  // real incremental numbers instead of just a total at the very end.
+  const onBlock = (block: Anthropic.ContentBlock) => {
+    if (block.type !== 'server_tool_use') return
+    if (block.name === 'web_search') searches += 1
+    else if (block.name === 'web_fetch') fetches += 1
+    else return
+    onProgress?.({ iteration: guard, maxIterations: SIMILAR_SHOWS_MAX_ITERATIONS, searches, fetches })
+  }
+
+  let response = await createWithRetryStream(params(), onBlock)
   // Same server-side tool loop as generateUniqueSentence above — a research
   // task this size routinely needs more searches than fit in one internal
   // iteration cap, so resume on pause_turn. Bounded so a misbehaving turn
@@ -2525,10 +2545,7 @@ export async function findSimilarShowProspects(
   while (response.stop_reason === 'pause_turn' && guard < SIMILAR_SHOWS_MAX_ITERATIONS) {
     guard += 1
     messages.push({ role: 'assistant', content: response.content })
-    response = await createWithRetryStream(params())
-    searches += response.usage.server_tool_use?.web_search_requests ?? 0
-    fetches += response.usage.server_tool_use?.web_fetch_requests ?? 0
-    onProgress?.({ iteration: guard, maxIterations: SIMILAR_SHOWS_MAX_ITERATIONS, searches, fetches })
+    response = await createWithRetryStream(params(), onBlock)
   }
 
   const texts = response.content.filter((b): b is Anthropic.TextBlock => b.type === 'text')
