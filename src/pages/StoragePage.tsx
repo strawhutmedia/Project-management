@@ -130,13 +130,21 @@ function TransferRow({ t, onCommand }: { t: ApiArchiveTransfer; onCommand: (name
               {t.currentFiles!.map((f, i) => {
                 const file = typeof f === 'string' ? { name: f, pct: null, speed: '', eta: '' } : f
                 return (
-                  <div key={i} className="flex items-center gap-2 text-[11px] text-muted pl-4">
-                    <span className="truncate min-w-0">🎬 {file.name}</span>
-                    <span className="ml-auto shrink-0 tabular-nums">
-                      {file.pct != null ? `${file.pct}%` : ''}
-                      {file.speed ? ` · ${file.speed}` : ''}
-                      {file.eta ? ` · ${file.eta} left` : ''}
-                    </span>
+                  <div key={i} className="pl-4 py-0.5">
+                    <div className="flex items-center gap-2 text-[11px] text-muted">
+                      <span className="truncate min-w-0">🎬 {file.name}</span>
+                      <span className="ml-auto shrink-0 tabular-nums">
+                        {file.pct != null ? `${file.pct}%` : 'starting…'}
+                        {file.speed ? ` · ${file.speed}` : ''}
+                        {file.eta ? ` · ${file.eta} left` : ''}
+                      </span>
+                    </div>
+                    <div className="mt-0.5 h-1 rounded-full bg-ink/60 overflow-hidden">
+                      <div
+                        className="h-full rounded-full bg-stage-stems/80"
+                        style={{ width: `${Math.max(2, Math.min(100, file.pct ?? 2))}%` }}
+                      />
+                    </div>
                   </div>
                 )
               })}
