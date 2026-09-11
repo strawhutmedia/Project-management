@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-09-11T18:28:45.267Z",
+  "generatedAt": "2026-09-11T18:33:09.305Z",
   "note": "Read-only operational snapshot. Emails are masked; no full contact list is stored here.",
   "summary": {
     "showsWithOutreach": 2,
@@ -160,9 +160,9 @@
       "projectId": "e356a418-e213-485a-9a09-aa785e11f9be",
       "name": "Private Talk with Alexis Texas",
       "outreach": {
-        "total": 15,
+        "total": 21,
         "needsEmail": 2,
-        "ready": 13,
+        "ready": 19,
         "queued": 0,
         "sent": 0,
         "replied": 0,
