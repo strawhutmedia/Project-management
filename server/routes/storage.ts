@@ -421,7 +421,7 @@ export async function maybeAutoQueue(): Promise<void> {
               c.action AS cmd_action, c.requested_at AS cmd_requested_at, c.executed_at AS cmd_executed_at
        FROM storage_transfer_reports r
        LEFT JOIN storage_transfer_commands c ON c.name = r.name
-       WHERE r.name <> 'connection-test'`,
+       WHERE r.name <> 'connection-test' AND r.name NOT ILIKE '%.check'`,
     )
     const now = Date.now()
     const age = (ts: unknown) => now - new Date(ts as string).getTime()
@@ -505,7 +505,14 @@ storageRouter.get('/transfers', async (_req, res) => {
               c.action AS cmd_action, c.requested_at AS cmd_requested_at, c.executed_at AS cmd_executed_at
        FROM storage_transfer_reports r
        LEFT JOIN storage_transfer_commands c ON c.name = r.name
-       WHERE r.name <> 'connection-test' ORDER BY r.reported_at DESC`,
+       WHERE r.name <> 'connection-test'
+         -- verification diaries (rclone check logs) are audits, not transfers:
+         -- they'd render as bogus paused rows with Resume buttons that map to
+         -- no container. Their verdicts are reported by Claude, not this card.
+         AND r.name NOT ILIKE '%.check'
+         -- finished rows linger a week as a receipt, then clear themselves
+         AND NOT (COALESCE(r.percent, 0) >= 100 AND r.last_progress_at < now() - interval '7 days')
+       ORDER BY r.reported_at DESC`,
     )
     res.json({
       transfers: rows.map((r) => ({
