@@ -690,6 +690,13 @@ export type ApiFollowupPreview = {
   followupSent: number
 }
 
+export type OutreachFindSimilarProgress = {
+  iteration: number
+  maxIterations: number
+  searches: number
+  fetches: number
+}
+
 export type ApiOutreachProspect = {
   id: string
   project_id: string
@@ -1998,22 +2005,56 @@ export const api = {
       { method: 'POST', body: JSON.stringify({ rows, batchLabel }) },
     ),
   // Not routed through the shared `request()` helper: this call can run
-  // several minutes, so the server sends heartbeat bytes and always
-  // responds 200 (it can't change the status code after streaming has
-  // started) — success/failure is encoded in the JSON body itself instead
-  // of the HTTP status.
-  findSimilarProspects: async (projectId: string) => {
+  // 10+ minutes, so the server streams newline-delimited JSON progress
+  // events and always responds 200 (it can't change the status code after
+  // streaming has started) — the real outcome is the stream's last line,
+  // not the HTTP status. `onProgress` gets real search/fetch counts as
+  // they happen, for a live progress indicator instead of a blind spinner.
+  findSimilarProspects: async (
+    projectId: string,
+    onProgress?: (progress: OutreachFindSimilarProgress) => void,
+  ) => {
     const res = await fetch(`/api/outreach/projects/${projectId}/prospects/find-similar`, {
       method: 'POST',
       credentials: 'include',
       headers: { 'Content-Type': 'application/json' },
     })
-    const body = await res.json().catch(() => ({ error: 'unknown' }))
-    if (!res.ok || body.error) {
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({ error: 'unknown' }))
       const code = body.error ?? `HTTP ${res.status}`
       throw new Error(body.detail ? `${code}: ${body.detail}` : code)
     }
-    return body as { imported: number; failed: number; duplicates: number; batchLabel: string }
+    if (!res.body) throw new Error('unknown')
+    const reader = res.body.getReader()
+    const decoder = new TextDecoder()
+    let buf = ''
+    type FindSimilarResult = { imported: number; failed: number; duplicates: number; batchLabel: string }
+    type FindSimilarError = { error: string; detail?: string }
+    let result: FindSimilarResult | null = null
+    let errorEvt: FindSimilarError | null = null
+    for (;;) {
+      const { done, value } = await reader.read()
+      if (done) break
+      buf += decoder.decode(value, { stream: true })
+      let idx: number
+      while ((idx = buf.indexOf('\n')) !== -1) {
+        const line = buf.slice(0, idx).trim()
+        buf = buf.slice(idx + 1)
+        if (!line) continue
+        let evt: Record<string, unknown>
+        try { evt = JSON.parse(line) } catch { continue }
+        if (evt.type === 'progress') onProgress?.(evt as unknown as OutreachFindSimilarProgress)
+        else if (evt.type === 'done') result = evt as unknown as FindSimilarResult
+        else if (evt.type === 'error') errorEvt = evt as unknown as FindSimilarError
+      }
+    }
+    if (errorEvt) {
+      const err: FindSimilarError = errorEvt
+      const code = err.error ?? 'unknown'
+      throw new Error(err.detail ? `${code}: ${err.detail}` : code)
+    }
+    if (!result) throw new Error('unknown')
+    return result
   },
   updateOutreachProspect: (id: string, patch: Partial<{
     name: string; fullName: string | null; email: string | null;

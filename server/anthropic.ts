@@ -2472,9 +2472,19 @@ function similarShowsUserBlock(showName: string, showDescription: string | null)
   ].filter((l): l is string => l !== null).join('\n')
 }
 
+const SIMILAR_SHOWS_MAX_ITERATIONS = 20
+
+export type SimilarShowsProgress = {
+  iteration: number
+  maxIterations: number
+  searches: number
+  fetches: number
+}
+
 export async function findSimilarShowProspects(
   showName: string,
   showDescription: string | null,
+  onProgress?: (progress: SimilarShowsProgress) => void,
 ): Promise<SimilarShowProspect[]> {
   logInfo('outreach: finding similar shows', { showName })
   const messages: Anthropic.MessageParam[] = [{
@@ -2503,16 +2513,22 @@ export async function findSimilarShowProspects(
   // (which closes a request after 5 min of no data transferred) doesn't
   // kill the outer connection either.
   let response = await createWithRetryStream(params())
+  let searches = response.usage.server_tool_use?.web_search_requests ?? 0
+  let fetches = response.usage.server_tool_use?.web_fetch_requests ?? 0
+  let guard = 0
+  onProgress?.({ iteration: guard, maxIterations: SIMILAR_SHOWS_MAX_ITERATIONS, searches, fetches })
   // Same server-side tool loop as generateUniqueSentence above — a research
   // task this size routinely needs more searches than fit in one internal
   // iteration cap, so resume on pause_turn. Bounded so a misbehaving turn
   // can't loop forever (higher guard than that one — a 30+-show target
   // needs more resumes).
-  let guard = 0
-  while (response.stop_reason === 'pause_turn' && guard < 20) {
+  while (response.stop_reason === 'pause_turn' && guard < SIMILAR_SHOWS_MAX_ITERATIONS) {
     guard += 1
     messages.push({ role: 'assistant', content: response.content })
     response = await createWithRetryStream(params())
+    searches += response.usage.server_tool_use?.web_search_requests ?? 0
+    fetches += response.usage.server_tool_use?.web_fetch_requests ?? 0
+    onProgress?.({ iteration: guard, maxIterations: SIMILAR_SHOWS_MAX_ITERATIONS, searches, fetches })
   }
 
   const texts = response.content.filter((b): b is Anthropic.TextBlock => b.type === 'text')

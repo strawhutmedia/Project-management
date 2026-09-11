@@ -325,37 +325,41 @@ outreachRouter.post('/projects/:projectId/prospects/find-similar', async (req, r
     return
   }
 
-  // This research call routinely runs multiple minutes. Railway's edge
-  // closes an HTTP request after 5 minutes with *no data transferred*
-  // (it allows up to 15 minutes as long as something keeps moving) — so
-  // once we commit to the long call, send a heartbeat byte every 20s to
-  // keep the connection alive. That means the status code can't change
-  // after this point (headers are already sent as 200), so every outcome
-  // below — success or failure — is encoded in the JSON body instead; the
-  // client checks `body.error`, not just `res.ok`. A run of whitespace
-  // bytes before the real JSON payload is still valid JSON (JSON.parse
-  // ignores leading/trailing whitespace).
-  res.writeHead(200, { 'Content-Type': 'application/json' })
-  const heartbeat = setInterval(() => res.write(' '), 20000)
-  const finish = (body: unknown) => {
+  // This research call routinely runs 10+ minutes. Railway's edge closes an
+  // HTTP request after 5 minutes with *no data transferred* (it allows up
+  // to 15 minutes as long as something keeps moving) — so once we commit
+  // to the long call, stream newline-delimited JSON progress events to the
+  // browser as they happen (real search/fetch counts from
+  // findSimilarShowProspects, not a fake timer), plus a periodic tick as a
+  // backstop in case a single iteration runs long with nothing to report.
+  // That means the status code can't change after this point (headers are
+  // already sent as 200), so the final outcome — success or failure — is
+  // its own last line in the stream instead; the client reads the stream
+  // and checks each event's `type`, not `res.ok`.
+  res.writeHead(200, { 'Content-Type': 'application/x-ndjson' })
+  const send = (evt: Record<string, unknown>) => res.write(`${JSON.stringify(evt)}\n`)
+  const heartbeat = setInterval(() => send({ type: 'tick' }), 15000)
+  const finish = (evt: Record<string, unknown>) => {
     clearInterval(heartbeat)
-    res.end(JSON.stringify(body))
+    res.end(`${JSON.stringify(evt)}\n`)
   }
 
   try {
-    const found = await findSimilarShowProspects(proj.rows[0].name, null)
+    const found = await findSimilarShowProspects(proj.rows[0].name, null, (progress) => {
+      send({ type: 'progress', ...progress })
+    })
     if (found.length === 0) {
-      finish({ error: 'no_results', detail: 'Claude found no verifiable similar shows this run — try again.' })
+      finish({ type: 'error', error: 'no_results', detail: 'Claude found no verifiable similar shows this run — try again.' })
       return
     }
     const today = new Date().toISOString().slice(0, 10)
     const rows: BulkRow[] = found.map((f) => ({ name: f.name, email: f.email, context: f.context }))
     const result = await insertProspectRows(projectId, rows, `Similar shows — AI research ${today}`, user.id)
     logInfo('outreach: find-similar complete', { projectId, found: found.length, imported: result.imported })
-    finish(result)
+    finish({ type: 'done', ...result })
   } catch (err) {
     logError('outreach: find-similar failed', { projectId, error: err instanceof Error ? err.message : String(err) })
-    finish({ error: 'find_similar_failed', detail: err instanceof Error ? err.message : String(err) })
+    finish({ type: 'error', error: 'find_similar_failed', detail: err instanceof Error ? err.message : String(err) })
   }
 })
 
