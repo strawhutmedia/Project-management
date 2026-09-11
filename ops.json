@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-09-11T17:25:48.819Z",
+  "generatedAt": "2026-09-11T17:27:05.000Z",
   "note": "Read-only operational snapshot. Emails are masked; no full contact list is stored here.",
   "summary": {
     "showsWithOutreach": 1,
@@ -12,9 +12,9 @@
       "projectId": "c3227529-8bc9-43d9-995f-5d65a7bdbf9c",
       "name": "Private Talk",
       "outreach": {
-        "total": 88,
+        "total": 95,
         "needsEmail": 0,
-        "ready": 0,
+        "ready": 7,
         "queued": 0,
         "sent": 88,
         "replied": 0,
