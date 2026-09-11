@@ -7,12 +7,30 @@
 //
 // Generating unique sentences + sending the campaign land next.
 import { useEffect, useRef, useState } from 'react'
-import { api, type ApiOutreachProspect, type ApiOutreachTemplate } from '../api'
+import { api, type ApiOutreachProspect, type ApiOutreachTemplate, type OutreachFindSimilarProgress } from '../api'
 import { useAuth } from '../auth'
 import ProspectDetailModal from './ProspectDetailModal'
 import RolodexPanel from './RolodexPanel'
 import FollowupPanel from './FollowupPanel'
 import { TokenBar } from './OutreachTokens'
+
+function formatElapsed(ms: number): string {
+  const totalSeconds = Math.floor(ms / 1000)
+  const minutes = Math.floor(totalSeconds / 60)
+  const seconds = totalSeconds % 60
+  return minutes > 0 ? `${minutes}m ${seconds}s` : `${seconds}s`
+}
+
+// The research call's actual finish time varies a lot run to run (it stops
+// once it has enough verified candidates, could be 6 min or 15). We don't
+// know the real total up front, so the bar fills against a ~12-min
+// expectation but is capped short of 100% until the run actually finishes
+// — real motion the whole time, without ever claiming to know exactly
+// when it'll land.
+const FIND_SIMILAR_EXPECTED_MS = 12 * 60 * 1000
+function findSimilarProgressFraction(elapsedMs: number): number {
+  return Math.min(0.92, elapsedMs / FIND_SIMILAR_EXPECTED_MS)
+}
 
 const RECIPIENT_LABEL: Record<ApiOutreachProspect['recipient_type'], string> = {
   person: 'The guest',
@@ -70,6 +88,8 @@ export default function OutreachSection({ projectId }: { projectId: string }) {
   const [bulkOpen, setBulkOpen] = useState(false)
   const [findingProspects, setFindingProspects] = useState(false)
   const [findResult, setFindResult] = useState<{ tone: 'success' | 'warn'; text: string } | null>(null)
+  const [findProgress, setFindProgress] = useState<OutreachFindSimilarProgress | null>(null)
+  const [findElapsedMs, setFindElapsedMs] = useState(0)
   const [rolodexOpen, setRolodexOpen] = useState(false)
   const [listFilter, setListFilter] = useState<string>('all') // 'all' | 'replied' | a batch label
   const [oneSheetApproval, setOneSheetApproval] = useState<{ approvedAt: string | null; editedSinceApproval: boolean } | null>(null)
@@ -193,8 +213,12 @@ export default function OutreachSection({ projectId }: { projectId: string }) {
   async function findSimilarProspects() {
     setFindingProspects(true)
     setFindResult(null)
+    setFindProgress({ iteration: 0, maxIterations: 20, searches: 0, fetches: 0 })
+    const startedAt = Date.now()
+    setFindElapsedMs(0)
+    const clock = setInterval(() => setFindElapsedMs(Date.now() - startedAt), 1000)
     try {
-      const r = await api.findSimilarProspects(projectId)
+      const r = await api.findSimilarProspects(projectId, (progress) => setFindProgress(progress))
       setFindResult({
         tone: 'success',
         text: `Found ${r.imported} new prospect${r.imported === 1 ? '' : 's'} — saved as "${r.batchLabel}". Review and send whenever you're ready.`,
@@ -203,7 +227,9 @@ export default function OutreachSection({ projectId }: { projectId: string }) {
     } catch (err) {
       setFindResult({ tone: 'warn', text: err instanceof Error ? err.message : 'Search failed — try again.' })
     } finally {
+      clearInterval(clock)
       setFindingProspects(false)
+      setFindProgress(null)
     }
   }
 
@@ -725,6 +751,24 @@ export default function OutreachSection({ projectId }: { projectId: string }) {
             </div>
           )}
 
+          {findingProspects && findProgress && (
+            <div className="rounded-lg border border-violet-500/40 bg-violet-500/10 px-3 py-2.5 text-xs text-violet-100">
+              <div className="flex items-center justify-between mb-1.5">
+                <span className="font-bold uppercase tracking-wider text-[10px]">🔍 Researching similar shows…</span>
+                <span className="text-violet-300">{formatElapsed(findElapsedMs)} elapsed</span>
+              </div>
+              <div className="h-1.5 w-full rounded-full bg-violet-950/50 overflow-hidden">
+                <div
+                  className="h-full rounded-full bg-gradient-to-r from-amber-300 via-pink-300 to-violet-300 transition-[width] duration-1000 ease-linear"
+                  style={{ width: `${Math.round(findSimilarProgressFraction(findElapsedMs) * 100)}%` }}
+                />
+              </div>
+              <div className="mt-1.5 text-violet-300">
+                {findProgress.searches} search{findProgress.searches === 1 ? '' : 'es'} · {findProgress.fetches} feed{findProgress.fetches === 1 ? '' : 's'} checked — this usually takes 10-15 min, feel free to keep working elsewhere in Slate.
+              </div>
+            </div>
+          )}
+
           {findResult && (
             <div
               className={`rounded-lg border px-3 py-2 text-xs ${
@@ -859,7 +903,7 @@ export default function OutreachSection({ projectId }: { projectId: string }) {
                 className="text-[10px] uppercase tracking-wider text-ink bg-gradient-to-r from-amber-300 via-pink-300 to-violet-300 rounded-full px-3 py-1 hover:opacity-90 disabled:opacity-40 font-bold"
                 title="Claude finds real similar shows and their verified contact emails, and adds them as a new batch — no fields to fill in."
               >
-                {findingProspects ? '🔍 Searching… (~10-15 min, hang tight)' : '🔍 Find new prospects'}
+                {findingProspects ? '🔍 Searching…' : '🔍 Find new prospects'}
               </button>
               <button
                 onClick={() => { setBulkOpen((v) => !v); if (!bulkOpen) setAddOpen(false) }}
