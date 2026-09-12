@@ -470,5 +470,11 @@
     "outcome": "gave_up",
     "summary": "hit max iterations (20)",
     "iterations": 20
+  },
+  "unhandled error::{\"message\":\"Unterminated string in JSON at position 39\",\"stack\":\"SyntaxError: Un": {
+    "attemptedAt": "2026-09-12T22:38:39.479Z",
+    "outcome": "fixed",
+    "summary": "Added message pattern check to catch JSON parse errors from body-parser that weren't being caught by the existing type/status checks, preventing \"Unterminated string in JSON\" errors from being logged as unhandled errors.",
+    "iterations": 12
   }
 }
