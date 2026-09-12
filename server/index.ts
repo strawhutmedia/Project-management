@@ -298,6 +298,9 @@ async function start() {
     void import('./cashflow_payment_check').then(({ startCashflowPaymentCheckLoop }) => {
       startCashflowPaymentCheckLoop()
     })
+    void import('./qa_digest').then(({ startQaDigestLoop }) => {
+      startQaDigestLoop()
+    })
     void enableDomainOpenTracking()
     // Pick up any breakdown runs that were killed by the previous
     // shutdown (deploy / crash). Producers don't have to click

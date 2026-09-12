@@ -24,6 +24,85 @@ const btnGhost =
 const RECORDING_TYPES = ['In person', 'Riverside', 'Zoom', 'Audio only', 'Other']
 const RESOLUTIONS = ['1080', '4K', '1080 + 4K', '8K', 'Audio only']
 
+// Every card number that ever appeared in the old QA sheet, normalized to
+// the dominant zero-padded spelling (the sheet had SSD005 / SSD05 / SSD0005
+// all meaning the same card). Tap to select instead of typing.
+const AUDIO_CARDS = Array.from({ length: 18 }, (_, i) => `SD${String(i + 1).padStart(4, '0')}`)
+const VIDEO_CARDS = Array.from({ length: 15 }, (_, i) => `SSD${String(i + 1).padStart(4, '0')}`)
+
+// Cards are stored as the same free text the sheet used ("SD0010 / RIVERSIDE"),
+// parsed into tokens for the picker so old-style values still round-trip.
+const cardTokens = (value: string): string[] =>
+  value.split(/[/,+]/).map((t) => t.trim()).filter(Boolean)
+const joinCards = (tokens: string[]): string => tokens.join(' / ')
+
+function CardField({
+  label, options, value, onChange,
+}: {
+  label: string
+  options: string[]
+  value: string
+  onChange: (v: string) => void
+}) {
+  const [other, setOther] = useState('')
+  const tokens = cardTokens(value)
+  const has = (opt: string) => tokens.some((t) => t.toUpperCase() === opt.toUpperCase())
+  const toggle = (opt: string) =>
+    onChange(joinCards(has(opt) ? tokens.filter((t) => t.toUpperCase() !== opt.toUpperCase()) : [...tokens, opt]))
+  const extras = tokens.filter((t) => !options.some((o) => o.toUpperCase() === t.toUpperCase()))
+  const addOther = () => {
+    const v = other.trim()
+    if (!v) return
+    if (!tokens.some((t) => t.toUpperCase() === v.toUpperCase())) onChange(joinCards([...tokens, v]))
+    setOther('')
+  }
+  return (
+    <div>
+      <div className={labelCls}>{label}</div>
+      <div className="mt-1 flex flex-wrap gap-1">
+        {options.map((opt) => {
+          const on = has(opt)
+          return (
+            <button
+              key={opt}
+              type="button"
+              onClick={() => toggle(opt)}
+              className={`rounded-full border px-2 py-0.5 text-[11px] font-bold transition ${
+                on
+                  ? 'border-stage-stems/60 bg-stage-stems/15 text-stage-stems'
+                  : 'border-line text-muted hover:text-text'
+              }`}
+            >
+              {on ? '✓ ' : ''}{opt}
+            </button>
+          )
+        })}
+        {extras.map((t) => (
+          <button
+            key={t}
+            type="button"
+            onClick={() => onChange(joinCards(tokens.filter((x) => x !== t)))}
+            className="rounded-full border border-stage-stems/60 bg-stage-stems/15 text-stage-stems px-2 py-0.5 text-[11px] font-bold"
+            title="Remove"
+          >
+            ✓ {t} ✕
+          </button>
+        ))}
+      </div>
+      <div className="mt-1.5 flex gap-1.5">
+        <input
+          className={`${inputCls} !py-1 !text-xs flex-1`}
+          placeholder="Other (e.g. Riverside, OBS, Zoom)"
+          value={other}
+          onChange={(e) => setOther(e.target.value)}
+          onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addOther() } }}
+        />
+        <button type="button" onClick={addOther} className={`${btnGhost} !py-1`}>＋</button>
+      </div>
+    </div>
+  )
+}
+
 const STATUS_META: Record<ApiQaRecording['status'], { label: string; cls: string; dot: string }> = {
   pending: { label: 'Awaiting QA', cls: 'border-stage-tracking/40 bg-stage-tracking/10 text-stage-tracking', dot: '●' },
   approved: { label: 'QA approved', cls: 'border-stage-done/40 bg-stage-done/10 text-stage-done', dot: '✓' },
@@ -206,13 +285,11 @@ function RecordingForm({
           <div className={labelCls}>Upload time</div>
           <input className={inputCls} placeholder="e.g. 12:49 PM" value={f.uploadTime} onChange={(e) => set('uploadTime', e.target.value)} />
         </div>
-        <div>
-          <div className={labelCls}>Audio card</div>
-          <input className={inputCls} placeholder="e.g. SD0015" value={f.audioCard} onChange={(e) => set('audioCard', e.target.value)} />
+        <div className="sm:col-span-2">
+          <CardField label="Audio card(s)" options={AUDIO_CARDS} value={f.audioCard} onChange={(v) => set('audioCard', v)} />
         </div>
-        <div>
-          <div className={labelCls}>Video card</div>
-          <input className={inputCls} placeholder="e.g. SSD0011" value={f.videoCard} onChange={(e) => set('videoCard', e.target.value)} />
+        <div className="sm:col-span-2">
+          <CardField label="Video card(s)" options={VIDEO_CARDS} value={f.videoCard} onChange={(v) => set('videoCard', v)} />
         </div>
         <div className="sm:col-span-2">
           <div className={labelCls}>Dropbox folder link</div>
