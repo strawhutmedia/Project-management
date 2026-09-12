@@ -17,6 +17,38 @@ const PEOPLE: Array<{ email: string; name: string; display: string }> = [
   { email: 'blake@strawhutmedia.com', name: 'Blake Beeler', display: 'Blake' },
 ]
 
+// The 10 historical recordings seeded by migration 148 recorded their
+// shooters as names in the old sheet, but shooter rows could only attach
+// to users that existed when the migration ran. Re-attach on every boot
+// (idempotent) so names land as soon as the matching account exists —
+// Xavier now, Sullivan/Steven whenever they get accounts.
+const SEEDED_SHOOTERS: Array<{ title: string; names: string[] }> = [
+  { title: 'DBAWJK - Chris Collins & Griffin James', names: ['sullivan', 'xavier'] },
+  { title: 'DBAWJK - Linwood Boomer', names: ['sullivan', 'xavier'] },
+  { title: 'DBAWJK - INTRO FOR Barbara Heller', names: ['sullivan', 'xavier'] },
+  { title: 'DBAWJK - Scott Thompson', names: ['sullivan'] },
+  { title: 'Invest in Her - Tyne Daly and Eric Dyson', names: ['sullivan'] },
+  { title: 'SHAPING FREEDOM - Tiffany Toney', names: ['xavier'] },
+  { title: 'SHAPING FREEDOM - Paulette Brown Hinds, Kenneth B. Morris, Jr. & Teri', names: ['xavier'] },
+  { title: 'SHAPING FREEDOM - Phill Branch', names: ['steven'] },
+  { title: 'Invest in Her - Kathy', names: ['steven'] },
+]
+
+async function backfillSeededShooters(): Promise<void> {
+  for (const row of SEEDED_SHOOTERS) {
+    const likes = row.names.map((n) => `${n}%`)
+    await pool.query(
+      `INSERT INTO qa_recording_shooters (recording_id, user_id)
+       SELECT r.id, u.id
+         FROM qa_recordings r, users u
+        WHERE r.title = $1
+          AND COALESCE(u.display_name, u.name) ILIKE ANY ($2::text[])
+       ON CONFLICT DO NOTHING`,
+      [row.title, likes],
+    )
+  }
+}
+
 export async function seedQaTeamInvites(): Promise<void> {
   for (const person of PEOPLE) {
     try {
@@ -66,5 +98,12 @@ export async function seedQaTeamInvites(): Promise<void> {
         error: err instanceof Error ? err.message : String(err),
       })
     }
+  }
+  try {
+    await backfillSeededShooters()
+  } catch (err) {
+    logError('seed: QA shooter backfill failed', {
+      error: err instanceof Error ? err.message : String(err),
+    })
   }
 }
