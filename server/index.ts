@@ -157,6 +157,11 @@ app.use('/api/scheduler', socialSchedulerRouter)
 // reaches them, which would 401 the phone's login-less button presses before
 // they got here. Its own /remote/stream route enforces login itself.
 app.use('/api/teleprompter/remote', teleprompterRemoteRouter)
+// QA router: its /approved feed is token-authed (no session) for the
+// Premiere automation, so it MUST be mounted before the broad
+// `app.use('/api', …)` routers below — those apply requireUser to every
+// /api/* request and would 401 the token-only call before it got here.
+app.use('/api/qa', qaRouter)
 // show_chat mounts on /api directly because its routes are
 // /api/projects/:id/chat — colocated with project-scoped endpoints.
 app.use('/api', showChatRouter)
@@ -179,7 +184,6 @@ app.use('/api/qb', qbInvoicesRouter)
 // (The public transfer-report POST is registered near the top of this file,
 // ahead of the requireUser-wrapped /api routers.)
 app.use('/api/storage', storageRouter)
-app.use('/api/qa', qaRouter)
 
 // Public per-show one-sheet page (guest outreach). Mounted at the root
 // so URLs are /shows/<slug>, and BEFORE the SPA fallback so requests
