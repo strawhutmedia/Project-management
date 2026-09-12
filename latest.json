@@ -1,9 +1,9 @@
 {
   "version": "0.2.2",
-  "now": "2026-09-12T16:26:14.093Z",
+  "now": "2026-09-12T17:25:49.232Z",
   "boot": {
-    "startedAt": "2026-09-12T16:26:13.139Z",
-    "completedAt": "2026-09-12T16:26:14.081Z",
+    "startedAt": "2026-09-12T17:25:48.612Z",
+    "completedAt": "2026-09-12T17:25:49.213Z",
     "error": null
   },
   "env": {
@@ -184,7 +184,8 @@
       "145_storage_transfer_dismissals.sql",
       "146_qa_production_checklist.sql",
       "147_qa_digest_runs.sql",
-      "148_qa_seed_recent.sql"
+      "148_qa_seed_recent.sql",
+      "149_ai_usage.sql"
     ],
     "userCount": 15,
     "projectCount": 15,
@@ -264,12 +265,13 @@
         "name": "WICKED: The Official Podcast",
         "kind": "podcast"
       }
-    ]
+    ],
+    "aiUsage30d": []
   },
   "recentLog": [
     {
       "level": "info",
-      "ts": "2026-09-12T16:26:13.137Z",
+      "ts": "2026-09-12T17:25:48.610Z",
       "msg": "serving client from",
       "data": {
         "clientDir": "/app/dist"
@@ -277,7 +279,7 @@
     },
     {
       "level": "info",
-      "ts": "2026-09-12T16:26:13.139Z",
+      "ts": "2026-09-12T17:25:48.612Z",
       "msg": "boot starting",
       "data": {
         "cwd": "/app",
@@ -288,12 +290,12 @@
     },
     {
       "level": "info",
-      "ts": "2026-09-12T16:26:13.509Z",
+      "ts": "2026-09-12T17:25:49.026Z",
       "msg": "migrations complete"
     },
     {
       "level": "info",
-      "ts": "2026-09-12T16:26:13.599Z",
+      "ts": "2026-09-12T17:25:49.154Z",
       "msg": "wardrobe outfits: applied",
       "data": {
         "projectId": "12f53ed1-c6c7-4c11-8d7b-06d91744c9af",
@@ -304,7 +306,7 @@
     },
     {
       "level": "info",
-      "ts": "2026-09-12T16:26:13.599Z",
+      "ts": "2026-09-12T17:25:49.154Z",
       "msg": "BIYA seed: project already exists, ensured shoot days",
       "data": {
         "projectId": "12f53ed1-c6c7-4c11-8d7b-06d91744c9af"
@@ -312,38 +314,17 @@
     },
     {
       "level": "info",
-      "ts": "2026-09-12T16:26:14.037Z",
-      "msg": "seed: Jay Kogen duplicate merged",
-      "data": {
-        "kept": "3e9a5661-8e76-47a2-a80c-375e9c24629c",
-        "keptHadName": "Don't Be Alone with Jay Kogen",
-        "deleted": "5de249c0-f326-45cc-be23-d52a7d77ef1d",
-        "deletedName": "Don't Be Alone w/ Jay Kogen",
-        "moved": {
-          "project_members": 2,
-          "songs": 2,
-          "transcripts": 2,
-          "clip_jobs": 3,
-          "social_plans": 2
-        },
-        "droppedDuplicates": {
-          "project_members": 7
-        }
-      }
-    },
-    {
-      "level": "info",
-      "ts": "2026-09-12T16:26:14.081Z",
+      "ts": "2026-09-12T17:25:49.213Z",
       "msg": "listening on :8080"
     },
     {
       "level": "info",
-      "ts": "2026-09-12T16:26:14.081Z",
+      "ts": "2026-09-12T17:25:49.213Z",
       "msg": "scheduler started (every 5 min)"
     },
     {
       "level": "info",
-      "ts": "2026-09-12T16:26:14.084Z",
+      "ts": "2026-09-12T17:25:49.216Z",
       "msg": "autopilot: loop started",
       "data": {
         "tickMinutes": 10
@@ -351,7 +332,7 @@
     },
     {
       "level": "info",
-      "ts": "2026-09-12T16:26:14.084Z",
+      "ts": "2026-09-12T17:25:49.216Z",
       "msg": "cashflow payment check: loop started",
       "data": {
         "tickHours": 6
@@ -359,7 +340,7 @@
     },
     {
       "level": "info",
-      "ts": "2026-09-12T16:26:14.084Z",
+      "ts": "2026-09-12T17:25:49.216Z",
       "msg": "qa digest: loop started",
       "data": {
         "sendHourPT": 8
