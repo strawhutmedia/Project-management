@@ -1,0 +1,29 @@
+{
+  "permissions": {
+    "allow": [
+      "Read(~/premiere-bot/**)",
+      "Write(~/premiere-bot/**)",
+      "Edit(~/premiere-bot/**)",
+      "Read(~/Dropbox/**)",
+      "Read(~/Library/CloudStorage/**)",
+      "Write(~/Dropbox/**)",
+      "Write(~/Library/CloudStorage/**)",
+      "Bash(ls:*)",
+      "Bash(find ~/Dropbox*)",
+      "Bash(find ~/Library/CloudStorage*)",
+      "Bash(open -a \"Adobe Premiere Pro*)",
+      "Bash(osascript -e:*)",
+      "Bash(curl -s https://slate.strawhutmedia.com/api/qa/*)"
+    ],
+    "deny": [
+      "WebFetch",
+      "WebSearch",
+      "Bash(sudo:*)",
+      "Bash(ssh:*)",
+      "Bash(scp:*)",
+      "Bash(git push:*)",
+      "Bash(npm install:*)",
+      "Bash(brew:*)"
+    ]
+  }
+}

@@ -6,3 +6,8 @@ server/dist
 .env.local
 *.log
 *.tsbuildinfo
+
+# premiere-bot local state (never committed)
+automation/premiere-bot/.env
+automation/premiere-bot/seen.json
+automation/premiere-bot/runs.log
