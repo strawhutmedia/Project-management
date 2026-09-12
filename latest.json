@@ -1,9 +1,9 @@
 {
   "version": "0.2.2",
-  "now": "2026-09-12T19:49:05.238Z",
+  "now": "2026-09-12T19:55:44.822Z",
   "boot": {
-    "startedAt": "2026-09-12T19:49:04.730Z",
-    "completedAt": "2026-09-12T19:49:05.221Z",
+    "startedAt": "2026-09-12T19:55:44.483Z",
+    "completedAt": "2026-09-12T19:55:44.810Z",
     "error": null
   },
   "env": {
@@ -186,7 +186,8 @@
       "147_qa_digest_runs.sql",
       "148_qa_seed_recent.sql",
       "149_ai_usage.sql",
-      "150_qa_dropbox_path.sql"
+      "150_qa_dropbox_path.sql",
+      "151_qa_bot_log.sql"
     ],
     "userCount": 15,
     "projectCount": 15,
@@ -272,7 +273,7 @@
   "recentLog": [
     {
       "level": "info",
-      "ts": "2026-09-12T19:49:04.728Z",
+      "ts": "2026-09-12T19:55:44.481Z",
       "msg": "serving client from",
       "data": {
         "clientDir": "/app/dist"
@@ -280,7 +281,7 @@
     },
     {
       "level": "info",
-      "ts": "2026-09-12T19:49:04.730Z",
+      "ts": "2026-09-12T19:55:44.484Z",
       "msg": "boot starting",
       "data": {
         "cwd": "/app",
@@ -291,12 +292,12 @@
     },
     {
       "level": "info",
-      "ts": "2026-09-12T19:49:05.056Z",
+      "ts": "2026-09-12T19:55:44.703Z",
       "msg": "migrations complete"
     },
     {
       "level": "info",
-      "ts": "2026-09-12T19:49:05.171Z",
+      "ts": "2026-09-12T19:55:44.779Z",
       "msg": "wardrobe outfits: applied",
       "data": {
         "projectId": "12f53ed1-c6c7-4c11-8d7b-06d91744c9af",
@@ -307,7 +308,7 @@
     },
     {
       "level": "info",
-      "ts": "2026-09-12T19:49:05.171Z",
+      "ts": "2026-09-12T19:55:44.779Z",
       "msg": "BIYA seed: project already exists, ensured shoot days",
       "data": {
         "projectId": "12f53ed1-c6c7-4c11-8d7b-06d91744c9af"
@@ -315,17 +316,17 @@
     },
     {
       "level": "info",
-      "ts": "2026-09-12T19:49:05.221Z",
+      "ts": "2026-09-12T19:55:44.810Z",
       "msg": "listening on :8080"
     },
     {
       "level": "info",
-      "ts": "2026-09-12T19:49:05.222Z",
+      "ts": "2026-09-12T19:55:44.810Z",
       "msg": "scheduler started (every 5 min)"
     },
     {
       "level": "info",
-      "ts": "2026-09-12T19:49:05.224Z",
+      "ts": "2026-09-12T19:55:44.814Z",
       "msg": "autopilot: loop started",
       "data": {
         "tickMinutes": 10
@@ -333,7 +334,7 @@
     },
     {
       "level": "info",
-      "ts": "2026-09-12T19:49:05.225Z",
+      "ts": "2026-09-12T19:55:44.814Z",
       "msg": "cashflow payment check: loop started",
       "data": {
         "tickHours": 6
@@ -341,7 +342,7 @@
     },
     {
       "level": "info",
-      "ts": "2026-09-12T19:49:05.225Z",
+      "ts": "2026-09-12T19:55:44.814Z",
       "msg": "qa digest: loop started",
       "data": {
         "sendHourPT": 8
