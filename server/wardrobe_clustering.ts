@@ -22,6 +22,7 @@
 import Anthropic from '@anthropic-ai/sdk'
 import { pool } from './db'
 import { logError, logInfo } from './diag'
+import { recordAiUsage } from './ai_usage'
 
 const client = new Anthropic()
 const MODEL = 'claude-sonnet-4-6'
@@ -155,6 +156,7 @@ export async function clusterProjectWardrobe(projectId: string, userId: string):
           system: SYSTEM_PROMPT,
           messages: [{ role: 'user', content: userBlock }],
         })
+        recordAiUsage({ source: 'wardrobe_clustering', model: MODEL, usage: response.usage })
         const text = response.content.find((b) => b.type === 'text')
         const raw = text && text.type === 'text' ? text.text : ''
         const start = raw.indexOf('{')

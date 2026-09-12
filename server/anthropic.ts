@@ -19,6 +19,7 @@
 // model can't return weird shapes we have to defend against.
 import Anthropic from '@anthropic-ai/sdk'
 import { logError, logInfo } from './diag'
+import { recordAiUsage } from './ai_usage'
 
 const client = new Anthropic()
 
@@ -482,6 +483,7 @@ export async function generateAutopilotPlan(input: AutopilotGenerateInput): Prom
         format: { type: 'json_schema', schema: SCHEMA },
       },
     })
+    recordAiUsage({ source: 'autopilot_plan', model: MODEL, usage: response.usage })
   } catch (err) {
     logError('autopilot: claude call failed', {
       showName: input.showName,
@@ -596,6 +598,7 @@ export async function generateSocialPlan(input: GenerateInput): Promise<Generate
         },
       },
     })
+    recordAiUsage({ source: 'social_plan', model: MODEL, usage: response.usage })
   } catch (err) {
     logError('socials: claude call failed', {
       error: err instanceof Error ? err.message : String(err),
@@ -814,6 +817,7 @@ Return your brand profile as JSON matching the schema. Requirements:
       messages: [{ role: 'user', content: [{ type: 'text', text: userText }] }],
       output_config: { format: { type: 'json_schema', schema: BRAND_PROFILE_SCHEMA } },
     })
+    recordAiUsage({ source: 'brand_profile', model: MODEL, usage: response.usage })
   } catch (err) {
     logError('brand profile: claude call failed', {
       error: err instanceof Error ? err.message : String(err),
@@ -1030,6 +1034,7 @@ Return the JSON per the schema. Reminders:
       messages: [{ role: 'user', content: [{ type: 'text', text: userText }] }],
       output_config: { format: { type: 'json_schema', schema: TRANSCRIPT_FIX_SCHEMA } },
     })
+    recordAiUsage({ source: 'transcript_fix', model: MODEL, usage: response.usage })
   } catch (err) {
     logError('transcript correction: claude call failed', {
       error: err instanceof Error ? err.message : String(err),
@@ -1192,6 +1197,7 @@ Return strict JSON per the schema.`
       messages: [{ role: 'user', content: [{ type: 'text', text: userText }] }],
       output_config: { format: { type: 'json_schema', schema: REGEN_SCHEMAS[input.kind] } },
     })
+    recordAiUsage({ source: 'social_regen', model: MODEL, usage: response.usage })
   } catch (err) {
     logError('socials: regen claude call failed', {
       kind: input.kind,
@@ -1541,7 +1547,7 @@ export async function deriveCarouselPreset(
     max_tokens: 400,
     system: CAROUSEL_PALETTE_SYSTEM,
     messages: [{ role: 'user', content }],
-  })
+  }, 'carousel_preset')
   const block = response.content.find((b) => b.type === 'text')
   const text = block && block.type === 'text' ? block.text : ''
   const s = text.indexOf('{'), e = text.lastIndexOf('}')
@@ -1620,6 +1626,7 @@ export async function generateCarouselDeck(input: CarouselGenerateInput): Promis
         format: { type: 'json_schema', schema: DECK_SCHEMA },
       },
     })
+    recordAiUsage({ source: 'carousel_deck', model: MODEL, usage: response.usage })
   } catch (err) {
     logError('carousel: claude call failed', { error: err instanceof Error ? err.message : String(err) })
     throw err
@@ -2293,12 +2300,15 @@ function isUnusableSentence(raw: string): boolean {
 // Non-transient errors (bad request, auth) throw immediately.
 async function createWithRetry(
   params: Anthropic.MessageCreateParamsNonStreaming,
+  source?: string,
   maxAttempts = 4,
 ): Promise<Anthropic.Message> {
   let lastErr: unknown
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     try {
-      return await client.messages.create(params)
+      const response = await client.messages.create(params)
+      if (source) recordAiUsage({ source, model: params.model, usage: response.usage })
+      return response
     } catch (err) {
       lastErr = err
       const status = (err as { status?: number })?.status
@@ -2321,6 +2331,7 @@ async function createWithRetry(
 async function createWithRetryStream(
   params: Omit<Anthropic.MessageCreateParamsNonStreaming, 'stream'>,
   onContentBlock?: (block: Anthropic.ContentBlock) => void,
+  source?: string,
   maxAttempts = 4,
 ): Promise<Anthropic.Message> {
   let lastErr: unknown
@@ -2336,7 +2347,9 @@ async function createWithRetryStream(
       // `contentBlock` fires as each block completes mid-stream, so a
       // caller can get live search/fetch counts instead.
       if (onContentBlock) stream.on('contentBlock', onContentBlock)
-      return await stream.finalMessage()
+      const response = await stream.finalMessage()
+      if (source) recordAiUsage({ source, model: params.model, usage: response.usage })
+      return response
     } catch (err) {
       lastErr = err
       const status = (err as { status?: number })?.status
@@ -2382,7 +2395,7 @@ export async function generateUniqueSentence(input: UniqueSentenceInput): Promis
     return p
   }
 
-  let response = await createWithRetry(params())
+  let response = await createWithRetry(params(), 'unique_sentence')
   // web_search runs a server-side tool loop; if it exceeds the internal
   // iteration cap the turn pauses — re-send to let it finish. Bounded so a
   // misbehaving turn can't loop forever.
@@ -2390,7 +2403,7 @@ export async function generateUniqueSentence(input: UniqueSentenceInput): Promis
   while (response.stop_reason === 'pause_turn' && guard < 5) {
     guard += 1
     messages.push({ role: 'assistant', content: response.content })
-    response = await createWithRetry(params())
+    response = await createWithRetry(params(), 'unique_sentence')
   }
 
   // The sentence is the LAST text block — earlier text blocks can be the
@@ -2536,7 +2549,7 @@ export async function findSimilarShowProspects(
     onProgress?.({ iteration: guard, maxIterations: SIMILAR_SHOWS_MAX_ITERATIONS, searches, fetches })
   }
 
-  let response = await createWithRetryStream(params(), onBlock)
+  let response = await createWithRetryStream(params(), onBlock, 'similar_shows')
   // Same server-side tool loop as generateUniqueSentence above — a research
   // task this size routinely needs more searches than fit in one internal
   // iteration cap, so resume on pause_turn. Bounded so a misbehaving turn
@@ -2545,7 +2558,7 @@ export async function findSimilarShowProspects(
   while (response.stop_reason === 'pause_turn' && guard < SIMILAR_SHOWS_MAX_ITERATIONS) {
     guard += 1
     messages.push({ role: 'assistant', content: response.content })
-    response = await createWithRetryStream(params(), onBlock)
+    response = await createWithRetryStream(params(), onBlock, 'similar_shows')
   }
 
   const texts = response.content.filter((b): b is Anthropic.TextBlock => b.type === 'text')
@@ -2671,6 +2684,7 @@ export async function generateOneSheetAuto(input: OneSheetAutoInput): Promise<On
     }],
     output_config: { format: { type: 'json_schema', schema: ONE_SHEET_AUTO_SCHEMA } },
   })
+  recordAiUsage({ source: 'one_sheet_auto', model: MODEL, usage: response.usage })
   const textBlock = response.content.find((b) => b.type === 'text')
   if (!textBlock || textBlock.type !== 'text') throw new Error('one-sheet auto: no text block')
   const parsed = JSON.parse(textBlock.text) as {
@@ -2722,6 +2736,7 @@ export async function generateSocialStrategyDocument(
       messages: [{ role: 'user', content: userBlocks }],
       output_config: { format: { type: 'json_schema', schema } },
     })
+    recordAiUsage({ source: 'social_strategy', model: MODEL, usage: response.usage })
   } catch (err) {
     logError('strategy: claude call failed', { kind: input.kind, error: err instanceof Error ? err.message : String(err) })
     throw err
@@ -2839,6 +2854,7 @@ export async function pickClipMoments(input: ClipMomentInput): Promise<ClipMomen
     system: CLIP_PICKER_SYSTEM,
     messages: [{ role: 'user', content: user }],
   })
+  recordAiUsage({ source: 'clip_moments', model: MODEL, usage: response.usage })
   const block = response.content.find((b) => b.type === 'text')
   const text = block && block.type === 'text' ? block.text : ''
   // Tolerate stray prose / fences around the JSON array.
@@ -2912,6 +2928,7 @@ export async function pickVerticalCrop(frames: Buffer[]): Promise<VerticalCrop> 
     system: CROP_SYSTEM,
     messages: [{ role: 'user', content }],
   })
+  recordAiUsage({ source: 'vertical_crop', model: VISION_MODEL, usage: response.usage })
   const block = response.content.find((b) => b.type === 'text')
   const text = block && block.type === 'text' ? block.text : ''
   const s = text.indexOf('{'), e = text.lastIndexOf('}')
@@ -2962,6 +2979,7 @@ export async function trackVerticalCrop(frames: Buffer[]): Promise<VerticalTrack
     system: TRACK_SYSTEM,
     messages: [{ role: 'user', content }],
   })
+  recordAiUsage({ source: 'vertical_track', model: VISION_MODEL, usage: response.usage })
   const block = response.content.find((b) => b.type === 'text')
   const text = block && block.type === 'text' ? block.text : ''
   const s = text.indexOf('{'), e = text.lastIndexOf('}')
@@ -3085,6 +3103,7 @@ export async function generateLeadFollowup(input: LeadFollowupInput): Promise<Le
     messages: [{ role: 'user', content: lines.join('\n') }],
     output_config: { format: { type: 'json_schema', schema: LEAD_FOLLOWUP_SCHEMA } },
   })
+  recordAiUsage({ source: 'lead_followup', model: MODEL, usage: response.usage })
   const block = response.content.find((b) => b.type === 'text')
   if (!block || block.type !== 'text') throw new Error('lead_followup: claude returned no text block')
   const parsed = JSON.parse(block.text) as { subject: string; body: string }
