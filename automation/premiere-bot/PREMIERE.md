@@ -88,3 +88,17 @@ plan Straw Hut already pays for.
   need a human ear — do not guess those.
 Do NOT start Phase 2 until the assembly (sync + multicam + good audio) is
 proven working end to end.
+
+### Preset prompts (Creator-Mode-style picker) — for Phase 2/3
+A chip picker of saved instruction templates + an effort selector
+(Standard/Studio/Ultra = Claude effort/model: Sonnet-low → Opus-high).
+Podcast needs its own presets, split by job:
+- EPISODE ROUGH CUT (premiere-bot + Premiere transcription):
+  "remove fillers + dead air, keep rest" / "remove flubbed takes, keep the
+  one they said was better" / "tighten pacing, keep conversational flow" /
+  "minimal — only obvious mistakes + long silences" / "aggressive tighten".
+- SOCIAL CLIPS (belongs in Slate's EXISTING clips pipeline / OpusClip, not
+  here): "3 strongest standalone moments" / "funniest exchange" / "most
+  emotional moment" / "hook-first open" / "60s vertical fast cuts".
+Keep the two buckets in separate tools: podcast machine = assembly + rough
+cut; clips feature = short-form.
