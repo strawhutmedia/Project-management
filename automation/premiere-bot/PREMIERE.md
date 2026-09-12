@@ -72,3 +72,19 @@ Once confirmed scriptable, steps 1–6 run end to end.
 ## Later (not yet specified)
 Specific effects on the audio tracks + the master track — Ryan will walk
 through / screenshot these. Do not invent effects until then.
+
+## Phase 2 idea (after assembly is proven) — transcript-driven rough cut
+Uses Premiere's OWN built-in transcription (Text-Based Editing) — no
+Deepgram, no AutoEdit, no extra subscription; it's included in the Adobe
+plan Straw Hut already pays for.
+- Silence removal + filler-word removal: Premiere already does both in the
+  app; the human uses them today. Automating them depends on whether
+  Premiere exposes Text-Based Editing to scripting (uncertain).
+- Take selection via VERBAL CUES (Ryan's point): people usually announce
+  the keeper — "that was better", "use that one", "one more time",
+  "sorry, again". Reading the transcript for those markers picks the
+  keeper with high confidence. Automatable subset.
+- Boundary: takes with NO verbal cue (a silently better delivery) still
+  need a human ear — do not guess those.
+Do NOT start Phase 2 until the assembly (sync + multicam + good audio) is
+proven working end to end.
