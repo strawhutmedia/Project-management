@@ -1,9 +1,9 @@
 {
   "version": "0.2.2",
-  "now": "2026-09-12T06:46:24.401Z",
+  "now": "2026-09-12T16:26:14.093Z",
   "boot": {
-    "startedAt": "2026-09-12T06:46:24.084Z",
-    "completedAt": "2026-09-12T06:46:24.385Z",
+    "startedAt": "2026-09-12T16:26:13.139Z",
+    "completedAt": "2026-09-12T16:26:14.081Z",
     "error": null
   },
   "env": {
@@ -187,7 +187,7 @@
       "148_qa_seed_recent.sql"
     ],
     "userCount": 15,
-    "projectCount": 16,
+    "projectCount": 15,
     "projects": [
       {
         "id": "2e9e2425-f53d-42d5-a4b6-ba29e25bb01b",
@@ -212,11 +212,6 @@
       {
         "id": "3e9a5661-8e76-47a2-a80c-375e9c24629c",
         "name": "Don't Be Alone with Jay Kogen",
-        "kind": "podcast"
-      },
-      {
-        "id": "5de249c0-f326-45cc-be23-d52a7d77ef1d",
-        "name": "Don't Be Alone w/ Jay Kogen",
         "kind": "podcast"
       },
       {
@@ -274,7 +269,7 @@
   "recentLog": [
     {
       "level": "info",
-      "ts": "2026-09-12T06:46:24.081Z",
+      "ts": "2026-09-12T16:26:13.137Z",
       "msg": "serving client from",
       "data": {
         "clientDir": "/app/dist"
@@ -282,7 +277,7 @@
     },
     {
       "level": "info",
-      "ts": "2026-09-12T06:46:24.084Z",
+      "ts": "2026-09-12T16:26:13.139Z",
       "msg": "boot starting",
       "data": {
         "cwd": "/app",
@@ -293,12 +288,12 @@
     },
     {
       "level": "info",
-      "ts": "2026-09-12T06:46:24.264Z",
+      "ts": "2026-09-12T16:26:13.509Z",
       "msg": "migrations complete"
     },
     {
       "level": "info",
-      "ts": "2026-09-12T06:46:24.352Z",
+      "ts": "2026-09-12T16:26:13.599Z",
       "msg": "wardrobe outfits: applied",
       "data": {
         "projectId": "12f53ed1-c6c7-4c11-8d7b-06d91744c9af",
@@ -309,7 +304,7 @@
     },
     {
       "level": "info",
-      "ts": "2026-09-12T06:46:24.353Z",
+      "ts": "2026-09-12T16:26:13.599Z",
       "msg": "BIYA seed: project already exists, ensured shoot days",
       "data": {
         "projectId": "12f53ed1-c6c7-4c11-8d7b-06d91744c9af"
@@ -317,17 +312,38 @@
     },
     {
       "level": "info",
-      "ts": "2026-09-12T06:46:24.386Z",
+      "ts": "2026-09-12T16:26:14.037Z",
+      "msg": "seed: Jay Kogen duplicate merged",
+      "data": {
+        "kept": "3e9a5661-8e76-47a2-a80c-375e9c24629c",
+        "keptHadName": "Don't Be Alone with Jay Kogen",
+        "deleted": "5de249c0-f326-45cc-be23-d52a7d77ef1d",
+        "deletedName": "Don't Be Alone w/ Jay Kogen",
+        "moved": {
+          "project_members": 2,
+          "songs": 2,
+          "transcripts": 2,
+          "clip_jobs": 3,
+          "social_plans": 2
+        },
+        "droppedDuplicates": {
+          "project_members": 7
+        }
+      }
+    },
+    {
+      "level": "info",
+      "ts": "2026-09-12T16:26:14.081Z",
       "msg": "listening on :8080"
     },
     {
       "level": "info",
-      "ts": "2026-09-12T06:46:24.386Z",
+      "ts": "2026-09-12T16:26:14.081Z",
       "msg": "scheduler started (every 5 min)"
     },
     {
       "level": "info",
-      "ts": "2026-09-12T06:46:24.392Z",
+      "ts": "2026-09-12T16:26:14.084Z",
       "msg": "autopilot: loop started",
       "data": {
         "tickMinutes": 10
@@ -335,7 +351,7 @@
     },
     {
       "level": "info",
-      "ts": "2026-09-12T06:46:24.392Z",
+      "ts": "2026-09-12T16:26:14.084Z",
       "msg": "cashflow payment check: loop started",
       "data": {
         "tickHours": 6
@@ -343,7 +359,7 @@
     },
     {
       "level": "info",
-      "ts": "2026-09-12T06:46:24.392Z",
+      "ts": "2026-09-12T16:26:14.084Z",
       "msg": "qa digest: loop started",
       "data": {
         "sendHourPT": 8
