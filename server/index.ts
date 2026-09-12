@@ -42,6 +42,7 @@ import { handleSesInboundReply } from './routes/ses_inbound_reply'
 import { scheduleBoot as scheduleSesBounceSetup } from './ses_bounce_setup'
 import { seedBackInYourArms } from './seeds/back_in_your_arms'
 import { seedMadelineInvite } from './seeds/invite_madeline'
+import { seedQaTeamInvites } from './seeds/invite_qa_team'
 import { ensureRyanIsPodcastEp } from './routes/projects'
 import { startScheduler } from './scheduler'
 import { scheduleBootTimeCoverSync, syncMissingCoversFromRss } from './rss_cover_sync'
@@ -272,6 +273,7 @@ async function start() {
     await seedBackInYourArms()
     await ensureRyanIsPodcastEp()
     await seedMadelineInvite()
+    await seedQaTeamInvites()
   } catch (err) {
     logError('migrations failed', { error: err instanceof Error ? err.message : String(err) })
     markBootError(err)
