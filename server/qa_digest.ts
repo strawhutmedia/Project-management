@@ -1,6 +1,6 @@
 import { pool } from './db'
 import { sendNotificationEmail } from './email'
-import { logError } from './diag'
+import { logError, logInfo } from './diag'
 
 // Daily QA digest — every morning (8am PT) that recordings are sitting in
 // 'pending', everyone on the podcast side of Slate gets one email: "these
@@ -97,7 +97,7 @@ async function runOnce(): Promise<void> {
     }
   }
   await pool.query(`UPDATE qa_digest_runs SET recipient_count = $2 WHERE run_date = $1`, [date, sent])
-  console.log(`[slate] qa digest sent: ${n} pending recording(s) to ${sent}/${recipients.rows.length} recipient(s)`)
+  logInfo('qa digest sent', { pending: n, sent, recipients: recipients.rows.length })
 }
 
 export function startQaDigestLoop(): void {
@@ -109,5 +109,5 @@ export function startQaDigestLoop(): void {
   setInterval(tick, TICK_MS)
   // First check shortly after boot (not instantly — let migrations settle).
   setTimeout(tick, 30 * 1000)
-  console.log('[slate] qa digest: loop started (daily at 8am PT while recordings are pending)')
+  logInfo('qa digest: loop started', { sendHourPT: SEND_HOUR_PT })
 }
