@@ -12,6 +12,9 @@
       "Bash(find ~/Dropbox*)",
       "Bash(find ~/Library/CloudStorage*)",
       "Bash(open -a \"Adobe Premiere Pro*)",
+      "Bash(cmd.exe /c start*)",
+      "Read(~/Dropbox (Straw Hut Media)/**)",
+      "Write(~/Dropbox (Straw Hut Media)/**)",
       "Bash(osascript -e:*)",
       "Bash(curl -s https://slate.strawhutmedia.com/api/qa/*)"
     ],

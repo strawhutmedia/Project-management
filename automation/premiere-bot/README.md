@@ -18,6 +18,18 @@ Security posture (non-negotiable, per Ryan):
 
 ## One-time setup on the machine
 
+> **Windows notes** (the edit machine is a Windows PC): create the
+> Standard user under Settings → Accounts → Other users → "Add account"
+> (choose "I don't have this person's sign-in information" → "Add a user
+> without a Microsoft account" for a local account, and leave it a
+> **Standard User**, not Administrator). Install Claude Code from
+> PowerShell: `irm https://claude.ai/install.ps1 | iex`, and Node.js with
+> `winget install OpenJS.NodeJS.LTS`. Desktop notifications in poll.mjs
+> are macOS-only for now — on Windows, results land in the console and
+> `runs.log`. A Standard account already can't install software or touch
+> other users' files; on Windows Pro, AppLocker can additionally allowlist
+> the Adobe apps.
+
 1. **Create the account** (macOS): System Settings → Users & Groups →
    Add User → **Standard** → name it `editbot`. Log into it.
 2. **Lock the account down**: System Settings → Screen Time (enable for
