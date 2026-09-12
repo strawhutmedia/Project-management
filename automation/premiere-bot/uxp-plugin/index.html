@@ -1,0 +1,54 @@
+<!-- Straw Hut Edit Bot — UXP panel for Premiere Pro.
+     v0.0.1 is a PROBE: it loads inside Premiere, dumps the real scripting
+     API surface, and posts it to Slate's bot-log so Claude can see exactly
+     what is scriptable on this machine (no screenshots, no pasting). -->
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <style>
+      body {
+        font-family: -apple-system, "Segoe UI", sans-serif;
+        margin: 0;
+        padding: 12px;
+        color: #e6e6e6;
+        background: #262626;
+      }
+      h1 { font-size: 13px; margin: 0 0 4px; }
+      p.sub { font-size: 11px; color: #9a9a9a; margin: 0 0 12px; }
+      button {
+        width: 100%;
+        padding: 9px 12px;
+        margin: 0 0 8px;
+        font-size: 12px;
+        border-radius: 6px;
+        border: 1px solid #4a4a4a;
+        background: #3a3a3a;
+        color: #fff;
+      }
+      button.primary { background: #0b7; border-color: #0b7; color: #04241a; font-weight: 600; }
+      #status { font-size: 11px; color: #ccc; margin: 6px 0; min-height: 14px; }
+      #log {
+        font-family: "SF Mono", Consolas, monospace;
+        font-size: 10px;
+        white-space: pre-wrap;
+        color: #b8d8cf;
+        background: #1c1c1c;
+        border: 1px solid #383838;
+        border-radius: 6px;
+        padding: 8px;
+        height: 260px;
+        overflow: auto;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Straw Hut Edit Bot</h1>
+    <p class="sub">v0.0.1 — bridge probe</p>
+    <button id="probe" class="primary">Probe Premiere API &rarr; send to Slate</button>
+    <button id="active">Show active project</button>
+    <div id="status"></div>
+    <div id="log">Ready. Click "Probe" to report what this Premiere build can script.</div>
+    <script src="main.js"></script>
+  </body>
+</html>
