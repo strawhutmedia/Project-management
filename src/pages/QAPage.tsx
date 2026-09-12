@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useAuth } from '../auth'
+import DropboxFolderPicker from '../components/DropboxFolderPicker'
 import {
   qaApi,
   type ApiQaContext,
@@ -149,6 +150,7 @@ type FormState = {
   audioCard: string
   videoCard: string
   dropboxUrl: string
+  dropboxPath: string
   notes: string
   shooterIds: string[]
 }
@@ -164,6 +166,7 @@ const emptyForm = (): FormState => ({
   audioCard: '',
   videoCard: '',
   dropboxUrl: '',
+  dropboxPath: '',
   notes: '',
   shooterIds: [],
 })
@@ -179,6 +182,7 @@ const formOf = (r: ApiQaRecording): FormState => ({
   audioCard: r.audioCard,
   videoCard: r.videoCard,
   dropboxUrl: r.dropboxUrl,
+  dropboxPath: r.dropboxPath,
   notes: r.notes,
   shooterIds: r.shooters.map((s) => s.id),
 })
@@ -194,6 +198,7 @@ const toInput = (f: FormState): QaRecordingInput => ({
   audioCard: f.audioCard,
   videoCard: f.videoCard,
   dropboxUrl: f.dropboxUrl,
+  dropboxPath: f.dropboxPath,
   notes: f.notes,
   shooterIds: f.shooterIds,
 })
@@ -239,9 +244,21 @@ function RecordingForm({
   onCancel: () => void
 }) {
   const [f, setF] = useState<FormState>(initial)
+  const [pickerOpen, setPickerOpen] = useState(false)
   const set = <K extends keyof FormState>(k: K, v: FormState[K]) => setF((prev) => ({ ...prev, [k]: v }))
+  const selectedShow = ctx.projects.find((p) => p.id === f.projectId)
   return (
     <div className="space-y-3">
+      {pickerOpen && (
+        <DropboxFolderPicker
+          // Non-admins can only browse inside the selected show's folder
+          // (server-side scope guard); admins can browse anywhere.
+          scopeProjectId={f.projectId || undefined}
+          initialPath={selectedShow?.dropboxFolder ?? undefined}
+          onSelect={(p) => { set('dropboxPath', p); setPickerOpen(false) }}
+          onCancel={() => setPickerOpen(false)}
+        />
+      )}
       <div className="grid sm:grid-cols-2 gap-3">
         <div className="sm:col-span-2">
           <div className={labelCls}>Recording / session title</div>
@@ -292,8 +309,24 @@ function RecordingForm({
           <CardField label="Video card(s)" options={VIDEO_CARDS} value={f.videoCard} onChange={(v) => set('videoCard', v)} />
         </div>
         <div className="sm:col-span-2">
-          <div className={labelCls}>Dropbox folder link</div>
-          <input className={inputCls} placeholder="https://www.dropbox.com/…" value={f.dropboxUrl} onChange={(e) => set('dropboxUrl', e.target.value)} />
+          <div className={labelCls}>Dropbox folder</div>
+          <div className="mt-1 flex items-center gap-2 flex-wrap">
+            {f.dropboxPath ? (
+              <span className="inline-flex items-center gap-2 rounded-xl border border-stage-stems/40 bg-stage-stems/10 px-3 py-1.5 text-xs font-mono text-stage-stems break-all">
+                📁 {f.dropboxPath}
+                <button type="button" onClick={() => set('dropboxPath', '')} className="text-stage-stems/70 hover:text-urgent" title="Clear">✕</button>
+              </span>
+            ) : null}
+            <button type="button" onClick={() => setPickerOpen(true)} className={btnGhost}>
+              📁 {f.dropboxPath ? 'Change folder' : 'Choose folder in Dropbox'}
+            </button>
+          </div>
+          <input
+            className={`${inputCls} mt-2 !py-1 !text-xs`}
+            placeholder="…or paste a Dropbox link (fallback)"
+            value={f.dropboxUrl}
+            onChange={(e) => set('dropboxUrl', e.target.value)}
+          />
         </div>
         <div className="sm:col-span-2">
           <div className={labelCls}>Who shot it</div>
@@ -532,9 +565,14 @@ function RecordingCard({
                 <div className="sm:col-span-2">
                   <span className={labelCls}>Dropbox folder</span>
                   <div className="truncate">
-                    {rec.dropboxUrl ? (
-                      <a href={rec.dropboxUrl} target="_blank" rel="noreferrer" className="text-stage-stems hover:underline text-sm">
-                        📁 Open in Dropbox
+                    {rec.dropboxPath || rec.dropboxUrl ? (
+                      <a
+                        href={rec.dropboxUrl || `https://www.dropbox.com/home${rec.dropboxPath.split('/').map(encodeURIComponent).join('/')}`}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="text-stage-stems hover:underline text-sm"
+                      >
+                        📁 {rec.dropboxPath ? <span className="font-mono text-xs">{rec.dropboxPath}</span> : 'Open in Dropbox'}
                       </a>
                     ) : (
                       <span className="text-muted">Not uploaded yet</span>

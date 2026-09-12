@@ -5,9 +5,12 @@ type Props = {
   initialPath?: string
   onSelect: (path: string) => void
   onCancel: () => void
+  // Lets non-admin project members browse inside that project's Dropbox
+  // folder (the server's path guard requires a scope for non-admins).
+  scopeProjectId?: string
 }
 
-export default function DropboxFolderPicker({ initialPath, onSelect, onCancel }: Props) {
+export default function DropboxFolderPicker({ initialPath, onSelect, onCancel, scopeProjectId }: Props) {
   // Empty initialPath ('') is allowed and means root; undefined falls back
   // to the workspace pickerStartPath so users don't see personal folders.
   const [currentPath, setCurrentPath] = useState(initialPath ?? '')
@@ -46,7 +49,7 @@ export default function DropboxFolderPicker({ initialPath, onSelect, onCancel }:
     setError(null)
     try {
       const apiPath = path === '' || path === '/' ? '/' : path
-      const { entries } = await api.dropboxList(apiPath)
+      const { entries } = await api.dropboxList(apiPath, scopeProjectId ? { scopeProjectId } : undefined)
       setEntries(entries.filter((e) => e.type === 'folder'))
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'failed'
@@ -88,7 +91,7 @@ export default function DropboxFolderPicker({ initialPath, onSelect, onCancel }:
     const path = `${(currentPath || '').replace(/\/$/, '')}/${name}`
     setCreating(true)
     try {
-      await api.dropboxCreateFolder(path)
+      await api.dropboxCreateFolder(path, scopeProjectId ? { scopeProjectId } : undefined)
       setNewFolderName('')
       setShowNewFolder(false)
       await load(currentPath)

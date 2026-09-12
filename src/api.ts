@@ -2153,6 +2153,7 @@ export type ApiQaRecording = {
   audioCard: string
   videoCard: string
   dropboxUrl: string
+  dropboxPath: string
   notes: string
   status: 'pending' | 'approved' | 'flagged' | 'cancelled'
   qaById: string | null
@@ -2175,12 +2176,13 @@ export type QaRecordingInput = {
   audioCard?: string
   videoCard?: string
   dropboxUrl?: string
+  dropboxPath?: string
   notes?: string
   shooterIds?: string[]
 }
 
 export type ApiQaContext = {
-  projects: Array<{ id: string; name: string; coverArtUrl: string | null }>
+  projects: Array<{ id: string; name: string; coverArtUrl: string | null; dropboxFolder: string | null }>
   users: Array<{ id: string; name: string; role: 'admin' | 'user' | 'viewer' }>
   canWrite: boolean
 }

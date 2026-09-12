@@ -37,7 +37,7 @@ qaRouter.get('/approved', async (req, res) => {
     }
     const { rows } = await pool.query(
       `SELECT r.id, r.title, r.record_date, r.recording_type, r.resolution,
-              r.dropbox_url, r.notes, r.qa_at,
+              r.dropbox_url, r.dropbox_path, r.notes, r.qa_at,
               p.id AS project_id, p.name AS project_name,
               qb.display_name AS qa_by_display, qb.name AS qa_by_name
          FROM qa_recordings r
@@ -56,6 +56,7 @@ qaRouter.get('/approved', async (req, res) => {
         recordingType: r.recording_type,
         resolution: r.resolution,
         dropboxUrl: r.dropbox_url,
+        dropboxPath: r.dropbox_path,
         notes: r.notes,
         approvedAt: r.qa_at,
         approvedBy: r.qa_by_display || r.qa_by_name || null,
@@ -110,8 +111,8 @@ qaRouter.get('/context', async (req, res) => {
   try {
     const projects = await pool.query(
       user.role === 'admin'
-        ? `SELECT id, name, cover_art_url FROM projects WHERE kind = 'podcast' ORDER BY name ASC`
-        : `SELECT DISTINCT p.id, p.name, p.cover_art_url FROM projects p
+        ? `SELECT id, name, cover_art_url, dropbox_folder FROM projects WHERE kind = 'podcast' ORDER BY name ASC`
+        : `SELECT DISTINCT p.id, p.name, p.cover_art_url, p.dropbox_folder FROM projects p
            LEFT JOIN project_members m ON m.project_id = p.id AND m.user_id = $1
            WHERE p.kind = 'podcast' AND (p.created_by = $1 OR m.user_id IS NOT NULL)
            ORDER BY p.name ASC`,
@@ -123,7 +124,7 @@ qaRouter.get('/context', async (req, res) => {
       `SELECT id, name, display_name, role FROM users ORDER BY COALESCE(display_name, name) ASC`,
     )
     res.json({
-      projects: projects.rows.map((p) => ({ id: p.id, name: p.name, coverArtUrl: p.cover_art_url ?? null })),
+      projects: projects.rows.map((p) => ({ id: p.id, name: p.name, coverArtUrl: p.cover_art_url ?? null, dropboxFolder: p.dropbox_folder ?? null })),
       users: users.rows.map((u) => ({ id: u.id, name: u.display_name || u.name, role: u.role })),
       canWrite: !isViewer(user),
     })
@@ -195,6 +196,7 @@ async function loadRecordings(where: string, params: unknown[]) {
     audioCard: r.audio_card,
     videoCard: r.video_card,
     dropboxUrl: r.dropbox_url,
+    dropboxPath: r.dropbox_path,
     notes: r.notes,
     status: r.status,
     qaById: r.qa_by,
@@ -247,6 +249,7 @@ type RecordingBody = {
   audioCard?: string
   videoCard?: string
   dropboxUrl?: string
+  dropboxPath?: string
   notes?: string
   shooterIds?: string[]
 }
@@ -279,14 +282,14 @@ qaRouter.post('/recordings', async (req, res) => {
     const { rows } = await pool.query<{ id: string }>(
       `INSERT INTO qa_recordings
          (project_id, title, record_date, upload_time, recording_type, resolution,
-          audio_folder, audio_card, video_card, dropbox_url, notes, created_by)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
+          audio_folder, audio_card, video_card, dropbox_url, dropbox_path, notes, created_by)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
        RETURNING id`,
       [
         projectId, title, dateOrNull(body.recordDate), str(body.uploadTime),
         str(body.recordingType), str(body.resolution), str(body.audioFolder),
         str(body.audioCard), str(body.videoCard), str(body.dropboxUrl),
-        str(body.notes), user.id,
+        str(body.dropboxPath), str(body.notes), user.id,
       ],
     )
     const id = rows[0].id
@@ -337,6 +340,7 @@ qaRouter.patch('/recordings/:id', async (req, res) => {
     if (body.audioCard !== undefined) set('audio_card', str(body.audioCard))
     if (body.videoCard !== undefined) set('video_card', str(body.videoCard))
     if (body.dropboxUrl !== undefined) set('dropbox_url', str(body.dropboxUrl))
+    if (body.dropboxPath !== undefined) set('dropbox_path', str(body.dropboxPath))
     if (body.notes !== undefined) set('notes', str(body.notes))
     if (sets.length > 0) {
       params.push(req.params.id)
