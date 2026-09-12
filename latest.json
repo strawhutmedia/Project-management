@@ -1,9 +1,9 @@
 {
   "version": "0.2.2",
-  "now": "2026-09-12T03:12:01.647Z",
+  "now": "2026-09-12T06:46:24.401Z",
   "boot": {
-    "startedAt": "2026-09-12T03:12:01.124Z",
-    "completedAt": "2026-09-12T03:12:01.638Z",
+    "startedAt": "2026-09-12T06:46:24.084Z",
+    "completedAt": "2026-09-12T06:46:24.385Z",
     "error": null
   },
   "env": {
@@ -187,12 +187,94 @@
       "148_qa_seed_recent.sql"
     ],
     "userCount": 15,
-    "projectCount": 16
+    "projectCount": 16,
+    "projects": [
+      {
+        "id": "2e9e2425-f53d-42d5-a4b6-ba29e25bb01b",
+        "name": "10 Seconds To Air with Alita Guillen",
+        "kind": "podcast"
+      },
+      {
+        "id": "12f53ed1-c6c7-4c11-8d7b-06d91744c9af",
+        "name": "Back in Your Arms",
+        "kind": "film"
+      },
+      {
+        "id": "c3ce2347-3703-494c-bfe3-1ff1a2d361fd",
+        "name": "Brandi Glanville Unfiltered with James Maas",
+        "kind": "podcast"
+      },
+      {
+        "id": "7116902a-ca1e-43ef-9eeb-e54f669cedd6",
+        "name": "Code x Connor",
+        "kind": "podcast"
+      },
+      {
+        "id": "3e9a5661-8e76-47a2-a80c-375e9c24629c",
+        "name": "Don't Be Alone with Jay Kogen",
+        "kind": "podcast"
+      },
+      {
+        "id": "5de249c0-f326-45cc-be23-d52a7d77ef1d",
+        "name": "Don't Be Alone w/ Jay Kogen",
+        "kind": "podcast"
+      },
+      {
+        "id": "3a941368-80ff-487a-a085-22dd78e4106f",
+        "name": "Maggie Glass — Record",
+        "kind": "album"
+      },
+      {
+        "id": "d46a04b9-ca9b-409d-a7a5-5fb878eaa7ea",
+        "name": "Naked Lunch",
+        "kind": "podcast"
+      },
+      {
+        "id": "f4680d92-624d-449e-b9c5-37ae2174d34c",
+        "name": "Only Murders in the Building Official Podcast",
+        "kind": "podcast"
+      },
+      {
+        "id": "c3227529-8bc9-43d9-995f-5d65a7bdbf9c",
+        "name": "Private Talk",
+        "kind": "podcast"
+      },
+      {
+        "id": "e356a418-e213-485a-9a09-aa785e11f9be",
+        "name": "Private Talk with Alexis Texas",
+        "kind": "podcast"
+      },
+      {
+        "id": "a54d52a7-8038-43f1-9768-d1278a65c90f",
+        "name": "Seen on the Screen",
+        "kind": "podcast"
+      },
+      {
+        "id": "8c019950-0299-4b76-aa22-ac1ad09caf19",
+        "name": "Shaping Freedom",
+        "kind": "podcast"
+      },
+      {
+        "id": "77d9b3b7-01a9-4856-8723-fa4bc9c6e21f",
+        "name": "Soul & Science",
+        "kind": "podcast"
+      },
+      {
+        "id": "59affa76-9eed-4ca7-a3ce-1bfd3413e6d8",
+        "name": "String and Tell",
+        "kind": "podcast"
+      },
+      {
+        "id": "6398889f-2481-4488-ab45-9d5ccace741b",
+        "name": "WICKED: The Official Podcast",
+        "kind": "podcast"
+      }
+    ]
   },
   "recentLog": [
     {
       "level": "info",
-      "ts": "2026-09-12T03:12:01.122Z",
+      "ts": "2026-09-12T06:46:24.081Z",
       "msg": "serving client from",
       "data": {
         "clientDir": "/app/dist"
@@ -200,7 +282,7 @@
     },
     {
       "level": "info",
-      "ts": "2026-09-12T03:12:01.124Z",
+      "ts": "2026-09-12T06:46:24.084Z",
       "msg": "boot starting",
       "data": {
         "cwd": "/app",
@@ -211,12 +293,12 @@
     },
     {
       "level": "info",
-      "ts": "2026-09-12T03:12:01.451Z",
+      "ts": "2026-09-12T06:46:24.264Z",
       "msg": "migrations complete"
     },
     {
       "level": "info",
-      "ts": "2026-09-12T03:12:01.570Z",
+      "ts": "2026-09-12T06:46:24.352Z",
       "msg": "wardrobe outfits: applied",
       "data": {
         "projectId": "12f53ed1-c6c7-4c11-8d7b-06d91744c9af",
@@ -227,7 +309,7 @@
     },
     {
       "level": "info",
-      "ts": "2026-09-12T03:12:01.570Z",
+      "ts": "2026-09-12T06:46:24.353Z",
       "msg": "BIYA seed: project already exists, ensured shoot days",
       "data": {
         "projectId": "12f53ed1-c6c7-4c11-8d7b-06d91744c9af"
@@ -235,17 +317,17 @@
     },
     {
       "level": "info",
-      "ts": "2026-09-12T03:12:01.638Z",
+      "ts": "2026-09-12T06:46:24.386Z",
       "msg": "listening on :8080"
     },
     {
       "level": "info",
-      "ts": "2026-09-12T03:12:01.638Z",
+      "ts": "2026-09-12T06:46:24.386Z",
       "msg": "scheduler started (every 5 min)"
     },
     {
       "level": "info",
-      "ts": "2026-09-12T03:12:01.641Z",
+      "ts": "2026-09-12T06:46:24.392Z",
       "msg": "autopilot: loop started",
       "data": {
         "tickMinutes": 10
@@ -253,7 +335,7 @@
     },
     {
       "level": "info",
-      "ts": "2026-09-12T03:12:01.641Z",
+      "ts": "2026-09-12T06:46:24.392Z",
       "msg": "cashflow payment check: loop started",
       "data": {
         "tickHours": 6
@@ -261,7 +343,7 @@
     },
     {
       "level": "info",
-      "ts": "2026-09-12T03:12:01.641Z",
+      "ts": "2026-09-12T06:46:24.392Z",
       "msg": "qa digest: loop started",
       "data": {
         "sendHourPT": 8
