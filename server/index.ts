@@ -35,6 +35,7 @@ import { audienceRouter } from './routes/audience'
 import { quickbooksRouter } from './routes/quickbooks'
 import { qbInvoicesRouter } from './routes/qb_invoices'
 import { storageRouter, handleTransferReport, handleAgentCommands, handleAgentAck } from './routes/storage'
+import { qaRouter } from './routes/qa'
 import { handleResendWebhook } from './routes/outreach_webhook'
 import { handleSesNotify } from './routes/ses_notify'
 import { handleSesInboundReply } from './routes/ses_inbound_reply'
@@ -176,6 +177,7 @@ app.use('/api/qb', qbInvoicesRouter)
 // (The public transfer-report POST is registered near the top of this file,
 // ahead of the requireUser-wrapped /api routers.)
 app.use('/api/storage', storageRouter)
+app.use('/api/qa', qaRouter)
 
 // Public per-show one-sheet page (guest outreach). Mounted at the root
 // so URLs are /shows/<slug>, and BEFORE the SPA fallback so requests

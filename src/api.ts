@@ -2128,3 +2128,102 @@ export const api = {
   notificationsReadAll: () =>
     request<{ ok: true }>('/api/notifications/read-all', { method: 'POST' }),
 }
+
+// ── QA Production Checklist (footage recorded + stored properly) ──
+export type ApiQaCheck = {
+  id: string
+  label: string
+  spec: string
+  checked: boolean
+  checkedByName: string | null
+  checkedAt: string | null
+}
+
+export type ApiQaRecording = {
+  id: string
+  projectId: string | null
+  projectName: string | null
+  projectCoverArtUrl: string | null
+  title: string
+  recordDate: string | null
+  uploadTime: string
+  recordingType: string
+  resolution: string
+  audioFolder: string
+  audioCard: string
+  videoCard: string
+  dropboxUrl: string
+  notes: string
+  status: 'pending' | 'approved' | 'flagged' | 'cancelled'
+  qaById: string | null
+  qaByName: string | null
+  qaAt: string | null
+  createdByName: string | null
+  createdAt: string
+  shooters: Array<{ id: string; name: string }>
+  checks: ApiQaCheck[]
+}
+
+export type QaRecordingInput = {
+  title?: string
+  projectId?: string | null
+  recordDate?: string | null
+  uploadTime?: string
+  recordingType?: string
+  resolution?: string
+  audioFolder?: string
+  audioCard?: string
+  videoCard?: string
+  dropboxUrl?: string
+  notes?: string
+  shooterIds?: string[]
+}
+
+export type ApiQaContext = {
+  projects: Array<{ id: string; name: string; coverArtUrl: string | null }>
+  users: Array<{ id: string; name: string; role: 'admin' | 'user' | 'viewer' }>
+  canWrite: boolean
+}
+
+export type ApiQaTemplateItem = { id: string; label: string; spec: string; position: number }
+
+export const qaApi = {
+  context: () => request<ApiQaContext>('/api/qa/context'),
+  recordings: (opts?: { projectId?: string; status?: string }) => {
+    const qs = new URLSearchParams()
+    if (opts?.projectId) qs.set('projectId', opts.projectId)
+    if (opts?.status) qs.set('status', opts.status)
+    const suffix = qs.toString() ? `?${qs.toString()}` : ''
+    return request<{ recordings: ApiQaRecording[] }>(`/api/qa/recordings${suffix}`)
+  },
+  createRecording: (body: QaRecordingInput) =>
+    request<{ recording: ApiQaRecording }>('/api/qa/recordings', { method: 'POST', body: JSON.stringify(body) }),
+  updateRecording: (id: string, body: QaRecordingInput) =>
+    request<{ recording: ApiQaRecording }>(`/api/qa/recordings/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
+  deleteRecording: (id: string) =>
+    request<{ ok: true }>(`/api/qa/recordings/${id}`, { method: 'DELETE' }),
+  setStatus: (id: string, status: ApiQaRecording['status']) =>
+    request<{ recording: ApiQaRecording }>(`/api/qa/recordings/${id}/status`, {
+      method: 'POST',
+      body: JSON.stringify({ status }),
+    }),
+  addCheck: (recordingId: string, body: { label: string; spec?: string }) =>
+    request<{ recording: ApiQaRecording }>(`/api/qa/recordings/${recordingId}/checks`, {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+  setCheck: (checkId: string, body: { checked?: boolean; label?: string; spec?: string }) =>
+    request<{ recording: ApiQaRecording }>(`/api/qa/checks/${checkId}`, {
+      method: 'PATCH',
+      body: JSON.stringify(body),
+    }),
+  deleteCheck: (checkId: string) =>
+    request<{ recording?: ApiQaRecording; ok?: true }>(`/api/qa/checks/${checkId}`, { method: 'DELETE' }),
+  template: (projectId: string) =>
+    request<{ items: ApiQaTemplateItem[] }>(`/api/qa/projects/${projectId}/template`),
+  saveTemplate: (projectId: string, items: Array<{ label: string; spec: string }>) =>
+    request<{ items: ApiQaTemplateItem[] }>(`/api/qa/projects/${projectId}/template`, {
+      method: 'PUT',
+      body: JSON.stringify({ items }),
+    }),
+}
