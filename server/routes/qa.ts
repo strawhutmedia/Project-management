@@ -70,6 +70,61 @@ qaRouter.get('/approved', async (req, res) => {
   }
 })
 
+// Token-authed status channel for the on-PC Premiere bot. It POSTs what
+// it's doing here; Ryan and Claude read it in Slate instead of relaying a
+// terminal by screenshot. Same QA_SERVICE_TOKEN as /approved, registered
+// BEFORE requireUser so the session-less bot can reach it.
+function qaTokenOk(req: { header: (n: string) => string | undefined }): boolean {
+  const configured = (process.env.QA_SERVICE_TOKEN ?? '').trim()
+  const presented = (
+    req.header('x-qa-token') ??
+    (req.header('authorization') ?? '').replace(/^Bearer\s+/i, '')
+  ).trim()
+  return configured.length >= 16 && presented === configured
+}
+
+qaRouter.post('/bot-log', async (req, res) => {
+  if (!qaTokenOk(req)) {
+    const u = await getSessionUser(req)
+    if (!u) { res.status(401).json({ error: 'unauthorized' }); return }
+  }
+  try {
+    const b = (req.body ?? {}) as { level?: string; message?: string; data?: unknown; source?: string }
+    const level = ['info', 'ok', 'warn', 'error'].includes(String(b.level)) ? String(b.level) : 'info'
+    await pool.query(
+      `INSERT INTO qa_bot_log (level, source, message, data) VALUES ($1, $2, $3, $4)`,
+      [
+        level,
+        String(b.source ?? 'premiere-bot').slice(0, 80),
+        String(b.message ?? '').slice(0, 8000),
+        b.data !== undefined ? JSON.stringify(b.data) : null,
+      ],
+    )
+    res.json({ ok: true })
+  } catch (err) {
+    logError('qa bot-log post failed', { error: err instanceof Error ? err.message : String(err) })
+    res.status(500).json({ error: 'internal_error' })
+  }
+})
+
+qaRouter.get('/bot-log', async (req, res) => {
+  if (!qaTokenOk(req)) {
+    const u = await getSessionUser(req)
+    if (!u) { res.status(401).json({ error: 'unauthorized' }); return }
+  }
+  try {
+    const limit = Math.min(200, Math.max(1, Number(req.query.limit) || 50))
+    const { rows } = await pool.query(
+      `SELECT ts, level, source, message, data FROM qa_bot_log ORDER BY ts DESC LIMIT $1`,
+      [limit],
+    )
+    res.json({ log: rows })
+  } catch (err) {
+    logError('qa bot-log get failed', { error: err instanceof Error ? err.message : String(err) })
+    res.status(500).json({ error: 'internal_error' })
+  }
+})
+
 qaRouter.use(requireUser)
 
 // The QA board is open to anyone who can see at least one podcast project
