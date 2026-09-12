@@ -49,6 +49,28 @@ async function backfillSeededShooters(): Promise<void> {
   }
 }
 
+// Same story for the show link: migration 148 could only attach seeded
+// recordings to projects that existed (and matched by name) when it ran.
+// Re-link any still-unlinked seeded row by title prefix on every boot.
+const SEEDED_SHOWS: Array<{ titlePrefix: string; nameLikes: string[] }> = [
+  { titlePrefix: 'DBAWJK%', nameLikes: ['%don%t be alone%', '%jay kogen%', '%dbawjk%'] },
+  { titlePrefix: 'SHAPING FREEDOM%', nameLikes: ['%shaping freedom%'] },
+  { titlePrefix: 'Invest in Her%', nameLikes: ['%invest in her%'] },
+]
+
+async function backfillSeededShows(): Promise<void> {
+  for (const s of SEEDED_SHOWS) {
+    await pool.query(
+      `UPDATE qa_recordings r SET project_id = p.id
+         FROM (SELECT id FROM projects
+                WHERE kind = 'podcast' AND name ILIKE ANY ($2::text[])
+                ORDER BY name LIMIT 1) p
+        WHERE r.project_id IS NULL AND r.title ILIKE $1`,
+      [s.titlePrefix, s.nameLikes],
+    )
+  }
+}
+
 export async function seedQaTeamInvites(): Promise<void> {
   for (const person of PEOPLE) {
     try {
@@ -101,6 +123,7 @@ export async function seedQaTeamInvites(): Promise<void> {
   }
   try {
     await backfillSeededShooters()
+    await backfillSeededShows()
   } catch (err) {
     logError('seed: QA shooter backfill failed', {
       error: err instanceof Error ? err.message : String(err),

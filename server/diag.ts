@@ -104,6 +104,7 @@ async function collectSnapshot() {
   let migrationsApplied: string[] = []
   let userCount: number | null = null
   let projectCount: number | null = null
+  let projects: Array<{ id: string; name: string; kind: string }> = []
   try {
     const r = await pool.query('SELECT 1 as ok')
     if (r.rows[0]?.ok === 1) dbState = 'ok'
@@ -118,6 +119,10 @@ async function collectSnapshot() {
       userCount = u.rows[0].n
       const p = await pool.query(`SELECT COUNT(*)::int as n FROM projects`)
       projectCount = p.rows[0].n
+      // Name + kind of every project, so status-branch readers can answer
+      // "does show X exist in Slate?" without DB access.
+      const pl = await pool.query(`SELECT id, name, kind FROM projects ORDER BY name`)
+      projects = pl.rows
     } catch {
       // tables may not exist yet
     }
@@ -135,7 +140,7 @@ async function collectSnapshot() {
     },
     env,
     paths: { ...expectedPaths, exists },
-    db: { state: dbState, error: dbError, migrationsApplied, userCount, projectCount },
+    db: { state: dbState, error: dbError, migrationsApplied, userCount, projectCount, projects },
     recentLog: ring.slice(-50),
   }
 }
