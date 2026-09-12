@@ -259,7 +259,18 @@ app.use((err: Error, req: express.Request, res: express.Response, _next: express
     res.status(400).send('Bad Request')
     return
   }
-  
+
+  // Malformed JSON request body (bad client, shell-quoting mangling a POST).
+  // Return 400 quietly — a bad body is the caller's problem, not a server
+  // fault, and it must NOT fire an admin alert. (This was spamming Ryan when
+  // the Windows premiere-bot posted status with mangled JSON quoting.)
+  if ((err as { type?: string }).type === 'entity.parse.failed' ||
+      (err instanceof SyntaxError && (err as { status?: number }).status === 400)) {
+    logInfo('ignored malformed JSON body', { method: req.method, path: req.path })
+    res.status(400).json({ error: 'bad_json' })
+    return
+  }
+
   logError('unhandled error', { message: err.message, stack: err.stack })
   res.status(500).json({ error: 'internal_error', message: err.message })
 })
