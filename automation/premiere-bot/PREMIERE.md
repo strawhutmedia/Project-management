@@ -19,6 +19,23 @@ How the bot builds a Premiere project for one episode. Confirmed with Ryan
 Import every video file into `Media/Video` and every standalone audio file
 into `Media/Audio`.
 
+## Sync method (confirmed) — per-camera waveform offset
+- No matching timecode. The Zoom recorder (H6 / L12 etc.) is the master
+  reference; its tracks share one start.
+- Compute an INDEPENDENT offset for each camera by cross-correlating that
+  camera's embedded scratch audio against the recorder's MASTER.WAV.
+- This one method covers both shooting modes with no special-casing:
+  - ATEM switcher: all cameras start together → offsets come out equal.
+  - Canon R5C manual start/stop: each camera starts at a different time →
+    each gets its own offset.
+- A camera split into `...01.mp4`, `...02.mp4` (file-size spanning) is ONE
+  continuous take — join per camera. (Open edge case for later: a camera
+  manually stopped and restarted mid-episode, which makes a real gap, not
+  a size-split span.)
+- Real example folder inspected (Ep190_RyanT): recorder subfolder
+  `180421_205013` with TRACK03/04.WAV (mics) + MASTER.WAV (mix); cameras
+  CAM 1 / CAM 3 / CAM 4 (no CAM 2), each spanned 01+02 → 3-angle multicam.
+
 ## The "good audio" rule (important)
 - **Good audio** = the standalone files in the `Audio` bin.
 - **Scratch audio** = the audio baked into the video clips (camera mic).
