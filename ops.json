@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-09-14T19:42:40.516Z",
+  "generatedAt": "2026-09-14T19:47:40.523Z",
   "note": "Read-only operational snapshot. Emails are masked; no full contact list is stored here.",
   "summary": {
     "showsWithOutreach": 2,
@@ -95,7 +95,7 @@
           {
             "name": "Steven Grossman",
             "emailMasked": "s***@untitledent.com",
-            "daysSinceFirstEmail": 60,
+            "daysSinceFirstEmail": 61,
             "opened": false,
             "openCount": 0
           },
