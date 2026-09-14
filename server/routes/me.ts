@@ -37,7 +37,7 @@ meRouter.patch('/', requireUser, async (req, res) => {
     values,
   )
   const refreshed = await pool.query(
-    `SELECT id, email, name, display_name, role, timezone FROM users WHERE id = $1`,
+    `SELECT id, email, name, display_name, role, timezone, is_invoicing_owner FROM users WHERE id = $1`,
     [user.id],
   )
   res.json({ user: refreshed.rows[0] })

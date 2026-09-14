@@ -18,6 +18,7 @@ export type SessionUser = {
   display_name: string | null
   role: UserRole
   timezone: string
+  is_invoicing_owner: boolean
 }
 
 // Convenience: returns true for viewer accounts (read-only). Used by
@@ -55,7 +56,7 @@ export async function getSessionUser(req: Request): Promise<SessionUser | null> 
   const sid = req.cookies?.[SESSION_COOKIE]
   if (!sid) return null
   const { rows } = await pool.query(
-    `SELECT u.id, u.email, u.name, u.display_name, u.role, u.timezone
+    `SELECT u.id, u.email, u.name, u.display_name, u.role, u.timezone, u.is_invoicing_owner
      FROM sessions s JOIN users u ON u.id = s.user_id
      WHERE s.id = $1 AND s.expires_at > now()`,
     [sid],
@@ -99,9 +100,10 @@ export async function requireAdmin(req: Request, res: Response, next: NextFuncti
   next()
 }
 
-// The invoicing / payroll tool is locked to a SINGLE owner account — not
-// just any admin. Contractor pay is nobody else's business. Defaults to
-// Ryan; override with the INVOICING_OWNER_EMAIL env var if ownership moves.
+// The invoicing / payroll tool (contractor pay, W9/TIN) and Cash Flow are
+// locked to a SINGLE owner account — not just any admin, and NOT
+// `is_invoicing_owner` below. Defaults to Ryan; override with
+// INVOICING_OWNER_EMAIL if ownership moves.
 export function ownerEmail(): string {
   return (process.env.INVOICING_OWNER_EMAIL || 'ryan@strawhutmedia.com').trim().toLowerCase()
 }
@@ -113,6 +115,28 @@ export function isOwner(user: { email: string }): boolean {
 export async function requireOwner(req: Request, res: Response, next: NextFunction) {
   const u = await getSessionUser(req)
   if (!u || !isOwner(u)) {
+    res.status(403).json({ error: 'forbidden' })
+    return
+  }
+  ;(req as Request & { user: SessionUser }).user = u
+  next()
+}
+
+// A narrow, named second seat on the CLIENT (AR) side of invoicing ONLY —
+// QuickBooks connection status + the Client Invoices card (create/edit/
+// send) — granted via the `is_invoicing_owner` flag (see migration 136).
+// Currently Caroline. Deliberately NOT folded into isOwner/requireOwner:
+// she must NOT gain contractor payroll/W9 (TIN) access or Cash Flow —
+// Ryan was explicit that she should see neither. If someone else needs
+// this same narrow seat later, set their `is_invoicing_owner` flag the
+// same way (034/136 pattern).
+export function isInvoicingCoOwner(user: { is_invoicing_owner?: boolean }): boolean {
+  return Boolean(user.is_invoicing_owner)
+}
+
+export async function requireInvoicingAccess(req: Request, res: Response, next: NextFunction) {
+  const u = await getSessionUser(req)
+  if (!u || !(isOwner(u) || isInvoicingCoOwner(u))) {
     res.status(403).json({ error: 'forbidden' })
     return
   }
@@ -141,7 +165,7 @@ export async function requireOwnerOrService(req: Request, res: Response, next: N
     (authHeader.startsWith('Bearer ') ? authHeader.slice(7).trim() : '')
   if (expected && header && safeEqual(header, expected)) {
     const { rows } = await pool.query(
-      `SELECT id, email, name, display_name, role, timezone FROM users WHERE lower(email) = $1 LIMIT 1`,
+      `SELECT id, email, name, display_name, role, timezone, is_invoicing_owner FROM users WHERE lower(email) = $1 LIMIT 1`,
       [ownerEmail()],
     )
     if (!rows[0]) { res.status(500).json({ error: 'owner_user_missing' }); return }

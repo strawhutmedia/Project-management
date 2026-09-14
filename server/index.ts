@@ -33,14 +33,23 @@ import { cashflowRouter } from './routes/cashflow'
 import { intakeRouter } from './routes/intake'
 import { audienceRouter } from './routes/audience'
 import { quickbooksRouter } from './routes/quickbooks'
+import { qbInvoicesRouter } from './routes/qb_invoices'
+import { storageRouter, handleTransferReport, handleAgentCommands, handleAgentAck } from './routes/storage'
+import { qaRouter } from './routes/qa'
 import { handleResendWebhook } from './routes/outreach_webhook'
+import { handleSesNotify } from './routes/ses_notify'
+import { handleSesInboundReply } from './routes/ses_inbound_reply'
+import { scheduleBoot as scheduleSesBounceSetup } from './ses_bounce_setup'
 import { seedBackInYourArms } from './seeds/back_in_your_arms'
 import { seedMadelineInvite } from './seeds/invite_madeline'
+import { seedQaTeamInvites } from './seeds/invite_qa_team'
+import { seedMergeJayKogen } from './seeds/merge_jay_kogen'
 import { ensureRyanIsPodcastEp } from './routes/projects'
 import { startScheduler } from './scheduler'
 import { scheduleBootTimeCoverSync, syncMissingCoversFromRss } from './rss_cover_sync'
 import { scheduleFlagshipSeed } from './seeds/flagship_podcasts'
 import { scheduleBootResendProbe } from './boot_resend_probe'
+import { scheduleBootSesProbe } from './boot_ses_probe'
 import { scheduleBootBiyaScriptDump } from './boot_biya_script_dump'
 import { scheduleBootBudgetDump } from './boot_budget_dump'
 import { scheduleBootLocationsDump } from './boot_locations_dump'
@@ -83,8 +92,42 @@ app.post('/api/outreach/resend-webhook', express.raw({ type: () => true }), (req
   void handleResendWebhook(req, res)
 })
 
+// Amazon SES bounce/complaint receiver, delivered via SNS — the same idea
+// as the Resend webhook above, for mail sent through SES instead. Also
+// needs the raw body (to verify SNS's own message signature) ahead of the
+// JSON parser. Public: SNS can't authenticate as an admin.
+app.post('/api/ses/notify', express.raw({ type: () => true }), (req, res) => {
+  void handleSesNotify(req, res)
+})
+
+// Inbound-reply receiver — outreach replies sent to a show's Slate-owned
+// capture address (p-<projectId>@<inbound domain>) instead of a real human
+// inbox. Same raw-body-before-JSON-parser requirement as the two above.
+app.post('/api/ses/inbound-reply', express.raw({ type: () => true }), (req, res) => {
+  void handleSesInboundReply(req, res)
+})
+
 app.use(express.json({ limit: '20mb' }))
 app.use(cookieParser())
+
+// Live transfer stats POSTed by the reporter on the UGREEN NAS (text/plain
+// rclone log tail, token-gated via STORAGE_REPORT_TOKEN — the NAS has no
+// browser session). MUST be registered before the broad `app.use('/api', …)`
+// routers below: those apply requireUser to every /api/* request that
+// reaches them, which 401s the reporter's token-authenticated POSTs.
+app.post('/api/storage/transfer-report/:name', express.text({ type: '*/*', limit: '64kb' }), (req, res) => {
+  void handleTransferReport(req, res)
+})
+
+// Pause/Resume agent on each NAS: polls pending commands, runs docker
+// stop/start on the matching rclone container, then acks. Same token gate
+// and same must-be-before-requireUser reasoning as the transfer report.
+app.get('/api/storage/agent/commands', (req, res) => {
+  void handleAgentCommands(req, res)
+})
+app.post('/api/storage/agent/ack/:name', (req, res) => {
+  void handleAgentAck(req, res)
+})
 
 app.get('/api/health', (_req, res) => {
   res.json({ ok: true, ts: new Date().toISOString() })
@@ -114,6 +157,11 @@ app.use('/api/scheduler', socialSchedulerRouter)
 // reaches them, which would 401 the phone's login-less button presses before
 // they got here. Its own /remote/stream route enforces login itself.
 app.use('/api/teleprompter/remote', teleprompterRemoteRouter)
+// QA router: its /approved feed is token-authed (no session) for the
+// Premiere automation, so it MUST be mounted before the broad
+// `app.use('/api', …)` routers below — those apply requireUser to every
+// /api/* request and would 401 the token-only call before it got here.
+app.use('/api/qa', qaRouter)
 // show_chat mounts on /api directly because its routes are
 // /api/projects/:id/chat — colocated with project-scoped endpoints.
 app.use('/api', showChatRouter)
@@ -131,6 +179,11 @@ app.use('/api/intake', intakeRouter)
 // public (ManyChat posts to it); everything else requires a session.
 app.use('/api/audience', audienceRouter)
 app.use('/api/qb', quickbooksRouter)
+app.use('/api/qb', qbInvoicesRouter)
+// Master Archive (S3 Deep Archive vault) browser — admin-only, read-only.
+// (The public transfer-report POST is registered near the top of this file,
+// ahead of the requireUser-wrapped /api routers.)
+app.use('/api/storage', storageRouter)
 
 // Public per-show one-sheet page (guest outreach). Mounted at the root
 // so URLs are /shows/<slug>, and BEFORE the SPA fallback so requests
@@ -206,7 +259,20 @@ app.use((err: Error, req: express.Request, res: express.Response, _next: express
     res.status(400).send('Bad Request')
     return
   }
-  
+
+  // Malformed JSON request body (bad client, shell-quoting mangling a POST).
+  // Return 400 quietly — a bad body is the caller's problem, not a server
+  // fault, and it must NOT fire an admin alert. (This was spamming Ryan when
+  // the Windows premiere-bot posted status with mangled JSON quoting.)
+  const isJsonParseError = (err as { type?: string }).type === 'entity.parse.failed' ||
+                           (err instanceof SyntaxError && (err as { status?: number }).status === 400) ||
+                           (err instanceof SyntaxError && /\bin JSON\b/i.test(err.message))
+  if (isJsonParseError) {
+    logInfo('ignored malformed JSON body', { method: req.method, path: req.path })
+    res.status(400).json({ error: 'bad_json' })
+    return
+  }
+
   logError('unhandled error', { message: err.message, stack: err.stack })
   res.status(500).json({ error: 'internal_error', message: err.message })
 })
@@ -225,6 +291,8 @@ async function start() {
     await seedBackInYourArms()
     await ensureRyanIsPodcastEp()
     await seedMadelineInvite()
+    await seedMergeJayKogen()
+    await seedQaTeamInvites()
   } catch (err) {
     logError('migrations failed', { error: err instanceof Error ? err.message : String(err) })
     markBootError(err)
@@ -236,6 +304,8 @@ async function start() {
     scheduleFlagshipSeed()
     scheduleBootTimeCoverSync()
     scheduleBootResendProbe()
+    scheduleBootSesProbe()
+    scheduleSesBounceSetup()
     scheduleBootBiyaScriptDump()
     scheduleBootBudgetDump()
     scheduleBootLocationsDump()
@@ -248,6 +318,9 @@ async function start() {
     })
     void import('./cashflow_payment_check').then(({ startCashflowPaymentCheckLoop }) => {
       startCashflowPaymentCheckLoop()
+    })
+    void import('./qa_digest').then(({ startQaDigestLoop }) => {
+      startQaDigestLoop()
     })
     void enableDomainOpenTracking()
     // Pick up any breakdown runs that were killed by the previous

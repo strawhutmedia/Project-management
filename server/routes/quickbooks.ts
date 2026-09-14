@@ -1,17 +1,20 @@
 import { Router } from 'express'
 import crypto from 'crypto'
-import { requireOwner, type SessionUser } from '../auth'
+import { requireOwner, requireInvoicingAccess, type SessionUser } from '../auth'
 import { logError } from '../diag'
 import * as qb from '../quickbooks'
 
-// QuickBooks OAuth connect flow. Owner-only. The callback is hit by the
-// owner's browser after authorizing at Intuit (session cookie rides along on
-// the top-level redirect), and a CSRF state cookie guards it.
+// QuickBooks OAuth connect flow. Connecting/disconnecting the actual
+// QuickBooks account stays owner-only. /status is also readable by the
+// invoicing co-owner (Caroline) since the Client Invoices card needs it
+// just to know whether to render. The callback is hit by the owner's
+// browser after authorizing at Intuit (session cookie rides along on the
+// top-level redirect), and a CSRF state cookie guards it.
 export const quickbooksRouter = Router()
 
 const STATE_COOKIE = 'qb_oauth_state'
 
-quickbooksRouter.get('/status', requireOwner, async (_req, res) => {
+quickbooksRouter.get('/status', requireInvoicingAccess, async (_req, res) => {
   try {
     const c = await qb.getConnection()
     res.json({

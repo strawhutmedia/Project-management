@@ -15,6 +15,9 @@ export type ApiUser = {
   display_name: string | null
   role: 'admin' | 'user' | 'viewer'
   timezone: string
+  // Named second seat on the client (AR) side of Invoicing — QuickBooks
+  // connection + Client Invoices only, not contractor payroll/W9 or Cash Flow.
+  is_invoicing_owner: boolean
 }
 
 export type ApiComment = {
@@ -662,6 +665,7 @@ export type ApiOutreachTemplate = {
   body: string
   from_name: string | null
   reply_to: string | null
+  notify_email: string | null
   location: string | null
   followup_subject: string | null
   followup_body: string | null
@@ -684,6 +688,13 @@ export type ApiFollowupPreview = {
   eligible: ApiFollowupEligible[]
   followupQueued: number
   followupSent: number
+}
+
+export type OutreachFindSimilarProgress = {
+  iteration: number
+  maxIterations: number
+  searches: number
+  fetches: number
 }
 
 export type ApiOutreachProspect = {
@@ -799,6 +810,44 @@ export type ApiPipelineDeal = {
   notes: string
   createdAt: string
   updatedAt: string
+}
+
+// ── Master Archive (S3 vault) browser ──
+export type ApiArchiveFile = {
+  key: string
+  name: string
+  size: number
+  storageClass: string
+  lastModified: string | null
+}
+
+export type ApiArchivePrefixAgg = { prefix: string; objects: number; bytes: number }
+
+export type ApiArchiveTransfer = {
+  name: string
+  bytesDone: string
+  bytesTotal: string
+  percent: number | null
+  speed: string
+  eta: string
+  filesDone: number | null
+  filesTotal: number | null
+  errors: number
+  lastProgressAt?: string
+  currentFiles?: Array<{ name: string; pct: number | null; speed: string; eta: string }>
+  reportedAt: string
+  command?: { action: 'stop' | 'start'; requestedAt: string; executedAt: string | null } | null
+}
+
+export type ApiArchiveSummary = {
+  bucket: string
+  scannedAt: string
+  truncated: boolean
+  totals: { objects: number; bytes: number }
+  byClass: Array<{ storageClass: string; objects: number; bytes: number; estMonthlyUsd: number }>
+  estMonthlyUsd: number
+  topLevel: ApiArchivePrefixAgg[]
+  secondLevel: ApiArchivePrefixAgg[]
 }
 
 // ── Contractor invoicing (admin payroll tool) ──
@@ -980,6 +1029,64 @@ export const api = {
   // QuickBooks connection (AR side)
   qbStatus: () => request<{ configured: boolean; connected: boolean; env: string; realmId: string | null; redirectUri: string }>('/api/qb/status'),
   qbDisconnect: () => request<{ ok: true }>('/api/qb/disconnect', { method: 'POST' }),
+  // Client invoices (AR) — create is draft-only, never emails. Send is a
+  // separate, explicit call only ever made from a button the owner clicks.
+  qbSearchCustomers: (q: string) =>
+    request<{ customers: Array<{ id: string; name: string; email: string | null }> }>(`/api/qb/customers/search?q=${encodeURIComponent(q)}`),
+  qbItems: () => request<{ items: Array<{ id: string; name: string; unitPrice: number }> }>('/api/qb/items'),
+  qbListInvoices: () =>
+    request<{ invoices: Array<{
+      id: string; docNumber: string; total: number; balance: number
+      dueDate: string | null; txnDate: string | null
+      customerId: string | null; customerName: string; billEmail: string | null; ccEmail: string | null
+      note: string
+      sent: boolean; paid: boolean
+      lines: Array<{ itemId: string; description: string; qty: number; rate: number; amount: number }>
+    }> }>('/api/qb/invoices'),
+  qbCreateInvoiceDraft: (body: {
+    customerId: string; dueDate?: string; txnDate?: string; note?: string; billEmail?: string; ccEmail?: string
+    lines: Array<{ itemId: string; description?: string; qty?: number; rate: number }>
+  }) => request<{ invoice: { id: string; docNumber: string; total: number } }>('/api/qb/invoices', {
+    method: 'POST', body: JSON.stringify(body),
+  }),
+  // Edit an existing invoice (line items/dates/note/emails) — never emails
+  // by itself, sent or not. Use this to fix a mistake, then Send/Resend below.
+  qbUpdateInvoice: (id: string, body: {
+    dueDate?: string; note?: string; billEmail?: string; ccEmail?: string
+    lines: Array<{ itemId: string; description?: string; qty?: number; rate: number }>
+  }) => request<{ invoice: { id: string; docNumber: string; total: number } }>(`/api/qb/invoices/${id}`, {
+    method: 'PUT', body: JSON.stringify(body),
+  }),
+  qbSendInvoice: (id: string, sendTo: string) =>
+    request<{ ok: true }>(`/api/qb/invoices/${id}/send`, { method: 'POST', body: JSON.stringify({ sendTo }) }),
+
+  // Master Archive (S3 Deep Archive vault) — admin-only, read-only browser.
+  storageStatus: () =>
+    request<{ configured: boolean; bucket: string; region: string }>('/api/storage/status'),
+  storageSummary: (force = false) =>
+    request<{ configured: boolean; cached?: boolean; summary?: ApiArchiveSummary }>(
+      `/api/storage/summary${force ? '?force=1' : ''}`,
+    ),
+  storageTransfers: () =>
+    request<{ transfers: ApiArchiveTransfer[] }>('/api/storage/transfers'),
+  storageAutoQueue: () => request<{ on: boolean }>('/api/storage/auto-queue'),
+  storageSetAutoQueue: (on: boolean) =>
+    request<{ ok: boolean; on: boolean }>('/api/storage/auto-queue', { method: 'POST', body: JSON.stringify({ on }) }),
+  storageTransferDismiss: (name: string) =>
+    request<{ ok: boolean }>(`/api/storage/transfers/${encodeURIComponent(name)}/dismiss`, { method: 'POST', body: '{}' }),
+  storageTransferCommand: (name: string, action: 'pause' | 'resume') =>
+    request<{ ok: boolean; action: 'stop' | 'start' }>(`/api/storage/transfers/${encodeURIComponent(name)}/command`, {
+      method: 'POST',
+      body: JSON.stringify({ action }),
+    }),
+  storageList: (prefix: string) =>
+    request<{
+      configured: boolean
+      prefix: string
+      folders: string[]
+      files: ApiArchiveFile[]
+      truncated: boolean
+    }>(`/api/storage/list?prefix=${encodeURIComponent(prefix)}`),
 
   // Teleprompter — shared sessions for the podcast team.
   teleprompterList: () => request<{ sessions: ApiTeleprompterSession[] }>('/api/teleprompter'),
@@ -1124,6 +1231,14 @@ export const api = {
     }),
   audienceResync: (projectId: string) =>
     request<{ ok: true; pushed: number }>(`/api/audience/projects/${projectId}/resync`, { method: 'POST' }),
+  // Broadcast to a show's fan list directly from Slate (SES today, Resend
+  // as fallback) — the in-app replacement for sending from the Resend
+  // dashboard. Never called automatically; only from an explicit click.
+  audienceBroadcast: (projectId: string, body: { subject: string; html: string; fromName?: string; fromEmail?: string }) =>
+    request<{ ok: true; sent: number; failed: number; failedEmails: string[] }>(
+      `/api/audience/projects/${projectId}/broadcast`,
+      { method: 'POST', body: JSON.stringify(body) },
+    ),
   // Lead follow-up drafts (sales-pipeline lists only)
   audienceFollowups: (projectId: string) =>
     request<{
@@ -1824,8 +1939,8 @@ export const api = {
       { method: 'POST', body: JSON.stringify({ contactIds }) },
     ),
   outreachTemplate: (projectId: string) =>
-    request<{ template: ApiOutreachTemplate | null }>(`/api/outreach/projects/${projectId}/template`),
-  saveOutreachTemplate: (projectId: string, body: { subject: string; body: string; fromName?: string; replyTo?: string; location?: string }) =>
+    request<{ template: ApiOutreachTemplate | null; inboundCaptureAddress: string }>(`/api/outreach/projects/${projectId}/template`),
+  saveOutreachTemplate: (projectId: string, body: { subject: string; body: string; fromName?: string; replyTo?: string; notifyEmail?: string; location?: string }) =>
     request<{ ok: true }>(`/api/outreach/projects/${projectId}/template`, {
       method: 'PUT', body: JSON.stringify(body),
     }),
@@ -1918,6 +2033,58 @@ export const api = {
       `/api/outreach/projects/${projectId}/prospects/bulk`,
       { method: 'POST', body: JSON.stringify({ rows, batchLabel }) },
     ),
+  // Not routed through the shared `request()` helper: this call can run
+  // 10+ minutes, so the server streams newline-delimited JSON progress
+  // events and always responds 200 (it can't change the status code after
+  // streaming has started) — the real outcome is the stream's last line,
+  // not the HTTP status. `onProgress` gets real search/fetch counts as
+  // they happen, for a live progress indicator instead of a blind spinner.
+  findSimilarProspects: async (
+    projectId: string,
+    onProgress?: (progress: OutreachFindSimilarProgress) => void,
+  ) => {
+    const res = await fetch(`/api/outreach/projects/${projectId}/prospects/find-similar`, {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+    })
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({ error: 'unknown' }))
+      const code = body.error ?? `HTTP ${res.status}`
+      throw new Error(body.detail ? `${code}: ${body.detail}` : code)
+    }
+    if (!res.body) throw new Error('unknown')
+    const reader = res.body.getReader()
+    const decoder = new TextDecoder()
+    let buf = ''
+    type FindSimilarResult = { imported: number; failed: number; duplicates: number; batchLabel: string }
+    type FindSimilarError = { error: string; detail?: string }
+    let result: FindSimilarResult | null = null
+    let errorEvt: FindSimilarError | null = null
+    for (;;) {
+      const { done, value } = await reader.read()
+      if (done) break
+      buf += decoder.decode(value, { stream: true })
+      let idx: number
+      while ((idx = buf.indexOf('\n')) !== -1) {
+        const line = buf.slice(0, idx).trim()
+        buf = buf.slice(idx + 1)
+        if (!line) continue
+        let evt: Record<string, unknown>
+        try { evt = JSON.parse(line) } catch { continue }
+        if (evt.type === 'progress') onProgress?.(evt as unknown as OutreachFindSimilarProgress)
+        else if (evt.type === 'done') result = evt as unknown as FindSimilarResult
+        else if (evt.type === 'error') errorEvt = evt as unknown as FindSimilarError
+      }
+    }
+    if (errorEvt) {
+      const err: FindSimilarError = errorEvt
+      const code = err.error ?? 'unknown'
+      throw new Error(err.detail ? `${code}: ${err.detail}` : code)
+    }
+    if (!result) throw new Error('unknown')
+    return result
+  },
   updateOutreachProspect: (id: string, patch: Partial<{
     name: string; fullName: string | null; email: string | null;
     recipientType: 'person' | 'agent' | 'manager' | 'other';
@@ -1964,6 +2131,22 @@ export const api = {
         action: 'updated' | 'unchanged' | 'missing_in_resend';
       }>;
     }>('/api/admin/outreach/domains/sync-with-resend', { method: 'POST' }),
+  syncOutreachDomainsWithSes: () =>
+    request<{
+      ok: true;
+      changes: Array<{
+        name: string;
+        before: string;
+        after: string;
+        sesVisibility: 'not_added' | 'added_unverified' | 'verified';
+        action: 'updated' | 'unchanged';
+      }>;
+    }>('/api/admin/outreach/domains/sync-with-ses', { method: 'POST' }),
+  syncOutreachBounceWebhook: () =>
+    request<
+      | { configured: false; reason: string }
+      | { configured: true; topicArn: string; eventDestinationName: string; action: 'created' | 'updated' | 'already_current' }
+    >('/api/admin/outreach/domains/bounce-webhook/sync', { method: 'POST' }),
 
   // Notifications
   notifications: () => request<{ notifications: ApiNotification[]; unreadCount: number }>('/api/notifications'),
@@ -1971,4 +2154,105 @@ export const api = {
     request<{ ok: true }>(`/api/notifications/${id}/read`, { method: 'POST' }),
   notificationsReadAll: () =>
     request<{ ok: true }>('/api/notifications/read-all', { method: 'POST' }),
+}
+
+// ── QA Production Checklist (footage recorded + stored properly) ──
+export type ApiQaCheck = {
+  id: string
+  label: string
+  spec: string
+  checked: boolean
+  checkedByName: string | null
+  checkedAt: string | null
+}
+
+export type ApiQaRecording = {
+  id: string
+  projectId: string | null
+  projectName: string | null
+  projectCoverArtUrl: string | null
+  title: string
+  recordDate: string | null
+  uploadTime: string
+  recordingType: string
+  resolution: string
+  audioFolder: string
+  audioCard: string
+  videoCard: string
+  dropboxUrl: string
+  dropboxPath: string
+  notes: string
+  status: 'pending' | 'approved' | 'flagged' | 'cancelled'
+  qaById: string | null
+  qaByName: string | null
+  qaAt: string | null
+  createdByName: string | null
+  createdAt: string
+  shooters: Array<{ id: string; name: string }>
+  checks: ApiQaCheck[]
+}
+
+export type QaRecordingInput = {
+  title?: string
+  projectId?: string | null
+  recordDate?: string | null
+  uploadTime?: string
+  recordingType?: string
+  resolution?: string
+  audioFolder?: string
+  audioCard?: string
+  videoCard?: string
+  dropboxUrl?: string
+  dropboxPath?: string
+  notes?: string
+  shooterIds?: string[]
+}
+
+export type ApiQaContext = {
+  projects: Array<{ id: string; name: string; coverArtUrl: string | null; dropboxFolder: string | null }>
+  users: Array<{ id: string; name: string; role: 'admin' | 'user' | 'viewer' }>
+  canWrite: boolean
+}
+
+export type ApiQaTemplateItem = { id: string; label: string; spec: string; position: number }
+
+export const qaApi = {
+  context: () => request<ApiQaContext>('/api/qa/context'),
+  recordings: (opts?: { projectId?: string; status?: string }) => {
+    const qs = new URLSearchParams()
+    if (opts?.projectId) qs.set('projectId', opts.projectId)
+    if (opts?.status) qs.set('status', opts.status)
+    const suffix = qs.toString() ? `?${qs.toString()}` : ''
+    return request<{ recordings: ApiQaRecording[] }>(`/api/qa/recordings${suffix}`)
+  },
+  createRecording: (body: QaRecordingInput) =>
+    request<{ recording: ApiQaRecording }>('/api/qa/recordings', { method: 'POST', body: JSON.stringify(body) }),
+  updateRecording: (id: string, body: QaRecordingInput) =>
+    request<{ recording: ApiQaRecording }>(`/api/qa/recordings/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
+  deleteRecording: (id: string) =>
+    request<{ ok: true }>(`/api/qa/recordings/${id}`, { method: 'DELETE' }),
+  setStatus: (id: string, status: ApiQaRecording['status']) =>
+    request<{ recording: ApiQaRecording }>(`/api/qa/recordings/${id}/status`, {
+      method: 'POST',
+      body: JSON.stringify({ status }),
+    }),
+  addCheck: (recordingId: string, body: { label: string; spec?: string }) =>
+    request<{ recording: ApiQaRecording }>(`/api/qa/recordings/${recordingId}/checks`, {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+  setCheck: (checkId: string, body: { checked?: boolean; label?: string; spec?: string }) =>
+    request<{ recording: ApiQaRecording }>(`/api/qa/checks/${checkId}`, {
+      method: 'PATCH',
+      body: JSON.stringify(body),
+    }),
+  deleteCheck: (checkId: string) =>
+    request<{ recording?: ApiQaRecording; ok?: true }>(`/api/qa/checks/${checkId}`, { method: 'DELETE' }),
+  template: (projectId: string) =>
+    request<{ items: ApiQaTemplateItem[] }>(`/api/qa/projects/${projectId}/template`),
+  saveTemplate: (projectId: string, items: Array<{ label: string; spec: string }>) =>
+    request<{ items: ApiQaTemplateItem[] }>(`/api/qa/projects/${projectId}/template`, {
+      method: 'PUT',
+      body: JSON.stringify({ items }),
+    }),
 }

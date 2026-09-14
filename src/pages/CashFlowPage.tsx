@@ -65,6 +65,8 @@ function Stat({ label, value, tone }: { label: string; value: string; tone?: 'go
 
 // The server is the real gate (403s for anyone but the owner). This
 // client-side check just hides the UI from other signed-in accounts.
+// Deliberately Ryan-only — Cash Flow does NOT extend to the invoicing
+// co-owner (Caroline); see server/auth.ts requireInvoicingAccess.
 const OWNER_EMAIL = 'ryan@strawhutmedia.com'
 
 type EntryDraft = {

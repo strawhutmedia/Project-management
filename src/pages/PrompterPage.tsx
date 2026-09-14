@@ -201,7 +201,13 @@ export default function PrompterPage() {
   // --- phone-as-remote (this device HOSTS a control channel) ---------------
   const [remoteOpen, setRemoteOpen] = useState(false) // pairing overlay visible
   const [remoteCode, setRemoteCode] = useState<string | null>(null)
-  const [remotePhoneSeen, setRemotePhoneSeen] = useState(false)
+  // 'waiting': nobody has loaded /r on this code yet.
+  // 'joined':  a phone opened /r and polled status — reachable, but no
+  //            button pressed yet (this is the state most pairings sit
+  //            in — it used to look identical to 'waiting').
+  // 'pressed': a button press round-tripped — fully proven working.
+  const [remoteConn, setRemoteConn] = useState<'waiting' | 'joined' | 'pressed'>('waiting')
+  const [remoteLostConn, setRemoteLostConn] = useState(false)
   // A monotonically-bumped signal so the Runner reacts to run-control presses
   // (play/pause, restart, exit) even when the same button is pressed twice.
   const [runnerCmd, setRunnerCmd] = useState<{ action: string; n: number }>({ action: '', n: 0 })
@@ -237,7 +243,7 @@ export default function PrompterPage() {
   // Apply a button press coming from a paired phone. Settings-level presses
   // (speed / size) are handled here; run controls are forwarded to the Runner.
   const handleRemoteAction = useCallback((action: string) => {
-    setRemotePhoneSeen(true)
+    setRemoteConn('pressed')
     switch (action) {
       case 'faster':
         setSettingsState((s) => ({ ...s, speed: Math.min(100, s.speed + 2) }))
@@ -288,11 +294,21 @@ export default function PrompterPage() {
     es.addEventListener('code', (e) => {
       try {
         const { code } = JSON.parse((e as MessageEvent).data)
-        if (code) setRemoteCode(code)
+        if (code) {
+          // A fresh code means a brand-new channel (first connect, or a
+          // reconnect after the server dropped us — e.g. a deploy). Either
+          // way any old pairing state is void: a phone that already scanned
+          // the previous QR is now pointed at a dead code and needs to
+          // rescan, so don't leave the UI reading "connected".
+          setRemoteCode(code)
+          setRemoteConn('waiting')
+          setRemoteLostConn(false)
+        }
       } catch {
         /* ignore */
       }
     })
+    es.addEventListener('joined', () => setRemoteConn((c) => (c === 'pressed' ? c : 'joined')))
     es.addEventListener('cmd', (e) => {
       try {
         const { action } = JSON.parse((e as MessageEvent).data)
@@ -301,6 +317,10 @@ export default function PrompterPage() {
         /* ignore */
       }
     })
+    // The browser retries automatically, but silently — without this the
+    // overlay would keep showing a code that's already dead server-side
+    // (e.g. mid-deploy) with no indication anything's wrong.
+    es.onerror = () => setRemoteLostConn(true)
   }, [handleRemoteAction])
 
   // Tear down the channel when leaving the prompter entirely.
@@ -487,7 +507,8 @@ export default function PrompterPage() {
   const remoteOverlay = remoteOpen ? (
     <RemoteOverlay
       code={remoteCode}
-      phoneSeen={remotePhoneSeen}
+      conn={remoteConn}
+      lostConn={remoteLostConn}
       onClose={() => setRemoteOpen(false)}
     />
   ) : null
@@ -503,6 +524,7 @@ export default function PrompterPage() {
           onOpenRemote={startRemote}
           remoteActive={Boolean(remoteCode)}
           command={runnerCmd}
+          onEditHtml={updateCurrentHtml}
         />
         {remoteOverlay}
       </>
@@ -542,11 +564,13 @@ export default function PrompterPage() {
 
 function RemoteOverlay({
   code,
-  phoneSeen,
+  conn,
+  lostConn,
   onClose,
 }: {
   code: string | null
-  phoneSeen: boolean
+  conn: 'waiting' | 'joined' | 'pressed'
+  lostConn: boolean
   onClose: () => void
 }) {
   const [qr, setQr] = useState<string>('')
@@ -577,9 +601,27 @@ function RemoteOverlay({
             <p className="text-text font-mono text-sm mb-3">{window.location.host}/r</p>
             <p className="text-xs text-muted mb-1">and enter code</p>
             <p className="font-display text-4xl tracking-[0.3em] text-rainbow mb-4">{code}</p>
-            <div className="flex items-center justify-center gap-2 mb-4">
-              <span className={`h-2.5 w-2.5 rounded-full ${phoneSeen ? 'bg-emerald-400' : 'bg-amber-400'}`} />
-              <span className="text-xs text-muted">{phoneSeen ? 'Phone connected — you can close this' : 'Waiting for a phone…'}</span>
+            <div className="mb-4">
+              <div className="flex items-center justify-center gap-2">
+                <span className={`h-2.5 w-2.5 rounded-full ${
+                  lostConn ? 'bg-urgent animate-pulse'
+                    : conn === 'pressed' ? 'bg-emerald-400'
+                    : conn === 'joined' ? 'bg-sky-400'
+                    : 'bg-amber-400'
+                }`} />
+                <span className="text-xs text-muted">
+                  {lostConn ? 'Reconnecting… if this sticks, close and reopen phone remote'
+                    : conn === 'pressed' ? 'Working — you can close this'
+                    : conn === 'joined' ? 'Phone connected — press a button to confirm'
+                    : 'Waiting for a phone…'}
+                </span>
+              </div>
+              {conn === 'joined' && !lostConn && (
+                <p className="text-[11px] text-muted/70 mt-1">
+                  Your phone reached the prompter. Tap ▶/❚❚ on it now — this dot turns green once a
+                  button actually controls the prompter.
+                </p>
+              )}
             </div>
           </>
         ) : (
@@ -1123,6 +1165,7 @@ function Runner({
   onOpenRemote,
   remoteActive,
   command,
+  onEditHtml,
 }: {
   session: Session
   settings: Settings
@@ -1131,6 +1174,7 @@ function Runner({
   onOpenRemote: () => void
   remoteActive: boolean
   command: { action: string; n: number }
+  onEditHtml: (html: string) => void
 }) {
   const scrollRef = useRef<HTMLDivElement>(null)
   const [playing, setPlaying] = useState(false)
@@ -1139,6 +1183,7 @@ function Runner({
   const [progress, setProgress] = useState(0)
   const [remaining, setRemaining] = useState(0)
   const [isFs, setIsFs] = useState(false)
+  const [editing, setEditing] = useState(false)
 
   const isTouch = useMemo(() => typeof window !== 'undefined' && window.matchMedia?.('(pointer: coarse)').matches, [])
 
@@ -1292,6 +1337,11 @@ function Runner({
     if (el) el.scrollTop = Math.max(0, el.scrollTop + deltaPx)
   }, [])
 
+  // A "slightly" step — a couple of lines at the current text size,
+  // not a full page. Scales with font size so it means the same thing
+  // (roughly two lines) whatever size the reader is running.
+  const nudgeAmount = settings.fontSize * settings.lineHeight * 2.2
+
   const toggleFullscreen = useCallback(() => {
     const d = document as any
     if (!d.fullscreenElement && document.documentElement.requestFullscreen) {
@@ -1330,17 +1380,36 @@ function Runner({
       case 'exit':
         handleExit()
         break
+      case 'back':
+        // Nudge only — deliberately does NOT pause. Restart was the
+        // remote's only correction option before this, which meant any
+        // small slip forced starting over from zero. This corrects a
+        // couple of lines without losing the take.
+        jump(-nudgeAmount)
+        break
+      case 'fwd':
+        jump(nudgeAmount)
+        break
     }
-  }, [command, togglePlay, restart, handleExit])
+  }, [command, togglePlay, restart, handleExit, jump, nudgeAmount])
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
+      // While the quick-edit overlay is open, let every key go to the editor
+      // (typing, paste, arrows) instead of driving the prompter.
+      if (editing) return
       switch (e.key) {
         case ' ':
         case 'Spacebar':
         case 'Enter': // many Bluetooth clicker remotes send Enter/Return
           e.preventDefault()
           togglePlay()
+          break
+        case 'e':
+        case 'E':
+          e.preventDefault()
+          setPlaying(false)
+          setEditing(true)
           break
         case 'ArrowUp':
           e.preventDefault()
@@ -1385,7 +1454,7 @@ function Runner({
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [settings, setSettings, togglePlay, restart, jump, toggleFullscreen, handleExit])
+  }, [settings, setSettings, togglePlay, restart, jump, toggleFullscreen, handleExit, editing])
 
   const transform = `${settings.mirrorX ? 'scaleX(-1)' : ''} ${settings.flipY ? 'scaleY(-1)' : ''}`.trim()
 
@@ -1402,6 +1471,25 @@ function Runner({
         style={{ transform: transform || undefined }}
         onWheel={() => {
           if (playing) setPlaying(false)
+        }}
+        onTouchStart={() => {
+          // A finger touching down to manually scroll is the touch
+          // equivalent of the wheel event above — without this, the
+          // autoscroll loop keeps forcing scrollTop forward every frame
+          // and simply overrides a drag before it can move anything,
+          // which is what made manual scroll look broken on iPad.
+          if (playing) setPlaying(false)
+        }}
+        onClick={() => {
+          togglePlay()
+          revealControls()
+        }}
+        onMouseMove={() => {
+          // In full screen, any stray cursor twitch was popping the whole
+          // bar up mid-take. Full screen means recording — a deliberate
+          // tap (still reveals it, above) is the only trigger there;
+          // windowed/setup mode keeps the old hover-to-peek behavior.
+          if (!isFs) revealControls()
         }}
       >
         <div
@@ -1434,15 +1522,6 @@ function Runner({
       <div className="pointer-events-none absolute inset-x-0 top-0 h-[22vh]" style={{ background: `linear-gradient(to bottom, rgba(${fadeRgb},0.85), transparent)` }} />
       <div className="pointer-events-none absolute inset-x-0 bottom-0 h-[22vh]" style={{ background: `linear-gradient(to top, rgba(${fadeRgb},0.85), transparent)` }} />
 
-      <div
-        className="absolute inset-0"
-        onClick={() => {
-          togglePlay()
-          revealControls()
-        }}
-        onMouseMove={revealControls}
-      />
-
       {countdown != null && (
         <div className="absolute inset-0 grid place-items-center pointer-events-none">
           <div className="text-[22vw] font-black tabular-nums leading-none" style={{ color: fg, opacity: 0.9 }}>
@@ -1456,97 +1535,179 @@ function Runner({
       </div>
 
       <div className={`absolute inset-x-0 bottom-0 transition-opacity duration-300 ${showControls ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
-        <div className="mx-auto max-w-3xl m-3 rounded-2xl bg-black/80 backdrop-blur border border-white/10 px-3 py-2.5 text-white">
+        <div className={`mx-auto rounded-2xl bg-black/80 backdrop-blur border border-white/10 text-white transition-[max-width,margin,padding] ${
+          isFs ? 'max-w-md m-2 px-2 py-1.5' : 'max-w-3xl m-3 px-3 py-2.5'
+        }`}>
           <div className="flex items-center justify-between gap-2">
-            <button onClick={handleExit} className="text-xs sm:text-sm text-white/70 hover:text-white px-2 py-2">
+            <button onClick={handleExit} className={`text-white/70 hover:text-white ${isFs ? 'text-[11px] px-1.5 py-1.5' : 'text-xs sm:text-sm px-2 py-2'}`}>
               ✕ Exit
             </button>
 
-            <div className="flex items-center gap-1.5 sm:gap-2">
-              <CtrlBtn onClick={() => setSettings({ speed: Math.max(1, settings.speed - 2) })} label="Slower">
+            <div className={`flex items-center ${isFs ? 'gap-1' : 'gap-1.5 sm:gap-2'}`}>
+              <CtrlBtn compact={isFs} onClick={() => setSettings({ speed: Math.max(1, settings.speed - 2) })} label="Slower">
                 −
               </CtrlBtn>
-              <div className="text-center min-w-[52px]">
-                <div className="text-[9px] uppercase tracking-wider text-white/40">Speed</div>
-                <div className="text-sm tabular-nums">{settings.speed}</div>
-              </div>
-              <CtrlBtn onClick={() => setSettings({ speed: Math.min(100, settings.speed + 2) })} label="Faster">
+              {!isFs && (
+                <div className="text-center min-w-[52px]">
+                  <div className="text-[9px] uppercase tracking-wider text-white/40">Speed</div>
+                  <div className="text-sm tabular-nums">{settings.speed}</div>
+                </div>
+              )}
+              <CtrlBtn compact={isFs} onClick={() => setSettings({ speed: Math.min(100, settings.speed + 2) })} label="Faster">
                 +
               </CtrlBtn>
 
               <button
                 onClick={togglePlay}
-                className="mx-1 sm:mx-2 h-14 w-14 rounded-full bg-gradient-to-r from-stage-producing to-stage-mastering text-white text-2xl grid place-items-center shadow-lg"
+                className={`rounded-full bg-gradient-to-r from-stage-producing to-stage-mastering text-white grid place-items-center shadow-lg ${
+                  isFs ? 'mx-1 h-9 w-9 text-base' : 'mx-1 sm:mx-2 h-14 w-14 text-2xl'
+                }`}
                 aria-label={playing ? 'Pause' : 'Play'}
               >
                 {playing ? '❚❚' : '▶'}
               </button>
 
-              <CtrlBtn onClick={() => setSettings({ fontSize: Math.max(20, settings.fontSize - 4) })} label="Smaller">
+              <CtrlBtn compact={isFs} onClick={() => setSettings({ fontSize: Math.max(20, settings.fontSize - 4) })} label="Smaller">
                 A−
               </CtrlBtn>
-              <div className="text-center min-w-[52px]">
-                <div className="text-[9px] uppercase tracking-wider text-white/40">Size</div>
-                <div className="text-sm tabular-nums">{settings.fontSize}</div>
-              </div>
-              <CtrlBtn onClick={() => setSettings({ fontSize: Math.min(160, settings.fontSize + 4) })} label="Bigger">
+              {!isFs && (
+                <div className="text-center min-w-[52px]">
+                  <div className="text-[9px] uppercase tracking-wider text-white/40">Size</div>
+                  <div className="text-sm tabular-nums">{settings.fontSize}</div>
+                </div>
+              )}
+              <CtrlBtn compact={isFs} onClick={() => setSettings({ fontSize: Math.min(160, settings.fontSize + 4) })} label="Bigger">
                 A+
               </CtrlBtn>
             </div>
 
-            <button onClick={restart} className="text-xs sm:text-sm text-white/70 hover:text-white px-2 py-2" title="Restart">
-              ↺
-            </button>
+            <div className="flex items-center gap-1">
+              <button
+                onClick={() => jump(-nudgeAmount)}
+                className={`text-white/70 hover:text-white ${isFs ? 'text-[11px] px-1.5 py-1.5' : 'text-xs sm:text-sm px-2 py-2'}`}
+                title="Back a touch — keeps reading, doesn't stop"
+                aria-label="Back a touch"
+              >
+                ‹ back
+              </button>
+              <button
+                onClick={() => jump(nudgeAmount)}
+                className={`text-white/70 hover:text-white ${isFs ? 'text-[11px] px-1.5 py-1.5' : 'text-xs sm:text-sm px-2 py-2'}`}
+                title="Forward a touch — keeps reading, doesn't stop"
+                aria-label="Forward a touch"
+              >
+                fwd ›
+              </button>
+              <button onClick={restart} className={`text-white/70 hover:text-white ${isFs ? 'text-[11px] px-1.5 py-1.5' : 'text-xs sm:text-sm px-2 py-2'}`} title="Restart">
+                ↺
+              </button>
+            </div>
           </div>
 
-          <div className="flex items-center justify-center gap-2 mt-2 flex-wrap">
-            <MiniToggle on={settings.background === 'white'} onClick={() => setSettings({ background: settings.background === 'white' ? 'black' : 'white' })}>
-              {settings.background === 'white' ? '○ White' : '● Black'}
-            </MiniToggle>
-            <MiniToggle on={settings.mirrorX} onClick={() => setSettings({ mirrorX: !settings.mirrorX })}>
-              Mirror ↔
-            </MiniToggle>
-            <MiniToggle on={settings.flipY} onClick={() => setSettings({ flipY: !settings.flipY })}>
-              Flip ↕
-            </MiniToggle>
+          {/* Setup-time toggles — not needed mid-take, hidden in full screen
+              to keep the bar out of the way. Full-screen toggle stays (you
+              still need a way out) alongside the remaining-time clock. */}
+          <div className={`flex items-center justify-center gap-2 flex-wrap ${isFs ? 'mt-1' : 'mt-2'}`}>
+            {!isFs && (
+              <>
+                <MiniToggle on={settings.background === 'white'} onClick={() => setSettings({ background: settings.background === 'white' ? 'black' : 'white' })}>
+                  {settings.background === 'white' ? '○ White' : '● Black'}
+                </MiniToggle>
+                <MiniToggle on={settings.mirrorX} onClick={() => setSettings({ mirrorX: !settings.mirrorX })}>
+                  Mirror ↔
+                </MiniToggle>
+                <MiniToggle on={settings.flipY} onClick={() => setSettings({ flipY: !settings.flipY })}>
+                  Flip ↕
+                </MiniToggle>
+              </>
+            )}
             <button
               onClick={toggleFullscreen}
-              className={`text-[11px] rounded-lg px-2.5 py-1.5 border transition ${
+              className={`rounded-lg border transition ${isFs ? 'text-[10px] px-2 py-1' : 'text-[11px] px-2.5 py-1.5'} ${
                 isFs ? 'border-stage-mastering bg-stage-mastering/20 text-white' : 'border-white/15 text-white/70 hover:text-white'
               }`}
               title="Hide the Mac dock and menu bar"
             >
               {isFs ? '⤢ Exit full screen' : '⤢ Full screen'}
             </button>
+            {!isFs && (
+              <button
+                onClick={onOpenRemote}
+                className={`text-[11px] rounded-lg px-2.5 py-1.5 border transition ${
+                  remoteActive ? 'border-stage-mastering bg-stage-mastering/20 text-white' : 'border-white/15 text-white/70 hover:text-white'
+                }`}
+                title="Control from a phone"
+              >
+                📱 Phone
+              </button>
+            )}
+            {/* Edit stays available in full screen — quick paste/tweak is the
+                whole point, so it must be reachable mid-read. */}
             <button
-              onClick={onOpenRemote}
-              className={`text-[11px] rounded-lg px-2.5 py-1.5 border transition ${
-                remoteActive ? 'border-stage-mastering bg-stage-mastering/20 text-white' : 'border-white/15 text-white/70 hover:text-white'
+              onClick={() => {
+                setPlaying(false)
+                setEditing(true)
+              }}
+              className={`rounded-lg border border-white/15 text-white/70 hover:text-white transition ${
+                isFs ? 'text-[10px] px-2 py-1' : 'text-[11px] px-2.5 py-1.5'
               }`}
-              title="Control from a phone"
+              title="Edit or paste the script without leaving full screen (E)"
             >
-              📱 Phone
+              ✎ Edit
             </button>
-            <span className="text-[11px] text-white/40 tabular-nums px-1">{formatClock(remaining)} left</span>
+            <span className={`text-white/40 tabular-nums px-1 ${isFs ? 'text-[10px]' : 'text-[11px]'}`}>{formatClock(remaining)} left</span>
           </div>
 
-          {!isTouch && showControls && (
+          {!isTouch && showControls && !isFs && (
             <p className="text-center text-[10px] text-white/30 mt-1.5">
-              Space play/pause · ↑↓ speed · ←→ size · M mirror · R restart · F fullscreen · Esc exit
+              Space play/pause · ↑↓ speed · ←→ size · E edit · M mirror · R restart · F fullscreen · Esc exit
             </p>
           )}
         </div>
       </div>
+
+      {/* Quick edit — paste or tweak the script without leaving full screen. */}
+      {editing && (
+        <div className="absolute inset-0 z-[60] bg-ink/95 backdrop-blur flex flex-col p-4 sm:p-6 text-text">
+          <div className="flex items-center justify-between mb-3 w-full max-w-3xl mx-auto">
+            <div>
+              <p className="text-[10px] uppercase tracking-[0.3em] text-muted">Quick edit</p>
+              <p className="text-sm text-text">{sessionTitle(session)}</p>
+            </div>
+            <button
+              onClick={() => setEditing(false)}
+              className="rounded-xl bg-gradient-to-r from-stage-producing to-stage-mastering text-white font-bold uppercase tracking-wider text-sm px-5 py-3"
+            >
+              Done
+            </button>
+          </div>
+          <div className="w-full max-w-3xl mx-auto flex-1 min-h-0">
+            <RichEditor
+              key={`run-edit-${session.id}`}
+              initialHtml={session.html}
+              onChange={onEditHtml}
+              background={settings.background}
+              fontStack={FONTS[settings.fontFamily].stack}
+            />
+          </div>
+          <p className="text-[11px] text-muted text-center mt-3 max-w-3xl mx-auto">
+            Paste with ⌘V (or long-press → Paste on iPad). Changes save automatically and show in the prompter when you tap
+            Done. Scrolling is paused while you edit.
+          </p>
+        </div>
+      )}
     </div>
   )
 }
 
-function CtrlBtn({ children, onClick, label }: { children: React.ReactNode; onClick: () => void; label: string }) {
+function CtrlBtn({ children, onClick, label, compact }: { children: React.ReactNode; onClick: () => void; label: string; compact?: boolean }) {
   return (
     <button
       onClick={onClick}
       aria-label={label}
-      className="h-11 w-11 rounded-xl bg-white/10 hover:bg-white/20 text-lg grid place-items-center active:scale-95 transition"
+      className={`rounded-xl bg-white/10 hover:bg-white/20 grid place-items-center active:scale-95 transition ${
+        compact ? 'h-8 w-8 text-sm' : 'h-11 w-11 text-lg'
+      }`}
     >
       {children}
     </button>

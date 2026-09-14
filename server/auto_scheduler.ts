@@ -23,6 +23,7 @@
 import Anthropic from '@anthropic-ai/sdk'
 import { pool } from './db'
 import { logError, logInfo } from './diag'
+import { recordAiUsage } from './ai_usage'
 
 const client = new Anthropic()
 
@@ -229,19 +230,21 @@ export async function proposeSchedule(
     corpus,
   ].filter(Boolean).join('\n')
 
+  const schedulerModel = constraints.useOpus === false ? SCHEDULER_MODEL_SONNET : SCHEDULER_MODEL_OPUS
   let response
   try {
     response = await client.messages.create({
       // Default to Opus for scheduling — it's a complex constraint
       // problem and a one-shot operation. Sonnet fallback is available
       // via useOpus=false but Opus does noticeably better.
-      model: constraints.useOpus === false ? SCHEDULER_MODEL_SONNET : SCHEDULER_MODEL_OPUS,
+      model: schedulerModel,
       // 16k tokens is generous enough for a feature-length script
       // (157 scenes × structure overhead well under this).
       max_tokens: 16000,
       system: SYSTEM_PROMPT,
       messages: [{ role: 'user', content: userBlock }],
     })
+    recordAiUsage({ source: 'auto_scheduler', model: schedulerModel, usage: response.usage, projectId })
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err)
     logError('auto_scheduler: claude call failed', { projectId, error: msg })

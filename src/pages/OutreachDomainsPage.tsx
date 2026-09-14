@@ -28,9 +28,12 @@ export default function OutreachDomainsPage() {
   const [error, setError] = useState<string | null>(null)
   const [newName, setNewName] = useState('')
   const [busy, setBusy] = useState(false)
-  const [syncing, setSyncing] = useState(false)
-  type SyncReport = Awaited<ReturnType<typeof api.syncOutreachDomainsWithResend>>
-  const [syncReport, setSyncReport] = useState<SyncReport | null>(null)
+  type SesSyncReport = Awaited<ReturnType<typeof api.syncOutreachDomainsWithSes>>
+  const [sesSyncing, setSesSyncing] = useState(false)
+  const [sesSyncReport, setSesSyncReport] = useState<SesSyncReport | null>(null)
+  type BounceWebhookReport = Awaited<ReturnType<typeof api.syncOutreachBounceWebhook>>
+  const [bounceWiring, setBounceWiring] = useState(false)
+  const [bounceReport, setBounceReport] = useState<BounceWebhookReport | null>(null)
 
   async function load() {
     try {
@@ -74,18 +77,32 @@ export default function OutreachDomainsPage() {
     }
   }
 
-  async function syncWithResend() {
-    setSyncing(true)
+  async function syncWithSes() {
+    setSesSyncing(true)
     setError(null)
-    setSyncReport(null)
+    setSesSyncReport(null)
     try {
-      const r = await api.syncOutreachDomainsWithResend()
-      setSyncReport(r)
+      const r = await api.syncOutreachDomainsWithSes()
+      setSesSyncReport(r)
       await load()
     } catch (err) {
       setError(err instanceof Error ? err.message : 'sync failed')
     } finally {
-      setSyncing(false)
+      setSesSyncing(false)
+    }
+  }
+
+  async function syncBounceWebhook() {
+    setBounceWiring(true)
+    setError(null)
+    setBounceReport(null)
+    try {
+      const r = await api.syncOutreachBounceWebhook()
+      setBounceReport(r)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'sync failed')
+    } finally {
+      setBounceWiring(false)
     }
   }
 
@@ -144,8 +161,8 @@ export default function OutreachDomainsPage() {
         <h1 className="text-2xl font-bold">Sending domains</h1>
         <p className="text-sm text-muted mt-2 max-w-2xl">
           Slate rotates cold-outreach sends across this pool so no single domain concentrates the volume. Add a
-          domain here after you've verified it in Resend. When one domain's reputation dips, Slate auto-pauses it
-          and falls back to the next healthiest — you'll get an email so you can buy a replacement.
+          domain here after you've verified it in the AWS SES console. When one domain's reputation dips, Slate
+          auto-pauses it and falls back to the next healthiest — you'll get an email so you can buy a replacement.
         </p>
       </div>
 
@@ -155,97 +172,96 @@ export default function OutreachDomainsPage() {
         </div>
       )}
 
-      <section className="rounded-2xl border border-stage-tracking/40 bg-stage-tracking/5 p-4 space-y-3">
+      <section className="rounded-2xl border border-stage-mastering/40 bg-stage-mastering/5 p-4 space-y-3">
         <div className="flex items-center justify-between gap-3 flex-wrap">
           <div>
-            <h2 className="text-[11px] uppercase tracking-[0.2em] text-stage-tracking font-bold">Resend cross-check</h2>
+            <h2 className="text-[11px] uppercase tracking-[0.2em] text-stage-mastering font-bold">Amazon SES cross-check</h2>
             <p className="text-[11px] text-muted/70 mt-1 max-w-xl">
-              Ask Resend what domains this API key can actually see. If Slate says "verified"
-              but Resend rejects the send, this is the diagnostic — it'll surface the mismatch
-              and fix Slate's status to match reality.
+              Sends already go out over SES for every domain here. Add a new one via the AWS SES console
+              (Create identity → add the DKIM CNAMEs it gives you to DNS) instead of Resend's dashboard,
+              then run this to pull its real SES verification status into Slate — no Resend involved.
             </p>
           </div>
           <button
-            onClick={() => void syncWithResend()}
-            disabled={syncing}
-            className="text-[10px] uppercase tracking-wider text-stage-tracking border border-stage-tracking/40 rounded-full px-3 py-1.5 hover:bg-stage-tracking/10 disabled:opacity-40 font-bold whitespace-nowrap"
+            onClick={() => void syncWithSes()}
+            disabled={sesSyncing}
+            className="text-[10px] uppercase tracking-wider text-stage-mastering border border-stage-mastering/40 rounded-full px-3 py-1.5 hover:bg-stage-mastering/10 disabled:opacity-40 font-bold whitespace-nowrap"
           >
-            {syncing ? 'Checking…' : '🔄 Sync with Resend'}
+            {sesSyncing ? 'Checking…' : '🔄 Sync with SES'}
           </button>
         </div>
-        {syncReport && (
-          <div className="space-y-3 text-[11px]">
-            <div className="rounded-lg border border-line bg-ink/40 p-3">
-              <div className="text-[10px] uppercase tracking-wider text-muted font-bold mb-2">
-                What Resend sees ({syncReport.resendDomainsSeen.length})
-              </div>
-              {syncReport.resendDomainsSeen.length === 0 ? (
-                <p className="text-urgent">
-                  <strong>Resend sees zero domains for this API key.</strong> Either the key is
-                  wrong, it belongs to a different Resend team, or no domains have been added
-                  under this account.
-                </p>
-              ) : (
-                <ul className="space-y-1 font-mono">
-                  {syncReport.resendDomainsSeen.map((d) => (
-                    <li key={d.name} className="flex items-center gap-2">
-                      <span className="font-bold">{d.name}</span>
-                      <span className={
-                        d.status === 'verified'
-                          ? 'text-emerald-300'
-                          : d.status === 'pending'
-                            ? 'text-amber-300'
-                            : 'text-urgent'
-                      }>
-                        {d.status}
-                      </span>
-                      {d.region && <span className="text-muted/60">({d.region})</span>}
-                    </li>
-                  ))}
-                </ul>
-              )}
+        {sesSyncReport && (
+          <div className="rounded-lg border border-line bg-ink/40 p-3 text-[11px]">
+            <div className="text-[10px] uppercase tracking-wider text-muted font-bold mb-2">
+              Slate ↔ SES diff ({sesSyncReport.changes.length})
             </div>
-            <div className="rounded-lg border border-line bg-ink/40 p-3">
-              <div className="text-[10px] uppercase tracking-wider text-muted font-bold mb-2">
-                Slate ↔ Resend diff ({syncReport.changes.length})
+            <ul className="space-y-1 font-mono">
+              {sesSyncReport.changes.map((c) => (
+                <li key={c.name} className="flex items-center gap-2 flex-wrap">
+                  <span className="font-bold">{c.name}</span>
+                  <span className="text-muted/60">Slate:</span>
+                  <span className={
+                    c.after === 'verified' ? 'text-emerald-300'
+                    : c.after === 'verifying' ? 'text-amber-300'
+                    : 'text-muted'
+                  }>
+                    {c.after}
+                  </span>
+                  <span className="text-muted/60">SES:</span>
+                  <span className={
+                    c.sesVisibility === 'verified' ? 'text-emerald-300'
+                      : c.sesVisibility === 'added_unverified' ? 'text-amber-300'
+                        : 'text-urgent'
+                  }>
+                    {c.sesVisibility === 'not_added' ? 'not added' : c.sesVisibility === 'added_unverified' ? 'pending DKIM' : 'verified'}
+                  </span>
+                  {c.action === 'updated' && (
+                    <span className="text-[9px] uppercase tracking-wider text-stage-mastering font-bold">← updated</span>
+                  )}
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+      </section>
+
+      <section className="rounded-2xl border border-urgent/30 bg-urgent/5 p-4 space-y-3">
+        <div className="flex items-center justify-between gap-3 flex-wrap">
+          <div>
+            <h2 className="text-[11px] uppercase tracking-[0.2em] text-urgent font-bold">Bounce/complaint auto-pause</h2>
+            <p className="text-[11px] text-muted/70 mt-1 max-w-xl">
+              The safety net that auto-pauses a domain whose bounce/complaint rate crosses 5%. Needs an SNS topic
+              created once in the AWS console (subscribe it to <code className="font-mono">/api/ses/notify</code>),
+              with its ARN set as <code className="font-mono">SES_SNS_TOPIC_ARN</code> on Railway. Once that ARN
+              exists, this button (and every boot) wires SES's configuration set to publish Bounce/Complaint events
+              there — no other AWS access needed.
+            </p>
+          </div>
+          <button
+            onClick={() => void syncBounceWebhook()}
+            disabled={bounceWiring}
+            className="text-[10px] uppercase tracking-wider text-urgent border border-urgent/40 rounded-full px-3 py-1.5 hover:bg-urgent/10 disabled:opacity-40 font-bold whitespace-nowrap"
+          >
+            {bounceWiring ? 'Checking…' : '🔌 Wire bounce webhook'}
+          </button>
+        </div>
+        {bounceReport && (
+          <div className="rounded-lg border border-line bg-ink/40 p-3 text-[11px] font-mono">
+            {bounceReport.configured ? (
+              <div className="text-emerald-300">
+                ✓ wired — topic <span className="font-bold">{bounceReport.topicArn}</span> ({bounceReport.action})
               </div>
-              <ul className="space-y-1 font-mono">
-                {syncReport.changes.map((c) => (
-                  <li key={c.name} className="flex items-center gap-2 flex-wrap">
-                    <span className="font-bold">{c.name}</span>
-                    <span className="text-muted/60">Slate:</span>
-                    <span className={
-                      c.after.status === 'verified' ? 'text-emerald-300'
-                      : c.after.status === 'verifying' ? 'text-amber-300'
-                      : c.after.status === 'failed' ? 'text-urgent'
-                      : 'text-muted'
-                    }>
-                      {c.after.status}
-                    </span>
-                    <span className="text-muted/60">Resend:</span>
-                    <span className={
-                      c.resendVisibility === 'missing'
-                        ? 'text-urgent'
-                        : c.resendStatus === 'verified'
-                          ? 'text-emerald-300'
-                          : 'text-amber-300'
-                    }>
-                      {c.resendVisibility === 'missing' ? 'not found' : c.resendStatus}
-                    </span>
-                    {c.action === 'updated' && (
-                      <span className="text-[9px] uppercase tracking-wider text-stage-mastering font-bold">
-                        ← updated
-                      </span>
-                    )}
-                    {c.action === 'missing_in_resend' && (
-                      <span className="text-[9px] uppercase tracking-wider text-urgent font-bold">
-                        ← problem
-                      </span>
-                    )}
-                  </li>
-                ))}
-              </ul>
-            </div>
+            ) : (
+              <div className="text-urgent">
+                ✗ not configured — {bounceReport.reason === 'ses_sns_topic_arn_not_set'
+                  ? 'SES_SNS_TOPIC_ARN is not set yet. Create the SNS topic + subscription in the AWS console first.'
+                  : bounceReport.reason === 'ses_config_set_not_set'
+                    ? 'SES_CONFIG_SET is not set on Railway.'
+                    : bounceReport.reason === 'ses_not_configured'
+                      ? 'SES credentials are not configured.'
+                      : bounceReport.reason}
+              </div>
+            )}
           </div>
         )}
       </section>

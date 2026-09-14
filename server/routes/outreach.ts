@@ -13,18 +13,29 @@
 // and shouldn't be exposed to producers/editors.
 
 import { Router } from 'express'
-import { Resend } from 'resend'
+import { Resend } from '../mailTransport'
 import { pool } from '../db'
 import { requireAdmin, type SessionUser } from '../auth'
 import { logError, logInfo } from '../diag'
-import { generateUniqueSentence, generateOneSheetAuto, hasAnthropicKey, type UniqueSentenceInput } from '../anthropic'
+import { generateUniqueSentence, generateOneSheetAuto, findSimilarShowProspects, hasAnthropicKey, type UniqueSentenceInput } from '../anthropic'
 import { loadShowBrief } from './show_brief'
 import { syncMissingCoversFromRss } from '../rss_cover_sync'
 import { seedFlagshipPodcasts } from '../seeds/flagship_podcasts'
 import { checkEmail } from '../email_verify'
 
+// BUG FIX (2026-09-10): this used to be `resendKey ? new Resend(resendKey) : null`,
+// which made `resend` null — and every `if (!resend)` guard below refuse to
+// send — the moment RESEND_API_KEY was unset, even though mailTransport's
+// Resend shim routes .emails.send() through SES regardless of whether a
+// Resend key was passed to its constructor. That silently broke the entire
+// campaign sender, follow-up sender, test-send, and send-campaign trigger
+// the moment Resend was deleted, despite SES working fine. Always construct
+// it — only .domains.list()/.update() (Resend-only, no SES equivalent, used
+// solely by the open-tracking toggle below) actually need a real Resend key,
+// and those already degrade gracefully via mailTransport's stub instead of
+// throwing.
 const resendKey = process.env.RESEND_API_KEY
-const resend = resendKey ? new Resend(resendKey) : null
+const resend = new Resend(resendKey)
 
 export const outreachRouter = Router()
 outreachRouter.use(requireAdmin)
@@ -131,12 +142,16 @@ outreachRouter.get('/template.csv', (_req, res) => {
 // ─── Templates ──────────────────────────────────────────────────────
 outreachRouter.get('/projects/:projectId/template', async (req, res) => {
   const { rows } = await pool.query(
-    `SELECT project_id, subject, body, from_name, reply_to, location,
+    `SELECT project_id, subject, body, from_name, reply_to, notify_email, location,
             followup_subject, followup_body, updated_at
        FROM outreach_templates WHERE project_id = $1`,
     [req.params.projectId],
   )
-  res.json({ template: rows[0] ?? null })
+  const inboundDomain = process.env.INBOUND_REPLY_DOMAIN || 'strawhutmedia.net'
+  res.json({
+    template: rows[0] ?? null,
+    inboundCaptureAddress: `p-${req.params.projectId}@${inboundDomain}`,
+  })
 })
 
 outreachRouter.put('/projects/:projectId/template', async (req, res) => {
@@ -148,20 +163,23 @@ outreachRouter.put('/projects/:projectId/template', async (req, res) => {
     ? req.body.fromName.trim() : null
   const replyTo = typeof req.body?.replyTo === 'string' && req.body.replyTo.trim()
     ? req.body.replyTo.trim() : null
+  const notifyEmail = typeof req.body?.notifyEmail === 'string' && req.body.notifyEmail.trim()
+    ? req.body.notifyEmail.trim() : null
   const location = LOCATION_LINES[req.body?.location] ? String(req.body.location) : 'either'
   await pool.query(
     `INSERT INTO outreach_templates
-       (project_id, subject, body, from_name, reply_to, location, updated_by, updated_at)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, now())
+       (project_id, subject, body, from_name, reply_to, notify_email, location, updated_by, updated_at)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, now())
      ON CONFLICT (project_id) DO UPDATE SET
        subject = EXCLUDED.subject,
        body = EXCLUDED.body,
        from_name = EXCLUDED.from_name,
        reply_to = EXCLUDED.reply_to,
+       notify_email = EXCLUDED.notify_email,
        location = EXCLUDED.location,
        updated_by = EXCLUDED.updated_by,
        updated_at = now()`,
-    [projectId, subject, body, fromName, replyTo, location, user.id],
+    [projectId, subject, body, fromName, replyTo, notifyEmail, location, user.id],
   )
   res.json({ ok: true })
 })
@@ -191,22 +209,18 @@ outreachRouter.get('/projects/:projectId/prospects', async (req, res) => {
 // Bulk import — paste a spreadsheet, get N prospects. Each row is
 // validated + inserted in one transaction. Returns per-row status so
 // the UI can show what got imported vs skipped.
-outreachRouter.post('/projects/:projectId/prospects/bulk', async (req, res) => {
-  const user = (req as typeof req & { user: SessionUser }).user
-  const projectId = req.params.projectId
-  const rows: unknown = req.body?.rows
-  if (!Array.isArray(rows) || rows.length === 0) {
-    res.status(400).json({ error: 'rows_required' })
-    return
-  }
-  if (rows.length > 500) {
-    res.status(400).json({ error: 'too_many_rows', detail: 'max 500 per bulk import' })
-    return
-  }
-  // Tag this whole import as one batch. Use the name the operator typed, or
-  // auto-number the next one for this show ("Batch 2", "Batch 3", …).
-  let batchLabel = typeof req.body?.batchLabel === 'string' && req.body.batchLabel.trim()
-    ? req.body.batchLabel.trim().slice(0, 80) : ''
+type BulkRow = {
+  name?: unknown; fullName?: unknown; email?: unknown
+  recipientType?: unknown; clientName?: unknown; context?: unknown
+}
+type BulkResult = { row: number; ok: boolean; error?: string; id?: string }
+
+// Shared by the manual bulk-import paste AND the AI similar-shows finder —
+// same dedup-by-email, same batch tagging, same insert shape either way.
+async function insertProspectRows(
+  projectId: string, rows: BulkRow[], batchLabelInput: string | undefined, userId: string,
+): Promise<{ imported: number; failed: number; duplicates: number; batchLabel: string; results: BulkResult[] }> {
+  let batchLabel = batchLabelInput?.trim() ? batchLabelInput.trim().slice(0, 80) : ''
   if (!batchLabel) {
     const { rows: br } = await pool.query<{ n: number }>(
       `SELECT COUNT(DISTINCT batch_label)::int AS n FROM outreach_prospects WHERE project_id = $1 AND batch_label IS NOT NULL`,
@@ -214,14 +228,13 @@ outreachRouter.post('/projects/:projectId/prospects/bulk', async (req, res) => {
     )
     batchLabel = `Batch ${(br[0]?.n ?? 0) + 1}`
   }
-  type Result = { row: number; ok: boolean; error?: string; id?: string }
-  const results: Result[] = []
+  const results: BulkResult[] = []
   const client = await pool.connect()
   const seenEmails = new Set<string>()
   try {
     await client.query('BEGIN')
     for (let i = 0; i < rows.length; i++) {
-      const raw = rows[i] as Record<string, unknown> | undefined
+      const raw = rows[i]
       const name = typeof raw?.name === 'string' ? raw.name.trim() : ''
       if (!name) {
         results.push({ row: i, ok: false, error: 'name_required' })
@@ -258,22 +271,96 @@ outreachRouter.post('/projects/:projectId/prospects/bulk', async (req, res) => {
             context, status, created_by, batch_label)
          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
          RETURNING id`,
-        [projectId, name, fullName, email, recipientType, clientName, context, initialStatus, user.id, batchLabel],
+        [projectId, name, fullName, email, recipientType, clientName, context, initialStatus, userId, batchLabel],
       )
       results.push({ row: i, ok: true, id: insertRes.rows[0].id })
     }
     await client.query('COMMIT')
   } catch (err) {
     await client.query('ROLLBACK').catch(() => {})
-    res.status(500).json({ error: 'bulk_import_failed', detail: err instanceof Error ? err.message : String(err) })
-    return
+    throw err
   } finally {
     client.release()
   }
   const imported = results.filter((r) => r.ok).length
   const duplicates = results.filter((r) => !r.ok && r.error === 'duplicate_email').length
   const failed = results.filter((r) => !r.ok && r.error !== 'duplicate_email').length
-  res.json({ imported, failed, duplicates, batchLabel, results })
+  return { imported, failed, duplicates, batchLabel, results }
+}
+
+outreachRouter.post('/projects/:projectId/prospects/bulk', async (req, res) => {
+  const user = (req as typeof req & { user: SessionUser }).user
+  const projectId = req.params.projectId
+  const rows: unknown = req.body?.rows
+  if (!Array.isArray(rows) || rows.length === 0) {
+    res.status(400).json({ error: 'rows_required' })
+    return
+  }
+  if (rows.length > 500) {
+    res.status(400).json({ error: 'too_many_rows', detail: 'max 500 per bulk import' })
+    return
+  }
+  try {
+    const result = await insertProspectRows(projectId, rows as BulkRow[], req.body?.batchLabel, user.id)
+    res.json(result)
+  } catch (err) {
+    res.status(500).json({ error: 'bulk_import_failed', detail: err instanceof Error ? err.message : String(err) })
+  }
+})
+
+// The "🔍 Find new prospects" button — no fields, no paste, no batch name.
+// Claude researches real similar shows + verified RSS contact emails, then
+// they land as their own auto-named batch, same as a manual import. Nothing
+// sends automatically — same review queue as everything else in Outreach.
+outreachRouter.post('/projects/:projectId/prospects/find-similar', async (req, res) => {
+  const user = (req as typeof req & { user: SessionUser }).user
+  const projectId = req.params.projectId
+  if (!hasAnthropicKey()) {
+    res.status(503).json({ error: 'anthropic_not_configured' })
+    return
+  }
+  const proj = await pool.query<{ name: string }>(`SELECT name FROM projects WHERE id = $1`, [projectId])
+  if (proj.rows.length === 0) {
+    res.status(404).json({ error: 'not_found' })
+    return
+  }
+
+  // This research call routinely runs 10+ minutes. Railway's edge closes an
+  // HTTP request after 5 minutes with *no data transferred* (it allows up
+  // to 15 minutes as long as something keeps moving) — so once we commit
+  // to the long call, stream newline-delimited JSON progress events to the
+  // browser as they happen (real search/fetch counts from
+  // findSimilarShowProspects, not a fake timer), plus a periodic tick as a
+  // backstop in case a single iteration runs long with nothing to report.
+  // That means the status code can't change after this point (headers are
+  // already sent as 200), so the final outcome — success or failure — is
+  // its own last line in the stream instead; the client reads the stream
+  // and checks each event's `type`, not `res.ok`.
+  res.writeHead(200, { 'Content-Type': 'application/x-ndjson' })
+  const send = (evt: Record<string, unknown>) => res.write(`${JSON.stringify(evt)}\n`)
+  const heartbeat = setInterval(() => send({ type: 'tick' }), 15000)
+  const finish = (evt: Record<string, unknown>) => {
+    clearInterval(heartbeat)
+    res.end(`${JSON.stringify(evt)}\n`)
+  }
+
+  try {
+    const found = await findSimilarShowProspects(proj.rows[0].name, null, (progress) => {
+      send({ type: 'progress', ...progress })
+    })
+    if (found.length === 0) {
+      finish({ type: 'error', error: 'no_results', detail: 'Claude found no verifiable similar shows this run — try again.' })
+      return
+    }
+    const today = new Date().toISOString().slice(0, 10)
+    const rows: BulkRow[] = found.map((f) => ({ name: f.name, email: f.email, context: f.context }))
+    const result = await insertProspectRows(projectId, rows, `Similar shows — AI research ${today}`, user.id)
+    logInfo('outreach: find-similar complete', { projectId, found: found.length, imported: result.imported })
+    finish({ type: 'done', ...result })
+  } catch (err) {
+    logError('outreach: find-similar failed', { projectId, error: err instanceof Error ? err.message : String(err) })
+    finish({ type: 'error', error: 'find_similar_failed', detail: err instanceof Error ? err.message : String(err) })
+  }
 })
 
 outreachRouter.post('/projects/:projectId/prospects', async (req, res) => {
@@ -382,7 +469,7 @@ outreachRouter.patch('/prospects/:id', async (req, res) => {
 // Copy a prospect into the workspace Rolodex, deduped by email. Refreshes the
 // facts we know and tags them 'responded'. No email → nothing to dedup on, so
 // we skip (a contact with no address isn't reusable for a future blast).
-async function fileProspectInRolodex(prospectId: string): Promise<void> {
+export async function fileProspectInRolodex(prospectId: string): Promise<void> {
   const { rows } = await pool.query<{
     name: string; full_name: string | null; email: string | null;
     recipient_type: string | null; client_name: string | null; context: string | null;
@@ -739,6 +826,7 @@ async function sendOneProspect(prospectId: string): Promise<void> {
   try {
     const send = await resend.emails.send({
       from, to: p.email, subject, text: body, replyTo,
+      tags: [{ name: 'show', value: showName }, { name: 'stage', value: 'outreach' }, { name: 'category', value: 'outreach' }],
     })
     if (send.error) {
       const errorMsg = String(send.error.message ?? send.error).slice(0, 500)
@@ -890,7 +978,8 @@ async function sendFollowUp(prospectId: string): Promise<void> {
   const sendLogId = logRes.rows[0].id
 
   try {
-    const send = await resend.emails.send({ from, to: p.email, subject, text: body, replyTo })
+    const send = await resend.emails.send({ from, to: p.email, subject, text: body, replyTo,
+      tags: [{ name: 'show', value: showName }, { name: 'stage', value: 'outreach' }, { name: 'category', value: 'outreach-followup' }] })
     if (send.error) {
       const errorMsg = String(send.error.message ?? send.error).slice(0, 500)
       await pool.query(`UPDATE outreach_sends SET status = 'failed', error = $1 WHERE id = $2`, [errorMsg, sendLogId])
@@ -1723,6 +1812,7 @@ outreachRouter.post('/projects/:projectId/test-send', async (req, res) => {
       subject: `[TEST] ${subject}`,
       text: body,
       replyTo,
+      tags: [{ name: 'show', value: showName }, { name: 'stage', value: 'outreach' }, { name: 'category', value: 'outreach-test' }],
     })
     if (send.error) {
       logError('outreach test-send failed', { projectId, error: send.error })
@@ -2049,7 +2139,8 @@ outreachRouter.post('/projects/:projectId/followup/test-send', async (req, res) 
   const replyTo = parseReplyTo(tpl.reply_to)
 
   try {
-    const send = await resend.emails.send({ from, to, subject: `[TEST] ${subject}`, text: body, replyTo })
+    const send = await resend.emails.send({ from, to, subject: `[TEST] ${subject}`, text: body, replyTo,
+      tags: [{ name: 'show', value: showName }, { name: 'stage', value: 'outreach' }, { name: 'category', value: 'outreach-followup-test' }] })
     if (send.error) {
       const errorMsg = send.error.message ?? String(send.error)
       logError('outreach followup test-send failed', { projectId, error: send.error })

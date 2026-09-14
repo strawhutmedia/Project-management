@@ -20,9 +20,9 @@ import { requireUser } from '../auth'
 
 // No ambiguous characters (0/O, 1/I) — easy to read off a screen and type.
 const ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'
-const ACTIONS = new Set(['playpause', 'faster', 'slower', 'bigger', 'smaller', 'restart', 'exit', 'start'])
+const ACTIONS = new Set(['playpause', 'faster', 'slower', 'bigger', 'smaller', 'restart', 'exit', 'start', 'back', 'fwd'])
 
-type Channel = { code: string; res: Response; createdAt: number }
+type Channel = { code: string; res: Response; createdAt: number; announced: boolean }
 const channels = new Map<string, Channel>()
 
 function randomCode(len = 4): string {
@@ -56,7 +56,7 @@ teleprompterRemoteRouter.get('/stream', requireUser, (req, res) => {
   res.setHeader('X-Accel-Buffering', 'no')
   res.flushHeaders?.()
 
-  const channel: Channel = { code, res, createdAt: Date.now() }
+  const channel: Channel = { code, res, createdAt: Date.now(), announced: false }
   channels.set(code, channel)
   res.write(`event: code\ndata: ${JSON.stringify({ code })}\n\n`)
 
@@ -98,7 +98,21 @@ teleprompterRemoteRouter.post('/:code/cmd', (req, res) => {
 })
 
 // Phone checks whether a prompter is actually listening on this code.
+// This is also the ONLY signal the phone ever gives that it exists — the
+// host previously learned nothing until the operator pressed a button, so
+// simply opening the remote page and looking at it (the natural first
+// thing to do) produced zero feedback on the host side. Tell the host
+// "a phone showed up" the first time this fires for the channel.
 teleprompterRemoteRouter.get('/:code/status', (req, res) => {
   const code = (req.params.code || '').toUpperCase()
-  res.json({ ok: true, connected: channels.has(code) })
+  const ch = channels.get(code)
+  if (ch && !ch.announced) {
+    ch.announced = true
+    try {
+      ch.res.write(`event: joined\ndata: {}\n\n`)
+    } catch {
+      /* host connection dropped; cleaned up on close */
+    }
+  }
+  res.json({ ok: true, connected: Boolean(ch) })
 })

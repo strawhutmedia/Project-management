@@ -14,6 +14,8 @@ import { Resend } from 'resend'
 import { pool } from '../db'
 import { requireAdmin } from '../auth'
 import { logError, logInfo } from '../diag'
+import { sesCheckIdentity, sesConfigured } from '../mailTransport'
+import { ensureSesBounceEventDestination } from '../ses_bounce_setup'
 
 export const outreachDomainsRouter = Router()
 outreachDomainsRouter.use(requireAdmin)
@@ -273,6 +275,82 @@ outreachDomainsRouter.post('/sync-with-resend', async (_req, res) => {
     resendDomainsSeen: resendDomains.map((d) => ({ name: d.name, status: d.status, region: d.region ?? null })),
     changes,
   })
+})
+
+// Same idea as /sync-with-resend, but against Amazon SES — added so a new
+// rotation domain can be added and verified entirely through the AWS SES
+// console (Create identity → add the DKIM CNAMEs it gives you → wait for
+// verification) with NO dependency on Resend at all, going forward. Actual
+// sending already runs through SES for every domain (mailTransport.ts);
+// this is what keeps Slate's own eligibility gate (sending_domains.status)
+// in sync with that reality instead of only ever reflecting Resend's.
+outreachDomainsRouter.post('/sync-with-ses', async (_req, res) => {
+  if (!sesConfigured()) {
+    res.status(503).json({ error: 'ses_not_configured' })
+    return
+  }
+  const { rows: slateDomains } = await pool.query<{ id: string; name: string; status: string }>(
+    `SELECT id, name, status FROM sending_domains ORDER BY created_at ASC`,
+  )
+  const results = await Promise.all(slateDomains.map((d) => sesCheckIdentity(d.name)))
+
+  const changes: Array<{
+    name: string
+    before: string
+    after: string
+    sesVisibility: 'not_added' | 'added_unverified' | 'verified'
+    action: 'updated' | 'unchanged'
+  }> = []
+
+  for (let i = 0; i < slateDomains.length; i++) {
+    const s = slateDomains[i]
+    const r = results[i]
+    let mapped: 'pending' | 'verifying' | 'verified'
+    let visibility: 'not_added' | 'added_unverified' | 'verified'
+    if (!r.ok) {
+      mapped = 'pending'
+      visibility = 'not_added'
+    } else if (r.verifiedForSending) {
+      mapped = 'verified'
+      visibility = 'verified'
+    } else {
+      mapped = 'verifying'
+      visibility = 'added_unverified'
+    }
+    if (s.status !== mapped) {
+      await pool.query(`UPDATE sending_domains SET status = $1, updated_at = now() WHERE id = $2`, [mapped, s.id])
+      changes.push({ name: s.name, before: s.status, after: mapped, sesVisibility: visibility, action: 'updated' })
+    } else {
+      changes.push({ name: s.name, before: s.status, after: mapped, sesVisibility: visibility, action: 'unchanged' })
+    }
+  }
+
+  logInfo('outreach: ses sync complete', {
+    domainCount: slateDomains.length,
+    updated: changes.filter((c) => c.action === 'updated').length,
+    verified: changes.filter((c) => c.sesVisibility === 'verified').length,
+  })
+  res.json({ ok: true, changes })
+})
+
+// The last Resend-only gap: bounce/complaint auto-pause for the rotation
+// pool. Requires SES_SNS_TOPIC_ARN to already exist — someone with AWS
+// console access creates the SNS topic + an HTTPS subscription pointing at
+// POST /api/ses/notify (SNS's SubscriptionConfirmation handshake is
+// auto-confirmed there), then sets that ARN as a Railway env var. Once the
+// ARN exists, this wires the SES configuration set's event destination to
+// it via ordinary SES API calls — same credentials Slate already sends
+// mail with, no separate AWS access needed. Safe to call repeatedly
+// (idempotent) and already runs once on every boot; this route exists so
+// it can be triggered on demand instead of waiting for a redeploy.
+outreachDomainsRouter.post('/bounce-webhook/sync', async (_req, res) => {
+  try {
+    const status = await ensureSesBounceEventDestination()
+    res.json(status)
+  } catch (err) {
+    logError('outreach: bounce webhook sync failed', { error: err instanceof Error ? err.message : String(err) })
+    res.status(502).json({ configured: false, reason: 'ses_api_error', detail: err instanceof Error ? err.message : String(err) })
+  }
 })
 
 outreachDomainsRouter.delete('/:id', async (req, res) => {

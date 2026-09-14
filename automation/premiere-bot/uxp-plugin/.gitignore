@@ -1,0 +1,2 @@
+# Holds the Slate QA_SERVICE_TOKEN for posting to the bot-log — machine-local, never commit.
+bridge.local.json

@@ -1,8 +1,14 @@
-import { Resend } from 'resend'
+import { Resend } from './mailTransport'
 import { pool } from './db'
 
+// BUG FIX (2026-09-10): always construct the shim. mailTransport's Resend
+// class routes .emails.send() through SES regardless of whether a Resend
+// key was passed in — gating construction on RESEND_API_KEY made `resend`
+// null (and every `if (!resend)` guard below silently no-op instead of
+// sending) the moment Resend was deleted, even though SES works fine. This
+// silently broke magic-link sign-in, invites, and admin alerts.
 const apiKey = process.env.RESEND_API_KEY
-const resend = apiKey ? new Resend(apiKey) : null
+const resend = new Resend(apiKey)
 
 // System email (magic links, invites, alerts, notifications) sends from a
 // domain that must be VERIFIED under RESEND_API_KEY's Resend team. The
@@ -10,7 +16,7 @@ const resend = apiKey ? new Resend(apiKey) : null
 // the default sends from strawhutmedia.net — sending from an unverified
 // domain fails the send and locks everyone out of magic-link sign-in.
 // Override with MAIL_FROM only if that address's domain is verified too.
-const FROM = process.env.MAIL_FROM || 'Slate <slate@strawhutmedia.net>'
+export const FROM = process.env.MAIL_FROM || 'Slate <slate@strawhutmedia.net>'
 const ADMIN_EMAIL = process.env.ADMIN_EMAIL || 'ryan@strawhutmedia.com'
 
 // Persistent admin-alert dedupe via the sent_admin_alerts table. An
@@ -53,12 +59,25 @@ export async function sendAdminAlert(subject: string, body: string, key?: string
     const ok = await shouldSendAdminAlert(key, isDigest ? 24 * 60 : 60)
     if (!ok) return
   }
+  const baseUrl = (process.env.APP_BASE_URL || 'https://slate.strawhutmedia.com').replace(/\/+$/, '')
   try {
     await resend.emails.send({
       from: FROM,
       to: ADMIN_EMAIL,
       subject: `[Slate] ${subject}`,
       text: body,
+      tags: [{ name: 'stage', value: 'internal' }, { name: 'category', value: 'admin-alert' }],
+      html: `
+        <div style="font-family:system-ui,sans-serif;max-width:480px;margin:0 auto;padding:32px 24px;color:#0b0d12">
+          <p style="font-size:11px;letter-spacing:0.3em;text-transform:uppercase;color:#7a8294;margin:0 0 8px">Straw Hut Media presents</p>
+          <h1 style="font-family:Impact,sans-serif;font-size:32px;letter-spacing:0.02em;margin:0 0 20px;background:linear-gradient(90deg,#fbbf24,#f472b6,#a78bfa,#2dd4bf);-webkit-background-clip:text;background-clip:text;color:transparent">SLATE</h1>
+          <h2 style="font-size:17px;margin:0 0 14px">${escapeHtml(subject)}</h2>
+          <p style="font-size:14.5px;line-height:1.6;white-space:pre-wrap;color:#333333">${escapeHtml(body)}</p>
+          <p style="margin:26px 0 0">
+            <a href="${baseUrl}" style="display:inline-block;background:#a78bfa;color:white;padding:10px 20px;border-radius:999px;text-decoration:none;font-weight:600;font-size:14px">Open Slate</a>
+          </p>
+        </div>
+      `,
     })
   } catch (err) {
     console.error('[slate] sendAdminAlert failed', err)
@@ -75,6 +94,7 @@ export async function sendInviteEmail(email: string, name: string, inviterName: 
     from: FROM,
     to: email,
     subject: `${inviterName} invited you to Slate`,
+    tags: [{ name: 'stage', value: 'team' }, { name: 'category', value: 'invite' }],
     html: `
       <div style="font-family:system-ui,sans-serif;max-width:480px;margin:0 auto;padding:32px 24px;color:#0b0d12">
         <p style="font-size:11px;letter-spacing:0.3em;text-transform:uppercase;color:#7a8294;margin:0 0 8px">Straw Hut Media presents</p>
@@ -108,6 +128,7 @@ export async function sendNotificationEmail(args: {
     from: FROM,
     to: args.to,
     subject: args.subject,
+    tags: [{ name: 'stage', value: 'team' }, { name: 'category', value: 'notification' }],
     html: `
       <div style="font-family:system-ui,sans-serif;max-width:480px;margin:0 auto;padding:32px 24px;color:#0b0d12">
         <p style="font-size:11px;letter-spacing:0.3em;text-transform:uppercase;color:#7a8294;margin:0 0 8px">Straw Hut Media presents</p>
@@ -146,6 +167,7 @@ export async function sendInvoiceEmail(args: {
     to: args.to,
     ...(args.replyTo ? { replyTo: args.replyTo } : {}),
     subject: `Invoice ${args.invoiceNumber} — ${args.companyName}`,
+    tags: [{ name: 'stage', value: 'vendor' }, { name: 'category', value: 'invoice' }],
     html: `
       <div style="font-family:system-ui,sans-serif;max-width:520px;margin:0 auto;padding:32px 24px;color:#0b0d12">
         <h1 style="font-family:Impact,sans-serif;font-size:30px;margin:0 0 16px;color:#A96B12">${escapeHtml(args.companyName)}</h1>
@@ -168,7 +190,7 @@ export async function sendInvoiceEmail(args: {
   }
 }
 
-function escapeHtml(s: string): string {
+export function escapeHtml(s: string): string {
   return s
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
@@ -186,6 +208,7 @@ export async function sendMagicLink(email: string, link: string) {
     from: FROM,
     to: email,
     subject: 'Sign in to Slate',
+    tags: [{ name: 'stage', value: 'team' }, { name: 'category', value: 'login' }],
     html: `
       <div style="font-family:system-ui,sans-serif;max-width:480px;margin:0 auto;padding:32px 24px;color:#0b0d12">
         <p style="font-size:11px;letter-spacing:0.3em;text-transform:uppercase;color:#7a8294;margin:0 0 8px">Straw Hut Media presents</p>

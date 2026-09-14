@@ -24,7 +24,7 @@ const todayISO = () => new Date().toISOString().slice(0, 10)
 const defaultPeriod = () => new Date().toLocaleString('en-US', { month: 'long', year: 'numeric' })
 
 type EditItem = { desc: string; hours: string; rate: string }
-type Tab = 'dashboard' | 'new' | 'invoices' | 'contractors' | 'settings'
+type Tab = 'dashboard' | 'new' | 'invoices' | 'clients' | 'contractors' | 'settings'
 
 // Parse pasted spreadsheet rows / CSV into line items.
 function parseRows(text: string, fallbackRateCents: number): EditItem[] {
@@ -85,14 +85,19 @@ function StatusChip({ status }: { status: string }) {
   )
 }
 
-// Locked to a single owner account — must match the server's
-// INVOICING_OWNER_EMAIL (defaults to ryan@strawhutmedia.com). The server
-// enforces this on every request; this is the matching UI gate.
+// Full owner — must match the server's INVOICING_OWNER_EMAIL (defaults
+// to ryan@strawhutmedia.com). Sees everything: contractor payroll/W9,
+// Cash Flow, and the client (AR) side. A separate, narrower co-owner
+// seat (user.is_invoicing_owner — currently Caroline) gets ONLY the
+// QuickBooks/Client Invoices view below — no contractor payroll/W9, no
+// Cash Flow; the server enforces the same split on every request.
 const OWNER_EMAIL = 'ryan@strawhutmedia.com'
 
 // ── main page ─────────────────────────────────────────────────────────
 export default function InvoicingPage() {
   const { user } = useAuth()
+  const isFullOwner = (user?.email || '').trim().toLowerCase() === OWNER_EMAIL
+  const isCoOwner = Boolean(user?.is_invoicing_owner)
   const [tab, setTab] = useState<Tab>('dashboard')
   const [settings, setSettings] = useState<ApiInvoiceSettings | null>(null)
   const [contractors, setContractors] = useState<ApiContractor[]>([])
@@ -113,11 +118,35 @@ export default function InvoicingPage() {
     setSettings(s.settings); setContractors(c.contractors); setInvoices(iv.invoices)
   }, [])
 
-  useEffect(() => { void reload().finally(() => setLoading(false)) }, [reload])
+  // Contractor payroll/W9 data is owner-only server-side — a co-owner
+  // (Caroline) would just get 403s, so don't even ask for it.
+  useEffect(() => {
+    if (!isFullOwner) { setLoading(false); return }
+    void reload().finally(() => setLoading(false))
+  }, [reload, isFullOwner])
 
   if (!user) return null
-  if ((user.email || '').trim().toLowerCase() !== OWNER_EMAIL) {
+  if (!isFullOwner && !isCoOwner) {
     return <div className="max-w-2xl"><div className={`${card} p-8 text-center text-muted`}>This section is private.</div></div>
+  }
+  if (!isFullOwner) {
+    // Co-owner: Client Invoices / QuickBooks only — no contractor
+    // payroll/W9 and no Cash Flow.
+    return (
+      <div className="space-y-6 max-w-2xl">
+        <div>
+          <h1 className="font-display text-5xl text-rainbow">Client Invoices</h1>
+          <p className="text-muted text-sm mt-1">Draft, edit, and send client invoices via QuickBooks.</p>
+        </div>
+        <QuickBooksCard flash={flash} />
+        <ClientInvoicesCard flash={flash} />
+        {toast && (
+          <div className="fixed left-1/2 bottom-8 -translate-x-1/2 z-50 bg-text text-ink font-semibold text-sm px-4 py-2.5 rounded-full shadow-2xl">
+            {toast}
+          </div>
+        )}
+      </div>
+    )
   }
   if (loading || !settings) return <div className="text-muted text-sm">Loading invoicing…</div>
 
@@ -128,8 +157,9 @@ export default function InvoicingPage() {
 
   const tabs: { key: Tab; label: string }[] = [
     { key: 'dashboard', label: 'Dashboard' },
+    { key: 'clients', label: 'Client Invoices' },
     { key: 'new', label: 'New Invoice' },
-    { key: 'invoices', label: 'Invoices' },
+    { key: 'invoices', label: 'Contractor Invoices' },
     { key: 'contractors', label: 'Contractors' },
     { key: 'settings', label: 'Settings' },
   ]
@@ -167,6 +197,11 @@ export default function InvoicingPage() {
           contractorCount={contractors.length} invoices={invoices.slice(0, 6)}
           onOpen={(id) => setViewingId(id)} onNew={() => setTab('new')}
         />
+      ) : tab === 'clients' ? (
+        <div className="space-y-4 max-w-2xl">
+          <QuickBooksCard flash={flash} />
+          <ClientInvoicesCard flash={flash} />
+        </div>
       ) : tab === 'new' ? (
         <NewInvoice
           contractors={contractors} settings={settings} flash={flash}
@@ -788,8 +823,366 @@ function SettingsPanel({ settings, onSaved, flash }: {
         </div>
         <div className="flex justify-end"><Btn variant="primary" onClick={save} disabled={saving}>{saving ? 'Saving…' : 'Save settings'}</Btn></div>
       </div>
+    </div>
+  )
+}
 
-      <QuickBooksCard flash={flash} />
+// Client-facing (AR) invoices — draft here, review, then Send is a
+// separate button click. Creating a draft never emails anyone;
+// QuickBooks invoices are born unsent. Only the Send button (one per
+// invoice, below) calls the endpoint that actually emails a client.
+function ClientInvoicesCard({ flash }: { flash: (m: string) => void }) {
+  const [connected, setConnected] = useState(false)
+  useEffect(() => { api.qbStatus().then((s) => setConnected(s.connected)).catch(() => setConnected(false)) }, [])
+
+  type ApiQbInvoice = Awaited<ReturnType<typeof api.qbListInvoices>>['invoices'][number]
+  type ApiQbCustomer = { id: string; name: string; email: string | null }
+  type ApiQbItem = { id: string; name: string; unitPrice: number }
+
+  const [invoices, setInvoices] = useState<ApiQbInvoice[]>([])
+  const [loadingList, setLoadingList] = useState(false)
+  // A failed fetch must never look like "no invoices" — that's what sent
+  // Caroline hunting for an invoice that was actually just hidden behind
+  // a silent QuickBooks API error.
+  const [listError, setListError] = useState('')
+  const reload = useCallback(() => {
+    setLoadingList(true)
+    setListError('')
+    api.qbListInvoices().then((r) => setInvoices(r.invoices))
+      .catch((err) => setListError(err instanceof Error ? err.message : 'Failed to load invoices'))
+      .finally(() => setLoadingList(false))
+  }, [])
+  useEffect(() => { if (connected) reload() }, [connected, reload])
+
+  const [items, setItems] = useState<ApiQbItem[]>([])
+  const [itemsError, setItemsError] = useState('')
+  useEffect(() => {
+    if (!connected) return
+    setItemsError('')
+    api.qbItems().then((r) => setItems(r.items))
+      .catch((err) => setItemsError(err instanceof Error ? err.message : 'Failed to load items'))
+  }, [connected])
+
+  const [customerQuery, setCustomerQuery] = useState('')
+  const [customerResults, setCustomerResults] = useState<ApiQbCustomer[]>([])
+  const [customer, setCustomer] = useState<ApiQbCustomer | null>(null)
+  useEffect(() => {
+    if (customer || customerQuery.trim().length < 2) { setCustomerResults([]); return }
+    const t = window.setTimeout(() => {
+      api.qbSearchCustomers(customerQuery).then((r) => setCustomerResults(r.customers)).catch(() => {})
+    }, 300)
+    return () => window.clearTimeout(t)
+  }, [customerQuery, customer])
+
+  const [lines, setLines] = useState<Array<{ itemId: string; description: string; qty: number; rate: number }>>([])
+  const [dueDate, setDueDate] = useState('')
+  const [note, setNote] = useState('')
+  const [billEmail, setBillEmail] = useState('')
+  // Standing rule: every client invoice CCs accounting. Baked into the
+  // invoice itself (QBO CCs this address whenever it's sent, by whoever
+  // clicks Send) — editable/removable per invoice if there's a reason to.
+  const [ccEmail, setCcEmail] = useState('accounting@strawhutmedia.com')
+  const [creating, setCreating] = useState(false)
+
+  function addLine() {
+    setLines((ls) => [...ls, { itemId: items[0]?.id ?? '', description: '', qty: 1, rate: items[0]?.unitPrice ?? 0 }])
+  }
+  function updateLine(i: number, patch: Partial<{ itemId: string; description: string; qty: number; rate: number }>) {
+    setLines((ls) => ls.map((l, idx) => (idx === i ? { ...l, ...patch } : l)))
+  }
+  function removeLine(i: number) {
+    setLines((ls) => ls.filter((_, idx) => idx !== i))
+  }
+  const total = lines.reduce((s, l) => s + (l.qty || 1) * l.rate, 0)
+
+  function resetForm() {
+    setCustomer(null); setCustomerQuery(''); setLines([]); setDueDate(''); setNote(''); setBillEmail('')
+    setCcEmail('accounting@strawhutmedia.com')
+  }
+
+  async function createDraft() {
+    if (!customer) { flash('Pick a customer first'); return }
+    if (lines.length === 0) { flash('Add at least one line item'); return }
+    setCreating(true)
+    try {
+      await api.qbCreateInvoiceDraft({
+        customerId: customer.id,
+        dueDate: dueDate || undefined,
+        note: note || undefined,
+        billEmail: billEmail || customer.email || undefined,
+        ccEmail: ccEmail || undefined,
+        lines: lines.map((l) => ({ itemId: l.itemId, description: l.description || undefined, qty: l.qty, rate: l.rate })),
+      })
+      flash('Draft created — review it below. Nothing has been sent.')
+      resetForm()
+      reload()
+    } catch (err) {
+      flash(err instanceof Error ? err.message : 'Failed to create draft')
+    } finally {
+      setCreating(false)
+    }
+  }
+
+  const [sendTo, setSendTo] = useState<Record<string, string>>({})
+  async function sendInvoice(inv: ApiQbInvoice) {
+    const to = (sendTo[inv.id] ?? inv.billEmail ?? '').trim()
+    if (!to) { flash('Enter an email to send to'); return }
+    const verb = inv.sent ? 'Resend' : 'Send'
+    if (!window.confirm(`${verb} invoice #${inv.docNumber || inv.id} to ${to}? This emails the client right now.`)) return
+    try {
+      await api.qbSendInvoice(inv.id, to)
+      flash(`${verb === 'Resend' ? 'Resent' : 'Sent'} to ${to}`)
+      reload()
+    } catch (err) {
+      flash(err instanceof Error ? err.message : 'Send failed')
+    }
+  }
+
+  // Editing an existing invoice — line items, dates, note, send-to/cc.
+  // Never emails by itself; only Send/Resend above does that.
+  const [editingId, setEditingId] = useState<string | null>(null)
+  const [editLines, setEditLines] = useState<Array<{ itemId: string; description: string; qty: number; rate: number }>>([])
+  const [editDueDate, setEditDueDate] = useState('')
+  const [editNote, setEditNote] = useState('')
+  const [editBillEmail, setEditBillEmail] = useState('')
+  const [editCcEmail, setEditCcEmail] = useState('')
+  const [savingEdit, setSavingEdit] = useState(false)
+
+  function startEdit(inv: ApiQbInvoice) {
+    setEditingId(inv.id)
+    setEditLines(inv.lines.map((l) => ({ itemId: l.itemId, description: l.description, qty: l.qty, rate: l.rate })))
+    setEditDueDate(inv.dueDate || '')
+    setEditNote(inv.note || '')
+    setEditBillEmail(inv.billEmail || '')
+    setEditCcEmail(inv.ccEmail || '')
+  }
+  function cancelEdit() { setEditingId(null) }
+  function updateEditLine(i: number, patch: Partial<{ itemId: string; description: string; qty: number; rate: number }>) {
+    setEditLines((ls) => ls.map((l, idx) => (idx === i ? { ...l, ...patch } : l)))
+  }
+  async function saveEdit(inv: ApiQbInvoice) {
+    if (editLines.length === 0) { flash('Add at least one line item'); return }
+    setSavingEdit(true)
+    try {
+      await api.qbUpdateInvoice(inv.id, {
+        dueDate: editDueDate || undefined,
+        note: editNote,
+        billEmail: editBillEmail || undefined,
+        ccEmail: editCcEmail || undefined,
+        lines: editLines.map((l) => ({ itemId: l.itemId, description: l.description || undefined, qty: l.qty, rate: l.rate })),
+      })
+      flash(inv.sent ? 'Invoice updated — hit Resend when ready, nothing sent yet' : 'Invoice updated')
+      setEditingId(null)
+      reload()
+    } catch (err) {
+      flash(err instanceof Error ? err.message : 'Update failed')
+    } finally {
+      setSavingEdit(false)
+    }
+  }
+
+  if (!connected) return null
+
+  return (
+    <div className={`${card} p-5 space-y-4`}>
+      <div>
+        <h2 className="font-display text-xl">Client Invoices</h2>
+        <p className="text-sm text-muted">
+          Build a draft here and it stays a draft — QuickBooks never emails on creation. Review it below,
+          then hit <b className="text-text">Send</b> yourself when you're ready. Nothing goes to a client any other way.
+        </p>
+      </div>
+
+      <div className="space-y-3 border-t border-line pt-4">
+        <Labeled label="Customer">
+          <input
+            className={inputCls}
+            value={customer ? customer.name : customerQuery}
+            onChange={(e) => { setCustomer(null); setCustomerQuery(e.target.value) }}
+            placeholder="Search QuickBooks customers…"
+          />
+          {!customer && customerResults.length > 0 && (
+            <div className="mt-1 rounded-xl border border-line bg-ink/80 overflow-hidden">
+              {customerResults.map((c) => (
+                <button
+                  key={c.id} type="button"
+                  className="block w-full text-left px-3 py-2 text-sm hover:bg-line/40"
+                  onClick={() => { setCustomer(c); setCustomerQuery(c.name); setCustomerResults([]); if (c.email) setBillEmail(c.email) }}
+                >
+                  {c.name}{c.email ? <span className="text-muted"> — {c.email}</span> : null}
+                </button>
+              ))}
+            </div>
+          )}
+        </Labeled>
+
+        {customer && (
+          <>
+            <Labeled label="Send-to email, for when you're ready — the on-file address isn't always the right one">
+              <input className={inputCls} value={billEmail} onChange={(e) => setBillEmail(e.target.value)} placeholder="client@company.com" />
+            </Labeled>
+            <Labeled label="CC (always accounting, unless you clear it)">
+              <input className={inputCls} value={ccEmail} onChange={(e) => setCcEmail(e.target.value)} placeholder="accounting@strawhutmedia.com" />
+            </Labeled>
+
+            <div className="space-y-2">
+              <span className={labelCls}>Line items</span>
+              {itemsError && (
+                <div className="rounded-xl border border-urgent/40 bg-urgent/10 p-3 text-sm">
+                  <b className="text-urgent">Couldn't load QuickBooks items.</b>{' '}
+                  <span className="text-muted">{itemsError}</span>
+                </div>
+              )}
+              {lines.map((l, i) => (
+                <div key={i} className="flex flex-wrap gap-2 items-center">
+                  <select
+                    className={`${inputCls} w-auto`}
+                    value={l.itemId}
+                    onChange={(e) => {
+                      const it = items.find((x) => x.id === e.target.value)
+                      updateLine(i, { itemId: e.target.value, rate: it?.unitPrice ?? l.rate })
+                    }}
+                  >
+                    {items.map((it) => <option key={it.id} value={it.id}>{it.name}</option>)}
+                  </select>
+                  <input className={`${inputCls} flex-1 min-w-[160px]`} placeholder="Description" value={l.description}
+                    onChange={(e) => updateLine(i, { description: e.target.value })} />
+                  <input className={`${inputCls} w-20`} type="number" min={0} value={l.qty}
+                    onChange={(e) => updateLine(i, { qty: Number(e.target.value) })} />
+                  <span className="text-muted text-sm">@</span>
+                  <input className={`${inputCls} w-28`} type="number" min={0} step="0.01" value={l.rate}
+                    onChange={(e) => updateLine(i, { rate: Number(e.target.value) })} />
+                  <Btn variant="danger" onClick={() => removeLine(i)}>✕</Btn>
+                </div>
+              ))}
+              <Btn variant="ghost" onClick={addLine}>+ Add line item</Btn>
+            </div>
+
+            <div className="flex gap-3 flex-wrap">
+              <Labeled label="Due date">
+                <input className={inputCls} type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} />
+              </Labeled>
+              <Labeled label="Note to customer">
+                <input className={inputCls} value={note} onChange={(e) => setNote(e.target.value)} />
+              </Labeled>
+            </div>
+
+            <div className="flex items-center justify-between pt-2">
+              <span className="text-lg font-bold">${total.toLocaleString('en-US', { minimumFractionDigits: 2 })}</span>
+              <Btn variant="primary" onClick={createDraft} disabled={creating}>
+                {creating ? 'Creating…' : 'Create draft (does not send)'}
+              </Btn>
+            </div>
+          </>
+        )}
+      </div>
+
+      <div className="space-y-2 border-t border-line pt-4">
+        <div className="flex items-center justify-between">
+          <span className={labelCls}>Recent invoices</span>
+          <Btn variant="ghost" onClick={reload}>{loadingList ? 'Loading…' : 'Refresh'}</Btn>
+        </div>
+        {listError && (
+          <div className="rounded-xl border border-urgent/40 bg-urgent/10 p-3 text-sm">
+            <b className="text-urgent">Couldn't load invoices from QuickBooks.</b>{' '}
+            <span className="text-muted">{listError}</span>
+          </div>
+        )}
+        {!listError && invoices.length === 0 && <p className="text-sm text-muted">No invoices yet.</p>}
+        {invoices.map((inv) => (
+          <div key={inv.id} className="rounded-xl border border-line p-3 space-y-2">
+            <div className="flex items-center justify-between flex-wrap gap-2">
+              <div>
+                <span className="font-bold">#{inv.docNumber || inv.id}</span>{' '}
+                <span className="text-muted">{inv.customerName}</span>
+                {inv.ccEmail && <span className="text-[10px] text-muted block">cc: {inv.ccEmail}</span>}
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-sm">${inv.total.toLocaleString('en-US', { minimumFractionDigits: 2 })}</span>
+                <span className={`text-[10px] uppercase tracking-wider font-bold rounded-full px-2 py-1 border ${
+                  inv.paid ? 'text-stage-done border-stage-done/40 bg-stage-done/10'
+                    : inv.sent ? 'text-stage-mastering border-stage-mastering/40 bg-stage-mastering/10'
+                    : 'text-muted border-line bg-line/20'
+                }`}>
+                  {inv.paid ? 'Paid' : inv.sent ? 'Sent' : 'Draft — not sent'}
+                </span>
+                <Btn variant="ghost" onClick={() => (editingId === inv.id ? cancelEdit() : startEdit(inv))}>
+                  {editingId === inv.id ? 'Cancel' : 'Edit'}
+                </Btn>
+              </div>
+            </div>
+
+            {editingId === inv.id ? (
+              <div className="space-y-2 border-t border-line pt-2">
+                {inv.sent && (
+                  <p className="text-xs text-stage-mastering">
+                    Already sent once — editing here only changes the QuickBooks record. Nothing goes to the
+                    client until you hit Resend below.
+                  </p>
+                )}
+                <Labeled label="Send-to email">
+                  <input className={inputCls} value={editBillEmail} onChange={(e) => setEditBillEmail(e.target.value)} placeholder="client@company.com" />
+                </Labeled>
+                <Labeled label="CC">
+                  <input className={inputCls} value={editCcEmail} onChange={(e) => setEditCcEmail(e.target.value)} placeholder="accounting@strawhutmedia.com" />
+                </Labeled>
+                <div className="space-y-2">
+                  <span className={labelCls}>Line items</span>
+                  {editLines.map((l, i) => (
+                    <div key={i} className="flex flex-wrap gap-2 items-center">
+                      <select
+                        className={`${inputCls} w-auto`}
+                        value={l.itemId}
+                        onChange={(e) => {
+                          const it = items.find((x) => x.id === e.target.value)
+                          updateEditLine(i, { itemId: e.target.value, rate: it?.unitPrice ?? l.rate })
+                        }}
+                      >
+                        {items.map((it) => <option key={it.id} value={it.id}>{it.name}</option>)}
+                      </select>
+                      <input className={`${inputCls} flex-1 min-w-[160px]`} placeholder="Description" value={l.description}
+                        onChange={(e) => updateEditLine(i, { description: e.target.value })} />
+                      <input className={`${inputCls} w-20`} type="number" min={0} value={l.qty}
+                        onChange={(e) => updateEditLine(i, { qty: Number(e.target.value) })} />
+                      <span className="text-muted text-sm">@</span>
+                      <input className={`${inputCls} w-28`} type="number" min={0} step="0.01" value={l.rate}
+                        onChange={(e) => updateEditLine(i, { rate: Number(e.target.value) })} />
+                      <Btn variant="danger" onClick={() => setEditLines((ls) => ls.filter((_, idx) => idx !== i))}>✕</Btn>
+                    </div>
+                  ))}
+                  <Btn variant="ghost" onClick={() => setEditLines((ls) => [...ls, { itemId: items[0]?.id ?? '', description: '', qty: 1, rate: items[0]?.unitPrice ?? 0 }])}>
+                    + Add line item
+                  </Btn>
+                </div>
+                <div className="flex gap-3 flex-wrap">
+                  <Labeled label="Due date">
+                    <input className={inputCls} type="date" value={editDueDate} onChange={(e) => setEditDueDate(e.target.value)} />
+                  </Labeled>
+                  <Labeled label="Note to customer">
+                    <input className={inputCls} value={editNote} onChange={(e) => setEditNote(e.target.value)} />
+                  </Labeled>
+                </div>
+                <div className="flex justify-end gap-2 pt-1">
+                  <Btn onClick={cancelEdit}>Cancel</Btn>
+                  <Btn variant="primary" onClick={() => saveEdit(inv)} disabled={savingEdit}>
+                    {savingEdit ? 'Saving…' : 'Save changes (does not send)'}
+                  </Btn>
+                </div>
+              </div>
+            ) : (
+              <div className="flex items-center gap-2 flex-wrap">
+                <input
+                  className={`${inputCls} flex-1 min-w-[200px]`}
+                  placeholder="Send to…"
+                  value={sendTo[inv.id] ?? inv.billEmail ?? ''}
+                  onChange={(e) => setSendTo((s) => ({ ...s, [inv.id]: e.target.value }))}
+                />
+                <Btn variant="primary" onClick={() => sendInvoice(inv)}>{inv.sent ? 'Resend' : 'Send'}</Btn>
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
     </div>
   )
 }

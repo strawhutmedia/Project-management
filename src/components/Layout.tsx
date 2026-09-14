@@ -60,6 +60,19 @@ export default function Layout() {
               📅 Scheduler
             </NavLink>
 
+            <NavLink
+              to="/qa"
+              className={({ isActive }) =>
+                `hidden sm:inline-flex items-center gap-1 text-[11px] uppercase tracking-wider font-bold px-2.5 py-1 rounded-full border transition ${
+                  isActive
+                    ? 'text-stage-done bg-stage-done/10 border-stage-done/40'
+                    : 'text-muted border-line hover:text-text hover:border-line'
+                }`
+              }
+            >
+              ✅ QA
+            </NavLink>
+
             {user?.role === 'admin' && (
               <NavLink
                 to="/admin/outreach"
@@ -113,23 +126,29 @@ export default function Layout() {
                     <NavMenuLink to="/scheduler" onClick={() => setNavOpen(false)}>
                       📅 Scheduler
                     </NavMenuLink>
+                    <NavMenuLink to="/qa" onClick={() => setNavOpen(false)}>
+                      ✅ Production QA
+                    </NavMenuLink>
                     {isPodcastWorkspace && (
                       <NavMenuLink to="/prompter" onClick={() => setNavOpen(false)}>
                         🎬 Teleprompter
                       </NavMenuLink>
                     )}
+                    {(user?.email?.trim().toLowerCase() === 'ryan@strawhutmedia.com' || user?.is_invoicing_owner) && (
+                      <NavMenuLink to="/invoicing" onClick={() => setNavOpen(false)}>
+                        🧾 Invoices
+                      </NavMenuLink>
+                    )}
                     {user?.email?.trim().toLowerCase() === 'ryan@strawhutmedia.com' && (
-                      <>
-                        <NavMenuLink to="/invoicing" onClick={() => setNavOpen(false)}>
-                          🧾 Invoices
-                        </NavMenuLink>
-                        <NavMenuLink to="/cashflow" onClick={() => setNavOpen(false)}>
-                          💵 Cash Flow
-                        </NavMenuLink>
-                      </>
+                      <NavMenuLink to="/cashflow" onClick={() => setNavOpen(false)}>
+                        💵 Cash Flow
+                      </NavMenuLink>
                     )}
                     {user?.role === 'admin' && (
                       <>
+                        <NavMenuLink to="/storage" onClick={() => setNavOpen(false)}>
+                          🗄️ Storage
+                        </NavMenuLink>
                         <NavMenuLink to="/admin/outreach" onClick={() => setNavOpen(false)}>
                           ✉ Outreach
                         </NavMenuLink>
