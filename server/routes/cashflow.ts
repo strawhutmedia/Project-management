@@ -86,6 +86,21 @@ async function loadSettings() {
   }
 }
 
+type PipelineDealRow = {
+  id: string; name: string; estimated_mrr_cents: string | number
+  stage: string; notes: string; created_at: string; updated_at: string
+}
+
+function mapDeal(r: PipelineDealRow) {
+  return {
+    id: r.id, name: r.name, estimatedMrrCents: Number(r.estimated_mrr_cents),
+    stage: r.stage as 'prospecting' | 'quoted' | 'negotiating' | 'won' | 'lost',
+    notes: r.notes, createdAt: r.created_at, updatedAt: r.updated_at,
+  }
+}
+
+const PIPELINE_STAGES = ['prospecting', 'quoted', 'negotiating', 'won', 'lost']
+
 // ── overview: balance + monthly series + category breakdown ──────────
 cashflowRouter.get('/overview', async (_req, res) => {
   try {
@@ -180,6 +195,23 @@ cashflowRouter.get('/overview', async (_req, res) => {
     const oneTimeInCents = Number(oneTime.rows.find((r) => r.kind === 'in')?.total_cents ?? 0)
     const oneTimeOutCents = Number(oneTime.rows.find((r) => r.kind === 'out')?.total_cents ?? 0)
 
+    // Growth pipeline — target MRR vs current recurring income, plus the
+    // working list of prospective new-client deals that could close the gap.
+    const targetRow = await pool.query(
+      `SELECT target_mrr_cents FROM cashflow_growth_target WHERE id = 1`,
+    )
+    const targetMrrCents = Number(targetRow.rows[0]?.target_mrr_cents ?? 8000000)
+    const deals = await pool.query(
+      `SELECT id, name, estimated_mrr_cents, stage, notes, created_at, updated_at
+       FROM cashflow_pipeline_deals
+       ORDER BY CASE stage
+         WHEN 'negotiating' THEN 0 WHEN 'quoted' THEN 1 WHEN 'prospecting' THEN 2
+         WHEN 'won' THEN 3 WHEN 'lost' THEN 4 ELSE 5 END, updated_at DESC`,
+    )
+    const openPipelineCents = deals.rows
+      .filter((r) => r.stage !== 'lost' && r.stage !== 'won')
+      .reduce((sum, r) => sum + Number(r.estimated_mrr_cents), 0)
+
     res.json({
       settings,
       currentBalanceCents,
@@ -198,6 +230,13 @@ cashflowRouter.get('/overview', async (_req, res) => {
         recurringNetCents: recurringInCents - recurringOutCents,
         oneTimeInCents, oneTimeOutCents,
         oneTimeNetCents: oneTimeInCents - oneTimeOutCents,
+      },
+      growthPipeline: {
+        targetMrrCents,
+        currentMrrCents: recurringInCents,
+        gapCents: Math.max(0, targetMrrCents - recurringInCents),
+        openPipelineCents,
+        deals: deals.rows.map(mapDeal),
       },
     })
   } catch (err) {
@@ -315,6 +354,100 @@ cashflowRouter.patch('/settings', async (req, res) => {
   } catch (err) {
     logError('cashflow_settings_failed', { err: String(err) })
     res.status(500).json({ error: 'settings_failed' })
+  }
+})
+
+// ── growth pipeline: target MRR + prospective deals ───────────────────
+cashflowRouter.patch('/growth-target', async (req, res) => {
+  try {
+    const body = (req.body ?? {}) as Record<string, unknown>
+    const targetMrrCents = toCents(body.targetMrrCents)
+    if (targetMrrCents <= 0) { res.status(400).json({ error: 'invalid_target', detail: 'targetMrrCents must be greater than zero' }); return }
+    await pool.query(
+      `UPDATE cashflow_growth_target SET target_mrr_cents = $1, updated_at = now() WHERE id = 1`,
+      [targetMrrCents],
+    )
+    res.json({ targetMrrCents })
+  } catch (err) {
+    logError('cashflow_growth_target_failed', { err: String(err) })
+    res.status(500).json({ error: 'growth_target_failed' })
+  }
+})
+
+function parseDealBody(body: Record<string, unknown>, partial: boolean) {
+  const out: { name?: string; estimatedMrrCents?: number; stage?: string; notes?: string } = {}
+  if (!partial || body.name !== undefined) {
+    const name = String(body.name ?? '').trim().slice(0, 200)
+    if (!name) return { error: 'name is required' }
+    out.name = name
+  }
+  if (!partial || body.estimatedMrrCents !== undefined) {
+    out.estimatedMrrCents = Math.max(0, toCents(body.estimatedMrrCents))
+  }
+  if (!partial || body.stage !== undefined) {
+    const stage = String(body.stage ?? 'prospecting')
+    if (!PIPELINE_STAGES.includes(stage)) return { error: `stage must be one of: ${PIPELINE_STAGES.join(', ')}` }
+    out.stage = stage
+  }
+  if (!partial || body.notes !== undefined) out.notes = String(body.notes ?? '').slice(0, 2000)
+  return { value: out }
+}
+
+cashflowRouter.post('/pipeline', async (req, res) => {
+  try {
+    const parsed = parseDealBody((req.body ?? {}) as Record<string, unknown>, false)
+    if ('error' in parsed) { res.status(400).json({ error: 'invalid_deal', detail: parsed.error }); return }
+    const d = parsed.value!
+    const user = (req as Request & { user: SessionUser }).user
+    const { rows } = await pool.query(
+      `INSERT INTO cashflow_pipeline_deals (name, estimated_mrr_cents, stage, notes, created_by)
+       VALUES ($1, $2, $3, $4, $5)
+       RETURNING id, name, estimated_mrr_cents, stage, notes, created_at, updated_at`,
+      [d.name, d.estimatedMrrCents ?? 0, d.stage ?? 'prospecting', d.notes ?? '', user.id],
+    )
+    res.json({ deal: mapDeal(rows[0]) })
+  } catch (err) {
+    logError('cashflow_pipeline_create_failed', { err: String(err) })
+    res.status(500).json({ error: 'create_failed' })
+  }
+})
+
+cashflowRouter.patch('/pipeline/:id', async (req, res) => {
+  try {
+    const parsed = parseDealBody((req.body ?? {}) as Record<string, unknown>, true)
+    if ('error' in parsed) { res.status(400).json({ error: 'invalid_deal', detail: parsed.error }); return }
+    const d = parsed.value!
+    const sets: string[] = []
+    const params: unknown[] = []
+    const push = (col: string, v: unknown) => { params.push(v); sets.push(`${col} = $${params.length}`) }
+    if (d.name !== undefined) push('name', d.name)
+    if (d.estimatedMrrCents !== undefined) push('estimated_mrr_cents', d.estimatedMrrCents)
+    if (d.stage !== undefined) push('stage', d.stage)
+    if (d.notes !== undefined) push('notes', d.notes)
+    if (!sets.length) { res.status(400).json({ error: 'invalid_deal', detail: 'nothing to update' }); return }
+    params.push(req.params.id)
+    const { rows } = await pool.query(
+      `UPDATE cashflow_pipeline_deals SET ${sets.join(', ')}, updated_at = now()
+       WHERE id = $${params.length}
+       RETURNING id, name, estimated_mrr_cents, stage, notes, created_at, updated_at`,
+      params,
+    )
+    if (!rows[0]) { res.status(404).json({ error: 'not_found' }); return }
+    res.json({ deal: mapDeal(rows[0]) })
+  } catch (err) {
+    logError('cashflow_pipeline_update_failed', { err: String(err) })
+    res.status(500).json({ error: 'update_failed' })
+  }
+})
+
+cashflowRouter.delete('/pipeline/:id', async (req, res) => {
+  try {
+    const { rowCount } = await pool.query(`DELETE FROM cashflow_pipeline_deals WHERE id = $1`, [req.params.id])
+    if (!rowCount) { res.status(404).json({ error: 'not_found' }); return }
+    res.json({ ok: true })
+  } catch (err) {
+    logError('cashflow_pipeline_delete_failed', { err: String(err) })
+    res.status(500).json({ error: 'delete_failed' })
   }
 })
 

@@ -793,6 +793,23 @@ export type ApiCashflowOverview = {
     recurringInCents: number; recurringOutCents: number; recurringNetCents: number
     oneTimeInCents: number; oneTimeOutCents: number; oneTimeNetCents: number
   }
+  growthPipeline: {
+    targetMrrCents: number
+    currentMrrCents: number
+    gapCents: number
+    openPipelineCents: number
+    deals: ApiPipelineDeal[]
+  }
+}
+
+export type ApiPipelineDeal = {
+  id: string
+  name: string
+  estimatedMrrCents: number
+  stage: 'prospecting' | 'quoted' | 'negotiating' | 'won' | 'lost'
+  notes: string
+  createdAt: string
+  updatedAt: string
 }
 
 // ── Master Archive (S3 vault) browser ──
@@ -998,6 +1015,16 @@ export const api = {
     request<{ ok: true }>(`/api/cashflow/entries/${id}`, { method: 'DELETE' }),
   updateCashflowSettings: (patch: Partial<{ startingBalanceCents: number; startingDate: string }>) =>
     request<{ settings: { startingBalanceCents: number; startingDate: string } }>('/api/cashflow/settings', { method: 'PATCH', body: JSON.stringify(patch) }),
+  updateGrowthTarget: (targetMrrCents: number) =>
+    request<{ targetMrrCents: number }>('/api/cashflow/growth-target', { method: 'PATCH', body: JSON.stringify({ targetMrrCents }) }),
+  createPipelineDeal: (body: {
+    name: string; estimatedMrrCents?: number; stage?: ApiPipelineDeal['stage']; notes?: string
+  }) => request<{ deal: ApiPipelineDeal }>('/api/cashflow/pipeline', { method: 'POST', body: JSON.stringify(body) }),
+  updatePipelineDeal: (id: string, body: Partial<{
+    name: string; estimatedMrrCents: number; stage: ApiPipelineDeal['stage']; notes: string
+  }>) => request<{ deal: ApiPipelineDeal }>(`/api/cashflow/pipeline/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
+  deletePipelineDeal: (id: string) =>
+    request<{ ok: true }>(`/api/cashflow/pipeline/${id}`, { method: 'DELETE' }),
 
   // QuickBooks connection (AR side)
   qbStatus: () => request<{ configured: boolean; connected: boolean; env: string; realmId: string | null; redirectUri: string }>('/api/qb/status'),
