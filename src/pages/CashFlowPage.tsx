@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useAuth } from '../auth'
-import { api, type ApiCashflowEntry, type ApiCashflowOverview } from '../api'
+import { api, type ApiCashflowEntry, type ApiCashflowOverview, type ApiPipelineDeal } from '../api'
 
 // ── money + date helpers ───────────────────────────────────
 const money = (cents: number) => {
@@ -84,6 +84,18 @@ const emptyDraft = (kind: 'in' | 'out' = 'in'): EntryDraft => ({
 const IN_CATEGORIES = ['Client payment', 'Podbooster', 'Ad revenue', 'Production fee', 'Sponsorship', 'Other income']
 const OUT_CATEGORIES = ['Payroll', 'Contractors', 'Ad spend', 'Software', 'Rent', 'Equipment', 'Travel', 'Taxes', 'Other expense']
 
+const DEAL_STAGES: ApiPipelineDeal['stage'][] = ['prospecting', 'quoted', 'negotiating', 'won', 'lost']
+const stageStyle: Record<ApiPipelineDeal['stage'], string> = {
+  prospecting: 'border-line bg-line/30 text-muted',
+  quoted: 'border-stage-mastering/40 bg-stage-mastering/10 text-stage-mastering',
+  negotiating: 'border-stage-producing/40 bg-stage-producing/10 text-stage-producing',
+  won: 'border-stage-done/40 bg-stage-done/10 text-stage-done',
+  lost: 'border-urgent/40 bg-urgent/10 text-urgent',
+}
+
+type DealDraft = { name: string; estimatedMrr: string; stage: ApiPipelineDeal['stage']; notes: string }
+const emptyDealDraft = (): DealDraft => ({ name: '', estimatedMrr: '', stage: 'prospecting', notes: '' })
+
 export default function CashFlowPage() {
   const { user } = useAuth()
   const [overview, setOverview] = useState<ApiCashflowOverview | null>(null)
@@ -98,6 +110,11 @@ export default function CashFlowPage() {
   const [showSettings, setShowSettings] = useState(false)
   const [settingsBalance, setSettingsBalance] = useState('')
   const [settingsDate, setSettingsDate] = useState(todayISO())
+  const [editingTarget, setEditingTarget] = useState(false)
+  const [targetInput, setTargetInput] = useState('')
+  const [dealDraft, setDealDraft] = useState<DealDraft>(emptyDealDraft())
+  const [editingDealId, setEditingDealId] = useState<string | null>(null)
+  const [showDealForm, setShowDealForm] = useState(false)
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const amountRef = useRef<HTMLInputElement | null>(null)
 
@@ -116,6 +133,7 @@ export default function CashFlowPage() {
     setEntries(e.entries)
     setSettingsBalance(centsToInput(o.settings.startingBalanceCents))
     setSettingsDate(o.settings.startingDate)
+    setTargetInput(centsToInput(o.growthPipeline.targetMrrCents))
   }, [monthFilter])
 
   useEffect(() => { void reload().catch((err) => setError(String(err?.message || err))).finally(() => setLoading(false)) }, [reload])
@@ -195,6 +213,62 @@ export default function CashFlowPage() {
       })
       setShowSettings(false)
       flash('Opening balance saved')
+      await reload()
+    } catch (err) {
+      setError(String((err as Error)?.message || err))
+    }
+  }
+
+  const saveTarget = async () => {
+    const cents = dollarsToCents(targetInput)
+    if (cents <= 0) { setError('Enter a target MRR greater than zero.'); return }
+    try {
+      await api.updateGrowthTarget(cents)
+      setEditingTarget(false)
+      flash('Target MRR updated')
+      await reload()
+    } catch (err) {
+      setError(String((err as Error)?.message || err))
+    }
+  }
+
+  const startEditDeal = (d: ApiPipelineDeal) => {
+    setEditingDealId(d.id)
+    setDealDraft({ name: d.name, estimatedMrr: centsToInput(d.estimatedMrrCents), stage: d.stage, notes: d.notes })
+    setShowDealForm(true)
+  }
+
+  const cancelDealEdit = () => { setEditingDealId(null); setDealDraft(emptyDealDraft()); setShowDealForm(false) }
+
+  const submitDeal = async () => {
+    setError('')
+    const name = dealDraft.name.trim()
+    if (!name) { setError('Enter a deal name.'); return }
+    try {
+      const body = {
+        name, estimatedMrrCents: dollarsToCents(dealDraft.estimatedMrr),
+        stage: dealDraft.stage, notes: dealDraft.notes.trim(),
+      }
+      if (editingDealId) {
+        await api.updatePipelineDeal(editingDealId, body)
+        flash('Deal updated')
+      } else {
+        await api.createPipelineDeal(body)
+        flash('Deal added')
+      }
+      cancelDealEdit()
+      await reload()
+    } catch (err) {
+      setError(String((err as Error)?.message || err))
+    }
+  }
+
+  const removeDeal = async (d: ApiPipelineDeal) => {
+    if (!window.confirm(`Delete "${d.name}" from the pipeline?`)) return
+    try {
+      await api.deletePipelineDeal(d.id)
+      if (editingDealId === d.id) cancelDealEdit()
+      flash('Deal deleted')
       await reload()
     } catch (err) {
       setError(String((err as Error)?.message || err))
@@ -334,6 +408,122 @@ export default function CashFlowPage() {
           <span className={`tabular-nums ${overview.currentMonthBaseline.recurringNetCents >= 0 ? 'text-stage-done' : 'text-urgent'}`}>
             {(overview.currentMonthBaseline.recurringNetCents >= 0 ? '+' : '') + money(overview.currentMonthBaseline.recurringNetCents)}
           </span>
+        </div>
+      </div>
+
+      {/* MRR Growth Pipeline — target MRR, gap to close, and prospective deals */}
+      <div className={`${card} p-4 space-y-4`}>
+        <div className="flex items-center justify-between flex-wrap gap-2">
+          <div>
+            <div className="font-bold text-text">MRR Growth Pipeline</div>
+            <div className="text-xs text-muted">Target recurring revenue vs. where you are now, and what's in the pipe to close the gap</div>
+          </div>
+          {!editingTarget && <Btn variant="ghost" onClick={() => setEditingTarget(true)}>Edit target</Btn>}
+        </div>
+
+        {editingTarget ? (
+          <div className="flex items-end gap-3 flex-wrap">
+            <div>
+              <div className={labelCls}>Target MRR ($/mo)</div>
+              <input className={inputCls} inputMode="decimal" value={targetInput}
+                onChange={(e) => setTargetInput(e.target.value)} placeholder="80000" />
+            </div>
+            <Btn variant="primary" onClick={() => void saveTarget()}>Save</Btn>
+            <Btn variant="ghost" onClick={() => { setEditingTarget(false); setTargetInput(centsToInput(overview.growthPipeline.targetMrrCents)) }}>Cancel</Btn>
+          </div>
+        ) : (
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+            <div className="rounded-xl border border-line bg-ink/40 p-3">
+              <div className={labelCls}>Target MRR</div>
+              <div className="text-xl font-bold mt-1 tabular-nums text-text">{money(overview.growthPipeline.targetMrrCents)}</div>
+            </div>
+            <div className="rounded-xl border border-line bg-ink/40 p-3">
+              <div className={labelCls}>Current MRR</div>
+              <div className="text-xl font-bold mt-1 tabular-nums text-stage-done">{money(overview.growthPipeline.currentMrrCents)}</div>
+            </div>
+            <div className="rounded-xl border border-line bg-ink/40 p-3">
+              <div className={labelCls}>Gap to close</div>
+              <div className={`text-xl font-bold mt-1 tabular-nums ${overview.growthPipeline.gapCents > 0 ? 'text-urgent' : 'text-stage-done'}`}>
+                {overview.growthPipeline.gapCents > 0 ? money(overview.growthPipeline.gapCents) : 'Target met'}
+              </div>
+            </div>
+            <div className="rounded-xl border border-line bg-ink/40 p-3">
+              <div className={labelCls}>Open pipeline (est.)</div>
+              <div className="text-xl font-bold mt-1 tabular-nums text-stage-mastering">{money(overview.growthPipeline.openPipelineCents)}</div>
+            </div>
+          </div>
+        )}
+
+        <div>
+          <div className="flex items-center justify-between mb-2">
+            <div className={labelCls}>Deals · {overview.growthPipeline.deals.length}</div>
+            {!showDealForm && <Btn variant="ghost" onClick={() => { cancelDealEdit(); setShowDealForm(true) }}>+ Add deal</Btn>}
+          </div>
+
+          {showDealForm && (
+            <div className="rounded-xl border border-line bg-ink/40 p-3 mb-3 space-y-2">
+              <div className="grid sm:grid-cols-3 gap-2">
+                <div className="sm:col-span-2">
+                  <div className={labelCls}>Name</div>
+                  <input className={inputCls} value={dealDraft.name}
+                    onChange={(e) => setDealDraft((d) => ({ ...d, name: e.target.value }))}
+                    placeholder="Who / what the deal is" />
+                </div>
+                <div>
+                  <div className={labelCls}>Est. MRR ($/mo)</div>
+                  <input className={inputCls} inputMode="decimal" value={dealDraft.estimatedMrr}
+                    onChange={(e) => setDealDraft((d) => ({ ...d, estimatedMrr: e.target.value }))}
+                    placeholder="Leave blank if not quoted yet" />
+                </div>
+              </div>
+              <div className="grid sm:grid-cols-3 gap-2">
+                <div>
+                  <div className={labelCls}>Stage</div>
+                  <select className={inputCls} value={dealDraft.stage}
+                    onChange={(e) => setDealDraft((d) => ({ ...d, stage: e.target.value as ApiPipelineDeal['stage'] }))}>
+                    {DEAL_STAGES.map((s) => <option key={s} value={s}>{s}</option>)}
+                  </select>
+                </div>
+                <div className="sm:col-span-2">
+                  <div className={labelCls}>Notes</div>
+                  <input className={inputCls} value={dealDraft.notes}
+                    onChange={(e) => setDealDraft((d) => ({ ...d, notes: e.target.value }))}
+                    placeholder="How it came in, where it stands, next step…" />
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <Btn variant="primary" onClick={() => void submitDeal()}>{editingDealId ? 'Save changes' : 'Add deal'}</Btn>
+                <Btn variant="ghost" onClick={cancelDealEdit}>Cancel</Btn>
+              </div>
+            </div>
+          )}
+
+          {overview.growthPipeline.deals.length === 0 ? (
+            <div className="text-sm text-muted py-4 text-center">No prospective deals tracked yet.</div>
+          ) : (
+            <div className="space-y-1.5">
+              {overview.growthPipeline.deals.map((d) => (
+                <div key={d.id} className="rounded-xl bg-ink/40 border border-line px-3 py-2.5">
+                  <div className="flex items-center gap-3">
+                    <span className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-bold capitalize ${stageStyle[d.stage]}`}>
+                      {d.stage}
+                    </span>
+                    <div className="flex-1 min-w-0">
+                      <div className="text-sm text-text font-semibold truncate">{d.name}</div>
+                      {d.notes && <div className="text-xs text-muted truncate">{d.notes}</div>}
+                    </div>
+                    <div className="text-sm font-bold tabular-nums text-stage-mastering">
+                      {d.estimatedMrrCents > 0 ? `${money(d.estimatedMrrCents)}/mo` : '—'}
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <Btn variant="ghost" className="!px-2.5 !py-1" onClick={() => startEditDeal(d)}>Edit</Btn>
+                      <Btn variant="danger" className="!px-2.5 !py-1" onClick={() => void removeDeal(d)}>✕</Btn>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       </div>
 
