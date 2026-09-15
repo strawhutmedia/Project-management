@@ -1126,6 +1126,8 @@ export const api = {
   logout: () => request<{ ok: true }>('/api/auth/logout', { method: 'POST' }),
   projects: () => request<{ projects: ApiProject[] }>('/api/projects'),
   project: (id: string) => request<{ project: ApiProject }>(`/api/projects/${id}`),
+  archiveProject: (id: string) => request<{ ok: true }>(`/api/projects/${id}/archive`, { method: 'POST' }),
+  unarchiveProject: (id: string) => request<{ ok: true }>(`/api/projects/${id}/unarchive`, { method: 'POST' }),
   song: (id: string) => request<{ song: ApiSongDetail }>(`/api/songs/${id}`),
   updateSong: (id: string, patch: {
     stage?: Stage

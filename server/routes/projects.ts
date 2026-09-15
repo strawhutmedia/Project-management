@@ -58,10 +58,11 @@ projectsRouter.get('/', async (req, res) => {
      FROM projects p
      LEFT JOIN songs s ON s.project_id = p.id
      LEFT JOIN song_members sm ON sm.song_id = s.id AND sm.user_id = $1
-     WHERE p.created_by = $1
+     WHERE (p.created_by = $1
         OR EXISTS (SELECT 1 FROM project_members m WHERE m.project_id = p.id AND m.user_id = $1)
         OR sm.user_id IS NOT NULL
-        OR $2 = 'admin'
+        OR $2 = 'admin')
+        AND p.archived_at IS NULL
      ORDER BY p.created_at DESC`,
     [user.id, user.role],
   )
@@ -96,6 +97,38 @@ projectsRouter.get('/', async (req, res) => {
       songs: songsByProject[p.id],
     })),
   })
+})
+
+// Archive (hide) a project — admin only. Reversible and non-destructive: it
+// just sets archived_at so the project drops out of every listing; all its
+// data stays put and an admin can unarchive it.
+projectsRouter.post('/:id/archive', async (req, res) => {
+  const user = (req as typeof req & { user: SessionUser }).user
+  if (user.role !== 'admin') {
+    res.status(403).json({ error: 'forbidden' })
+    return
+  }
+  const { rowCount } = await pool.query('UPDATE projects SET archived_at = now() WHERE id = $1', [req.params.id])
+  if (!rowCount) {
+    res.status(404).json({ error: 'not_found' })
+    return
+  }
+  logInfo('project archived', { projectId: req.params.id, by: user.id })
+  res.json({ ok: true })
+})
+
+projectsRouter.post('/:id/unarchive', async (req, res) => {
+  const user = (req as typeof req & { user: SessionUser }).user
+  if (user.role !== 'admin') {
+    res.status(403).json({ error: 'forbidden' })
+    return
+  }
+  const { rowCount } = await pool.query('UPDATE projects SET archived_at = NULL WHERE id = $1', [req.params.id])
+  if (!rowCount) {
+    res.status(404).json({ error: 'not_found' })
+    return
+  }
+  res.json({ ok: true })
 })
 
 // Default stage labels per project kind. The internal stage keys stay

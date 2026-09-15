@@ -1,4 +1,4 @@
-import { Link, useParams } from 'react-router-dom'
+import { Link, useNavigate, useParams } from 'react-router-dom'
 import { useEffect, useState } from 'react'
 import { api, type ApiMember, type ApiProject } from '../api'
 import { STAGE_COLOR, STAGES, stageLabel, stageIcon, type Song, type Stage, type StageLabels } from '../types'
@@ -26,6 +26,7 @@ import { useAuth } from '../auth'
 
 export default function ProjectPage() {
   const { projectId } = useParams()
+  const navigate = useNavigate()
   const { user } = useAuth()
   const isAdmin = user?.role === 'admin'
   const [project, setProject] = useState<ApiProject | null>(null)
@@ -126,13 +127,38 @@ export default function ProjectPage() {
     }
   }
 
+  async function removeProject() {
+    if (!project) return
+    const ok = confirm(
+      `Remove "${project.name}"?\n\nIt disappears from everyone's project list. It's archived (not permanently deleted) — nothing is lost, and an admin can bring it back if needed.`,
+    )
+    if (!ok) return
+    try {
+      await api.archiveProject(project.id)
+      navigate('/')
+    } catch (err) {
+      alert(`Couldn't remove project: ${err instanceof Error ? err.message : 'unknown'}`)
+    }
+  }
+
   return (
     <div className="space-y-10" data-theme={project.kind === 'film' ? 'film' : undefined}>
       <PresenceBar projectId={project.id} />
       <div>
-        <Link to="/" className="text-[11px] uppercase tracking-[0.2em] text-muted hover:text-text font-bold">
-          ← Projects
-        </Link>
+        <div className="flex items-center justify-between gap-3">
+          <Link to="/" className="text-[11px] uppercase tracking-[0.2em] text-muted hover:text-text font-bold">
+            ← Projects
+          </Link>
+          {isAdmin && (
+            <button
+              onClick={() => void removeProject()}
+              className="text-[11px] text-muted hover:text-urgent border border-line hover:border-urgent/50 rounded-full px-3 py-1 transition"
+              title="Remove this project from the list (archive — reversible)"
+            >
+              🗑 Remove project
+            </button>
+          )}
+        </div>
         <div className="mt-3 flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
           <div className="w-full sm:flex-1 min-w-0 flex flex-col sm:flex-row sm:items-start gap-4 sm:gap-5">
             {project.kind === 'podcast' && project.coverArtUrl && (
@@ -258,21 +284,54 @@ export default function ProjectPage() {
           the Claude assistant; project members at any level don't see
           it. Gated server-side too. NON-FILM only — for film projects
           this gets folded into the Settings panel below. */}
-      {user?.role === 'admin' && project.kind !== 'film' && <ShowChatCard projectId={project.id} />}
+      {user?.role === 'admin' && project.kind === 'album' && <ShowChatCard projectId={project.id} />}
 
       {isAdmin && project.kind === 'album' && <ProjectRolesSection project={project} members={members} onSaved={reload} />}
-      {isAdmin && project.kind === 'podcast' && <PodcastTeamSection project={project} members={members} onSaved={reload} />}
-      {isAdmin && project.kind === 'podcast' && <PodcastRssConfig project={project} onSaved={reload} />}
-      {isAdmin && project.kind === 'podcast' && <BrandAssetsCard project={project} onSaved={reload} />}
-      {isAdmin && project.kind === 'podcast' && <BrandProfileCard project={project} members={members} onSaved={reload} />}
-      {isAdmin && project.kind === 'podcast' && <AudienceSection projectId={project.id} canWrite={isAdmin} />}
-      {isAdmin && project.kind === 'podcast' && <ShowBriefCard projectId={project.id} canWrite={isAdmin} />}
-      {isAdmin && project.kind === 'podcast' && <SocialStrategySection projectId={project.id} canWrite={isAdmin} />}
-      {isAdmin && project.kind === 'podcast' && <PodcastSocialsConfig project={project} members={members} onSaved={reload} />}
 
-      {/* Members section — NON-FILM. Film projects fold this into the
-          Settings panel below. */}
-      {isAdmin && user?.id && project.kind !== 'film' && (
+      {/* Podcast: a plain "start here" so nobody has to guess what to do. */}
+      {project.kind === 'podcast' && (
+        <div className="rounded-2xl border border-stage-mastering/40 bg-stage-mastering/5 p-5">
+          <div className="text-[11px] uppercase tracking-[0.2em] text-stage-mastering font-bold mb-1.5">▶ Start here</div>
+          <p className="text-sm text-text leading-relaxed">
+            New episode? Tap <span className="font-bold">📤 Upload episode</span> (top right) — Slate transcribes it,
+            drafts the social plan, and cuts clips automatically. Then track it across the stages below:{' '}
+            <span className="text-muted">Scheduled → Prepped → Recorded → Editing → Client Review → Revisions → Finalized → Released.</span>
+          </p>
+          <p className="text-[11px] text-muted mt-2">
+            Just need words on the page? <span className="text-text">🎙 Quick transcript</span> does only that — fast and cheap.
+          </p>
+        </div>
+      )}
+
+      {/* Podcast: every setup/config card folded into ONE collapsed panel so
+          the page isn't a wall. Team never has to wade through it; open it only
+          when you actually need to change a setting. */}
+      {isAdmin && project.kind === 'podcast' && (
+        <details className="rounded-2xl border border-line bg-panel/40 overflow-hidden">
+          <summary className="cursor-pointer select-none px-5 py-4 flex items-center justify-between gap-3">
+            <span className="text-sm font-bold text-text">⚙️ Show setup &amp; tools</span>
+            <span className="text-[11px] text-muted hidden sm:inline">Team · RSS · brand · audience · strategy · socials · Claude chat — tap to open</span>
+            <span className="text-[11px] text-muted sm:hidden">tap to open</span>
+          </summary>
+          <div className="px-3 sm:px-5 pb-5 pt-5 space-y-6 border-t border-line/60">
+            <ShowChatCard projectId={project.id} />
+            <PodcastTeamSection project={project} members={members} onSaved={reload} />
+            <PodcastRssConfig project={project} onSaved={reload} />
+            <BrandAssetsCard project={project} onSaved={reload} />
+            <BrandProfileCard project={project} members={members} onSaved={reload} />
+            <AudienceSection projectId={project.id} canWrite={isAdmin} />
+            <ShowBriefCard projectId={project.id} canWrite={isAdmin} />
+            <SocialStrategySection projectId={project.id} canWrite={isAdmin} />
+            <PodcastSocialsConfig project={project} members={members} onSaved={reload} />
+            {user?.id && (
+              <ProjectMembersSection projectId={project.id} members={members} currentUserId={user.id} onChanged={reload} />
+            )}
+          </div>
+        </details>
+      )}
+
+      {/* Album members stay top-level (album pages are already lean). */}
+      {isAdmin && user?.id && project.kind === 'album' && (
         <ProjectMembersSection projectId={project.id} members={members} currentUserId={user.id} onChanged={reload} />
       )}
 
