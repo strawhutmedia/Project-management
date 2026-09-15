@@ -261,6 +261,25 @@ export default function ProjectPage() {
         </div>
       </div>
 
+      {/* Podcast: lead with the marketing flow — that's what these pages are
+          for (drop in a finished episode, get the marketing kit). Sits ABOVE
+          the status bar so nobody reads the pipeline as "what to do first". */}
+      {project.kind === 'podcast' && (
+        <div className="rounded-2xl border border-stage-mastering/40 bg-stage-mastering/5 p-5">
+          <div className="text-[11px] uppercase tracking-[0.2em] text-stage-mastering font-bold mb-1.5">
+            ▶ Start here — turn an episode into marketing
+          </div>
+          <p className="text-sm text-text leading-relaxed">
+            Got a finished (or near-final) episode? Tap <span className="font-bold">📤 Upload episode</span> (top right).
+            Slate transcribes it, drafts your social posts, and cuts clips — your whole marketing kit, automatically.
+          </p>
+          <p className="text-[11px] text-muted mt-2 leading-relaxed">
+            Just need a transcript? <span className="text-text">🎙 Quick transcript</span> does only that — fast and cheap.
+            The “Show progress” bar below is optional status tracking — ignore it if you don't use it.
+          </p>
+        </div>
+      )}
+
       {project.kind !== 'film' && (
         <div className="relative rounded-3xl border border-line/70 overflow-hidden">
           <div className="absolute inset-0 bg-gradient-to-br from-stage-mastering/20 via-stage-producing/15 to-stage-mixing/20 opacity-80" />
@@ -287,21 +306,6 @@ export default function ProjectPage() {
       {user?.role === 'admin' && project.kind === 'album' && <ShowChatCard projectId={project.id} />}
 
       {isAdmin && project.kind === 'album' && <ProjectRolesSection project={project} members={members} onSaved={reload} />}
-
-      {/* Podcast: a plain "start here" so nobody has to guess what to do. */}
-      {project.kind === 'podcast' && (
-        <div className="rounded-2xl border border-stage-mastering/40 bg-stage-mastering/5 p-5">
-          <div className="text-[11px] uppercase tracking-[0.2em] text-stage-mastering font-bold mb-1.5">▶ Start here</div>
-          <p className="text-sm text-text leading-relaxed">
-            New episode? Tap <span className="font-bold">📤 Upload episode</span> (top right) — Slate transcribes it,
-            drafts the social plan, and cuts clips automatically. Then track it across the stages below:{' '}
-            <span className="text-muted">Scheduled → Prepped → Recorded → Editing → Client Review → Revisions → Finalized → Released.</span>
-          </p>
-          <p className="text-[11px] text-muted mt-2">
-            Just need words on the page? <span className="text-text">🎙 Quick transcript</span> does only that — fast and cheap.
-          </p>
-        </div>
-      )}
 
       {/* Podcast: every setup/config card folded into ONE collapsed panel so
           the page isn't a wall. Team never has to wade through it; open it only
