@@ -1,9 +1,9 @@
 {
   "version": "0.2.2",
-  "now": "2026-09-15T23:24:29.545Z",
+  "now": "2026-09-15T23:29:45.483Z",
   "boot": {
-    "startedAt": "2026-09-15T23:24:29.020Z",
-    "completedAt": "2026-09-15T23:24:29.531Z",
+    "startedAt": "2026-09-15T23:29:44.992Z",
+    "completedAt": "2026-09-15T23:29:45.468Z",
     "error": null
   },
   "env": {
@@ -272,12 +272,23 @@
         "kind": "podcast"
       }
     ],
-    "aiUsage30d": []
+    "aiUsage30d": [
+      {
+        "source": "carousel_preset",
+        "model": "claude-sonnet-4-6",
+        "calls": 1,
+        "input_tokens": 1835,
+        "output_tokens": 75,
+        "cache_write_tokens": 0,
+        "cache_read_tokens": 0,
+        "cost_usd": "0.0066"
+      }
+    ]
   },
   "recentLog": [
     {
       "level": "info",
-      "ts": "2026-09-15T23:24:29.018Z",
+      "ts": "2026-09-15T23:29:44.991Z",
       "msg": "serving client from",
       "data": {
         "clientDir": "/app/dist"
@@ -285,7 +296,7 @@
     },
     {
       "level": "info",
-      "ts": "2026-09-15T23:24:29.020Z",
+      "ts": "2026-09-15T23:29:44.992Z",
       "msg": "boot starting",
       "data": {
         "cwd": "/app",
@@ -296,12 +307,12 @@
     },
     {
       "level": "info",
-      "ts": "2026-09-15T23:24:29.377Z",
+      "ts": "2026-09-15T23:29:45.321Z",
       "msg": "migrations complete"
     },
     {
       "level": "info",
-      "ts": "2026-09-15T23:24:29.482Z",
+      "ts": "2026-09-15T23:29:45.418Z",
       "msg": "wardrobe outfits: applied",
       "data": {
         "projectId": "12f53ed1-c6c7-4c11-8d7b-06d91744c9af",
@@ -312,7 +323,7 @@
     },
     {
       "level": "info",
-      "ts": "2026-09-15T23:24:29.482Z",
+      "ts": "2026-09-15T23:29:45.418Z",
       "msg": "BIYA seed: project already exists, ensured shoot days",
       "data": {
         "projectId": "12f53ed1-c6c7-4c11-8d7b-06d91744c9af"
@@ -320,17 +331,17 @@
     },
     {
       "level": "info",
-      "ts": "2026-09-15T23:24:29.531Z",
+      "ts": "2026-09-15T23:29:45.468Z",
       "msg": "listening on :8080"
     },
     {
       "level": "info",
-      "ts": "2026-09-15T23:24:29.532Z",
+      "ts": "2026-09-15T23:29:45.468Z",
       "msg": "scheduler started (every 5 min)"
     },
     {
       "level": "info",
-      "ts": "2026-09-15T23:24:29.535Z",
+      "ts": "2026-09-15T23:29:45.471Z",
       "msg": "autopilot: loop started",
       "data": {
         "tickMinutes": 10
@@ -338,7 +349,7 @@
     },
     {
       "level": "info",
-      "ts": "2026-09-15T23:24:29.535Z",
+      "ts": "2026-09-15T23:29:45.471Z",
       "msg": "cashflow payment check: loop started",
       "data": {
         "tickHours": 6
@@ -346,7 +357,7 @@
     },
     {
       "level": "info",
-      "ts": "2026-09-15T23:24:29.535Z",
+      "ts": "2026-09-15T23:29:45.471Z",
       "msg": "qa digest: loop started",
       "data": {
         "sendHourPT": 8
