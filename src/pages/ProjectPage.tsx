@@ -271,11 +271,12 @@ export default function ProjectPage() {
           </div>
           <p className="text-sm text-text leading-relaxed">
             Got a finished (or near-final) episode? Tap <span className="font-bold">📤 Upload episode</span> (top right).
-            Slate transcribes it, drafts your social posts, and cuts clips — your whole marketing kit, automatically.
+            Slate transcribes it and drafts your social posts — ready for the team to review.
           </p>
           <p className="text-[11px] text-muted mt-2 leading-relaxed">
-            Just need a transcript? <span className="text-text">🎙 Quick transcript</span> does only that — fast and cheap.
-            The “Show progress” bar below is optional status tracking — ignore it if you don't use it.
+            Clips stay in your usual tool (Opus Clip) — Slate doesn't try to replace that. Just need a transcript?{' '}
+            <span className="text-text">🎙 Quick transcript</span> does only that. The “Show progress” bar below is
+            optional status tracking — ignore it if you don't use it.
           </p>
         </div>
       )}
