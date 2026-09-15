@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import QRCode from 'qrcode'
 import { api, type ApiTeleprompterSession } from '../api'
 
@@ -1456,7 +1456,53 @@ function Runner({
     return () => window.removeEventListener('keydown', onKey)
   }, [settings, setSettings, togglePlay, restart, jump, toggleFullscreen, handleExit, editing])
 
-  const transform = `${settings.mirrorX ? 'scaleX(-1)' : ''} ${settings.flipY ? 'scaleY(-1)' : ''}`.trim()
+  const textRef = useRef<HTMLDivElement>(null)
+
+  // Keep the on-screen text in sync with the saved script when NOT editing.
+  // While editing, the DOM owns the contentEditable node so the caret never
+  // jumps out from under the person typing. Layout effect so the text is
+  // seeded before paint (no blank first frame).
+  useLayoutEffect(() => {
+    if (editing) return
+    const el = textRef.current
+    if (el && el.innerHTML !== session.html) el.innerHTML = session.html
+  }, [session.html, editing])
+
+  const openEdit = useCallback(() => {
+    setPlaying(false)
+    setEditing(true)
+  }, [])
+  const closeEdit = useCallback(() => {
+    if (textRef.current) onEditHtml(textRef.current.innerHTML)
+    setEditing(false)
+  }, [onEditHtml])
+  const holdSel = (e: React.MouseEvent) => e.preventDefault()
+  const execFmt = useCallback(
+    (cmd: string, val?: string) => {
+      try {
+        document.execCommand('styleWithCSS', false, 'true')
+        document.execCommand(cmd, false, val)
+      } catch {
+        /* ignore */
+      }
+      if (textRef.current) onEditHtml(textRef.current.innerHTML)
+    },
+    [onEditHtml],
+  )
+  const execHighlight = useCallback(() => {
+    try {
+      document.execCommand('styleWithCSS', false, 'true')
+      document.execCommand('hiliteColor', false, HIGHLIGHT_BG)
+      document.execCommand('foreColor', false, HIGHLIGHT_FG)
+    } catch {
+      /* ignore */
+    }
+    if (textRef.current) onEditHtml(textRef.current.innerHTML)
+  }, [onEditHtml])
+
+  // No mirror/flip while editing — you can't sanely click-to-edit through a
+  // mirror. It snaps back to the glass orientation when you tap Done.
+  const transform = editing ? '' : `${settings.mirrorX ? 'scaleX(-1)' : ''} ${settings.flipY ? 'scaleY(-1)' : ''}`.trim()
 
   const isDark = settings.background === 'black'
   const bg = isDark ? '#000000' : '#ffffff'
@@ -1481,6 +1527,7 @@ function Runner({
           if (playing) setPlaying(false)
         }}
         onClick={() => {
+          if (editing) return // while editing, a tap places the caret — don't toggle play
           togglePlay()
           revealControls()
         }}
@@ -1497,6 +1544,27 @@ function Runner({
           style={{ maxWidth: `${settings.maxWidth}%`, paddingTop: '46vh', paddingBottom: '80vh', paddingLeft: '4vw', paddingRight: '4vw' }}
         >
           <div
+            ref={textRef}
+            contentEditable={editing}
+            suppressContentEditableWarning
+            spellCheck={editing}
+            onInput={() => {
+              if (editing && textRef.current) onEditHtml(textRef.current.innerHTML)
+            }}
+            onPaste={(e) => {
+              if (!editing) return
+              // Keep pastes as clean text so nothing drags in stray styles.
+              e.preventDefault()
+              const t = e.clipboardData.getData('text/plain')
+              document.execCommand('insertText', false, t)
+              if (textRef.current) onEditHtml(textRef.current.innerHTML)
+            }}
+            onKeyDown={(e) => {
+              if (editing && e.key === 'Escape') {
+                e.preventDefault()
+                closeEdit()
+              }
+            }}
             style={{
               fontSize: `${settings.fontSize}px`,
               lineHeight: settings.lineHeight,
@@ -1504,8 +1572,10 @@ function Runner({
               fontFamily: FONTS[settings.fontFamily].stack,
               fontWeight: 600,
               wordBreak: 'break-word',
+              outline: 'none',
+              caretColor: '#22d3ee',
+              cursor: editing ? 'text' : undefined,
             }}
-            dangerouslySetInnerHTML={{ __html: session.html }}
           />
         </div>
       </div>
@@ -1534,6 +1604,7 @@ function Runner({
         <div className="h-full bar-rainbow" style={{ width: `${progress * 100}%` }} />
       </div>
 
+      {!editing && (
       <div className={`absolute inset-x-0 bottom-0 transition-opacity duration-300 ${showControls ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
         <div className={`mx-auto rounded-2xl bg-black/80 backdrop-blur border border-white/10 text-white transition-[max-width,margin,padding] ${
           isFs ? 'max-w-md m-2 px-2 py-1.5' : 'max-w-3xl m-3 px-3 py-2.5'
@@ -1644,14 +1715,11 @@ function Runner({
             {/* Edit stays available in full screen — quick paste/tweak is the
                 whole point, so it must be reachable mid-read. */}
             <button
-              onClick={() => {
-                setPlaying(false)
-                setEditing(true)
-              }}
+              onClick={openEdit}
               className={`rounded-lg border border-white/15 text-white/70 hover:text-white transition ${
                 isFs ? 'text-[10px] px-2 py-1' : 'text-[11px] px-2.5 py-1.5'
               }`}
-              title="Edit or paste the script without leaving full screen (E)"
+              title="Edit the script in place — tap a word to put your cursor there (E)"
             >
               ✎ Edit
             </button>
@@ -1665,35 +1733,38 @@ function Runner({
           )}
         </div>
       </div>
+      )}
 
-      {/* Quick edit — paste or tweak the script without leaving full screen. */}
+      {/* In-place edit: the prompter text itself becomes editable, upright,
+          at the same scroll position. Tap a word and the caret lands there —
+          no popup, you edit the exact moment you were looking at. */}
       {editing && (
-        <div className="absolute inset-0 z-[60] bg-ink/95 backdrop-blur flex flex-col p-4 sm:p-6 text-text">
-          <div className="flex items-center justify-between mb-3 w-full max-w-3xl mx-auto">
-            <div>
-              <p className="text-[10px] uppercase tracking-[0.3em] text-muted">Quick edit</p>
-              <p className="text-sm text-text">{sessionTitle(session)}</p>
-            </div>
+        <div className="absolute top-0 inset-x-0 z-[60] bg-black/85 backdrop-blur border-b border-white/10 text-white px-3 py-2 flex items-center gap-1.5 flex-wrap">
+          <span className="text-[11px] text-white/70 mr-auto">✎ Tap a word to edit it · changes auto-save</span>
+          <button onMouseDown={holdSel} onClick={() => execFmt('bold')} className="min-w-7 h-7 px-2 rounded-lg bg-white/10 hover:bg-white/20 text-sm grid place-items-center border border-white/15" title="Bold"><b>B</b></button>
+          <button onMouseDown={holdSel} onClick={() => execFmt('italic')} className="min-w-7 h-7 px-2 rounded-lg bg-white/10 hover:bg-white/20 text-sm grid place-items-center border border-white/15" title="Italic"><i>I</i></button>
+          <button onMouseDown={holdSel} onClick={execHighlight} className="min-w-7 h-7 px-2 rounded-lg bg-white/10 hover:bg-white/20 text-sm grid place-items-center border border-white/15" title="Highlight">
+            <span className="px-1 rounded" style={{ background: HIGHLIGHT_BG, color: HIGHLIGHT_FG }}>H</span>
+          </button>
+          {TEXT_COLORS.map((c) => (
             <button
-              onClick={() => setEditing(false)}
-              className="rounded-xl bg-gradient-to-r from-stage-producing to-stage-mastering text-white font-bold uppercase tracking-wider text-sm px-5 py-3"
+              key={c.key}
+              onMouseDown={holdSel}
+              onClick={() => execFmt('foreColor', c.hex)}
+              title={c.key}
+              className="h-6 w-6 rounded-full border border-white/25 grid place-items-center"
+              style={{ background: c.hex }}
             >
-              Done
+              {c.key === 'White' && <span className="h-4 w-4 rounded-full border border-white/40" />}
             </button>
-          </div>
-          <div className="w-full max-w-3xl mx-auto flex-1 min-h-0">
-            <RichEditor
-              key={`run-edit-${session.id}`}
-              initialHtml={session.html}
-              onChange={onEditHtml}
-              background={settings.background}
-              fontStack={FONTS[settings.fontFamily].stack}
-            />
-          </div>
-          <p className="text-[11px] text-muted text-center mt-3 max-w-3xl mx-auto">
-            Paste with ⌘V (or long-press → Paste on iPad). Changes save automatically and show in the prompter when you tap
-            Done. Scrolling is paused while you edit.
-          </p>
+          ))}
+          <button onMouseDown={holdSel} onClick={() => execFmt('removeFormat')} className="h-7 px-2 rounded-lg bg-white/10 hover:bg-white/20 text-[11px] grid place-items-center border border-white/15" title="Clear formatting">Clear</button>
+          <button
+            onClick={closeEdit}
+            className="ml-1 rounded-lg bg-gradient-to-r from-stage-producing to-stage-mastering text-white font-bold uppercase tracking-wider text-xs px-4 py-2"
+          >
+            Done ✓
+          </button>
         </div>
       )}
     </div>
