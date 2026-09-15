@@ -229,13 +229,37 @@ function handleRichPaste(e: React.ClipboardEvent, done: () => void) {
   done()
 }
 
-// Uppercase whatever text is currently selected inside a contentEditable
-// (destructive — actually changes the letters). No-op if nothing is selected.
-function uppercaseSelection(done: () => void) {
+// Toggle UPPERCASE display on the current selection — REVERSIBLE. It wraps the
+// selection in a span that renders uppercase via CSS (the underlying letters
+// keep their real case), so pressing it again removes the wrap and the text
+// returns to exactly how it was typed. `root` is the contentEditable element.
+function toggleCapsSelection(root: HTMLElement | null, done: () => void) {
   const sel = window.getSelection()
-  const s = sel?.toString() ?? ''
-  if (!s) return
-  document.execCommand('insertText', false, s.toUpperCase())
+  if (!root || !sel || sel.rangeCount === 0 || sel.isCollapsed) return
+  const range = sel.getRangeAt(0)
+  const capped = Array.from(root.querySelectorAll('span[data-caps="1"]')).filter((s) => {
+    try {
+      return range.intersectsNode(s)
+    } catch {
+      return false
+    }
+  })
+  if (capped.length) {
+    // Turn OFF: unwrap any caps spans the selection touches.
+    capped.forEach((s) => s.replaceWith(...Array.from(s.childNodes)))
+  } else {
+    // Turn ON: wrap the selection in a caps span (non-destructive).
+    try {
+      const span = document.createElement('span')
+      span.setAttribute('data-caps', '1')
+      span.style.textTransform = 'uppercase'
+      span.appendChild(range.extractContents())
+      range.insertNode(span)
+    } catch {
+      /* selection crossed incompatible nodes — ignore */
+    }
+  }
+  root.normalize()
   done()
 }
 
@@ -1081,7 +1105,7 @@ function RichEditor({
         <TbBtn onMouseDown={hold} onClick={() => exec('removeFormat')} title="Clear formatting">
           <span className="text-[11px]">Clear</span>
         </TbBtn>
-        <TbBtn onMouseDown={hold} onClick={() => uppercaseSelection(sync)} title="UPPERCASE the selected text">
+        <TbBtn onMouseDown={hold} onClick={() => toggleCapsSelection(ref.current, sync)} title="Toggle UPPERCASE on the selected text (press again to undo)">
           <span className="text-[11px] font-bold">AA</span>
         </TbBtn>
       </div>
@@ -1879,7 +1903,7 @@ function Runner({
             </button>
           ))}
           <button onMouseDown={holdSel} onClick={() => execFmt('removeFormat')} className="h-7 px-2 rounded-lg bg-white/10 hover:bg-white/20 text-[11px] grid place-items-center border border-white/15" title="Clear formatting">Clear</button>
-          <button onMouseDown={holdSel} onClick={() => uppercaseSelection(() => { if (textRef.current) onEditHtml(textRef.current.innerHTML) })} className="h-7 px-2 rounded-lg bg-white/10 hover:bg-white/20 text-[11px] font-bold grid place-items-center border border-white/15" title="UPPERCASE the selected text">AA</button>
+          <button onMouseDown={holdSel} onClick={() => toggleCapsSelection(textRef.current, () => { if (textRef.current) onEditHtml(textRef.current.innerHTML) })} className="h-7 px-2 rounded-lg bg-white/10 hover:bg-white/20 text-[11px] font-bold grid place-items-center border border-white/15" title="Toggle UPPERCASE on the selected text (press again to undo)">AA</button>
           <button
             onClick={closeEdit}
             className="ml-1 rounded-lg bg-gradient-to-r from-stage-producing to-stage-mastering text-white font-bold uppercase tracking-wider text-xs px-4 py-2"
