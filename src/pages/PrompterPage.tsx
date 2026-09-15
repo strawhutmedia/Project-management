@@ -58,6 +58,7 @@ type Settings = {
   flipY: boolean
   countdown: boolean
   showGuide: boolean
+  allCaps: boolean
 }
 
 const DEFAULT_SETTINGS: Settings = {
@@ -72,6 +73,7 @@ const DEFAULT_SETTINGS: Settings = {
   flipY: false,
   countdown: true,
   showGuide: true,
+  allCaps: false,
 }
 
 function loadSettings(): Settings {
@@ -179,6 +181,62 @@ function placeCaretAtPoint(x: number, y: number) {
     sel?.removeAllRanges()
     sel?.addRange(range)
   }
+}
+
+function escapeHtml(s: string): string {
+  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+}
+
+// Plain text → block HTML that PRESERVES every line break, including blank
+// lines (double-enters). This is the fix for pasted paragraph spacing getting
+// eaten: each line becomes its own <div>, empty lines become <div><br></div>.
+function textToBlocks(text: string): string {
+  return text
+    .replace(/\r\n?/g, '\n')
+    .split('\n')
+    .map((l) => (l.length ? `<div>${escapeHtml(l)}</div>` : '<div><br></div>'))
+    .join('')
+}
+
+// Clean pasted rich text: keep structure (paragraphs, line breaks) and basic
+// emphasis tags (b/i/u/etc.), but strip EVERY attribute — colors, fonts,
+// backgrounds, sizes, classes — so nothing pasted can turn invisible or off-
+// theme on the prompter. Falls back to line-preserving plain text.
+function sanitizePastedHtml(html: string): string {
+  const tmp = document.createElement('div')
+  tmp.innerHTML = html
+  tmp.querySelectorAll('script,style,meta,link,img,svg,object,iframe,input,textarea,button,table,thead,tbody,tr,td,th').forEach(
+    (n) => n.replaceWith(...Array.from(n.childNodes)),
+  )
+  tmp.querySelectorAll('*').forEach((el) => {
+    for (const attr of Array.from(el.attributes)) el.removeAttribute(attr.name)
+  })
+  const out = tmp.innerHTML.trim()
+  return out || textToBlocks(tmp.textContent || '')
+}
+
+// Shared paste handler for both editors — preserves formatting + line breaks.
+function handleRichPaste(e: React.ClipboardEvent, done: () => void) {
+  e.preventDefault()
+  const cb = e.clipboardData
+  const html = cb.getData('text/html')
+  const clean = html && html.trim() ? sanitizePastedHtml(html) : textToBlocks(cb.getData('text/plain'))
+  try {
+    document.execCommand('insertHTML', false, clean)
+  } catch {
+    document.execCommand('insertText', false, cb.getData('text/plain'))
+  }
+  done()
+}
+
+// Uppercase whatever text is currently selected inside a contentEditable
+// (destructive — actually changes the letters). No-op if nothing is selected.
+function uppercaseSelection(done: () => void) {
+  const sel = window.getSelection()
+  const s = sel?.toString() ?? ''
+  if (!s) return
+  document.execCommand('insertText', false, s.toUpperCase())
+  done()
 }
 
 // One-time lift of anything a user saved on THIS device (old localStorage
@@ -732,6 +790,7 @@ function Editor(props: {
               onChange={onHtml}
               background={settings.background}
               fontStack={FONTS[settings.fontFamily].stack}
+              allCaps={settings.allCaps}
             />
           )}
 
@@ -939,11 +998,13 @@ function RichEditor({
   onChange,
   background,
   fontStack,
+  allCaps,
 }: {
   initialHtml: string
   onChange: (html: string) => void
   background: 'black' | 'white'
   fontStack: string
+  allCaps?: boolean
 }) {
   const ref = useRef<HTMLDivElement>(null)
 
@@ -1020,6 +1081,9 @@ function RichEditor({
         <TbBtn onMouseDown={hold} onClick={() => exec('removeFormat')} title="Clear formatting">
           <span className="text-[11px]">Clear</span>
         </TbBtn>
+        <TbBtn onMouseDown={hold} onClick={() => uppercaseSelection(sync)} title="UPPERCASE the selected text">
+          <span className="text-[11px] font-bold">AA</span>
+        </TbBtn>
       </div>
 
       <div
@@ -1028,15 +1092,10 @@ function RichEditor({
         suppressContentEditableWarning
         onInput={sync}
         onBlur={sync}
-        onPaste={(e) => {
-          e.preventDefault()
-          const text = e.clipboardData.getData('text/plain')
-          document.execCommand('insertText', false, text)
-          sync()
-        }}
+        onPaste={(e) => handleRichPaste(e, sync)}
         data-empty-text="Write or paste your script here…"
         className="prompter-editable px-4 py-4 h-[38vh] lg:h-[44vh] overflow-y-auto outline-none leading-relaxed text-[16px]"
-        style={{ background: bg, color: fg, fontFamily: fontStack }}
+        style={{ background: bg, color: fg, fontFamily: fontStack, textTransform: allCaps ? 'uppercase' : 'none' }}
       />
     </div>
   )
@@ -1129,6 +1188,7 @@ function SettingsPanel({ settings, setSettings }: { settings: Settings; setSetti
         <Toggle label="Flip ↕" on={settings.flipY} onClick={() => setSettings({ flipY: !settings.flipY })} hint="For overhead rigs" />
         <Toggle label="Countdown" on={settings.countdown} onClick={() => setSettings({ countdown: !settings.countdown })} />
         <Toggle label="Eye-line guide" on={settings.showGuide} onClick={() => setSettings({ showGuide: !settings.showGuide })} />
+        <Toggle label="ALL CAPS" on={settings.allCaps} onClick={() => setSettings({ allCaps: !settings.allCaps })} />
       </div>
     </div>
   )
@@ -1606,11 +1666,10 @@ function Runner({
             }}
             onPaste={(e) => {
               if (!editing) return
-              // Keep pastes as clean text so nothing drags in stray styles.
-              e.preventDefault()
-              const t = e.clipboardData.getData('text/plain')
-              document.execCommand('insertText', false, t)
-              if (textRef.current) onEditHtml(textRef.current.innerHTML)
+              // Preserve formatting + line breaks (the "enters" fix).
+              handleRichPaste(e, () => {
+                if (textRef.current) onEditHtml(textRef.current.innerHTML)
+              })
             }}
             onKeyDown={(e) => {
               if (editing && e.key === 'Escape') {
@@ -1628,6 +1687,7 @@ function Runner({
               outline: 'none',
               caretColor: '#22d3ee',
               cursor: editing ? 'text' : undefined,
+              textTransform: settings.allCaps ? 'uppercase' : 'none',
               // The prompter root sets user-select:none; the caret and text
               // selection need it back on while editing.
               userSelect: editing ? 'text' : 'none',
@@ -1747,6 +1807,9 @@ function Runner({
                 <MiniToggle on={settings.flipY} onClick={() => setSettings({ flipY: !settings.flipY })}>
                   Flip ↕
                 </MiniToggle>
+                <MiniToggle on={settings.allCaps} onClick={() => setSettings({ allCaps: !settings.allCaps })}>
+                  ALL CAPS
+                </MiniToggle>
               </>
             )}
             <button
@@ -1816,6 +1879,7 @@ function Runner({
             </button>
           ))}
           <button onMouseDown={holdSel} onClick={() => execFmt('removeFormat')} className="h-7 px-2 rounded-lg bg-white/10 hover:bg-white/20 text-[11px] grid place-items-center border border-white/15" title="Clear formatting">Clear</button>
+          <button onMouseDown={holdSel} onClick={() => uppercaseSelection(() => { if (textRef.current) onEditHtml(textRef.current.innerHTML) })} className="h-7 px-2 rounded-lg bg-white/10 hover:bg-white/20 text-[11px] font-bold grid place-items-center border border-white/15" title="UPPERCASE the selected text">AA</button>
           <button
             onClick={closeEdit}
             className="ml-1 rounded-lg bg-gradient-to-r from-stage-producing to-stage-mastering text-white font-bold uppercase tracking-wider text-xs px-4 py-2"
