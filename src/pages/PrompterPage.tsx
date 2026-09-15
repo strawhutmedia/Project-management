@@ -154,6 +154,33 @@ function errText(e: unknown): string {
   return e instanceof Error ? e.message : String(e)
 }
 
+// Drop the text caret at a screen point (used when a click enters edit mode,
+// so the cursor lands on the exact word tapped). Cross-browser: WebKit/Chrome
+// expose caretRangeFromPoint; Firefox uses caretPositionFromPoint.
+function placeCaretAtPoint(x: number, y: number) {
+  const doc = document as any
+  let range: Range | null = null
+  try {
+    if (doc.caretRangeFromPoint) {
+      range = doc.caretRangeFromPoint(x, y)
+    } else if (doc.caretPositionFromPoint) {
+      const pos = doc.caretPositionFromPoint(x, y)
+      if (pos) {
+        range = document.createRange()
+        range.setStart(pos.offsetNode, pos.offset)
+        range.collapse(true)
+      }
+    }
+  } catch {
+    /* ignore — fall back to a default caret */
+  }
+  if (range) {
+    const sel = window.getSelection()
+    sel?.removeAllRanges()
+    sel?.addRange(range)
+  }
+}
+
 // One-time lift of anything a user saved on THIS device (old localStorage
 // model) up into the shared server library, so no scripts are lost in the
 // switch. Guarded by a flag; skips the starter sample and empty scripts.
@@ -1457,6 +1484,9 @@ function Runner({
   }, [settings, setSettings, togglePlay, restart, jump, toggleFullscreen, handleExit, editing])
 
   const textRef = useRef<HTMLDivElement>(null)
+  // Where the operator clicked, so we can drop the caret there once the text
+  // becomes editable (you can't place a caret in a non-editable node).
+  const pendingCaret = useRef<{ x: number; y: number } | null>(null)
 
   // Keep the on-screen text in sync with the saved script when NOT editing.
   // While editing, the DOM owns the contentEditable node so the caret never
@@ -1467,6 +1497,22 @@ function Runner({
     const el = textRef.current
     if (el && el.innerHTML !== session.html) el.innerHTML = session.html
   }, [session.html, editing])
+
+  // On entering edit, focus the text and — if this was triggered by a click —
+  // drop the caret exactly where the click landed.
+  useEffect(() => {
+    if (!editing) return
+    const el = textRef.current
+    if (!el) return
+    el.focus()
+    const pc = pendingCaret.current
+    pendingCaret.current = null
+    // Mirror/flip is dropped while editing; if it was on, the click's screen
+    // coords no longer map to the same character, so skip point-caret then.
+    if (pc && !settings.mirrorX && !settings.flipY) {
+      placeCaretAtPoint(pc.x, pc.y)
+    }
+  }, [editing, settings.mirrorX, settings.flipY])
 
   const openEdit = useCallback(() => {
     setPlaying(false)
@@ -1526,10 +1572,13 @@ function Runner({
           // which is what made manual scroll look broken on iPad.
           if (playing) setPlaying(false)
         }}
-        onClick={() => {
-          if (editing) return // while editing, a tap places the caret — don't toggle play
-          togglePlay()
-          revealControls()
+        onClick={(e) => {
+          if (editing) return // clicks inside the editor place the caret natively
+          // A click on the script drops you straight into editing at that exact
+          // spot — it does NOT start/stop playback. Play/pause lives on the
+          // control bar, the spacebar, and the phone remote.
+          pendingCaret.current = { x: e.clientX, y: e.clientY }
+          openEdit()
         }}
         onMouseMove={() => {
           // In full screen, any stray cursor twitch was popping the whole
@@ -1575,6 +1624,10 @@ function Runner({
               outline: 'none',
               caretColor: '#22d3ee',
               cursor: editing ? 'text' : undefined,
+              // The prompter root sets user-select:none; the caret and text
+              // selection need it back on while editing.
+              userSelect: editing ? 'text' : 'none',
+              WebkitUserSelect: editing ? 'text' : 'none',
             }}
           />
         </div>
