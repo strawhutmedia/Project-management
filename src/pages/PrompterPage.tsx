@@ -1504,7 +1504,11 @@ function Runner({
     if (!editing) return
     const el = textRef.current
     if (!el) return
-    el.focus()
+    // preventScroll is essential: a plain focus() scrolls the (huge) editable
+    // into view, yanking the reading position to the top — which then made the
+    // caret land on whatever text ended up under the click point after the
+    // jump. Keeping scroll put means the click maps to the word you tapped.
+    el.focus({ preventScroll: true })
     const pc = pendingCaret.current
     pendingCaret.current = null
     // Mirror/flip is dropped while editing; if it was on, the click's screen
