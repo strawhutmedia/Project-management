@@ -152,7 +152,7 @@ export default function ProjectPage() {
           {isAdmin && (
             <button
               onClick={() => void removeProject()}
-              className="text-[11px] text-muted hover:text-urgent border border-line hover:border-urgent/50 rounded-full px-3 py-1 transition"
+              className="inline-flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-urgent border border-urgent/50 hover:bg-urgent/15 rounded-full px-3.5 py-1.5 transition whitespace-nowrap"
               title="Remove this project from the list (archive — reversible)"
             >
               🗑 Remove project
