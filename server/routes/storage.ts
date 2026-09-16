@@ -303,10 +303,19 @@ export async function handleTransferReport(req: Request, res: Response): Promise
        ON CONFLICT (name) DO UPDATE SET
          last_progress_at = CASE WHEN storage_transfer_reports.raw IS DISTINCT FROM EXCLUDED.raw
                                  THEN now() ELSE storage_transfer_reports.last_progress_at END,
-         raw = EXCLUDED.raw, bytes_done = EXCLUDED.bytes_done, bytes_total = EXCLUDED.bytes_total,
-         percent = EXCLUDED.percent, speed = EXCLUDED.speed, eta = EXCLUDED.eta,
-         files_done = EXCLUDED.files_done, files_total = EXCLUDED.files_total,
-         errors = EXCLUDED.errors, reported_at = now()`,
+         raw = EXCLUDED.raw,
+         -- A log tail with no stats block (a burst of per-file notices can
+         -- push it out of the window) must NOT blank a live row: keep the
+         -- last known numbers until a real stats block comes around again.
+         bytes_done  = COALESCE(NULLIF(EXCLUDED.bytes_done, ''), storage_transfer_reports.bytes_done),
+         bytes_total = COALESCE(NULLIF(EXCLUDED.bytes_total, ''), storage_transfer_reports.bytes_total),
+         percent     = COALESCE(EXCLUDED.percent, storage_transfer_reports.percent),
+         speed       = COALESCE(NULLIF(EXCLUDED.speed, ''), storage_transfer_reports.speed),
+         eta         = COALESCE(NULLIF(EXCLUDED.eta, ''), storage_transfer_reports.eta),
+         files_done  = COALESCE(EXCLUDED.files_done, storage_transfer_reports.files_done),
+         files_total = COALESCE(EXCLUDED.files_total, storage_transfer_reports.files_total),
+         errors      = GREATEST(EXCLUDED.errors, 0),
+         reported_at = now()`,
       [name, raw, p.bytesDone, p.bytesTotal, p.percent, p.speed, p.eta, p.filesDone, p.filesTotal, p.errors],
     )
     void maybeAutoQueue()
