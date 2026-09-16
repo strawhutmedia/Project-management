@@ -294,8 +294,12 @@ export async function handleTransferReport(req: Request, res: Response): Promise
     res.status(400).json({ error: 'bad_name' })
     return
   }
-  const raw = typeof req.body === 'string' ? req.body.slice(-8000) : ''
-  const p = parseRcloneStats(raw)
+  // Parse over the full posted tail (up to the 64kb route limit) so a chatty
+  // log can't push the stats block out of the parse window; store a shorter
+  // slice for the currentFiles dropdown.
+  const fullRaw = typeof req.body === 'string' ? req.body : ''
+  const raw = fullRaw.slice(-8000)
+  const p = parseRcloneStats(fullRaw)
   try {
     await pool.query(
       `INSERT INTO storage_transfer_reports (name, raw, bytes_done, bytes_total, percent, speed, eta, files_done, files_total, errors, reported_at, last_progress_at)
