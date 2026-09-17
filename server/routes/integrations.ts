@@ -176,6 +176,14 @@ function isPathWithin(child: string, parent: string): boolean {
   return c === p || c.startsWith(p + '/')
 }
 
+// "/A/B/Show" → "/A/B"; a top-level folder ("/Show") yields '' so callers
+// can refuse to widen scope to the Dropbox root.
+function parentDropboxDir(folder: string): string {
+  const clean = folder.replace(/\/+$/, '')
+  const idx = clean.lastIndexOf('/')
+  return idx > 0 ? clean.slice(0, idx) : ''
+}
+
 async function assertDropboxPathAllowed(
   user: SessionUser,
   path: string,
@@ -184,38 +192,69 @@ async function assertDropboxPathAllowed(
 ): Promise<{ ok: true } | { ok: false; status: number; error: string }> {
   if (user.role === 'admin') return { ok: true }
   if (!scopeSongId && !scopeProjectId) return { ok: false, status: 403, error: 'scope_required' }
+  // Non-admin Dropbox rule (Ryan, 2026-09-17): the team sees only PODCAST
+  // folders when browsing Dropbox. Any signed-in user can browse inside any
+  // podcast project's folder (the QA-sheet trust model); a non-podcast
+  // project's folder (album/film) still requires being a member of that
+  // project. Path containment below keeps everyone inside the scoped folder.
+  async function podcastOrMember(projectId: string, kind: string): Promise<boolean> {
+    if (kind === 'podcast') return true
+    const access = await pool.query(
+      `SELECT 1 FROM project_members WHERE project_id = $1 AND user_id = $2 LIMIT 1`,
+      [projectId, user.id],
+    )
+    return access.rows.length > 0
+  }
   // Song scope: stricter — must be inside the song's folder.
   if (scopeSongId) {
-    const { rows } = await pool.query<{ dropbox_folder: string | null; project_id: string }>(
-      `SELECT s.dropbox_folder, s.project_id FROM songs s WHERE s.id = $1`,
+    const { rows } = await pool.query<{ dropbox_folder: string | null; project_id: string; kind: string }>(
+      `SELECT s.dropbox_folder, s.project_id, p.kind
+         FROM songs s JOIN projects p ON p.id = s.project_id
+        WHERE s.id = $1`,
       [scopeSongId],
     )
     if (rows.length === 0) return { ok: false, status: 404, error: 'song_not_found' }
     const songRoot = rows[0].dropbox_folder
     if (!songRoot) return { ok: false, status: 400, error: 'song_has_no_folder' }
-    const access = await pool.query(
-      `SELECT 1 FROM project_members WHERE project_id = $1 AND user_id = $2 LIMIT 1`,
-      [rows[0].project_id, user.id],
-    )
-    if (access.rows.length === 0) return { ok: false, status: 403, error: 'forbidden' }
+    if (!(await podcastOrMember(rows[0].project_id, rows[0].kind))) {
+      return { ok: false, status: 403, error: 'forbidden' }
+    }
     if (!isPathWithin(path, songRoot)) {
       return { ok: false, status: 403, error: `out_of_scope:path_must_be_within:${songRoot}` }
     }
     return { ok: true }
   }
   // Project scope: looser — anywhere inside the project's root folder.
-  const { rows } = await pool.query<{ dropbox_folder: string | null }>(
-    `SELECT dropbox_folder FROM projects WHERE id = $1`,
+  const { rows } = await pool.query<{ dropbox_folder: string | null; kind: string }>(
+    `SELECT dropbox_folder, kind FROM projects WHERE id = $1`,
     [scopeProjectId],
   )
   if (rows.length === 0) return { ok: false, status: 404, error: 'project_not_found' }
+  if (!(await podcastOrMember(scopeProjectId as string, rows[0].kind))) {
+    return { ok: false, status: 403, error: 'forbidden' }
+  }
   const projectRoot = rows[0].dropbox_folder
-  if (!projectRoot) return { ok: false, status: 400, error: 'project_has_no_folder' }
-  const access = await pool.query(
-    `SELECT 1 FROM project_members WHERE project_id = $1 AND user_id = $2 LIMIT 1`,
-    [scopeProjectId, user.id],
-  )
-  if (access.rows.length === 0) return { ok: false, status: 403, error: 'forbidden' }
+  if (!projectRoot) {
+    // A podcast show without a configured root folder (e.g. one just added
+    // from the QA form) still needs a working picker — the crew creates the
+    // episode folder in Dropbox BEFORE logging it in QA (Ryan's workflow),
+    // so let them browse where the other podcast folders live: any parent
+    // directory of a configured podcast folder. Never falls open to the
+    // Dropbox root — top-level ('' / '/') parents are excluded.
+    if (rows[0].kind === 'podcast') {
+      const sib = await pool.query<{ f: string }>(
+        `SELECT DISTINCT dropbox_folder AS f FROM projects
+          WHERE kind = 'podcast' AND dropbox_folder IS NOT NULL AND archived_at IS NULL`,
+      )
+      const parents = new Set(
+        sib.rows.map((r) => parentDropboxDir(r.f)).filter((p) => p && p !== '/'),
+      )
+      for (const p of parents) {
+        if (isPathWithin(path, p)) return { ok: true }
+      }
+    }
+    return { ok: false, status: 400, error: 'project_has_no_folder' }
+  }
   if (!isPathWithin(path, projectRoot)) {
     return { ok: false, status: 403, error: `out_of_scope:path_must_be_within:${projectRoot}` }
   }
@@ -349,14 +388,16 @@ integrationsRouter.get('/dropbox/file', requireUser, async (req, res) => {
         }
       }
     } else {
-      // Regular users: only folders on projects they're a member of.
+      // Regular users: any PODCAST project's brand-assets folder, plus
+      // non-podcast projects they're a member of (Ryan, 2026-09-17: the team
+      // sees only podcast folders in Dropbox). The path-prefix check below
+      // still keeps them inside brand folders.
       const { rows } = await pool.query<{ folder: string }>(
         `SELECT p.brand_assets_folder AS folder
            FROM projects p
-           LEFT JOIN project_members m
-             ON m.project_id = p.id AND m.user_id = $1
+           LEFT JOIN project_members m ON m.project_id = p.id AND m.user_id = $1
           WHERE p.brand_assets_folder IS NOT NULL
-            AND (p.created_by = $1 OR m.user_id IS NOT NULL)`,
+            AND (p.kind = 'podcast' OR p.created_by = $1 OR m.user_id IS NOT NULL)`,
         [user.id],
       )
       for (const r of rows) {

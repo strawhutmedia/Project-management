@@ -12,14 +12,10 @@ import { logError, logInfo } from '../diag'
 export const stripboardRouter = Router()
 stripboardRouter.use(requireUser)
 
-async function userCanAccessProject(userId: string, role: string, projectId: string): Promise<boolean> {
-  if (role === 'admin') return true
-  const { rows } = await pool.query(
-    `SELECT 1 FROM projects p
-     LEFT JOIN project_members m ON m.project_id = p.id AND m.user_id = $1
-     WHERE p.id = $2 AND (p.created_by = $1 OR m.user_id IS NOT NULL) LIMIT 1`,
-    [userId, projectId],
-  )
+// Everyone signed in can see and work in every project (Ryan, 2026-09-17:
+// "everyone can see everything") — only existence is checked now.
+async function userCanAccessProject(_userId: string, _role: string, projectId: string): Promise<boolean> {
+  const { rows } = await pool.query(`SELECT 1 FROM projects WHERE id = $1 LIMIT 1`, [projectId])
   return rows.length > 0
 }
 
@@ -343,12 +339,10 @@ stripboardRouter.post('/projects/:projectId/days', async (req, res) => {
 stripboardRouter.patch('/shoot-days/:shootDayId', async (req, res) => {
   const user = (req as typeof req & { user: SessionUser }).user
   const shootDayId = req.params.shootDayId
+  // Open to every signed-in user (Ryan, 2026-09-17) — existence check only.
   const access = await pool.query(
-    `SELECT sd.project_id FROM shoot_days sd
-       JOIN projects p ON p.id = sd.project_id
-       LEFT JOIN project_members m ON m.project_id = p.id AND m.user_id = $1
-      WHERE sd.id = $2 AND ($3 = 'admin' OR p.created_by = $1 OR m.user_id IS NOT NULL)`,
-    [user.id, shootDayId, user.role],
+    `SELECT sd.project_id FROM shoot_days sd WHERE sd.id = $1`,
+    [shootDayId],
   )
   if (access.rows.length === 0) { res.status(403).json({ error: 'forbidden' }); return }
   const { locationTag, shootDate, notes, isBreak, travelFrom, travelTo, travelMiles, travelHours } = req.body ?? {}
@@ -407,12 +401,10 @@ stripboardRouter.patch('/shoot-days/:shootDayId', async (req, res) => {
 stripboardRouter.patch('/scenes/:sceneId', async (req, res) => {
   const user = (req as typeof req & { user: SessionUser }).user
   const sceneId = req.params.sceneId
+  // Open to every signed-in user (Ryan, 2026-09-17) — existence check only.
   const access = await pool.query(
-    `SELECT s.project_id FROM scenes s
-     JOIN projects p ON p.id = s.project_id
-     LEFT JOIN project_members m ON m.project_id = p.id AND m.user_id = $1
-     WHERE s.id = $2 AND ($3 = 'admin' OR p.created_by = $1 OR m.user_id IS NOT NULL)`,
-    [user.id, sceneId, user.role],
+    `SELECT s.project_id FROM scenes s WHERE s.id = $1`,
+    [sceneId],
   )
   if (access.rows.length === 0) { res.status(403).json({ error: 'forbidden' }); return }
   const { shootDayId, dayPosition, locationStatus, notes } = req.body ?? {}
@@ -447,12 +439,10 @@ stripboardRouter.patch('/scenes/:sceneId', async (req, res) => {
 stripboardRouter.post('/scenes/:sceneId/breakdown', async (req, res) => {
   const user = (req as typeof req & { user: SessionUser }).user
   const sceneId = req.params.sceneId
+  // Open to every signed-in user (Ryan, 2026-09-17) — existence check only.
   const access = await pool.query<{ project_id: string }>(
-    `SELECT s.project_id FROM scenes s
-     JOIN projects p ON p.id = s.project_id
-     LEFT JOIN project_members m ON m.project_id = p.id AND m.user_id = $1
-     WHERE s.id = $2 AND ($3 = 'admin' OR p.created_by = $1 OR m.user_id IS NOT NULL)`,
-    [user.id, sceneId, user.role],
+    `SELECT s.project_id FROM scenes s WHERE s.id = $1`,
+    [sceneId],
   )
   if (access.rows.length === 0) { res.status(403).json({ error: 'forbidden' }); return }
   const projectId = access.rows[0].project_id
