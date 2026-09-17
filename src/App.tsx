@@ -18,6 +18,7 @@ import RemotePage from './pages/RemotePage'
 import Profile from './pages/Profile'
 import Settings from './pages/Settings'
 import InvoicingPage from './pages/InvoicingPage'
+import QAPage from './pages/QAPage'
 import StoragePage from './pages/StoragePage'
 import CashFlowPage from './pages/CashFlowPage'
 import VendorIntakePage from './pages/VendorIntakePage'
@@ -72,6 +73,7 @@ export default function App() {
           <Route path="projects/:projectId/transcripts/:transcriptId" element={<TranscriptPage />} />
           <Route path="projects/:projectId/songs/:songId" element={<SongPage />} />
           <Route path="scheduler" element={<SchedulerPage />} />
+          <Route path="qa" element={<QAPage />} />
           <Route path="invoicing" element={<InvoicingPage />} />
           <Route path="storage" element={<StoragePage />} />
           <Route path="cashflow" element={<CashFlowPage />} />

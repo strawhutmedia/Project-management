@@ -15,6 +15,7 @@
 import { Router } from 'express'
 import Anthropic from '@anthropic-ai/sdk'
 import { pool } from '../db'
+import { recordAiUsage } from '../ai_usage'
 import { requireUser, type SessionUser } from '../auth'
 import { assertWriter } from '../permissions'
 import { logError, logInfo } from '../diag'
@@ -262,6 +263,7 @@ showChatRouter.post('/projects/:id/chat', async (req, res) => {
       system,
       messages: apiMessages,
     })
+    recordAiUsage({ source: 'show_chat', model: modelId, usage: response.usage, projectId })
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err)
     logError('show_chat: claude call failed', { projectId, error: msg })

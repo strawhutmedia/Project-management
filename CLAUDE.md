@@ -425,3 +425,364 @@ never "owns" it.
 - Add a new external service without explicit user approval — current stack is
   GitHub + Railway + Amazon SES + Dropbox, full stop (Resend was deleted
   2026-09-10 — see "Email transport")
+
+---
+
+# Session handoff — Teleprompter, phone remote, podcast-page cleanup (Sept 2026)
+
+This block is the durable record of a big build session with Ryan. Read it so
+you don't re-derive or re-break any of it. Everything below is LIVE on `main`.
+
+## How Ryan wants you to work (learned the hard way — take these seriously)
+
+- **Never overpromise. Verify a feature actually works before you claim it
+  does.** Ryan got burned by a banner saying Slate "cuts clips" when the team
+  doesn't use Slate's clipper. Read the code, trace the wiring, then describe
+  only what's real.
+- **After every deploy, confirm the EXACT built bundle hash is live** before
+  telling him it's done. `npm run build:client` prints `dist/assets/index-XX
+  .js`; poll `https://slate.strawhutmedia.com/` until the served
+  `/assets/index-*.js` matches that hash (a substring/marker check gives false
+  positives — match the full hash). Then verify the relevant API too.
+- **Build for a non-technical team.** Default views must be dead simple; hide
+  advanced/experimental tools behind a toggle or collapsed panel. When a page
+  feels like "a wall of stuff," that's the bug.
+- **Stale-bundle confusion is common.** When he says "I don't see X," it's
+  usually his open tab on an old bundle — tell him to hard-refresh
+  (Cmd+Shift+R) before assuming a real bug.
+- He's blunt and moves fast. Give a recommendation, act, and report plainly.
+
+## Teleprompter — `/prompter` (src/pages/PrompterPage.tsx)
+
+A standalone, full-screen podcast teleprompter. Built this session end to end.
+
+- **Public, no login.** Route is OUTSIDE the `<Protected>` wrapper in
+  `src/App.tsx` so anyone can open it instantly on an iPad/computer. Clean URL
+  is intentional: `slate.strawhutmedia.com/prompter`. Nav link to it shows only
+  in the podcast workspace (`Layout.tsx`, keyed off `slate.dashboard.kindTab`).
+- **Sessions are SHARED across the podcast team**, stored server-side in
+  `teleprompter_sessions` (migration `094`). Not device-local, not per-user —
+  one shared pool. API: `server/routes/teleprompter.ts`
+  (`/api/teleprompter` list/create/update/delete), gated to podcast-access
+  users (admins, or members/creators of any podcast project). Autosaves with a
+  Saving/Saved badge; shows who created / last edited. Sessions can be named,
+  else titled by date.
+- **Look-and-feel settings stay per-device** (localStorage): speed, font size,
+  line spacing, width, font (Sans/Serif/Mono/Condensed), black/white screen,
+  mirror (glass rigs), vertical flip, countdown, eye-line guide, ALL CAPS.
+- **Editing model Ryan explicitly wanted:** in the running, full-screen
+  prompter, a CLICK on the text drops the cursor exactly where you clicked and
+  starts editing IN PLACE — no popup, no play toggle on click. (Play/pause is
+  the control-bar button, spacebar, and the phone remote.) Uses
+  `caretRangeFromPoint` + `focus({ preventScroll: true })` (the preventScroll
+  is essential — a plain focus scrolled the tall editable and made the caret
+  land in the wrong spot). Mirror/flip auto-off while editing.
+- **Paste preserves formatting + line breaks** (his "enters" pain): pasted HTML
+  is sanitized to keep structure + basic bold/italic but strip all foreign
+  colors/fonts/backgrounds; plain text falls back to one `<div>` per line so
+  blank lines survive. See `sanitizePastedHtml` / `handleRichPaste`.
+- **ALL CAPS** two ways: a whole-script toggle (display-only, reversible) and an
+  **AA** button that toggles UPPERCASE on a selection via a CSS-uppercase span
+  (reversible — the original letters are preserved, NOT rewritten).
+- **True full screen** (hides Mac dock + menu bar): Start requests OS fullscreen
+  from the click gesture; toggle + `F` key; Esc/Exit leaves it.
+- Device-adaptive: touch tap-zones + big controls on iPad, full keyboard
+  shortcuts on desktop; Screen Wake Lock so devices don't sleep mid-read.
+
+## Phone-as-remote — `/r` (src/pages/RemotePage.tsx + server/routes/teleprompter_remote.ts)
+
+Turn ANY phone into the teleprompter remote — no app, no purchase, works over
+cellular. On the prompter tap "📱 Phone remote" → it shows a QR + 4-letter
+code. Phone opens `/r` (public, no login), scans/enters the code, gets big
+Play/Pause + speed/size/nudge buttons.
+
+- **Architecture:** in-memory SSE relay. The prompter (logged-in) opens an SSE
+  host stream and gets a pairing code; the phone POSTs button presses to that
+  code; the server relays them to the host. Single Railway instance, so
+  in-memory is fine (same model as `server/events.ts`).
+- **CRITICAL routing gotcha (already fixed, don't reintroduce):** the public
+  `/api/teleprompter/remote` router MUST be mounted in `server/index.ts` BEFORE
+  the broad `app.use('/api', showChatRouter)` / `episodeCutsRouter` — those have
+  a router-level `requireUser` and will 401 the phone's login-less requests if
+  they're reached first.
+- Physical-remote guidance if he asks again: buy a **Bluetooth presentation
+  clicker that lists PowerPoint/Keynote/arrow keys** (works in a browser).
+  AVOID volume/camera-shutter/"AB shutter" remotes and VR-box pads — iOS won't
+  pass those keys to Safari. The app already listens for Space/Enter (play),
+  ↑↓ (speed), ←→ (size), PageUp/Down.
+
+## Project removal / archiving — NEW this session
+
+There was NO delete-project feature before (that's why he couldn't remove
+shows). Added **soft-archive** (reversible, avoids FK-cascade risk of a hard
+delete):
+- Migration `154` adds `projects.archived_at`; the project list
+  (`GET /api/projects`) excludes archived. Admin-only routes
+  `POST /api/projects/:id/archive` + `/unarchive`.
+- UI: a red **🗑 Remove project** button at the top of each project page
+  (`src/pages/ProjectPage.tsx`), admin only. Archiving hides it everywhere but
+  keeps the data.
+- **Ryan still intends to archive:** WICKED, Only Murders, Brandi Glanville, and
+  the stray bare **"Private Talk"** (KEEP "Private Talk with Alexis Texas" —
+  they're two different projects, not dupes of each other).
+
+## Podcast project page — reframed around MARKETING (his mental model)
+
+The page was an overwhelming wall of cards. Reworked (`ProjectPage.tsx`):
+- All the admin config (Team, RSS, Brand, Audience, Brief, Social Strategy,
+  Socials, Members, Claude chat) is folded into ONE collapsed **"⚙️ Show setup
+  & tools"** panel. Default podcast view = header → progress → Start-here →
+  episodes → transcripts.
+- **The real workflow he wants: "drop in a FINISHED (or near-final) episode →
+  Slate makes the marketing."** The Scheduled→Released production pipeline is
+  NOT how he thinks about it (uploading implies the episode is already done).
+  So the "▶ Start here" banner leads with Upload → **transcript + social
+  posts**, and the SHOW PROGRESS stage bar is demoted below and labeled
+  optional (he's "not sure yet" if the team uses it — leave it, don't remove
+  without asking).
+- **Clips: do NOT claim Slate cuts clips.** Slate has its own ffmpeg clip
+  pipeline (`server/routes/clips.ts` — "OpusClip removed") and Upload's
+  autopipeline (`server/routes/transcripts.ts runPostTranscriptAutopipeline`)
+  DOES auto-run transcript → social plan → carousel → clip job. BUT the team
+  doesn't use Slate's clips — **they still clip in Opus Clip** (the product),
+  and want to keep it. The banner now says clips stay in their tool. Note:
+  "Opus" elsewhere in the app = Claude's Opus MODEL (Show Chat "Use Opus"),
+  unrelated to Opus Clip — don't confuse them, and don't remove the Opus model.
+
+## Parked / next threads (NOT started — confirm before building)
+
+- **Clips → editors (parked at his request).** Vision: the studio's
+  **premiere-bot** (`automation/premiere-bot/`, Claude Code running on the edit
+  machine — the ONLY thing that can open Premiere; Slate is cloud and can't)
+  already cuts a variety of clips; the open question is just DELIVERY — getting
+  those clips into editors' hands (surface/link them per episode in Slate). See
+  `automation/premiere-bot/PREMIERE.md` "Phase 2/3": social clips are meant to
+  live in Slate's clips feature, driven by the transcript. Big feature, depends
+  on the on-machine bot actually running — don't build blind.
+- **Play with the Upload → transcript/social flow** and make that screen great
+  (the part he's most curious about).
+- **Only Murders shows album-style stage names** (Writing/Tracking/…) instead of
+  podcast labels (Scheduled/Prepped/…) — that project's `stage_labels` were
+  never set to the podcast set. Offered to fix; not done.
+- **Mara** (teammate) can sign in only if she already has a Slate account
+  (invite-only); she'd see projects she's a member of. Offered to help invite.
+- Heads-up seen in the status branch: `RESEND_API_KEY` was unset — fine only if
+  SES is delivering (see the email-transport section above). Flag if sign-in
+  emails ever stop.
+
+## Where the code lives (quick index for this session's work)
+
+- Teleprompter UI: `src/pages/PrompterPage.tsx`; remote UI: `src/pages/RemotePage.tsx`
+- Teleprompter API: `server/routes/teleprompter.ts`; remote relay:
+  `server/routes/teleprompter_remote.ts` (mounted before broad `/api` routers)
+- Routes/public pages wired in `src/App.tsx` (`/prompter` behind login,
+  `/r` + `/r/:code` public); nav link in `src/components/Layout.tsx`
+- Project archive: `server/routes/projects.ts` + migration `154`; button in
+  `src/pages/ProjectPage.tsx`
+- Migrations added: `094_teleprompter_sessions.sql`, `154_project_archive.sql`
+- Client dep added: `qrcode` (QR for the phone-remote pairing)
+
+---
+
+# Session handoff — Cash Flow tracker, MRR Growth Pipeline, financial cleanup (Sept 2026)
+
+This block is the durable record of a long financial-tracking session with
+Ryan. Read it before touching any number in `/cashflow` or the Growth
+Pipeline. Everything described as "live" below is on `main`.
+
+## How this tracker works (learned the hard way — read before touching numbers)
+
+- **Every dollar figure must come from a primary source** — real QuickBooks
+  data, a bank statement screenshot, a real receipt/renewal email — never a
+  guess, a memory, or an extrapolation. When Ryan disputes a number, go
+  re-verify from source; don't defend the old figure.
+- **Ryan will demand exact numbers, not approximations**, when the stakes are
+  real (e.g. "There should be no approximation. There should be only an exact
+  number."). If a spreadsheet or report has its own internal gaps/bugs, don't
+  trust its printed totals — recompute by hand from the underlying line items.
+- **Recurring lines are corrected IN PLACE via UPDATE**, not re-logged every
+  month — see the `is_recurring` flag + the "latest row per counterparty"
+  `DISTINCT ON (kind, counterparty) ORDER BY ... occurred_on DESC, created_at
+  DESC` pattern already used throughout `server/routes/cashflow.ts`. Each
+  correction gets its own numbered migration citing the real evidence in a
+  SQL comment (see migrations `127`–`138`, `153` for the pattern to follow).
+- `/cashflow` is locked to `requireOwner` (Ryan only, see "Invoicing / payroll"
+  section above) — do not widen it, and do not let Caroline's narrower
+  invoicing seat touch it.
+
+## What's live now
+
+### Cash Flow tracker (`/cashflow`, `src/pages/CashFlowPage.tsx` + `server/routes/cashflow.ts`)
+
+Running balance, monthly history, a recurring-vs-one-time baseline split
+(the "sustainable number" separate from lumpy project wins like Disney/Hulu),
+and a fully itemized recurring checklist so every total is independently
+checkable line by line. Migrations `127`–`138` corrected specific real line
+items this session: Ali duplicate removed, Kirill/Carla verified, car payment
+$550→$554 (new car), "Tesla Insurance"→renamed "Car Insurance" $180→$340,
+Anthropic $45→$150, Ana (graphic designer) corrected to $520/mo via a real
+bank ACH statement screenshot (was a $541.67/mo guess), Jump Desktop added
+($23.56/mo — the monthly-equivalent of an annual Paddle renewal found in an
+email; was missing from the tracker entirely).
+
+### MRR Growth Pipeline (new this session — migration `139`, growth-pipeline
+routes in `server/routes/cashflow.ts`, the "MRR Growth Pipeline" card in
+`CashFlowPage.tsx`)
+
+Built because Ryan said: *"I want to be making a million or more a year!!! I
+need to get my MRR over $80k!!!"*
+
+- Tracks an editable **target MRR** (default $80,000/mo) against **current
+  MRR** (reuses the existing recurring-revenue baseline calc) and the **gap
+  to close**.
+- A working **deals pipeline** (`cashflow_pipeline_deals` table): name,
+  estimated MRR, stage (`prospecting` → `quoted` → `negotiating` →
+  `won`/`lost`), notes. Add/edit/delete from the card in the UI.
+- **Current real deal:** Bruce Poon Tip (G Adventures) — introduced May 2026
+  via Brett Marchand (Plus Company). Ryan quoted **$4,000/mo**; stage is now
+  **negotiating**, not yet won (migration `153` corrected this from the
+  original $0/`prospecting` placeholder seeded in `139`, before a rate had
+  been discussed).
+- **This is a live tracking tool, not a one-time snapshot.** As new prospects
+  surface or a quote/stage changes, add or update a deal (via the UI, or a
+  numbered migration for historical corrections, same pattern as the
+  cashflow-entry fixes above) — don't let it go stale.
+
+## Real numbers established this session (verified from primary sources)
+
+- **Amex balance: $101,940.20** (real QuickBooks Balance Sheet). Ryan believed
+  it was ~$88,000 — that was wrong. ($88,611.78, a combined-loan total, is
+  likely what he was actually remembering.)
+- **Hulu payment: $41,354.96** (real invoiced amount). Ryan estimated
+  "$30,000" — the real number is higher, which is good news for the Amex
+  payoff plan below.
+- **Naked Lunch owed: exactly $41,180.00**, last paid 19 months ago —
+  hand-verified from Ryan's own "Naked Lunch payout spreadsheet" (a Google
+  Drive xlsx), correcting 3 real gaps in the sheet's own formulas (missing
+  Megaphone line items in the printed Feb/Mar/Apr 2026 monthly totals, and no
+  total row at all for May 2026). This is an EXACT figure per Ryan's explicit
+  demand for no approximation — not an estimate.
+- **Ana (graphic designer): $520.00/mo** ($120/wk), confirmed via a real bank
+  ACH statement screenshot (now reflected in the tracker, migration `138`).
+
+## Open / unresolved — pick these up next session
+
+1. **QuickBooks recurring line — still wrong, real amount unknown.** Ryan said
+   "it's no longer $189" but never gave the actual current number despite
+   being asked directly. Ask him again before touching this line.
+2. **Freelancer.com breakdown — reported to Ryan but NOT yet shipped as a
+   migration.** Real itemized figures were found (Muhammad ~$520/mo steady,
+   Daniel ~$1,195/mo, Talha and Alaa volatile/tapering toward near-zero),
+   which should replace the flat $2,000/mo guess still sitting in the
+   tracker. Needs a migration in the `127`–`138` style, or a decision from
+   Ryan on whether the volatile contractors even belong in the recurring
+   baseline.
+3. **Sajid's real pay — unverified.** Same situation Ana was in before her
+   bank screenshot: no payroll record, no email trail found. Needs a
+   bank-statement-style verification directly from Ryan.
+4. **Lisane Basquiat course invoicing — not finalized.** Landed on
+   Production $2,400 (Ryan $800/day + Xavier $400/day; possibly $2,100 if
+   Day 1 is billed three-quarter-day instead of full) + Editing $5,900, split
+   Invoice 1 $5,350 (kickoff) / Invoice 2 $2,950 (delivery) — but this was
+   never confirmed as final. There's also an unresolved complaint from Jenay
+   Reed (about whether Lisane attended both recording days — Ryan confirmed
+   she did) to close out before sending. **Do not draft or send these
+   invoices from a session without QuickBooks access** — and per the "Client
+   invoices" rule above, Ryan reviews and clicks Send personally, always.
+5. **Amex payoff plan** ($101,940.20, real balance) using upcoming
+   Disney/Hulu money — discussed, not executed. Revisit once those payments
+   land (Ryan expected ~October 2026).
+6. **Naked Lunch repayment plan** for the exact $41,180.00 owed — discussed,
+   no plan agreed yet.
+7. **MRR growth plan beyond the pipeline tool itself.** Ryan ran through a
+   7-phase "get rich" Instagram AI-prompt template using real business data.
+   The Growth Pipeline feature above is the tracking mechanism; the actual
+   plan to fill it with new prospects (beyond Bruce Poon Tip) hasn't been
+   built out — add deals as real prospects surface, don't invent placeholder
+   ones.
+8. **Veed/Opus AI video tools** — kept both after Ryan verified real usage
+   via a Slack screenshot (Caroline confirmed Veed for captions on
+   promotional videos, Opus for cutting + captions); Higgsfield was
+   considered but not adopted. No action needed unless usage changes.
+9. **Melio ACH transfer limits** — confirmed 5 free transfers/month, $0.50
+   each after. FYI only, no action needed.
+
+## Where the code lives
+
+- Cash Flow page: `src/pages/CashFlowPage.tsx`
+- Cash Flow + Growth Pipeline API: `server/routes/cashflow.ts`
+- Migrations: `127`–`138` (individual real line-item corrections), `139`
+  (growth pipeline tables + Bruce Poon Tip seed), `153` (Bruce Poon Tip
+  quote/stage update)
+- Client API types/functions: `src/api.ts` — `ApiCashflowOverview.growthPipeline`,
+  `ApiPipelineDeal`, `updateGrowthTarget` / `createPipelineDeal` /
+  `updatePipelineDeal` / `deletePipelineDeal`
+
+---
+
+# Session handoff — Outreach reply capture, Resend deletion fallout, Find new prospects (Sept 2026)
+
+This block is the fast "where we left off" pointer for this session — full
+technical detail already lives inline above in "Email transport", "Outreach
+reply capture", and "Find new prospects"; this just summarizes what shipped
+and what's still open so the next session doesn't have to re-derive it.
+
+## What's live now (all merged to `main`, all deployed and verified)
+
+- **Outreach reply capture** (PRs #63-64): a show's outreach template can
+  point `reply_to` at a Slate-owned `p-<projectId>@<INBOUND_REPLY_DOMAIN>`
+  address instead of a human inbox; replies auto-mark the prospect
+  `replied`, file them in the Rolodex, and notify whoever's in
+  `notify_email` (comma-separated multi-address supported). Full detail in
+  "Outreach reply capture" above.
+- **Resend-deletion incident, found and fixed** (PR #66-67): Ryan deleted
+  the Resend account; three files (`email.ts`, `outreach.ts`, `audience.ts`)
+  had a `resendKey ? new Resend(resendKey) : null` pattern that silently
+  broke magic-link sign-in, outreach sending, admin alerts, and fan-list
+  broadcasts the moment `RESEND_API_KEY` went unset. Fixed to always
+  construct the shim. Also removed the last dead Resend-only UI ("Sync with
+  Resend" button on Sending Domains). Full detail + "if this pattern
+  reappears" guidance in "Email transport" above.
+- **Find new prospects** (PRs #68-72): one-click AI-researched
+  similar-show prospecting, built from scratch this session in direct
+  response to Ryan rejecting the manual-paste workflow ("I shouldn't have
+  to paste! I should be able to click a button"). Went through 4 real
+  production bugs before it was solid — full blow-by-blow in "Find new
+  prospects" above. Confirmed working end-to-end in production (verified
+  via `/api/_diag` logs, not just "looks done"): real runs found 15 and 13
+  RSS-verified shows with real emails for "Private Talk with Alexis Texas."
+
+## Open / unresolved — pick these up next session
+
+1. **Find new prospects targets 30+ but real runs have landed 13-15.** Not
+   confirmed to be a bug — the model appears to stop once it's satisfied
+   with verified quality rather than padding to hit the exact count. Worth
+   revisiting only if Ryan/Caroline flag the yield as too low in practice;
+   don't "fix" this speculatively.
+2. **No client-side guard against double-firing a run.** The button
+   disables while `findingProspects` is true, but a page refresh or a
+   second browser tab could still kick off a second concurrent ~10-15 min
+   research call for the same show (this actually happened once this
+   session — two near-simultaneous runs on "Private Talk with Alexis
+   Texas" completed fine independently, just produced two overlapping
+   batches that deduped against each other on import). Not urgent; a
+   server-side "already running for this project" lock would close it if
+   it becomes a real annoyance.
+3. **Bounce/complaint auto-pause SNS topic** — still not wired (needs one
+   AWS-console step, see "Email transport" above). Not touched this
+   session; was already open before it and remains open now that Resend
+   really is gone (there is currently no live auto-pause safety net for
+   the outreach rotation pool).
+4. Everything else from this session (reply capture, the Resend bug fix,
+   the dead-button cleanup) is genuinely done — no follow-up needed.
+
+## Where the code lives
+
+- Reply capture: `server/routes/ses_inbound_reply.ts`, `server/sns_verify.ts`
+  (shared with `ses_notify.ts`), migration `139_outreach_reply_notify.sql`
+- Resend/SES shim + the fixed callers: `server/mailTransport.ts`,
+  `server/email.ts`, `server/routes/outreach.ts`, `server/routes/audience.ts`
+- Find new prospects: `findSimilarShowProspects` + `createWithRetryStream`
+  in `server/anthropic.ts`; the `find-similar` route in
+  `server/routes/outreach.ts`; `api.findSimilarProspects` in `src/api.ts`;
+  button + progress bar in `src/components/OutreachSection.tsx`

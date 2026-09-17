@@ -104,6 +104,13 @@ async function collectSnapshot() {
   let migrationsApplied: string[] = []
   let userCount: number | null = null
   let projectCount: number | null = null
+  let projects: Array<{ id: string; name: string; kind: string }> = []
+  let aiUsage30d: Array<{
+    source: string; model: string; calls: number
+    input_tokens: number; output_tokens: number
+    cache_write_tokens: number; cache_read_tokens: number
+    cost_usd: string | null
+  }> = []
   try {
     const r = await pool.query('SELECT 1 as ok')
     if (r.rows[0]?.ok === 1) dbState = 'ok'
@@ -118,6 +125,25 @@ async function collectSnapshot() {
       userCount = u.rows[0].n
       const p = await pool.query(`SELECT COUNT(*)::int as n FROM projects`)
       projectCount = p.rows[0].n
+      // Name + kind of every project, so status-branch readers can answer
+      // "does show X exist in Slate?" without DB access.
+      const pl = await pool.query(`SELECT id, name, kind FROM projects ORDER BY name`)
+      projects = pl.rows
+      // 30-day Anthropic spend by job — answers "what's spending the money"
+      // from the status branch without DB access.
+      const au = await pool.query(
+        `SELECT source, model, COUNT(*)::int AS calls,
+                COALESCE(SUM(input_tokens), 0)::bigint::int AS input_tokens,
+                COALESCE(SUM(output_tokens), 0)::bigint::int AS output_tokens,
+                COALESCE(SUM(cache_write_tokens), 0)::bigint::int AS cache_write_tokens,
+                COALESCE(SUM(cache_read_tokens), 0)::bigint::int AS cache_read_tokens,
+                ROUND(SUM(cost_usd), 4)::text AS cost_usd
+           FROM ai_usage
+          WHERE ts > now() - interval '30 days'
+          GROUP BY source, model
+          ORDER BY SUM(cost_usd) DESC NULLS LAST`,
+      )
+      aiUsage30d = au.rows
     } catch {
       // tables may not exist yet
     }
@@ -135,7 +161,7 @@ async function collectSnapshot() {
     },
     env,
     paths: { ...expectedPaths, exists },
-    db: { state: dbState, error: dbError, migrationsApplied, userCount, projectCount },
+    db: { state: dbState, error: dbError, migrationsApplied, userCount, projectCount, projects, aiUsage30d },
     recentLog: ring.slice(-50),
   }
 }

@@ -60,6 +60,19 @@ export default function Layout() {
               📅 Scheduler
             </NavLink>
 
+            <NavLink
+              to="/qa"
+              className={({ isActive }) =>
+                `hidden sm:inline-flex items-center gap-1 text-[11px] uppercase tracking-wider font-bold px-2.5 py-1 rounded-full border transition ${
+                  isActive
+                    ? 'text-stage-done bg-stage-done/10 border-stage-done/40'
+                    : 'text-muted border-line hover:text-text hover:border-line'
+                }`
+              }
+            >
+              ✅ QA
+            </NavLink>
+
             {user?.role === 'admin' && (
               <NavLink
                 to="/admin/outreach"
@@ -112,6 +125,9 @@ export default function Layout() {
                     </button>
                     <NavMenuLink to="/scheduler" onClick={() => setNavOpen(false)}>
                       📅 Scheduler
+                    </NavMenuLink>
+                    <NavMenuLink to="/qa" onClick={() => setNavOpen(false)}>
+                      ✅ Production QA
                     </NavMenuLink>
                     {isPodcastWorkspace && (
                       <NavMenuLink to="/prompter" onClick={() => setNavOpen(false)}>

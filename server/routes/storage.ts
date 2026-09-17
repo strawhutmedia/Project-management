@@ -294,8 +294,12 @@ export async function handleTransferReport(req: Request, res: Response): Promise
     res.status(400).json({ error: 'bad_name' })
     return
   }
-  const raw = typeof req.body === 'string' ? req.body.slice(-8000) : ''
-  const p = parseRcloneStats(raw)
+  // Parse over the full posted tail (up to the 64kb route limit) so a chatty
+  // log can't push the stats block out of the parse window; store a shorter
+  // slice for the currentFiles dropdown.
+  const fullRaw = typeof req.body === 'string' ? req.body : ''
+  const raw = fullRaw.slice(-8000)
+  const p = parseRcloneStats(fullRaw)
   try {
     await pool.query(
       `INSERT INTO storage_transfer_reports (name, raw, bytes_done, bytes_total, percent, speed, eta, files_done, files_total, errors, reported_at, last_progress_at)
@@ -303,10 +307,19 @@ export async function handleTransferReport(req: Request, res: Response): Promise
        ON CONFLICT (name) DO UPDATE SET
          last_progress_at = CASE WHEN storage_transfer_reports.raw IS DISTINCT FROM EXCLUDED.raw
                                  THEN now() ELSE storage_transfer_reports.last_progress_at END,
-         raw = EXCLUDED.raw, bytes_done = EXCLUDED.bytes_done, bytes_total = EXCLUDED.bytes_total,
-         percent = EXCLUDED.percent, speed = EXCLUDED.speed, eta = EXCLUDED.eta,
-         files_done = EXCLUDED.files_done, files_total = EXCLUDED.files_total,
-         errors = EXCLUDED.errors, reported_at = now()`,
+         raw = EXCLUDED.raw,
+         -- A log tail with no stats block (a burst of per-file notices can
+         -- push it out of the window) must NOT blank a live row: keep the
+         -- last known numbers until a real stats block comes around again.
+         bytes_done  = COALESCE(NULLIF(EXCLUDED.bytes_done, ''), storage_transfer_reports.bytes_done),
+         bytes_total = COALESCE(NULLIF(EXCLUDED.bytes_total, ''), storage_transfer_reports.bytes_total),
+         percent     = COALESCE(EXCLUDED.percent, storage_transfer_reports.percent),
+         speed       = COALESCE(NULLIF(EXCLUDED.speed, ''), storage_transfer_reports.speed),
+         eta         = COALESCE(NULLIF(EXCLUDED.eta, ''), storage_transfer_reports.eta),
+         files_done  = COALESCE(EXCLUDED.files_done, storage_transfer_reports.files_done),
+         files_total = COALESCE(EXCLUDED.files_total, storage_transfer_reports.files_total),
+         errors      = GREATEST(EXCLUDED.errors, 0),
+         reported_at = now()`,
       [name, raw, p.bytesDone, p.bytesTotal, p.percent, p.speed, p.eta, p.filesDone, p.filesTotal, p.errors],
     )
     void maybeAutoQueue()
@@ -421,7 +434,7 @@ export async function maybeAutoQueue(): Promise<void> {
               c.action AS cmd_action, c.requested_at AS cmd_requested_at, c.executed_at AS cmd_executed_at
        FROM storage_transfer_reports r
        LEFT JOIN storage_transfer_commands c ON c.name = r.name
-       WHERE r.name <> 'connection-test'`,
+       WHERE r.name <> 'connection-test' AND r.name NOT ILIKE '%.check'`,
     )
     const now = Date.now()
     const age = (ts: unknown) => now - new Date(ts as string).getTime()
@@ -497,6 +510,26 @@ storageRouter.post('/auto-queue', async (req, res) => {
   }
 })
 
+// Manual clear for a finished/stale row. Hidden as of now; any NEW progress
+// on the same name (e.g. the drive comes back next month) re-surfaces it.
+storageRouter.post('/transfers/:name/dismiss', async (req, res) => {
+  const name = String(req.params.name || '').replace(/[^A-Za-z0-9._-]/g, '').slice(0, 80)
+  if (!name) {
+    res.status(400).json({ error: 'bad_name' })
+    return
+  }
+  try {
+    await pool.query(
+      `INSERT INTO storage_transfer_dismissals (name, dismissed_at) VALUES ($1, now())
+       ON CONFLICT (name) DO UPDATE SET dismissed_at = now()`,
+      [name],
+    )
+    res.json({ ok: true })
+  } catch (err) {
+    res.status(500).json({ error: 'dismiss_failed', detail: err instanceof Error ? err.message : String(err) })
+  }
+})
+
 storageRouter.get('/transfers', async (_req, res) => {
   try {
     const { rows } = await pool.query(
@@ -505,7 +538,17 @@ storageRouter.get('/transfers', async (_req, res) => {
               c.action AS cmd_action, c.requested_at AS cmd_requested_at, c.executed_at AS cmd_executed_at
        FROM storage_transfer_reports r
        LEFT JOIN storage_transfer_commands c ON c.name = r.name
-       WHERE r.name <> 'connection-test' ORDER BY r.reported_at DESC`,
+       LEFT JOIN storage_transfer_dismissals d ON d.name = r.name
+       WHERE r.name <> 'connection-test'
+         -- verification diaries (rclone check logs) are audits, not transfers:
+         -- they'd render as bogus paused rows with Resume buttons that map to
+         -- no container. Their verdicts are reported by Claude, not this card.
+         AND r.name NOT ILIKE '%.check'
+         -- finished rows linger a week as a receipt, then clear themselves
+         AND NOT (COALESCE(r.percent, 0) >= 100 AND r.last_progress_at < now() - interval '7 days')
+         -- manually cleared rows stay hidden until they show NEW progress
+         AND (d.dismissed_at IS NULL OR r.last_progress_at > d.dismissed_at)
+       ORDER BY r.reported_at DESC`,
     )
     res.json({
       transfers: rows.map((r) => ({

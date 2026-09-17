@@ -1,0 +1,28 @@
+{
+  "id": "com.strawhut.editbot",
+  "name": "Straw Hut Edit Bot",
+  "version": "0.0.1",
+  "main": "index.html",
+  "manifestVersion": 5,
+  "host": [
+    { "app": "premierepro", "minVersion": "24.0.0" }
+  ],
+  "entrypoints": [
+    {
+      "type": "panel",
+      "id": "shmEditBotPanel",
+      "label": { "default": "Straw Hut Edit Bot" },
+      "minimumSize": { "width": 230, "height": 200 },
+      "maximumSize": { "width": 3000, "height": 3000 },
+      "preferredDockedSize": { "width": 320, "height": 480 },
+      "preferredFloatingSize": { "width": 420, "height": 560 }
+    }
+  ],
+  "requiredPermissions": {
+    "localFileSystem": "fullAccess",
+    "allowCodeGenerationFromStrings": false,
+    "network": {
+      "domains": ["https://slate.strawhutmedia.com"]
+    }
+  }
+}

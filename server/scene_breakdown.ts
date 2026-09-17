@@ -16,6 +16,7 @@
 import Anthropic from '@anthropic-ai/sdk'
 import { pool } from './db'
 import { logError, logInfo } from './diag'
+import { recordAiUsage } from './ai_usage'
 
 const client = new Anthropic()
 
@@ -254,6 +255,7 @@ export async function runSceneBreakdown(sceneId: string, userId: string): Promis
       system: SYSTEM_PROMPT,
       messages: [{ role: 'user', content: userBlock }],
     })
+    recordAiUsage({ source: 'scene_breakdown', model: MODEL, usage: response.usage })
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err)
     logError('scene_breakdown: claude call failed', { sceneId, error: msg })

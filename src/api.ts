@@ -793,6 +793,23 @@ export type ApiCashflowOverview = {
     recurringInCents: number; recurringOutCents: number; recurringNetCents: number
     oneTimeInCents: number; oneTimeOutCents: number; oneTimeNetCents: number
   }
+  growthPipeline: {
+    targetMrrCents: number
+    currentMrrCents: number
+    gapCents: number
+    openPipelineCents: number
+    deals: ApiPipelineDeal[]
+  }
+}
+
+export type ApiPipelineDeal = {
+  id: string
+  name: string
+  estimatedMrrCents: number
+  stage: 'prospecting' | 'quoted' | 'negotiating' | 'won' | 'lost'
+  notes: string
+  createdAt: string
+  updatedAt: string
 }
 
 // ── Master Archive (S3 vault) browser ──
@@ -998,6 +1015,16 @@ export const api = {
     request<{ ok: true }>(`/api/cashflow/entries/${id}`, { method: 'DELETE' }),
   updateCashflowSettings: (patch: Partial<{ startingBalanceCents: number; startingDate: string }>) =>
     request<{ settings: { startingBalanceCents: number; startingDate: string } }>('/api/cashflow/settings', { method: 'PATCH', body: JSON.stringify(patch) }),
+  updateGrowthTarget: (targetMrrCents: number) =>
+    request<{ targetMrrCents: number }>('/api/cashflow/growth-target', { method: 'PATCH', body: JSON.stringify({ targetMrrCents }) }),
+  createPipelineDeal: (body: {
+    name: string; estimatedMrrCents?: number; stage?: ApiPipelineDeal['stage']; notes?: string
+  }) => request<{ deal: ApiPipelineDeal }>('/api/cashflow/pipeline', { method: 'POST', body: JSON.stringify(body) }),
+  updatePipelineDeal: (id: string, body: Partial<{
+    name: string; estimatedMrrCents: number; stage: ApiPipelineDeal['stage']; notes: string
+  }>) => request<{ deal: ApiPipelineDeal }>(`/api/cashflow/pipeline/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
+  deletePipelineDeal: (id: string) =>
+    request<{ ok: true }>(`/api/cashflow/pipeline/${id}`, { method: 'DELETE' }),
 
   // QuickBooks connection (AR side)
   qbStatus: () => request<{ configured: boolean; connected: boolean; env: string; realmId: string | null; redirectUri: string }>('/api/qb/status'),
@@ -1045,6 +1072,8 @@ export const api = {
   storageAutoQueue: () => request<{ on: boolean }>('/api/storage/auto-queue'),
   storageSetAutoQueue: (on: boolean) =>
     request<{ ok: boolean; on: boolean }>('/api/storage/auto-queue', { method: 'POST', body: JSON.stringify({ on }) }),
+  storageTransferDismiss: (name: string) =>
+    request<{ ok: boolean }>(`/api/storage/transfers/${encodeURIComponent(name)}/dismiss`, { method: 'POST', body: '{}' }),
   storageTransferCommand: (name: string, action: 'pause' | 'resume') =>
     request<{ ok: boolean; action: 'stop' | 'start' }>(`/api/storage/transfers/${encodeURIComponent(name)}/command`, {
       method: 'POST',
@@ -1097,6 +1126,8 @@ export const api = {
   logout: () => request<{ ok: true }>('/api/auth/logout', { method: 'POST' }),
   projects: () => request<{ projects: ApiProject[] }>('/api/projects'),
   project: (id: string) => request<{ project: ApiProject }>(`/api/projects/${id}`),
+  archiveProject: (id: string) => request<{ ok: true }>(`/api/projects/${id}/archive`, { method: 'POST' }),
+  unarchiveProject: (id: string) => request<{ ok: true }>(`/api/projects/${id}/unarchive`, { method: 'POST' }),
   song: (id: string) => request<{ song: ApiSongDetail }>(`/api/songs/${id}`),
   updateSong: (id: string, patch: {
     stage?: Stage
@@ -2125,4 +2156,105 @@ export const api = {
     request<{ ok: true }>(`/api/notifications/${id}/read`, { method: 'POST' }),
   notificationsReadAll: () =>
     request<{ ok: true }>('/api/notifications/read-all', { method: 'POST' }),
+}
+
+// ── QA Production Checklist (footage recorded + stored properly) ──
+export type ApiQaCheck = {
+  id: string
+  label: string
+  spec: string
+  checked: boolean
+  checkedByName: string | null
+  checkedAt: string | null
+}
+
+export type ApiQaRecording = {
+  id: string
+  projectId: string | null
+  projectName: string | null
+  projectCoverArtUrl: string | null
+  title: string
+  recordDate: string | null
+  uploadTime: string
+  recordingType: string
+  resolution: string
+  audioFolder: string
+  audioCard: string
+  videoCard: string
+  dropboxUrl: string
+  dropboxPath: string
+  notes: string
+  status: 'pending' | 'approved' | 'flagged' | 'cancelled'
+  qaById: string | null
+  qaByName: string | null
+  qaAt: string | null
+  createdByName: string | null
+  createdAt: string
+  shooters: Array<{ id: string; name: string }>
+  checks: ApiQaCheck[]
+}
+
+export type QaRecordingInput = {
+  title?: string
+  projectId?: string | null
+  recordDate?: string | null
+  uploadTime?: string
+  recordingType?: string
+  resolution?: string
+  audioFolder?: string
+  audioCard?: string
+  videoCard?: string
+  dropboxUrl?: string
+  dropboxPath?: string
+  notes?: string
+  shooterIds?: string[]
+}
+
+export type ApiQaContext = {
+  projects: Array<{ id: string; name: string; coverArtUrl: string | null; dropboxFolder: string | null }>
+  users: Array<{ id: string; name: string; role: 'admin' | 'user' | 'viewer' }>
+  canWrite: boolean
+}
+
+export type ApiQaTemplateItem = { id: string; label: string; spec: string; position: number }
+
+export const qaApi = {
+  context: () => request<ApiQaContext>('/api/qa/context'),
+  recordings: (opts?: { projectId?: string; status?: string }) => {
+    const qs = new URLSearchParams()
+    if (opts?.projectId) qs.set('projectId', opts.projectId)
+    if (opts?.status) qs.set('status', opts.status)
+    const suffix = qs.toString() ? `?${qs.toString()}` : ''
+    return request<{ recordings: ApiQaRecording[] }>(`/api/qa/recordings${suffix}`)
+  },
+  createRecording: (body: QaRecordingInput) =>
+    request<{ recording: ApiQaRecording }>('/api/qa/recordings', { method: 'POST', body: JSON.stringify(body) }),
+  updateRecording: (id: string, body: QaRecordingInput) =>
+    request<{ recording: ApiQaRecording }>(`/api/qa/recordings/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
+  deleteRecording: (id: string) =>
+    request<{ ok: true }>(`/api/qa/recordings/${id}`, { method: 'DELETE' }),
+  setStatus: (id: string, status: ApiQaRecording['status']) =>
+    request<{ recording: ApiQaRecording }>(`/api/qa/recordings/${id}/status`, {
+      method: 'POST',
+      body: JSON.stringify({ status }),
+    }),
+  addCheck: (recordingId: string, body: { label: string; spec?: string }) =>
+    request<{ recording: ApiQaRecording }>(`/api/qa/recordings/${recordingId}/checks`, {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+  setCheck: (checkId: string, body: { checked?: boolean; label?: string; spec?: string }) =>
+    request<{ recording: ApiQaRecording }>(`/api/qa/checks/${checkId}`, {
+      method: 'PATCH',
+      body: JSON.stringify(body),
+    }),
+  deleteCheck: (checkId: string) =>
+    request<{ recording?: ApiQaRecording; ok?: true }>(`/api/qa/checks/${checkId}`, { method: 'DELETE' }),
+  template: (projectId: string) =>
+    request<{ items: ApiQaTemplateItem[] }>(`/api/qa/projects/${projectId}/template`),
+  saveTemplate: (projectId: string, items: Array<{ label: string; spec: string }>) =>
+    request<{ items: ApiQaTemplateItem[] }>(`/api/qa/projects/${projectId}/template`, {
+      method: 'PUT',
+      body: JSON.stringify({ items }),
+    }),
 }

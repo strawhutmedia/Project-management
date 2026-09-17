@@ -37,7 +37,11 @@ function ClassBadge({ storageClass }: { storageClass: string }) {
 
 // Live transfer rows, reported once a minute by the NAS. Considered stale
 // (job finished, or the reporter/NAS is down) after 5 minutes of silence.
-function TransferRow({ t, onCommand }: { t: ApiArchiveTransfer; onCommand: (name: string, action: 'pause' | 'resume') => Promise<void> }) {
+function TransferRow({ t, onCommand, onDismiss }: {
+  t: ApiArchiveTransfer
+  onCommand: (name: string, action: 'pause' | 'resume') => Promise<void>
+  onDismiss: (name: string) => Promise<void>
+}) {
   const [filesOpen, setFilesOpen] = useState(false)
   const [sending, setSending] = useState(false)
   const ageMs = Date.now() - new Date(t.reportedAt).getTime()
@@ -85,6 +89,15 @@ function TransferRow({ t, onCommand }: { t: ApiArchiveTransfer; onCommand: (name
             resuming — first progress lines coming up
           </span>
         )}
+        {(done || stale) && (
+          <button
+            onClick={() => { void onDismiss(t.name) }}
+            className="inline-flex items-center gap-1 rounded-full border border-line bg-panel hover:bg-line/40 px-2.5 py-0.5 text-[11px] font-bold text-muted"
+            title="Clear this row from the card. If this job ever runs again, it reappears on its own."
+          >
+            ✕ Clear
+          </button>
+        )}
         {!done && !stale && !cmdPending && (
           <button
             onClick={() => { void sendCommand(paused ? 'resume' : 'pause') }}
@@ -130,13 +143,21 @@ function TransferRow({ t, onCommand }: { t: ApiArchiveTransfer; onCommand: (name
               {t.currentFiles!.map((f, i) => {
                 const file = typeof f === 'string' ? { name: f, pct: null, speed: '', eta: '' } : f
                 return (
-                  <div key={i} className="flex items-center gap-2 text-[11px] text-muted pl-4">
-                    <span className="truncate min-w-0">🎬 {file.name}</span>
-                    <span className="ml-auto shrink-0 tabular-nums">
-                      {file.pct != null ? `${file.pct}%` : ''}
-                      {file.speed ? ` · ${file.speed}` : ''}
-                      {file.eta ? ` · ${file.eta} left` : ''}
-                    </span>
+                  <div key={i} className="pl-4 py-0.5">
+                    <div className="flex items-center gap-2 text-[11px] text-muted">
+                      <span className="truncate min-w-0">🎬 {file.name}</span>
+                      <span className="ml-auto shrink-0 tabular-nums">
+                        {file.pct != null ? `${file.pct}%` : 'starting…'}
+                        {file.speed ? ` · ${file.speed}` : ''}
+                        {file.eta ? ` · ${file.eta} left` : ''}
+                      </span>
+                    </div>
+                    <div className="mt-0.5 h-1 rounded-full bg-ink/60 overflow-hidden">
+                      <div
+                        className="h-full rounded-full bg-stage-stems/80"
+                        style={{ width: `${Math.max(2, Math.min(100, file.pct ?? 2))}%` }}
+                      />
+                    </div>
                   </div>
                 )
               })}
@@ -293,6 +314,11 @@ export default function StoragePage() {
     }
   }, [autoQueue])
 
+  const onDismiss = useCallback(async (name: string) => {
+    await api.storageTransferDismiss(name)
+    setTransfers((prev) => prev.filter((t) => t.name !== name))
+  }, [])
+
   const onCommand = useCallback(async (name: string, action: 'pause' | 'resume') => {
     await api.storageTransferCommand(name, action)
     try {
@@ -362,7 +388,7 @@ export default function StoragePage() {
         {transfers.length > 0 ? (
           <div className="divide-y divide-line/60">
             {transfers.map((t) => (
-              <TransferRow key={t.name} t={t} onCommand={onCommand} />
+              <TransferRow key={t.name} t={t} onCommand={onCommand} onDismiss={onDismiss} />
             ))}
           </div>
         ) : (

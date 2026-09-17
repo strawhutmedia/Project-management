@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import QRCode from 'qrcode'
 import { api, type ApiTeleprompterSession } from '../api'
 
@@ -58,6 +58,7 @@ type Settings = {
   flipY: boolean
   countdown: boolean
   showGuide: boolean
+  allCaps: boolean
 }
 
 const DEFAULT_SETTINGS: Settings = {
@@ -72,6 +73,7 @@ const DEFAULT_SETTINGS: Settings = {
   flipY: false,
   countdown: true,
   showGuide: true,
+  allCaps: false,
 }
 
 function loadSettings(): Settings {
@@ -152,6 +154,113 @@ function formatClock(sec: number): string {
 
 function errText(e: unknown): string {
   return e instanceof Error ? e.message : String(e)
+}
+
+// Drop the text caret at a screen point (used when a click enters edit mode,
+// so the cursor lands on the exact word tapped). Cross-browser: WebKit/Chrome
+// expose caretRangeFromPoint; Firefox uses caretPositionFromPoint.
+function placeCaretAtPoint(x: number, y: number) {
+  const doc = document as any
+  let range: Range | null = null
+  try {
+    if (doc.caretRangeFromPoint) {
+      range = doc.caretRangeFromPoint(x, y)
+    } else if (doc.caretPositionFromPoint) {
+      const pos = doc.caretPositionFromPoint(x, y)
+      if (pos) {
+        range = document.createRange()
+        range.setStart(pos.offsetNode, pos.offset)
+        range.collapse(true)
+      }
+    }
+  } catch {
+    /* ignore — fall back to a default caret */
+  }
+  if (range) {
+    const sel = window.getSelection()
+    sel?.removeAllRanges()
+    sel?.addRange(range)
+  }
+}
+
+function escapeHtml(s: string): string {
+  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+}
+
+// Plain text → block HTML that PRESERVES every line break, including blank
+// lines (double-enters). This is the fix for pasted paragraph spacing getting
+// eaten: each line becomes its own <div>, empty lines become <div><br></div>.
+function textToBlocks(text: string): string {
+  return text
+    .replace(/\r\n?/g, '\n')
+    .split('\n')
+    .map((l) => (l.length ? `<div>${escapeHtml(l)}</div>` : '<div><br></div>'))
+    .join('')
+}
+
+// Clean pasted rich text: keep structure (paragraphs, line breaks) and basic
+// emphasis tags (b/i/u/etc.), but strip EVERY attribute — colors, fonts,
+// backgrounds, sizes, classes — so nothing pasted can turn invisible or off-
+// theme on the prompter. Falls back to line-preserving plain text.
+function sanitizePastedHtml(html: string): string {
+  const tmp = document.createElement('div')
+  tmp.innerHTML = html
+  tmp.querySelectorAll('script,style,meta,link,img,svg,object,iframe,input,textarea,button,table,thead,tbody,tr,td,th').forEach(
+    (n) => n.replaceWith(...Array.from(n.childNodes)),
+  )
+  tmp.querySelectorAll('*').forEach((el) => {
+    for (const attr of Array.from(el.attributes)) el.removeAttribute(attr.name)
+  })
+  const out = tmp.innerHTML.trim()
+  return out || textToBlocks(tmp.textContent || '')
+}
+
+// Shared paste handler for both editors — preserves formatting + line breaks.
+function handleRichPaste(e: React.ClipboardEvent, done: () => void) {
+  e.preventDefault()
+  const cb = e.clipboardData
+  const html = cb.getData('text/html')
+  const clean = html && html.trim() ? sanitizePastedHtml(html) : textToBlocks(cb.getData('text/plain'))
+  try {
+    document.execCommand('insertHTML', false, clean)
+  } catch {
+    document.execCommand('insertText', false, cb.getData('text/plain'))
+  }
+  done()
+}
+
+// Toggle UPPERCASE display on the current selection — REVERSIBLE. It wraps the
+// selection in a span that renders uppercase via CSS (the underlying letters
+// keep their real case), so pressing it again removes the wrap and the text
+// returns to exactly how it was typed. `root` is the contentEditable element.
+function toggleCapsSelection(root: HTMLElement | null, done: () => void) {
+  const sel = window.getSelection()
+  if (!root || !sel || sel.rangeCount === 0 || sel.isCollapsed) return
+  const range = sel.getRangeAt(0)
+  const capped = Array.from(root.querySelectorAll('span[data-caps="1"]')).filter((s) => {
+    try {
+      return range.intersectsNode(s)
+    } catch {
+      return false
+    }
+  })
+  if (capped.length) {
+    // Turn OFF: unwrap any caps spans the selection touches.
+    capped.forEach((s) => s.replaceWith(...Array.from(s.childNodes)))
+  } else {
+    // Turn ON: wrap the selection in a caps span (non-destructive).
+    try {
+      const span = document.createElement('span')
+      span.setAttribute('data-caps', '1')
+      span.style.textTransform = 'uppercase'
+      span.appendChild(range.extractContents())
+      range.insertNode(span)
+    } catch {
+      /* selection crossed incompatible nodes — ignore */
+    }
+  }
+  root.normalize()
+  done()
 }
 
 // One-time lift of anything a user saved on THIS device (old localStorage
@@ -705,6 +814,7 @@ function Editor(props: {
               onChange={onHtml}
               background={settings.background}
               fontStack={FONTS[settings.fontFamily].stack}
+              allCaps={settings.allCaps}
             />
           )}
 
@@ -912,11 +1022,13 @@ function RichEditor({
   onChange,
   background,
   fontStack,
+  allCaps,
 }: {
   initialHtml: string
   onChange: (html: string) => void
   background: 'black' | 'white'
   fontStack: string
+  allCaps?: boolean
 }) {
   const ref = useRef<HTMLDivElement>(null)
 
@@ -993,6 +1105,9 @@ function RichEditor({
         <TbBtn onMouseDown={hold} onClick={() => exec('removeFormat')} title="Clear formatting">
           <span className="text-[11px]">Clear</span>
         </TbBtn>
+        <TbBtn onMouseDown={hold} onClick={() => toggleCapsSelection(ref.current, sync)} title="Toggle UPPERCASE on the selected text (press again to undo)">
+          <span className="text-[11px] font-bold">AA</span>
+        </TbBtn>
       </div>
 
       <div
@@ -1001,15 +1116,10 @@ function RichEditor({
         suppressContentEditableWarning
         onInput={sync}
         onBlur={sync}
-        onPaste={(e) => {
-          e.preventDefault()
-          const text = e.clipboardData.getData('text/plain')
-          document.execCommand('insertText', false, text)
-          sync()
-        }}
+        onPaste={(e) => handleRichPaste(e, sync)}
         data-empty-text="Write or paste your script here…"
         className="prompter-editable px-4 py-4 h-[38vh] lg:h-[44vh] overflow-y-auto outline-none leading-relaxed text-[16px]"
-        style={{ background: bg, color: fg, fontFamily: fontStack }}
+        style={{ background: bg, color: fg, fontFamily: fontStack, textTransform: allCaps ? 'uppercase' : 'none' }}
       />
     </div>
   )
@@ -1102,6 +1212,7 @@ function SettingsPanel({ settings, setSettings }: { settings: Settings; setSetti
         <Toggle label="Flip ↕" on={settings.flipY} onClick={() => setSettings({ flipY: !settings.flipY })} hint="For overhead rigs" />
         <Toggle label="Countdown" on={settings.countdown} onClick={() => setSettings({ countdown: !settings.countdown })} />
         <Toggle label="Eye-line guide" on={settings.showGuide} onClick={() => setSettings({ showGuide: !settings.showGuide })} />
+        <Toggle label="ALL CAPS" on={settings.allCaps} onClick={() => setSettings({ allCaps: !settings.allCaps })} />
       </div>
     </div>
   )
@@ -1456,7 +1567,76 @@ function Runner({
     return () => window.removeEventListener('keydown', onKey)
   }, [settings, setSettings, togglePlay, restart, jump, toggleFullscreen, handleExit, editing])
 
-  const transform = `${settings.mirrorX ? 'scaleX(-1)' : ''} ${settings.flipY ? 'scaleY(-1)' : ''}`.trim()
+  const textRef = useRef<HTMLDivElement>(null)
+  // Where the operator clicked, so we can drop the caret there once the text
+  // becomes editable (you can't place a caret in a non-editable node).
+  const pendingCaret = useRef<{ x: number; y: number } | null>(null)
+
+  // Keep the on-screen text in sync with the saved script when NOT editing.
+  // While editing, the DOM owns the contentEditable node so the caret never
+  // jumps out from under the person typing. Layout effect so the text is
+  // seeded before paint (no blank first frame).
+  useLayoutEffect(() => {
+    if (editing) return
+    const el = textRef.current
+    if (el && el.innerHTML !== session.html) el.innerHTML = session.html
+  }, [session.html, editing])
+
+  // On entering edit, focus the text and — if this was triggered by a click —
+  // drop the caret exactly where the click landed.
+  useEffect(() => {
+    if (!editing) return
+    const el = textRef.current
+    if (!el) return
+    // preventScroll is essential: a plain focus() scrolls the (huge) editable
+    // into view, yanking the reading position to the top — which then made the
+    // caret land on whatever text ended up under the click point after the
+    // jump. Keeping scroll put means the click maps to the word you tapped.
+    el.focus({ preventScroll: true })
+    const pc = pendingCaret.current
+    pendingCaret.current = null
+    // Mirror/flip is dropped while editing; if it was on, the click's screen
+    // coords no longer map to the same character, so skip point-caret then.
+    if (pc && !settings.mirrorX && !settings.flipY) {
+      placeCaretAtPoint(pc.x, pc.y)
+    }
+  }, [editing, settings.mirrorX, settings.flipY])
+
+  const openEdit = useCallback(() => {
+    setPlaying(false)
+    setEditing(true)
+  }, [])
+  const closeEdit = useCallback(() => {
+    if (textRef.current) onEditHtml(textRef.current.innerHTML)
+    setEditing(false)
+  }, [onEditHtml])
+  const holdSel = (e: React.MouseEvent) => e.preventDefault()
+  const execFmt = useCallback(
+    (cmd: string, val?: string) => {
+      try {
+        document.execCommand('styleWithCSS', false, 'true')
+        document.execCommand(cmd, false, val)
+      } catch {
+        /* ignore */
+      }
+      if (textRef.current) onEditHtml(textRef.current.innerHTML)
+    },
+    [onEditHtml],
+  )
+  const execHighlight = useCallback(() => {
+    try {
+      document.execCommand('styleWithCSS', false, 'true')
+      document.execCommand('hiliteColor', false, HIGHLIGHT_BG)
+      document.execCommand('foreColor', false, HIGHLIGHT_FG)
+    } catch {
+      /* ignore */
+    }
+    if (textRef.current) onEditHtml(textRef.current.innerHTML)
+  }, [onEditHtml])
+
+  // No mirror/flip while editing — you can't sanely click-to-edit through a
+  // mirror. It snaps back to the glass orientation when you tap Done.
+  const transform = editing ? '' : `${settings.mirrorX ? 'scaleX(-1)' : ''} ${settings.flipY ? 'scaleY(-1)' : ''}`.trim()
 
   const isDark = settings.background === 'black'
   const bg = isDark ? '#000000' : '#ffffff'
@@ -1480,9 +1660,13 @@ function Runner({
           // which is what made manual scroll look broken on iPad.
           if (playing) setPlaying(false)
         }}
-        onClick={() => {
-          togglePlay()
-          revealControls()
+        onClick={(e) => {
+          if (editing) return // clicks inside the editor place the caret natively
+          // A click on the script drops you straight into editing at that exact
+          // spot — it does NOT start/stop playback. Play/pause lives on the
+          // control bar, the spacebar, and the phone remote.
+          pendingCaret.current = { x: e.clientX, y: e.clientY }
+          openEdit()
         }}
         onMouseMove={() => {
           // In full screen, any stray cursor twitch was popping the whole
@@ -1497,6 +1681,26 @@ function Runner({
           style={{ maxWidth: `${settings.maxWidth}%`, paddingTop: '46vh', paddingBottom: '80vh', paddingLeft: '4vw', paddingRight: '4vw' }}
         >
           <div
+            ref={textRef}
+            contentEditable={editing}
+            suppressContentEditableWarning
+            spellCheck={editing}
+            onInput={() => {
+              if (editing && textRef.current) onEditHtml(textRef.current.innerHTML)
+            }}
+            onPaste={(e) => {
+              if (!editing) return
+              // Preserve formatting + line breaks (the "enters" fix).
+              handleRichPaste(e, () => {
+                if (textRef.current) onEditHtml(textRef.current.innerHTML)
+              })
+            }}
+            onKeyDown={(e) => {
+              if (editing && e.key === 'Escape') {
+                e.preventDefault()
+                closeEdit()
+              }
+            }}
             style={{
               fontSize: `${settings.fontSize}px`,
               lineHeight: settings.lineHeight,
@@ -1504,8 +1708,15 @@ function Runner({
               fontFamily: FONTS[settings.fontFamily].stack,
               fontWeight: 600,
               wordBreak: 'break-word',
+              outline: 'none',
+              caretColor: '#22d3ee',
+              cursor: editing ? 'text' : undefined,
+              textTransform: settings.allCaps ? 'uppercase' : 'none',
+              // The prompter root sets user-select:none; the caret and text
+              // selection need it back on while editing.
+              userSelect: editing ? 'text' : 'none',
+              WebkitUserSelect: editing ? 'text' : 'none',
             }}
-            dangerouslySetInnerHTML={{ __html: session.html }}
           />
         </div>
       </div>
@@ -1534,6 +1745,7 @@ function Runner({
         <div className="h-full bar-rainbow" style={{ width: `${progress * 100}%` }} />
       </div>
 
+      {!editing && (
       <div className={`absolute inset-x-0 bottom-0 transition-opacity duration-300 ${showControls ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
         <div className={`mx-auto rounded-2xl bg-black/80 backdrop-blur border border-white/10 text-white transition-[max-width,margin,padding] ${
           isFs ? 'max-w-md m-2 px-2 py-1.5' : 'max-w-3xl m-3 px-3 py-2.5'
@@ -1619,6 +1831,9 @@ function Runner({
                 <MiniToggle on={settings.flipY} onClick={() => setSettings({ flipY: !settings.flipY })}>
                   Flip ↕
                 </MiniToggle>
+                <MiniToggle on={settings.allCaps} onClick={() => setSettings({ allCaps: !settings.allCaps })}>
+                  ALL CAPS
+                </MiniToggle>
               </>
             )}
             <button
@@ -1644,14 +1859,11 @@ function Runner({
             {/* Edit stays available in full screen — quick paste/tweak is the
                 whole point, so it must be reachable mid-read. */}
             <button
-              onClick={() => {
-                setPlaying(false)
-                setEditing(true)
-              }}
+              onClick={openEdit}
               className={`rounded-lg border border-white/15 text-white/70 hover:text-white transition ${
                 isFs ? 'text-[10px] px-2 py-1' : 'text-[11px] px-2.5 py-1.5'
               }`}
-              title="Edit or paste the script without leaving full screen (E)"
+              title="Edit the script in place — tap a word to put your cursor there (E)"
             >
               ✎ Edit
             </button>
@@ -1665,35 +1877,39 @@ function Runner({
           )}
         </div>
       </div>
+      )}
 
-      {/* Quick edit — paste or tweak the script without leaving full screen. */}
+      {/* In-place edit: the prompter text itself becomes editable, upright,
+          at the same scroll position. Tap a word and the caret lands there —
+          no popup, you edit the exact moment you were looking at. */}
       {editing && (
-        <div className="absolute inset-0 z-[60] bg-ink/95 backdrop-blur flex flex-col p-4 sm:p-6 text-text">
-          <div className="flex items-center justify-between mb-3 w-full max-w-3xl mx-auto">
-            <div>
-              <p className="text-[10px] uppercase tracking-[0.3em] text-muted">Quick edit</p>
-              <p className="text-sm text-text">{sessionTitle(session)}</p>
-            </div>
+        <div className="absolute top-0 inset-x-0 z-[60] bg-black/85 backdrop-blur border-b border-white/10 text-white px-3 py-2 flex items-center gap-1.5 flex-wrap">
+          <span className="text-[11px] text-white/70 mr-auto">✎ Tap a word to edit it · changes auto-save</span>
+          <button onMouseDown={holdSel} onClick={() => execFmt('bold')} className="min-w-7 h-7 px-2 rounded-lg bg-white/10 hover:bg-white/20 text-sm grid place-items-center border border-white/15" title="Bold"><b>B</b></button>
+          <button onMouseDown={holdSel} onClick={() => execFmt('italic')} className="min-w-7 h-7 px-2 rounded-lg bg-white/10 hover:bg-white/20 text-sm grid place-items-center border border-white/15" title="Italic"><i>I</i></button>
+          <button onMouseDown={holdSel} onClick={execHighlight} className="min-w-7 h-7 px-2 rounded-lg bg-white/10 hover:bg-white/20 text-sm grid place-items-center border border-white/15" title="Highlight">
+            <span className="px-1 rounded" style={{ background: HIGHLIGHT_BG, color: HIGHLIGHT_FG }}>H</span>
+          </button>
+          {TEXT_COLORS.map((c) => (
             <button
-              onClick={() => setEditing(false)}
-              className="rounded-xl bg-gradient-to-r from-stage-producing to-stage-mastering text-white font-bold uppercase tracking-wider text-sm px-5 py-3"
+              key={c.key}
+              onMouseDown={holdSel}
+              onClick={() => execFmt('foreColor', c.hex)}
+              title={c.key}
+              className="h-6 w-6 rounded-full border border-white/25 grid place-items-center"
+              style={{ background: c.hex }}
             >
-              Done
+              {c.key === 'White' && <span className="h-4 w-4 rounded-full border border-white/40" />}
             </button>
-          </div>
-          <div className="w-full max-w-3xl mx-auto flex-1 min-h-0">
-            <RichEditor
-              key={`run-edit-${session.id}`}
-              initialHtml={session.html}
-              onChange={onEditHtml}
-              background={settings.background}
-              fontStack={FONTS[settings.fontFamily].stack}
-            />
-          </div>
-          <p className="text-[11px] text-muted text-center mt-3 max-w-3xl mx-auto">
-            Paste with ⌘V (or long-press → Paste on iPad). Changes save automatically and show in the prompter when you tap
-            Done. Scrolling is paused while you edit.
-          </p>
+          ))}
+          <button onMouseDown={holdSel} onClick={() => execFmt('removeFormat')} className="h-7 px-2 rounded-lg bg-white/10 hover:bg-white/20 text-[11px] grid place-items-center border border-white/15" title="Clear formatting">Clear</button>
+          <button onMouseDown={holdSel} onClick={() => toggleCapsSelection(textRef.current, () => { if (textRef.current) onEditHtml(textRef.current.innerHTML) })} className="h-7 px-2 rounded-lg bg-white/10 hover:bg-white/20 text-[11px] font-bold grid place-items-center border border-white/15" title="Toggle UPPERCASE on the selected text (press again to undo)">AA</button>
+          <button
+            onClick={closeEdit}
+            className="ml-1 rounded-lg bg-gradient-to-r from-stage-producing to-stage-mastering text-white font-bold uppercase tracking-wider text-xs px-4 py-2"
+          >
+            Done ✓
+          </button>
         </div>
       )}
     </div>

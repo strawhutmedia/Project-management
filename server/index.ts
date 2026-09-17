@@ -35,12 +35,15 @@ import { audienceRouter } from './routes/audience'
 import { quickbooksRouter } from './routes/quickbooks'
 import { qbInvoicesRouter } from './routes/qb_invoices'
 import { storageRouter, handleTransferReport, handleAgentCommands, handleAgentAck } from './routes/storage'
+import { qaRouter } from './routes/qa'
 import { handleResendWebhook } from './routes/outreach_webhook'
 import { handleSesNotify } from './routes/ses_notify'
 import { handleSesInboundReply } from './routes/ses_inbound_reply'
 import { scheduleBoot as scheduleSesBounceSetup } from './ses_bounce_setup'
 import { seedBackInYourArms } from './seeds/back_in_your_arms'
 import { seedMadelineInvite } from './seeds/invite_madeline'
+import { seedQaTeamInvites } from './seeds/invite_qa_team'
+import { seedMergeJayKogen } from './seeds/merge_jay_kogen'
 import { ensureRyanIsPodcastEp } from './routes/projects'
 import { startScheduler } from './scheduler'
 import { scheduleBootTimeCoverSync, syncMissingCoversFromRss } from './rss_cover_sync'
@@ -154,6 +157,11 @@ app.use('/api/scheduler', socialSchedulerRouter)
 // reaches them, which would 401 the phone's login-less button presses before
 // they got here. Its own /remote/stream route enforces login itself.
 app.use('/api/teleprompter/remote', teleprompterRemoteRouter)
+// QA router: its /approved feed is token-authed (no session) for the
+// Premiere automation, so it MUST be mounted before the broad
+// `app.use('/api', …)` routers below — those apply requireUser to every
+// /api/* request and would 401 the token-only call before it got here.
+app.use('/api/qa', qaRouter)
 // show_chat mounts on /api directly because its routes are
 // /api/projects/:id/chat — colocated with project-scoped endpoints.
 app.use('/api', showChatRouter)
@@ -251,7 +259,20 @@ app.use((err: Error, req: express.Request, res: express.Response, _next: express
     res.status(400).send('Bad Request')
     return
   }
-  
+
+  // Malformed JSON request body (bad client, shell-quoting mangling a POST).
+  // Return 400 quietly — a bad body is the caller's problem, not a server
+  // fault, and it must NOT fire an admin alert. (This was spamming Ryan when
+  // the Windows premiere-bot posted status with mangled JSON quoting.)
+  const isJsonParseError = (err as { type?: string }).type === 'entity.parse.failed' ||
+                           (err instanceof SyntaxError && (err as { status?: number }).status === 400) ||
+                           (err instanceof SyntaxError && /\bin JSON\b/i.test(err.message))
+  if (isJsonParseError) {
+    logInfo('ignored malformed JSON body', { method: req.method, path: req.path })
+    res.status(400).json({ error: 'bad_json' })
+    return
+  }
+
   logError('unhandled error', { message: err.message, stack: err.stack })
   res.status(500).json({ error: 'internal_error', message: err.message })
 })
@@ -270,6 +291,8 @@ async function start() {
     await seedBackInYourArms()
     await ensureRyanIsPodcastEp()
     await seedMadelineInvite()
+    await seedMergeJayKogen()
+    await seedQaTeamInvites()
   } catch (err) {
     logError('migrations failed', { error: err instanceof Error ? err.message : String(err) })
     markBootError(err)
@@ -295,6 +318,9 @@ async function start() {
     })
     void import('./cashflow_payment_check').then(({ startCashflowPaymentCheckLoop }) => {
       startCashflowPaymentCheckLoop()
+    })
+    void import('./qa_digest').then(({ startQaDigestLoop }) => {
+      startQaDigestLoop()
     })
     void enableDomainOpenTracking()
     // Pick up any breakdown runs that were killed by the previous
