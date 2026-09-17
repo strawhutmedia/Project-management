@@ -622,3 +622,35 @@ need to get my MRR over $80k!!!"*
 - Client API types/functions: `src/api.ts` — `ApiCashflowOverview.growthPipeline`,
   `ApiPipelineDeal`, `updateGrowthTarget` / `createPipelineDeal` /
   `updatePipelineDeal` / `deletePipelineDeal`
+
+---
+
+# Session handoff — song release checklist (parked, needs content) — Sept 2026
+
+Short session. Ryan wants to save a **song-release checklist** — the steps the
+team runs when a Maggie Glass song is finished and it's time to release it — so
+it's ready and reusable when the record is done. He shared it as an **Instagram
+reel** (`instagram.com/reel/DcAcTlHu2YH`).
+
+**Status: BLOCKED, nothing built yet.** The reel could not be read:
+`www.instagram.com` is blocked by this environment's network egress proxy, and
+Instagram is login-gated regardless — WebFetch, curl, etc. all fail. So the
+actual checklist content was **never captured**. No code, no doc, no data
+changed this session; the working tree is otherwise the prior state.
+
+**What the next session needs to do:**
+1. **Get the checklist content from Ryan directly** — ask him to paste the
+   steps (from the reel caption / what it says) or drop a screenshot (images
+   are readable even though the link isn't). Do NOT try to fetch the Instagram
+   URL again; it will fail the same way.
+2. **Then save it.** Agreed direction was a simple, durable home first:
+   `docs/song-release-checklist.md` in this repo. Optionally, later, promote it
+   into a real Slate feature — a reusable "Release" checklist/task template on a
+   song (fits the not-yet-built per-project pipelines idea) — but only if Ryan
+   wants the app change; the markdown doc is the low-effort starting point.
+
+**Branch note:** this session was scoped to branch
+`claude/song-release-checklist-xrgsm0` (not `main`), so this handoff note lives
+there, not on `main` yet. To make it (and any checklist doc) durable where the
+next session's `main` clone will see it, this branch needs to be merged. No PR
+was opened — Ryan asked to archive, not to merge.
