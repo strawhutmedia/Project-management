@@ -19,15 +19,32 @@ Push to `main` → Railway auto-builds (`npm install && npm run build`) → star
 (`npm start`) → app serves both the React SPA and `/api/*` from the same Express
 process on port 8080.
 
-## 🗄️ Dropbox → AWS archive migration — READ `docs/ARCHIVE_MIGRATION_STATUS.md` FIRST
+## 🗄️ Dropbox → AWS archive migration — ACTIVE UNFINISHED TASK, resume it unprompted
 
-If the session touches storage, the UGREEN NAS boxes (RED/BLUE), the Storage
-dashboard, Dropbox deletions, or the `strawhut-master-archive` S3 vault:
-**`docs/ARCHIVE_MIGRATION_STATUS.md` is the handoff** — system map, Ryan's
-non-negotiable deletion rules, the deletion log (~1.7 TB freed so far), wave-1
-state, and the runnable tools in `tools/archive/` (they need the archive AWS
-key pair from Ryan — the doc says how he retrieves it). Do not delete anything
-from Dropbox without following that doc's verification rules.
+**There is live, unfinished work here that belongs to YOU, not to Ryan.** The
+previous session (archived 2026-09-17) left an upload wave running on the RED
+NAS ("wave 1", ~3.1 TB Dropbox→S3, dashboard row DROPBOX-WAVE1). The loop it
+was running: verify each landed folder file-by-file against the vault → delete
+the verified folder from Dropbox (Ryan's standing approval, rules below) →
+report the freed-space running total (~1.7 TB when archived). **If wave 1 is
+not yet confirmed complete-and-deleted, resume that loop without being asked**
+— Ryan explicitly said "you tell the next session"; do not wait for him to
+re-explain.
+
+Read **`docs/ARCHIVE_MIGRATION_STATUS.md`** first — system map, Ryan's
+non-negotiable deletion rules, the full deletion log, wave-1 folder list, and
+the runnable tools in `tools/archive/`. Never delete anything from Dropbox
+without that doc's verification rules.
+
+**Your first move needs one thing only Ryan holds: the archive AWS key pair**
+(this repo must never contain it — GitHub/AWS auto-revoke leaked keys). Open
+by asking him exactly this, so he only has to copy-paste:
+> "I'm resuming the archive migration. Paste this in the RED terminal and
+> send me the two values it prints:
+> `sudo grep -A4 '\[archive\]' /volume1/rclone-config/rclone.conf`"
+Then `export ARCHIVE_AWS_ACCESS_KEY_ID=… ARCHIVE_AWS_SECRET_ACCESS_KEY=…` and
+run `node tools/archive/wave1-verify.mjs` (fetch the census per the doc) to
+see exactly where the wave stands.
 
 ## 🧭 SESSION HANDOFF — 2026-09-17 (READ FIRST if picking up QA / edit-machine / promos)
 

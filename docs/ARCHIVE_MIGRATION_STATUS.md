@@ -5,6 +5,27 @@ handoff for the storage-migration project. A future session touching storage,
 Dropbox deletions, the UGREENs, or the archive should read this whole file
 first._
 
+## ⚡ IF YOU ARE THE NEXT SESSION — DO THIS FIRST, UNPROMPTED
+
+Wave 1 was still uploading when the last session archived. This work is
+yours to resume without Ryan asking. In order:
+1. Ask Ryan for the archive AWS key pair with the exact copy-paste ask in
+   CLAUDE.md's archive section (he runs one grep on RED and pastes two
+   values). Export them as `ARCHIVE_AWS_ACCESS_KEY_ID` /
+   `ARCHIVE_AWS_SECRET_ACCESS_KEY`.
+2. `cd tools/archive && node fetch-inventory.mjs
+   _INVENTORY/inventory-DROPBOX-TEAM.csv inventory-DROPBOX-TEAM.csv`, then
+   `node wave1-verify.mjs`.
+3. Every target reporting `VERIFIED — DELETABLE` that is not yet in the
+   deletion log below: delete that folder from Dropbox (folder-level, via
+   the Dropbox connector — team paths are `/Straw Hut Team Folder/<group>`,
+   personal ones `ns:1531957776//<name>`), per Ryan's standing approval
+   quoted under "Ryan's standing rules". Update the deletion log in this
+   file afterwards.
+4. Report the running freed-space total to Ryan and schedule your own
+   periodic check-ins until wave 1 is done (ends with `Ryan Tillotson/Old
+   Dbox`), then move to "Big picture / what's next".
+
 ## The system (what exists and where)
 
 - **Vault**: S3 `strawhut-master-archive`, us-west-2, Glacier Deep Archive,
