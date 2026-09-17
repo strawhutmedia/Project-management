@@ -330,3 +330,159 @@ never "owns" it.
 - Re-enable the GitHub Pages workflow (Railway is the sole deploy target)
 - Add a new external service without explicit user approval — current stack is
   GitHub + Railway + Resend + Dropbox, full stop
+
+---
+
+# Session handoff — Teleprompter, phone remote, podcast-page cleanup (Sept 2026)
+
+This block is the durable record of a big build session with Ryan. Read it so
+you don't re-derive or re-break any of it. Everything below is LIVE on `main`.
+
+## How Ryan wants you to work (learned the hard way — take these seriously)
+
+- **Never overpromise. Verify a feature actually works before you claim it
+  does.** Ryan got burned by a banner saying Slate "cuts clips" when the team
+  doesn't use Slate's clipper. Read the code, trace the wiring, then describe
+  only what's real.
+- **After every deploy, confirm the EXACT built bundle hash is live** before
+  telling him it's done. `npm run build:client` prints `dist/assets/index-XX
+  .js`; poll `https://slate.strawhutmedia.com/` until the served
+  `/assets/index-*.js` matches that hash (a substring/marker check gives false
+  positives — match the full hash). Then verify the relevant API too.
+- **Build for a non-technical team.** Default views must be dead simple; hide
+  advanced/experimental tools behind a toggle or collapsed panel. When a page
+  feels like "a wall of stuff," that's the bug.
+- **Stale-bundle confusion is common.** When he says "I don't see X," it's
+  usually his open tab on an old bundle — tell him to hard-refresh
+  (Cmd+Shift+R) before assuming a real bug.
+- He's blunt and moves fast. Give a recommendation, act, and report plainly.
+
+## Teleprompter — `/prompter` (src/pages/PrompterPage.tsx)
+
+A standalone, full-screen podcast teleprompter. Built this session end to end.
+
+- **Public, no login.** Route is OUTSIDE the `<Protected>` wrapper in
+  `src/App.tsx` so anyone can open it instantly on an iPad/computer. Clean URL
+  is intentional: `slate.strawhutmedia.com/prompter`. Nav link to it shows only
+  in the podcast workspace (`Layout.tsx`, keyed off `slate.dashboard.kindTab`).
+- **Sessions are SHARED across the podcast team**, stored server-side in
+  `teleprompter_sessions` (migration `094`). Not device-local, not per-user —
+  one shared pool. API: `server/routes/teleprompter.ts`
+  (`/api/teleprompter` list/create/update/delete), gated to podcast-access
+  users (admins, or members/creators of any podcast project). Autosaves with a
+  Saving/Saved badge; shows who created / last edited. Sessions can be named,
+  else titled by date.
+- **Look-and-feel settings stay per-device** (localStorage): speed, font size,
+  line spacing, width, font (Sans/Serif/Mono/Condensed), black/white screen,
+  mirror (glass rigs), vertical flip, countdown, eye-line guide, ALL CAPS.
+- **Editing model Ryan explicitly wanted:** in the running, full-screen
+  prompter, a CLICK on the text drops the cursor exactly where you clicked and
+  starts editing IN PLACE — no popup, no play toggle on click. (Play/pause is
+  the control-bar button, spacebar, and the phone remote.) Uses
+  `caretRangeFromPoint` + `focus({ preventScroll: true })` (the preventScroll
+  is essential — a plain focus scrolled the tall editable and made the caret
+  land in the wrong spot). Mirror/flip auto-off while editing.
+- **Paste preserves formatting + line breaks** (his "enters" pain): pasted HTML
+  is sanitized to keep structure + basic bold/italic but strip all foreign
+  colors/fonts/backgrounds; plain text falls back to one `<div>` per line so
+  blank lines survive. See `sanitizePastedHtml` / `handleRichPaste`.
+- **ALL CAPS** two ways: a whole-script toggle (display-only, reversible) and an
+  **AA** button that toggles UPPERCASE on a selection via a CSS-uppercase span
+  (reversible — the original letters are preserved, NOT rewritten).
+- **True full screen** (hides Mac dock + menu bar): Start requests OS fullscreen
+  from the click gesture; toggle + `F` key; Esc/Exit leaves it.
+- Device-adaptive: touch tap-zones + big controls on iPad, full keyboard
+  shortcuts on desktop; Screen Wake Lock so devices don't sleep mid-read.
+
+## Phone-as-remote — `/r` (src/pages/RemotePage.tsx + server/routes/teleprompter_remote.ts)
+
+Turn ANY phone into the teleprompter remote — no app, no purchase, works over
+cellular. On the prompter tap "📱 Phone remote" → it shows a QR + 4-letter
+code. Phone opens `/r` (public, no login), scans/enters the code, gets big
+Play/Pause + speed/size/nudge buttons.
+
+- **Architecture:** in-memory SSE relay. The prompter (logged-in) opens an SSE
+  host stream and gets a pairing code; the phone POSTs button presses to that
+  code; the server relays them to the host. Single Railway instance, so
+  in-memory is fine (same model as `server/events.ts`).
+- **CRITICAL routing gotcha (already fixed, don't reintroduce):** the public
+  `/api/teleprompter/remote` router MUST be mounted in `server/index.ts` BEFORE
+  the broad `app.use('/api', showChatRouter)` / `episodeCutsRouter` — those have
+  a router-level `requireUser` and will 401 the phone's login-less requests if
+  they're reached first.
+- Physical-remote guidance if he asks again: buy a **Bluetooth presentation
+  clicker that lists PowerPoint/Keynote/arrow keys** (works in a browser).
+  AVOID volume/camera-shutter/"AB shutter" remotes and VR-box pads — iOS won't
+  pass those keys to Safari. The app already listens for Space/Enter (play),
+  ↑↓ (speed), ←→ (size), PageUp/Down.
+
+## Project removal / archiving — NEW this session
+
+There was NO delete-project feature before (that's why he couldn't remove
+shows). Added **soft-archive** (reversible, avoids FK-cascade risk of a hard
+delete):
+- Migration `154` adds `projects.archived_at`; the project list
+  (`GET /api/projects`) excludes archived. Admin-only routes
+  `POST /api/projects/:id/archive` + `/unarchive`.
+- UI: a red **🗑 Remove project** button at the top of each project page
+  (`src/pages/ProjectPage.tsx`), admin only. Archiving hides it everywhere but
+  keeps the data.
+- **Ryan still intends to archive:** WICKED, Only Murders, Brandi Glanville, and
+  the stray bare **"Private Talk"** (KEEP "Private Talk with Alexis Texas" —
+  they're two different projects, not dupes of each other).
+
+## Podcast project page — reframed around MARKETING (his mental model)
+
+The page was an overwhelming wall of cards. Reworked (`ProjectPage.tsx`):
+- All the admin config (Team, RSS, Brand, Audience, Brief, Social Strategy,
+  Socials, Members, Claude chat) is folded into ONE collapsed **"⚙️ Show setup
+  & tools"** panel. Default podcast view = header → progress → Start-here →
+  episodes → transcripts.
+- **The real workflow he wants: "drop in a FINISHED (or near-final) episode →
+  Slate makes the marketing."** The Scheduled→Released production pipeline is
+  NOT how he thinks about it (uploading implies the episode is already done).
+  So the "▶ Start here" banner leads with Upload → **transcript + social
+  posts**, and the SHOW PROGRESS stage bar is demoted below and labeled
+  optional (he's "not sure yet" if the team uses it — leave it, don't remove
+  without asking).
+- **Clips: do NOT claim Slate cuts clips.** Slate has its own ffmpeg clip
+  pipeline (`server/routes/clips.ts` — "OpusClip removed") and Upload's
+  autopipeline (`server/routes/transcripts.ts runPostTranscriptAutopipeline`)
+  DOES auto-run transcript → social plan → carousel → clip job. BUT the team
+  doesn't use Slate's clips — **they still clip in Opus Clip** (the product),
+  and want to keep it. The banner now says clips stay in their tool. Note:
+  "Opus" elsewhere in the app = Claude's Opus MODEL (Show Chat "Use Opus"),
+  unrelated to Opus Clip — don't confuse them, and don't remove the Opus model.
+
+## Parked / next threads (NOT started — confirm before building)
+
+- **Clips → editors (parked at his request).** Vision: the studio's
+  **premiere-bot** (`automation/premiere-bot/`, Claude Code running on the edit
+  machine — the ONLY thing that can open Premiere; Slate is cloud and can't)
+  already cuts a variety of clips; the open question is just DELIVERY — getting
+  those clips into editors' hands (surface/link them per episode in Slate). See
+  `automation/premiere-bot/PREMIERE.md` "Phase 2/3": social clips are meant to
+  live in Slate's clips feature, driven by the transcript. Big feature, depends
+  on the on-machine bot actually running — don't build blind.
+- **Play with the Upload → transcript/social flow** and make that screen great
+  (the part he's most curious about).
+- **Only Murders shows album-style stage names** (Writing/Tracking/…) instead of
+  podcast labels (Scheduled/Prepped/…) — that project's `stage_labels` were
+  never set to the podcast set. Offered to fix; not done.
+- **Mara** (teammate) can sign in only if she already has a Slate account
+  (invite-only); she'd see projects she's a member of. Offered to help invite.
+- Heads-up seen in the status branch: `RESEND_API_KEY` was unset — fine only if
+  SES is delivering (see the email-transport section above). Flag if sign-in
+  emails ever stop.
+
+## Where the code lives (quick index for this session's work)
+
+- Teleprompter UI: `src/pages/PrompterPage.tsx`; remote UI: `src/pages/RemotePage.tsx`
+- Teleprompter API: `server/routes/teleprompter.ts`; remote relay:
+  `server/routes/teleprompter_remote.ts` (mounted before broad `/api` routers)
+- Routes/public pages wired in `src/App.tsx` (`/prompter` behind login,
+  `/r` + `/r/:code` public); nav link in `src/components/Layout.tsx`
+- Project archive: `server/routes/projects.ts` + migration `154`; button in
+  `src/pages/ProjectPage.tsx`
+- Migrations added: `094_teleprompter_sessions.sql`, `154_project_archive.sql`
+- Client dep added: `qrcode` (QR for the phone-remote pairing)
