@@ -37,6 +37,16 @@ file and push it (on the task's branch/PR if one is open, otherwise to main)
 Add or refresh a dated "Session handoff" block, and keep the "Prioritized
 next steps" list current.
 
+## 🗄️ Dropbox → AWS archive migration — READ `docs/ARCHIVE_MIGRATION_STATUS.md` FIRST
+
+If the session touches storage, the UGREEN NAS boxes (RED/BLUE), the Storage
+dashboard, Dropbox deletions, or the `strawhut-master-archive` S3 vault:
+**`docs/ARCHIVE_MIGRATION_STATUS.md` is the handoff** — system map, Ryan's
+non-negotiable deletion rules, the deletion log (~1.7 TB freed so far), wave-1
+state, and the runnable tools in `tools/archive/` (they need the archive AWS
+key pair from Ryan — the doc says how he retrieves it). Do not delete anything
+from Dropbox without following that doc's verification rules.
+
 ## 🧭 SESSION HANDOFF — 2026-09-17 (READ FIRST if picking up QA / edit-machine / promos)
 
 Where the last session left off. Detail lives in the files named in each item.
