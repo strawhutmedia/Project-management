@@ -1,9 +1,9 @@
 {
   "version": "0.2.2",
-  "now": "2026-09-17T21:33:57.637Z",
+  "now": "2026-09-17T22:25:26.728Z",
   "boot": {
-    "startedAt": "2026-09-17T21:33:56.996Z",
-    "completedAt": "2026-09-17T21:33:57.622Z",
+    "startedAt": "2026-09-17T22:25:26.254Z",
+    "completedAt": "2026-09-17T22:25:26.711Z",
     "error": null
   },
   "env": {
@@ -191,10 +191,11 @@
       "151_qa_bot_log.sql",
       "152_qa_seed_ryant.sql",
       "153_cashflow_bruce_quoted.sql",
-      "154_project_archive.sql"
+      "154_project_archive.sql",
+      "155_qa_show_fixes.sql"
     ],
     "userCount": 14,
-    "projectCount": 15,
+    "projectCount": 16,
     "projects": [
       {
         "id": "2e9e2425-f53d-42d5-a4b6-ba29e25bb01b",
@@ -219,6 +220,11 @@
       {
         "id": "3e9a5661-8e76-47a2-a80c-375e9c24629c",
         "name": "Don't Be Alone with Jay Kogen",
+        "kind": "podcast"
+      },
+      {
+        "id": "dfa309de-727c-43de-8d99-a1715182f875",
+        "name": "Invest in Her",
         "kind": "podcast"
       },
       {
@@ -288,7 +294,7 @@
   "recentLog": [
     {
       "level": "info",
-      "ts": "2026-09-17T21:33:56.994Z",
+      "ts": "2026-09-17T22:25:26.250Z",
       "msg": "serving client from",
       "data": {
         "clientDir": "/app/dist"
@@ -296,7 +302,7 @@
     },
     {
       "level": "info",
-      "ts": "2026-09-17T21:33:56.996Z",
+      "ts": "2026-09-17T22:25:26.254Z",
       "msg": "boot starting",
       "data": {
         "cwd": "/app",
@@ -307,12 +313,12 @@
     },
     {
       "level": "info",
-      "ts": "2026-09-17T21:33:57.433Z",
+      "ts": "2026-09-17T22:25:26.561Z",
       "msg": "migrations complete"
     },
     {
       "level": "info",
-      "ts": "2026-09-17T21:33:57.567Z",
+      "ts": "2026-09-17T22:25:26.641Z",
       "msg": "wardrobe outfits: applied",
       "data": {
         "projectId": "12f53ed1-c6c7-4c11-8d7b-06d91744c9af",
@@ -323,7 +329,7 @@
     },
     {
       "level": "info",
-      "ts": "2026-09-17T21:33:57.567Z",
+      "ts": "2026-09-17T22:25:26.642Z",
       "msg": "BIYA seed: project already exists, ensured shoot days",
       "data": {
         "projectId": "12f53ed1-c6c7-4c11-8d7b-06d91744c9af"
@@ -331,17 +337,52 @@
     },
     {
       "level": "info",
-      "ts": "2026-09-17T21:33:57.622Z",
+      "ts": "2026-09-17T22:25:26.654Z",
+      "msg": "seed: Madeline memberships topped up",
+      "data": {
+        "added": 1
+      }
+    },
+    {
+      "level": "info",
+      "ts": "2026-09-17T22:25:26.664Z",
+      "msg": "seed: QA team memberships topped up",
+      "data": {
+        "email": "xavier@strawhutmedia.com",
+        "added": 1
+      }
+    },
+    {
+      "level": "info",
+      "ts": "2026-09-17T22:25:26.672Z",
+      "msg": "seed: QA team memberships topped up",
+      "data": {
+        "email": "riley@strawhutmedia.com",
+        "added": 1
+      }
+    },
+    {
+      "level": "info",
+      "ts": "2026-09-17T22:25:26.686Z",
+      "msg": "seed: QA team memberships topped up",
+      "data": {
+        "email": "blake@strawhutmedia.com",
+        "added": 1
+      }
+    },
+    {
+      "level": "info",
+      "ts": "2026-09-17T22:25:26.711Z",
       "msg": "listening on :8080"
     },
     {
       "level": "info",
-      "ts": "2026-09-17T21:33:57.622Z",
+      "ts": "2026-09-17T22:25:26.712Z",
       "msg": "scheduler started (every 5 min)"
     },
     {
       "level": "info",
-      "ts": "2026-09-17T21:33:57.625Z",
+      "ts": "2026-09-17T22:25:26.716Z",
       "msg": "autopilot: loop started",
       "data": {
         "tickMinutes": 10
@@ -349,7 +390,7 @@
     },
     {
       "level": "info",
-      "ts": "2026-09-17T21:33:57.625Z",
+      "ts": "2026-09-17T22:25:26.717Z",
       "msg": "cashflow payment check: loop started",
       "data": {
         "tickHours": 6
@@ -357,7 +398,7 @@
     },
     {
       "level": "info",
-      "ts": "2026-09-17T21:33:57.625Z",
+      "ts": "2026-09-17T22:25:26.717Z",
       "msg": "qa digest: loop started",
       "data": {
         "sendHourPT": 8
