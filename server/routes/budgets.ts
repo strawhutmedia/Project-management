@@ -52,14 +52,10 @@ async function emitItemUpdated(projectId: string, itemId: string, byUserId: stri
 export const budgetsRouter = Router()
 budgetsRouter.use(requireUser)
 
-async function userCanAccessProject(userId: string, role: string, projectId: string): Promise<boolean> {
-  if (role === 'admin') return true
-  const { rows } = await pool.query(
-    `SELECT 1 FROM projects p
-     LEFT JOIN project_members m ON m.project_id = p.id AND m.user_id = $1
-     WHERE p.id = $2 AND (p.created_by = $1 OR m.user_id IS NOT NULL) LIMIT 1`,
-    [userId, projectId],
-  )
+// Everyone signed in can see and work in every project (Ryan, 2026-09-17:
+// "everyone can see everything") — only existence is checked now.
+async function userCanAccessProject(_userId: string, _role: string, projectId: string): Promise<boolean> {
+  const { rows } = await pool.query(`SELECT 1 FROM projects WHERE id = $1 LIMIT 1`, [projectId])
   return rows.length > 0
 }
 
@@ -529,12 +525,7 @@ budgetsRouter.get('/scenes/:sceneId/items', async (req, res) => {
     `SELECT project_id FROM scenes WHERE id = $1`, [sceneId],
   )
   if (lookup.rows.length === 0) { res.status(404).json({ error: 'not_found' }); return }
-  if (!(await pool.query(
-    `SELECT 1 FROM projects p
-     LEFT JOIN project_members m ON m.project_id = p.id AND m.user_id = $1
-     WHERE p.id = $2 AND ($3 = 'admin' OR p.created_by = $1 OR m.user_id IS NOT NULL) LIMIT 1`,
-    [user.id, lookup.rows[0].project_id, user.role],
-  )).rows.length) {
+  if (!(await userCanAccessProject(user.id, user.role, lookup.rows[0].project_id))) {
     res.status(403).json({ error: 'forbidden' }); return
   }
   const items = await getSceneBudgetItems(sceneId)
@@ -551,13 +542,9 @@ budgetsRouter.get('/shoot-days/:shootDayId/items', async (req, res) => {
     `SELECT project_id FROM shoot_days WHERE id = $1`, [shootDayId],
   )
   if (lookup.rows.length === 0) { res.status(404).json({ error: 'not_found' }); return }
-  const access = await pool.query(
-    `SELECT 1 FROM projects p
-     LEFT JOIN project_members m ON m.project_id = p.id AND m.user_id = $1
-     WHERE p.id = $2 AND ($3 = 'admin' OR p.created_by = $1 OR m.user_id IS NOT NULL) LIMIT 1`,
-    [user.id, lookup.rows[0].project_id, user.role],
-  )
-  if (access.rows.length === 0) { res.status(403).json({ error: 'forbidden' }); return }
+  if (!(await userCanAccessProject(user.id, user.role, lookup.rows[0].project_id))) {
+    res.status(403).json({ error: 'forbidden' }); return
+  }
   // Return items physically attached to this shoot day PLUS any
   // "run of shoot" items attached to ANY other shoot day in the
   // same project — those show up on every day's view as read-only

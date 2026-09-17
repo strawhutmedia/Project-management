@@ -2214,12 +2214,22 @@ export type ApiQaContext = {
   projects: Array<{ id: string; name: string; coverArtUrl: string | null; dropboxFolder: string | null }>
   users: Array<{ id: string; name: string; role: 'admin' | 'user' | 'viewer' }>
   canWrite: boolean
+  // Parent directory the podcast show folders live in — picker fallback for
+  // shows without a configured folder.
+  podcastsFolder: string | null
 }
 
 export type ApiQaTemplateItem = { id: string; label: string; spec: string; position: number }
 
 export const qaApi = {
   context: () => request<ApiQaContext>('/api/qa/context'),
+  // Adds a podcast project from the QA show picker; returns the existing
+  // project (existed: true) when the name already matches one.
+  createShow: (name: string) =>
+    request<{ project: ApiQaContext['projects'][number]; existed: boolean }>('/api/qa/shows', {
+      method: 'POST',
+      body: JSON.stringify({ name }),
+    }),
   recordings: (opts?: { projectId?: string; status?: string }) => {
     const qs = new URLSearchParams()
     if (opts?.projectId) qs.set('projectId', opts.projectId)

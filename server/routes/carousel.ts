@@ -65,12 +65,11 @@ carouselRouter.post('/preview', async (req, res) => {
     // context).
     let strategyDocs
     if (typeof projectId === 'string' && projectId.trim()) {
+      // Everyone signed in can see every project (Ryan, 2026-09-17) —
+      // existence is the only check now.
       const projRes = await pool.query(
-        `SELECT 1 FROM projects p
-           LEFT JOIN project_members m ON m.project_id = p.id AND m.user_id = $1
-          WHERE p.id = $2 AND ($3 = 'admin' OR p.created_by = $1 OR m.user_id IS NOT NULL)
-          LIMIT 1`,
-        [user.id, projectId.trim(), user.role],
+        `SELECT 1 FROM projects p WHERE p.id = $1 LIMIT 1`,
+        [projectId.trim()],
       )
       if (projRes.rows.length > 0) {
         strategyDocs = await loadShowStrategyDocs(projectId.trim())
@@ -246,13 +245,12 @@ export async function generateAndSaveCarouselDeck(args: {
 carouselRouter.get('/decks/:songId', async (req, res) => {
   const user = (req as typeof req & { user: SessionUser }).user
   const songId = req.params.songId
+  // Readable by every signed-in user (Ryan, 2026-09-17).
   const access = await pool.query(
     `SELECT s.project_id, p.carousel_preset FROM songs s
        JOIN projects p ON p.id = s.project_id
-       LEFT JOIN project_members m ON m.project_id = p.id AND m.user_id = $1
-      WHERE s.id = $2 AND ($3 = 'admin' OR p.created_by = $1 OR m.user_id IS NOT NULL)
-      LIMIT 1`,
-    [user.id, songId, user.role],
+      WHERE s.id = $1 LIMIT 1`,
+    [songId],
   )
   if (access.rows.length === 0) { res.status(403).json({ error: 'forbidden' }); return }
   const { rows } = await pool.query(
@@ -287,13 +285,12 @@ carouselRouter.get('/preset/:projectId', async (req, res) => {
   const user = (req as typeof req & { user: SessionUser }).user
   const projectId = req.params.projectId
   const refresh = req.query.refresh === '1' || req.query.refresh === 'true'
+  // Readable by every signed-in user (Ryan, 2026-09-17).
   const { rows } = await pool.query<{ name: string; slug: string | null; cover_art_url: string | null; carousel_preset: unknown }>(
     `SELECT p.name, p.slug, p.cover_art_url, p.carousel_preset
        FROM projects p
-       LEFT JOIN project_members m ON m.project_id = p.id AND m.user_id = $1
-      WHERE p.id = $2 AND ($3 = 'admin' OR p.created_by = $1 OR m.user_id IS NOT NULL)
-      LIMIT 1`,
-    [user.id, projectId, user.role],
+      WHERE p.id = $1 LIMIT 1`,
+    [projectId],
   )
   const proj = rows[0]
   if (!proj) { res.status(404).json({ error: 'not_found' }); return }

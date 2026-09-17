@@ -21,16 +21,11 @@ const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
 const MAX_NAME = 200
 const MAX_HTML = 500_000 // ~500KB of script HTML is plenty; guards against abuse
 
-async function hasPodcastAccess(user: SessionUser): Promise<boolean> {
-  if (user.role === 'admin') return true
-  const { rows } = await pool.query(
-    `SELECT 1 FROM projects p
-       LEFT JOIN project_members m ON m.project_id = p.id AND m.user_id = $1
-      WHERE p.kind = 'podcast' AND (p.created_by = $1 OR m.user_id IS NOT NULL)
-      LIMIT 1`,
-    [user.id],
-  )
-  return rows.length > 0
+// Every signed-in Slate user can use the shared teleprompter sessions
+// (Ryan, 2026-09-17: "everyone can see everything"). Kept as a function so
+// a future gate has one place to live.
+async function hasPodcastAccess(_user: SessionUser): Promise<boolean> {
+  return true
 }
 
 // Gate the whole router on podcast access.

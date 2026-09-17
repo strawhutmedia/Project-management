@@ -1,6 +1,7 @@
 import { Router } from 'express'
 import { pool } from '../db'
 import { requireUser, getSessionUser, isViewer, type SessionUser } from '../auth'
+import { createProjectRecord } from './projects'
 import { logError } from '../diag'
 
 // QA Production Checklist — Slate's replacement for the "QA PRODUCTION
@@ -127,19 +128,12 @@ qaRouter.get('/bot-log', async (req, res) => {
 
 qaRouter.use(requireUser)
 
-// The QA board is open to anyone who can see at least one podcast project
-// (admins see everything). It's a studio-wide log — same trust model as the
-// shared sheet it replaces — so access to any podcast unlocks the whole board.
-async function hasPodcastAccess(user: SessionUser): Promise<boolean> {
-  if (user.role === 'admin') return true
-  const { rows } = await pool.query(
-    `SELECT 1 FROM projects p
-     LEFT JOIN project_members m ON m.project_id = p.id AND m.user_id = $1
-     WHERE p.kind = 'podcast' AND (p.created_by = $1 OR m.user_id IS NOT NULL)
-     LIMIT 1`,
-    [user.id],
-  )
-  return rows.length > 0
+// The QA board is open to every signed-in Slate user (Ryan, 2026-09-17:
+// "everyone can see everything") — same trust model as the shared sheet it
+// replaces. Kept as a function so a future gate has one place to live;
+// account-level viewers still can't write (assertQaAccess below).
+async function hasPodcastAccess(_user: SessionUser): Promise<boolean> {
+  return true
 }
 
 function userOf(req: unknown): SessionUser {
@@ -164,27 +158,88 @@ qaRouter.get('/context', async (req, res) => {
   const user = await assertQaAccess(req, res, false)
   if (!user) return
   try {
+    // Everyone gets the full show list (no membership scoping), ordered by
+    // most recently logged first — shows you're actively recording float to
+    // the top of the picker, dormant ones sink; never-logged shows trail
+    // alphabetically (Ryan, 2026-09-17).
     const projects = await pool.query(
-      user.role === 'admin'
-        ? `SELECT id, name, cover_art_url, dropbox_folder FROM projects WHERE kind = 'podcast' ORDER BY name ASC`
-        : `SELECT DISTINCT p.id, p.name, p.cover_art_url, p.dropbox_folder FROM projects p
-           LEFT JOIN project_members m ON m.project_id = p.id AND m.user_id = $1
-           WHERE p.kind = 'podcast' AND (p.created_by = $1 OR m.user_id IS NOT NULL)
-           ORDER BY p.name ASC`,
-      user.role === 'admin' ? [] : [user.id],
+      `SELECT p.id, p.name, p.cover_art_url, p.dropbox_folder
+         FROM projects p
+        WHERE p.kind = 'podcast' AND p.archived_at IS NULL
+        ORDER BY (SELECT MAX(COALESCE(r.record_date::timestamptz, r.created_at))
+                    FROM qa_recordings r WHERE r.project_id = p.id) DESC NULLS LAST,
+                 p.name ASC`,
     )
     // Every Slate account is a valid "shot by" / "QA by" pick — the crew
     // list IS the accounts list, per Ryan.
     const users = await pool.query(
       `SELECT id, name, display_name, role FROM users ORDER BY COALESCE(display_name, name) ASC`,
     )
+    // Where the podcast folders live in Dropbox — the most common parent
+    // directory of the configured show folders. The picker opens here for a
+    // show that has no folder configured yet (e.g. one just added inline);
+    // the crew creates/uploads the episode folder in Dropbox before logging
+    // it in QA, so it's already there to select.
+    const parentCounts = new Map<string, number>()
+    for (const p of projects.rows) {
+      const f = typeof p.dropbox_folder === 'string' ? p.dropbox_folder.replace(/\/+$/, '') : ''
+      const idx = f.lastIndexOf('/')
+      const parent = idx > 0 ? f.slice(0, idx) : ''
+      if (parent) parentCounts.set(parent, (parentCounts.get(parent) ?? 0) + 1)
+    }
+    let podcastsFolder: string | null = null
+    let bestCount = 0
+    for (const [folder, count] of parentCounts) {
+      if (count > bestCount) { bestCount = count; podcastsFolder = folder }
+    }
     res.json({
       projects: projects.rows.map((p) => ({ id: p.id, name: p.name, coverArtUrl: p.cover_art_url ?? null, dropboxFolder: p.dropbox_folder ?? null })),
       users: users.rows.map((u) => ({ id: u.id, name: u.display_name || u.name, role: u.role })),
       canWrite: !isViewer(user),
+      podcastsFolder,
     })
   } catch (err) {
     logError('qa context failed', { error: err instanceof Error ? err.message : String(err) })
+    res.status(500).json({ error: 'internal_error' })
+  }
+})
+
+// ── Add a show from the QA board ────────────────────────────────────────
+// The show picker is the podcast project list, so a recording for a show
+// that isn't a Slate project yet had nowhere to go (that's how the seeded
+// "Invest in Her" sheet rows ended up show-less). Anyone who can log a
+// recording can add the missing show right here. Reuses the same creation
+// core as POST /api/projects (slug, podcast stage labels, Ryan as EP), and
+// returns the existing project instead when the name already matches one,
+// case-insensitively — a second "Private Talk" in the picker is exactly
+// what this must not create.
+qaRouter.post('/shows', async (req, res) => {
+  const user = await assertQaAccess(req, res, true)
+  if (!user) return
+  const name = str((req.body ?? {}).name).slice(0, 200)
+  if (!name) { res.status(400).json({ error: 'name_required' }); return }
+  try {
+    const existing = await pool.query(
+      `SELECT id, name, cover_art_url, dropbox_folder FROM projects
+        WHERE kind = 'podcast' AND archived_at IS NULL AND lower(name) = lower($1)
+        ORDER BY created_at ASC LIMIT 1`,
+      [name],
+    )
+    if (existing.rows[0]) {
+      const p = existing.rows[0]
+      res.json({
+        project: { id: p.id, name: p.name, coverArtUrl: p.cover_art_url ?? null, dropboxFolder: p.dropbox_folder ?? null },
+        existed: true,
+      })
+      return
+    }
+    const project = await createProjectRecord(user, { name, kind: 'podcast' })
+    res.json({
+      project: { id: project.id, name: project.name, coverArtUrl: null, dropboxFolder: project.dropbox_folder ?? null },
+      existed: false,
+    })
+  } catch (err) {
+    logError('qa show create failed', { error: err instanceof Error ? err.message : String(err) })
     res.status(500).json({ error: 'internal_error' })
   }
 })

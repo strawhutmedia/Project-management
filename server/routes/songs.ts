@@ -36,17 +36,11 @@ const STAGES = new Set([
   'done',
 ])
 
-async function userCanAccessSong(userId: string, role: string, songId: string): Promise<boolean> {
-  if (role === 'admin') return true
-  const { rows } = await pool.query(
-    `SELECT 1 FROM songs s
-     JOIN projects p ON p.id = s.project_id
-     LEFT JOIN project_members pm ON pm.project_id = p.id AND pm.user_id = $1
-     LEFT JOIN song_members sm ON sm.song_id = s.id AND sm.user_id = $1
-     WHERE s.id = $2
-       AND (p.created_by = $1 OR pm.user_id IS NOT NULL OR sm.user_id IS NOT NULL)`,
-    [userId, songId],
-  )
+// Everyone signed in can see every song/episode (Ryan, 2026-09-17:
+// "everyone can see everything") — only existence is checked now; writes
+// still go through assertSongWriter's membership roles.
+async function userCanAccessSong(_userId: string, _role: string, songId: string): Promise<boolean> {
+  const { rows } = await pool.query(`SELECT 1 FROM songs s WHERE s.id = $1`, [songId])
   return rows.length > 0
 }
 
