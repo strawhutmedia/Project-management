@@ -19,6 +19,24 @@ Push to `main` → Railway auto-builds (`npm install && npm run build`) → star
 (`npm start`) → app serves both the React SPA and `/api/*` from the same Express
 process on port 8080.
 
+## 🔁 STANDING ORDER — end EVERY task with a handoff update (Ryan, 2026-09-17)
+
+Ryan ends the session after a task and expects the NEXT session to know
+everything without being told. So: before finishing any task, update this
+file and push it (on the task's branch/PR if one is open, otherwise to main)
+— never wait to be asked. A handoff update means:
+
+1. **What shipped** — PRs (with numbers/links), migrations, files touched,
+   and whether it's merged/deployed yet or still waiting on Ryan's merge.
+2. **Rule/access changes** — anything Ryan decided this session, dated.
+3. **Fix stale sections in place** — never leave an old rule standing that
+   this session's decisions contradict; mark it superseded with the date.
+4. **What's still open** — follow-ups, verification owed after deploy, and
+   any gotchas learned the hard way.
+
+Add or refresh a dated "Session handoff" block, and keep the "Prioritized
+next steps" list current.
+
 ## 🧭 SESSION HANDOFF — 2026-09-17 (READ FIRST if picking up QA / edit-machine / promos)
 
 Where the last session left off. Detail lives in the files named in each item.
@@ -39,9 +57,12 @@ Flow / Invoices.
   (`152`, under Don't Be Alone with Jay Kogen). Team-account seed
   (`server/seeds/invite_qa_team.ts` = Xavier/Riley/Blake) + Jay Kogen duplicate-
   project merge (`server/seeds/merge_jay_kogen.ts`).
-- **PERMISSION RULE (Ryan, hard):** Xavier/Riley/Blake see PODCASTS only, and
-  within podcasts **no Cash Flow, no Invoices**. "Caroline can have invoices; Cash
-  Flow is ALWAYS just for me." Enforce this if you widen access.
+- **PERMISSION RULE (Ryan, updated 2026-09-17 later that day):** the
+  "podcasts only" scoping is SUPERSEDED — anyone signed in to Slate now sees
+  everything (see the PR #78 handoff block at the end of this file). What
+  did NOT change and never will: **no Cash Flow, no Invoices** for the team.
+  "Caroline can have invoices; Cash Flow is ALWAYS just for me. That will
+  not change."
 
 ### 2. Prompt-caching audit — PARTIAL, measurement NOT delivered
 Ryan's rule: **do not apply any prompt-caching change until it's measured.** The
@@ -120,7 +141,11 @@ synced Dropbox footage, hands-off, for EVERY episode (not one test).
    scheduled task (self-recovers on reboot, no autologon).
 3. Deliver the **prompt-caching measurement report**, then decide on caching.
 4. Remove **OpusClip**; start the in-house clips generator per `CUTTING-NOTES.md`.
-5. Verify Xavier/Riley/Blake are scoped to podcasts only (no Cash Flow / Invoices).
+5. ~~Verify Xavier/Riley/Blake are scoped to podcasts only~~ SUPERSEDED
+   2026-09-17: everyone sees everything now (PR #78 handoff at end of file);
+   Cash Flow / Invoices gates unchanged and verified in code.
+6. If PR #78 isn't merged yet, get it merged and do the post-deploy
+   verification listed in its handoff block (end of file).
 
 <!-- End 2026-09-17 handoff -->
 
@@ -511,11 +536,21 @@ never "owns" it.
 
 ## Permissions
 
+**Visibility rule (Ryan, 2026-09-17): every signed-in user SEES everything**
+— all projects, all pages, the QA board, teleprompter, transcripts/socials/
+clips tools. Exceptions that will NOT change: **Cash Flow is Ryan only**
+(`requireOwner`), **Invoices are Ryan + Caroline** (`requireInvoicingAccess`
+/ `is_invoicing_owner`). Dropbox browsing for non-admins is **podcast
+folders only** (see the PR #78 handoff block at the end of this file).
+
 - **Admin** (currently Ryan only): invite/remove users, delete projects/songs,
-  edit any task or comment, connect Dropbox, see "Stuck Tasks" digest, auto-access
-  to every project.
-- **User**: edit songs/tasks on projects they're a member of, comment, @mention,
-  add links, manage their own profile/timezone.
+  edit any task or comment, connect Dropbox, see "Stuck Tasks" digest, browse
+  Dropbox anywhere.
+- **User**: sees everything (above); *edits* songs/tasks only on projects
+  they're a member of (`getProjectRole` gives non-members a read-only
+  `viewer` role), comments, @mentions, adds links, manages their own
+  profile/timezone. Podcast tool sections (QA, transcripts, socials, clips,
+  etc.) are open to all signed-in users, QA-sheet style.
 - Project creators can invite existing workspace users into their project but
   only admins can invite brand-new accounts.
 
@@ -892,3 +927,80 @@ and what's still open so the next session doesn't have to re-derive it.
   in `server/anthropic.ts`; the `find-similar` route in
   `server/routes/outreach.ts`; `api.findSimilarProspects` in `src/api.ts`;
   button + progress bar in `src/components/OutreachSection.tsx`
+
+---
+
+# Session handoff — QA show picker, everyone-sees-everything, Dropbox scoping (2026-09-17, PR #78)
+
+All of this session's work is in **[PR #78](https://github.com/strawhutmedia/Project-management/pull/78)**
+(branch `claude/trusting-ramanujan-3r4d7w`, 4 commits, build clean). At the
+time this was written the PR was **OPEN and waiting on Ryan's merge** —
+check its state first; nothing below is live until it merges to `main`
+(Railway deploys, migration 155 runs at boot).
+
+## What's in PR #78
+
+1. **QA show dropdown fixes** (Ryan's screenshot of `/qa` "Log a recording"):
+   - It never "pulled from the sheet" — the SHOW picker is the podcast
+     project list (`GET /api/qa/context`). Seed migration 148 left rows with
+     NULL `project_id` when no project matched the sheet's show name.
+   - **Migration `155_qa_show_fixes.sql`**: soft-archives the bare
+     **"Private Talk"** project (exact-name match; "Private Talk with Alexis
+     Texas" is a different show, untouched) + creates **"Invest in Her"**
+     (was in the sheet, never a Slate project) and re-attaches its orphaned
+     seeded QA rows.
+   - `qa /context` now filters `archived_at IS NULL` (it didn't before, so
+     archiving wouldn't have removed a show from the picker).
+   - **"＋ Add a show…"** option in the picker: inline name input →
+     `POST /api/qa/shows` → creates the podcast project via
+     `createProjectRecord` (extracted from `POST /api/projects` in
+     `server/routes/projects.ts` — same slug/stage-labels/Ryan-as-EP
+     defaults). Dedupes: an existing name (case-insensitive) returns the
+     existing project instead of creating a duplicate.
+   - **Picker ordering (Ryan):** shows sorted by most recent logged
+     recording, newest first; never-logged shows trail alphabetically; an
+     inline-added show goes straight to the top. (The recordings board was
+     already newest-first.)
+
+2. **ACCESS MODEL CHANGE (Ryan, explicit):** *"Any person that has access to
+   Slate can see anything in Slate… everyone can see everything."* Later
+   clarified: anyone with access to the QA sheet has access to everything.
+   - `GET /api/projects` returns ALL non-archived projects to every
+     signed-in user; `getProjectRole`/`getSongRole` (`server/permissions.ts`)
+     fall back to a read-only **`viewer`** role for non-members instead of
+     null/403, so every project & song page opens for everyone while WRITES
+     still need a real membership role.
+   - Per-router access gates became existence checks (QA, transcripts,
+     socials, clips, episode_cuts, carousel, show_brief, social_strategy,
+     audience, budgets, locations, stripboard, exports, teleprompter) —
+     whole team can work in the podcast tools, QA-sheet style.
+   - **Deliberately unchanged:** notification/digest recipient queries
+     (`server/notifications.ts`, `server/qa_digest.ts` decide who gets
+     EMAILED, not who can see), and the money gates — **Cash Flow = Ryan
+     only, Invoices = Ryan + Caroline. Ryan re-confirmed: "That will not
+     change."**
+
+3. **Dropbox scoping (Ryan): non-admins see PODCAST folders only.**
+   - `assertDropboxPathAllowed` (`server/routes/integrations.ts`) — behind
+     the folder picker, upload, create-folder, share-link: non-admins may
+     browse inside a project's Dropbox folder only if that project is a
+     podcast; album/film folders still require membership; path containment
+     (can't leave the scoped folder) unchanged. Admin (Ryan) browses
+     anywhere. Brand-asset file access follows the same rule.
+   - **Crew workflow (Ryan):** they create the episode folder in Dropbox
+     and upload the media BEFORE logging the recording in QA. So a podcast
+     show with no `dropbox_folder` configured (e.g. just added inline)
+     falls back: non-admins may browse within any PARENT directory of the
+     configured podcast folders (never the Dropbox root — top-level parents
+     excluded), and `qa /context` returns `podcastsFolder` (most common
+     parent) so the picker opens there. Paste-a-link fallback also exists.
+
+## Post-merge verification owed (per the "after every deploy" rule above)
+
+- Confirm the exact built bundle hash is live, then check `/qa`: bare
+  "Private Talk" gone, "Invest in Her" present with its 2 seeded recordings,
+  dropdown recency-ordered, "＋ Add a show…" works.
+- Have a non-admin (e.g. Xavier) click through: sees all projects/shows,
+  Dropbox picker confined to podcast folders, `/cashflow` + `/invoicing`
+  still locked.
+- Remind Ryan to hard-refresh (Cmd+Shift+R) before judging the dropdown.
