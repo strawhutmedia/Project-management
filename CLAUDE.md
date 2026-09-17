@@ -8,7 +8,10 @@ on it is the **Maggie Glass record** (13 songs, 14 tracks).
 - **Code**: GitHub `strawhutmedia/Project-management` (this repo), branch `main`
 - **Deploy**: Railway, single service named "Project-management" in the SLATE
   project, paired with a Railway Postgres service
-- **Email**: Resend (same key as Pod Booster), env var `RESEND_API_KEY`
+- **Email**: Amazon SES (via the `mailTransport.ts` Resend-shaped shim — see
+  "Email transport" below), env vars `SES_ACCESS_KEY_ID`/`SES_SECRET_ACCESS_KEY`.
+  Resend itself is gone — the account was deleted 2026-09-10; `RESEND_API_KEY`
+  is unset in production and that's expected, not a misconfiguration.
 - **Files** (planned): Dropbox via OAuth, admin-only connection
 - **Domain**: `slate.strawhutmedia.com` (CNAME in GoDaddy → Railway)
 
@@ -83,19 +86,43 @@ default.
 - Status went healthy → degraded → admin email "Degraded"
 - Status went degraded → healthy → admin email "Recovered"
 
-## Email transport — Amazon SES via a Resend-compatible shim, Resend still live for two things
+## Email transport — Amazon SES via a Resend-compatible shim (Resend is gone)
 
-Slate's transactional email (the four triggers above, plus invites,
-outreach/lead-follow-up sends, and contractor invoices) goes through
-`server/mailTransport.ts` — a drop-in `Resend`-shaped class that routes
-`.emails.send()` to **Amazon SES** when `SES_ACCESS_KEY_ID` +
-`SES_SECRET_ACCESS_KEY` are set, and falls back to the real Resend package
-otherwise. Every caller still does `import { Resend } from '...mailTransport'`
-and calls it exactly like the real SDK — `server/email.ts`,
-`server/routes/outreach.ts`, and `server/routes/audience.ts` all point at it.
-Sends carry SES message tags (`app=slate`, `stage=<outreach|sales|team|
-internal|vendor>`, `show=<project>` where applicable) so the SES/SNS event
-stream stays categorized.
+**Resend was fully deleted 2026-09-10** — the account no longer exists,
+`RESEND_API_KEY` is unset in production, and that's correct: nothing in
+Slate should require it. Slate's transactional email (the four triggers
+above, plus invites, outreach/lead-follow-up sends, and contractor
+invoices) goes through `server/mailTransport.ts` — a drop-in `Resend`-shaped
+class that routes `.emails.send()` to **Amazon SES** when
+`SES_ACCESS_KEY_ID` + `SES_SECRET_ACCESS_KEY` are set (they are), and would
+only fall back to the real Resend package if those were ever unset AND a
+Resend key were passed in — a combination that no longer applies anywhere
+in this codebase. Every caller still does
+`import { Resend } from '...mailTransport'` and calls it exactly like the
+real SDK — `server/email.ts`, `server/routes/outreach.ts`, and
+`server/routes/audience.ts` all point at it. Sends carry SES message tags
+(`app=slate`, `stage=<outreach|sales|team|internal|vendor>`,
+`show=<project>` where applicable) so the SES/SNS event stream stays
+categorized.
+
+**Incident (2026-09-10): deleting Resend silently broke outreach sending,
+magic-link sign-in, admin alerts, and fan-list broadcasts.** All three of
+those files used to gate the shim behind
+`const resend = resendKey ? new Resend(resendKey) : null`, which built a
+**null** client the moment `RESEND_API_KEY` was unset — even though the
+shim itself needs no Resend key to send via SES. Every `if (!resend)`
+guard downstream then silently refused to send. Caught via a live user
+report ("Enable Open Tracking" → `resend_not_configured`); fixed in all
+three files to always construct the shim
+(`const resend = new Resend(resendKey)`, `resendKey` may be `undefined`)
+since `.emails.send()` itself checks for SES config first. If you ever see
+a `resend_not_configured`-shaped error, or any `if (!resend)` /
+`resendKey ? new Resend(...) : null` pattern reappear anywhere, that's this
+same bug — always construct the shim unconditionally. Three other files
+(`outreach_domains.ts`, `audience_resend.ts`, `boot_resend_probe.ts`) are
+correctly gated behind a real Resend key because they're genuinely
+Resend-only features (or best-effort mirrors) with no SES equivalent —
+don't "fix" those.
 
 **Before trusting this for real traffic, confirm the SES account actually has
 production access.** A sandboxed SES account only delivers to individually
@@ -153,10 +180,11 @@ action from whoever has console access before it actually turns on.**
   handshake fires automatically once that subscription exists — nothing
   else to click), then set `SES_SNS_TOPIC_ARN` to that topic's ARN as a
   Railway env var on this service. The button above reports exactly what's
-  missing (`ses_sns_topic_arn_not_set`, etc.) until that's done. Until then,
-  deleting Resend means losing the live auto-pause safety net for the
-  outreach rotation pool; sends themselves keep working fine (confirmed all
-  4 domains verified in SES), there's just no automatic reaction if one
+  missing (`ses_sns_topic_arn_not_set`, etc.) until that's done. Until then
+  — and now that Resend really is deleted (see above) — there is no live
+  auto-pause safety net for the outreach rotation pool; sends themselves
+  keep working fine (confirmed all 4 domains verified in SES), there's
+  just no automatic reaction if one
   starts bouncing.
 
 ## Outreach reply capture (inbound email) — replies go to Slate, not a human inbox
@@ -207,12 +235,71 @@ alerts, not a person). To turn this on for a show:
 5. Set that show's reply-to to the `p-<projectId>@…` address shown in its
    template editor, and set `notify_email` to whoever should get pinged.
 
+## Find new prospects (AI-researched outreach batches)
+
+The Outreach page's "🔍 Find new prospects" button is a one-click
+replacement for a paid similar-shows API (Rephonic etc.): Claude researches
+real, currently-active podcasts similar to the show, verifies each one's
+contact email by actually fetching its RSS feed, and drops the results in
+as a new prospect batch — no fields to fill in, nothing sends
+automatically (same review queue as every other import).
+
+- **Code**: `findSimilarShowProspects()` in `server/anthropic.ts` (the
+  research), `POST /projects/:projectId/prospects/find-similar` in
+  `server/routes/outreach.ts` (the route), `api.findSimilarProspects` in
+  `src/api.ts` (the client), the button + progress bar in
+  `src/components/OutreachSection.tsx`.
+- **Model**: `claude-opus-5` with `web_search`/`web_fetch` server tools.
+  Targets 30+ verified candidates per run, but real runs have typically
+  landed 13-15 — the model prioritizes only genuinely RSS-verified shows
+  over hitting the exact count. That's expected behavior, not a bug; worth
+  revisiting only if the yield feels too low in practice.
+- **Typical run time: ~8-15 minutes.** This is a long-running, expensive
+  call — three real production bugs were found and fixed getting it stable
+  (2026-09-10/11, PRs #68-#72), each one a lesson worth not re-learning:
+  1. **The Anthropic SDK's own client-side request timeout.** A
+     non-streaming call (`client.messages.create`) for a task this size
+     ran ~15 minutes server-side and then died with `Request timed out.`
+     — the SDK's default per-request timeout is 10 minutes. Fixed by
+     switching to `client.messages.stream(params, { timeout }).finalMessage()`
+     with an explicit generous timeout (20 min) passed in.
+  2. **Railway's edge closes an HTTP request after 5 minutes with no data
+     transferred** (it allows up to 15 minutes as long as *something* keeps
+     moving). Fixing #1 wasn't enough — the outer browser↔Railway↔Express
+     connection still had nothing written to it until the whole call
+     finished, so Railway's edge killed it anyway. Fixed by having the
+     route stream newline-delimited JSON events to the browser as soon as
+     it commits to the long call (heartbeat `tick` + real `progress`
+     events, see #3, ending in one `done`/`error` line). Because sending
+     any bytes means committing to HTTP 200 before the outcome is known,
+     **success/failure is encoded in the JSON body/stream itself, not the
+     status code** — `api.ts`'s `findSimilarProspects` reads the stream
+     and checks each event's `type`, bypassing the shared status-code-based
+     `request()` helper for this one endpoint.
+  3. **Progress looked stuck at 0 even while the search was genuinely
+     working.** Progress was originally reported only after each full API
+     call resolved, using that call's `usage.server_tool_use` totals — but
+     a run this size routinely completes its *entire* tool-use loop inside
+     one continuous stream without ever hitting `pause_turn`, so there's
+     only one call total and its stats aren't visible until the exact
+     moment it (and the whole run) finishes. Fixed by hooking the stream's
+     `contentBlock` event (fires as each block — including every
+     `server_tool_use` block — completes mid-stream) for live counts
+     instead of waiting on a resolved call.
+- **If this breaks again**: check `/api/_diag`'s `recentLog` for
+  `outreach: finding similar shows` / `similar shows found` /
+  `find-similar failed` log lines first — they show real start/finish
+  timestamps and error messages. A push/merge while a run is mid-flight
+  will kill it via Railway's redeploy restart (learned the hard way this
+  same session) — check for an in-flight run before deploying a fix for
+  this feature specifically.
+
 ## Required env vars on the Railway "Project-management" service
 
 | Var | Purpose |
 |---|---|
 | `DATABASE_URL` | Postgres connection (use `${{Postgres.DATABASE_URL}}`) |
-| `RESEND_API_KEY` | Fallback transport when SES isn't configured, plus the only transport for Outreach domain management and the Audience CRM's Resend dashboard broadcasts (see "Email transport" above). Same key as Pod Booster — don't delete this account. |
+| `RESEND_API_KEY` | **Unset in production — the Resend account was deleted 2026-09-10 (see "Email transport" above).** Previously the fallback transport when SES wasn't configured, plus the only transport for Outreach domain management and the Audience CRM's Resend dashboard broadcasts. Those Resend-only features (`outreach_domains.ts`'s Resend sync, `audience_resend.ts`'s mirror, `boot_resend_probe.ts`) now just no-op/skip when this is unset — that's expected, not broken. Do not re-add this key without checking with Ryan first; SES is the transport now. |
 | `SES_ACCESS_KEY_ID` / `SES_SECRET_ACCESS_KEY` | Amazon SES credentials — when both are set, `server/mailTransport.ts` sends transactional/outreach/lead-follow-up mail via SES instead of Resend. Falls back to `AWS_ACCESS_KEY_ID`/`AWS_SECRET_ACCESS_KEY` if the dedicated ones aren't set. |
 | `SES_REGION` | Region the SES identity lives in. Falls back to `AWS_REGION`, then `us-east-1`. |
 | `SES_CONFIG_SET` | SES configuration set name — required for bounce/complaint tracking (see below), otherwise optional. |
@@ -287,16 +374,23 @@ explicit approval.
 Each podcast project has an email list (`audience_contacts`) fed by a public
 capture webhook (`POST /api/audience/hooks/:token`, per-show secret token on
 `projects.audience_capture_token`). ManyChat's External Request action posts
-captured emails here from comment-trigger DM flows; contacts also mirror into
-a lazily-created per-show Resend audience (`projects.resend_audience_id`).
-Lists are per-SHOW on purpose — fans follow shows, not the network.
+captured emails here from comment-trigger DM flows. Contacts used to also
+mirror into a lazily-created per-show Resend audience
+(`projects.resend_audience_id`, `server/audience_resend.ts`) — that mirror
+is now fully dead (Resend account deleted 2026-09-10, see "Email transport"
+above), nothing depends on it, and it's fine to leave the dormant code and
+column as-is. Lists are per-SHOW on purpose — fans follow shows, not the
+network.
 
-**Fan-facing email rule:** Slate never sends email to fans. Broadcasts go out
-from the Resend dashboard, and must use a from-address that is NOT the system
-sender (`slate@strawhutmedia.net` is for magic links/invites/alerts only).
-Only `strawhutmedia.net` is verified in Resend today — a fan-facing address
-on another domain (e.g. `@strawhutmedia.com` or a per-show domain) requires
-verifying that domain in Resend first.
+**Fan-facing email rule:** Slate never sends email to fans from the system
+sender — broadcasts go out via the "📣 Broadcast to this list" panel in
+`AudienceSection.tsx` (`POST /api/audience/projects/:id/broadcast`, see
+"Email transport" above), which sends through SES, not the system sender
+(`slate@strawhutmedia.net` is for magic links/invites/alerts only). A
+fan-facing from-address on a domain other than the ones already verified in
+SES (check `/admin/outreach/domains` or `sesCheckIdentity`) needs that
+domain verified in the AWS SES console first — same DKIM-CNAME flow as any
+other SES sending domain, no Resend dashboard involved anymore.
 
 **One deliberate exception: lead follow-ups.** For lists flagged
 `audience_lead_alerts` (sales pipelines, never fan lists — enforced
@@ -329,7 +423,8 @@ never "owns" it.
 - Push to a branch other than `main` for app changes (Railway only deploys main)
 - Re-enable the GitHub Pages workflow (Railway is the sole deploy target)
 - Add a new external service without explicit user approval — current stack is
-  GitHub + Railway + Resend + Dropbox, full stop
+  GitHub + Railway + Amazon SES + Dropbox, full stop (Resend was deleted
+  2026-09-10 — see "Email transport")
 
 ---
 
@@ -622,3 +717,72 @@ need to get my MRR over $80k!!!"*
 - Client API types/functions: `src/api.ts` — `ApiCashflowOverview.growthPipeline`,
   `ApiPipelineDeal`, `updateGrowthTarget` / `createPipelineDeal` /
   `updatePipelineDeal` / `deletePipelineDeal`
+
+---
+
+# Session handoff — Outreach reply capture, Resend deletion fallout, Find new prospects (Sept 2026)
+
+This block is the fast "where we left off" pointer for this session — full
+technical detail already lives inline above in "Email transport", "Outreach
+reply capture", and "Find new prospects"; this just summarizes what shipped
+and what's still open so the next session doesn't have to re-derive it.
+
+## What's live now (all merged to `main`, all deployed and verified)
+
+- **Outreach reply capture** (PRs #63-64): a show's outreach template can
+  point `reply_to` at a Slate-owned `p-<projectId>@<INBOUND_REPLY_DOMAIN>`
+  address instead of a human inbox; replies auto-mark the prospect
+  `replied`, file them in the Rolodex, and notify whoever's in
+  `notify_email` (comma-separated multi-address supported). Full detail in
+  "Outreach reply capture" above.
+- **Resend-deletion incident, found and fixed** (PR #66-67): Ryan deleted
+  the Resend account; three files (`email.ts`, `outreach.ts`, `audience.ts`)
+  had a `resendKey ? new Resend(resendKey) : null` pattern that silently
+  broke magic-link sign-in, outreach sending, admin alerts, and fan-list
+  broadcasts the moment `RESEND_API_KEY` went unset. Fixed to always
+  construct the shim. Also removed the last dead Resend-only UI ("Sync with
+  Resend" button on Sending Domains). Full detail + "if this pattern
+  reappears" guidance in "Email transport" above.
+- **Find new prospects** (PRs #68-72): one-click AI-researched
+  similar-show prospecting, built from scratch this session in direct
+  response to Ryan rejecting the manual-paste workflow ("I shouldn't have
+  to paste! I should be able to click a button"). Went through 4 real
+  production bugs before it was solid — full blow-by-blow in "Find new
+  prospects" above. Confirmed working end-to-end in production (verified
+  via `/api/_diag` logs, not just "looks done"): real runs found 15 and 13
+  RSS-verified shows with real emails for "Private Talk with Alexis Texas."
+
+## Open / unresolved — pick these up next session
+
+1. **Find new prospects targets 30+ but real runs have landed 13-15.** Not
+   confirmed to be a bug — the model appears to stop once it's satisfied
+   with verified quality rather than padding to hit the exact count. Worth
+   revisiting only if Ryan/Caroline flag the yield as too low in practice;
+   don't "fix" this speculatively.
+2. **No client-side guard against double-firing a run.** The button
+   disables while `findingProspects` is true, but a page refresh or a
+   second browser tab could still kick off a second concurrent ~10-15 min
+   research call for the same show (this actually happened once this
+   session — two near-simultaneous runs on "Private Talk with Alexis
+   Texas" completed fine independently, just produced two overlapping
+   batches that deduped against each other on import). Not urgent; a
+   server-side "already running for this project" lock would close it if
+   it becomes a real annoyance.
+3. **Bounce/complaint auto-pause SNS topic** — still not wired (needs one
+   AWS-console step, see "Email transport" above). Not touched this
+   session; was already open before it and remains open now that Resend
+   really is gone (there is currently no live auto-pause safety net for
+   the outreach rotation pool).
+4. Everything else from this session (reply capture, the Resend bug fix,
+   the dead-button cleanup) is genuinely done — no follow-up needed.
+
+## Where the code lives
+
+- Reply capture: `server/routes/ses_inbound_reply.ts`, `server/sns_verify.ts`
+  (shared with `ses_notify.ts`), migration `139_outreach_reply_notify.sql`
+- Resend/SES shim + the fixed callers: `server/mailTransport.ts`,
+  `server/email.ts`, `server/routes/outreach.ts`, `server/routes/audience.ts`
+- Find new prospects: `findSimilarShowProspects` + `createWithRetryStream`
+  in `server/anthropic.ts`; the `find-similar` route in
+  `server/routes/outreach.ts`; `api.findSimilarProspects` in `src/api.ts`;
+  button + progress bar in `src/components/OutreachSection.tsx`
