@@ -1,9 +1,9 @@
 {
   "version": "0.2.2",
-  "now": "2026-09-17T22:25:26.728Z",
+  "now": "2026-09-17T22:27:25.851Z",
   "boot": {
-    "startedAt": "2026-09-17T22:25:26.254Z",
-    "completedAt": "2026-09-17T22:25:26.711Z",
+    "startedAt": "2026-09-17T22:27:25.272Z",
+    "completedAt": "2026-09-17T22:27:25.833Z",
     "error": null
   },
   "env": {
@@ -294,7 +294,7 @@
   "recentLog": [
     {
       "level": "info",
-      "ts": "2026-09-17T22:25:26.250Z",
+      "ts": "2026-09-17T22:27:25.270Z",
       "msg": "serving client from",
       "data": {
         "clientDir": "/app/dist"
@@ -302,7 +302,7 @@
     },
     {
       "level": "info",
-      "ts": "2026-09-17T22:25:26.254Z",
+      "ts": "2026-09-17T22:27:25.272Z",
       "msg": "boot starting",
       "data": {
         "cwd": "/app",
@@ -313,12 +313,12 @@
     },
     {
       "level": "info",
-      "ts": "2026-09-17T22:25:26.561Z",
+      "ts": "2026-09-17T22:27:25.662Z",
       "msg": "migrations complete"
     },
     {
       "level": "info",
-      "ts": "2026-09-17T22:25:26.641Z",
+      "ts": "2026-09-17T22:27:25.772Z",
       "msg": "wardrobe outfits: applied",
       "data": {
         "projectId": "12f53ed1-c6c7-4c11-8d7b-06d91744c9af",
@@ -329,7 +329,7 @@
     },
     {
       "level": "info",
-      "ts": "2026-09-17T22:25:26.642Z",
+      "ts": "2026-09-17T22:27:25.772Z",
       "msg": "BIYA seed: project already exists, ensured shoot days",
       "data": {
         "projectId": "12f53ed1-c6c7-4c11-8d7b-06d91744c9af"
@@ -337,52 +337,17 @@
     },
     {
       "level": "info",
-      "ts": "2026-09-17T22:25:26.654Z",
-      "msg": "seed: Madeline memberships topped up",
-      "data": {
-        "added": 1
-      }
-    },
-    {
-      "level": "info",
-      "ts": "2026-09-17T22:25:26.664Z",
-      "msg": "seed: QA team memberships topped up",
-      "data": {
-        "email": "xavier@strawhutmedia.com",
-        "added": 1
-      }
-    },
-    {
-      "level": "info",
-      "ts": "2026-09-17T22:25:26.672Z",
-      "msg": "seed: QA team memberships topped up",
-      "data": {
-        "email": "riley@strawhutmedia.com",
-        "added": 1
-      }
-    },
-    {
-      "level": "info",
-      "ts": "2026-09-17T22:25:26.686Z",
-      "msg": "seed: QA team memberships topped up",
-      "data": {
-        "email": "blake@strawhutmedia.com",
-        "added": 1
-      }
-    },
-    {
-      "level": "info",
-      "ts": "2026-09-17T22:25:26.711Z",
+      "ts": "2026-09-17T22:27:25.833Z",
       "msg": "listening on :8080"
     },
     {
       "level": "info",
-      "ts": "2026-09-17T22:25:26.712Z",
+      "ts": "2026-09-17T22:27:25.834Z",
       "msg": "scheduler started (every 5 min)"
     },
     {
       "level": "info",
-      "ts": "2026-09-17T22:25:26.716Z",
+      "ts": "2026-09-17T22:27:25.836Z",
       "msg": "autopilot: loop started",
       "data": {
         "tickMinutes": 10
@@ -390,7 +355,7 @@
     },
     {
       "level": "info",
-      "ts": "2026-09-17T22:25:26.717Z",
+      "ts": "2026-09-17T22:27:25.836Z",
       "msg": "cashflow payment check: loop started",
       "data": {
         "tickHours": 6
@@ -398,7 +363,7 @@
     },
     {
       "level": "info",
-      "ts": "2026-09-17T22:25:26.717Z",
+      "ts": "2026-09-17T22:27:25.836Z",
       "msg": "qa digest: loop started",
       "data": {
         "sendHourPT": 8
