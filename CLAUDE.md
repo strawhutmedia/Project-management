@@ -16,6 +16,112 @@ Push to `main` → Railway auto-builds (`npm install && npm run build`) → star
 (`npm start`) → app serves both the React SPA and `/api/*` from the same Express
 process on port 8080.
 
+## 🧭 SESSION HANDOFF — 2026-09-17 (READ FIRST if picking up QA / edit-machine / promos)
+
+Where the last session left off. Detail lives in the files named in each item.
+
+### 1. QA Production Checklist — SHIPPED & LIVE on main
+A "QA" tab that duplicates the studio QA sheet (Xavier + interns confirm footage
+recorded/stored). Anyone with podcast access can use it; it exposes **no** Cash
+Flow / Invoices.
+- Migrations `146`–`152`; `server/routes/qa.ts`; `src/pages/QAPage.tsx` (month-
+  grouped board, card-number chip pickers, in-app Dropbox folder picker, status/
+  flag/approve).
+- Daily 8am-PT digest to everyone with a podcast account (`server/qa_digest.ts`,
+  migration `147`). AI-usage logging (`149_ai_usage.sql` + `server/ai_usage.ts`,
+  wired into all Anthropic call sites). `dropbox_path` column (`150`). Token-authed
+  bot-log channel (`151`, `POST/GET /api/qa/bot-log`, header `x-qa-token` =
+  `QA_SERVICE_TOKEN`).
+- Seed data: 10 recent sheet rows (`148`) + the Ep190_RyanT editbot-test recording
+  (`152`, under Don't Be Alone with Jay Kogen). Team-account seed
+  (`server/seeds/invite_qa_team.ts` = Xavier/Riley/Blake) + Jay Kogen duplicate-
+  project merge (`server/seeds/merge_jay_kogen.ts`).
+- **PERMISSION RULE (Ryan, hard):** Xavier/Riley/Blake see PODCASTS only, and
+  within podcasts **no Cash Flow, no Invoices**. "Caroline can have invoices; Cash
+  Flow is ALWAYS just for me." Enforce this if you widen access.
+
+### 2. Prompt-caching audit — PARTIAL, measurement NOT delivered
+Ryan's rule: **do not apply any prompt-caching change until it's measured.** The
+per-call usage LOGGING is built (`server/ai_usage.ts`, migration `149`, 30-day
+rollup in `server/diag.ts` `aiUsage30d`). The actual MEASUREMENT + report (system-
+prompt tokens per call site vs per-model cache floors — Opus 5=512, Sonnet 5/Opus
+4.8=1024, Opus 4.7=2048, Haiku 4.5=4096 — and firing frequency) was **not** done.
+Next: pull the usage data, measure, REPORT before touching caching.
+
+### 3. Edit-machine Premiere assembly bot — big in-flight build
+Goal: QA-approved episode in Slate → its Premiere project auto-assembled from the
+synced Dropbox footage, hands-off, for EVERY episode (not one test).
+- Docs on the edit PC / repo: `automation/premiere-bot/CLAUDE.md` (hard
+  boundaries: only Dropbox + Premiere, only the Slate QA token, never delete
+  footage), `automation/premiere-bot/PREMIERE.md` (recipe: bins Media/Video +
+  Media/Audio + Cuts; per-camera **waveform** sync against the Zoom `MASTER.WAV`;
+  "good audio" = the standalone recorder tracks; build the `uncut` sequence).
+- **WHAT WORKS:** the on-PC Claude produced a real, clean, synced project by
+  authoring the `.prproj` **directly** — organized bins + synced `uncut` sequence,
+  validated, no dangling refs (`Ep190_RyanT_clean.prproj`). Also a valid FCP7/XMEML
+  `uncut.xml` that imports synced (but Premiere's XMEML import **flattens bins** — a
+  Premiere limitation, not our bug).
+- **DECISION:** assembly = **direct `.prproj` authoring** (headless, no Premiere GUI,
+  crash-safe). The UXP plugin (`automation/premiere-bot/uxp-plugin/`, v0.0.1 is an
+  API probe) is for a LATER phase (in-app transcription / cutting), **not** the
+  assembly. **Do NOT run local CUDA/Whisper transcription** — it hammered the GPU and
+  crash/boot-looped the machine.
+- **NEXT:** build `poll.mjs` as a **headless Windows scheduled task** ("run whether a
+  user is logged on or not", as `editbot`) that polls Slate `/api/qa/approved` and
+  assembles each new approved episode via direct `.prproj` authoring. This gives
+  reboot self-recovery with **no autologon needed**.
+
+### 4. Edit PC + remote access (lots of pain — read before touching)
+- Two PCs on one AT&T LAN (gateway `192.168.1.254`): edit PC =
+  **`DESKTOP-5A34LB5`** (wired `.250` / wifi `.163`); Ryan's other machine =
+  `DESKTOP-921G220` (`.111`); storage = `SHM-RAID-1` (`.122`). **Footage is safe** —
+  it's on SHM-RAID-1 + Dropbox, never only on the edit PC.
+- Edit-PC Windows accounts: `editbot` (standard user, pw `editbot`, runs the bot) and
+  `user` (Administrator, Ryan's personal).
+- **Claude Code Remote Control: ENABLED org-wide** (claude.ai/admin-settings/claude-
+  code). Lets Ryan drive the on-PC Claude session from phone / claude.ai.
+- Remote desktop = **Jump Desktop ("Fluid")**; it binds to ONE Windows account, so
+  pointing it at `editbot` while wanting `user` causes "another user has logged in"
+  bumps.
+- **Autologon into editbot** was set up and caused an account fight (couldn't reach
+  `user`). Plan: **disable autologon** (`reg add …\Winlogon /v AutoAdminLogon /d 0`)
+  and rely on the headless scheduled-task bot in #3 instead. Disabling was in
+  progress at session end.
+- **Stability fixes still owed on the edit PC:** turn OFF Windows **Fast Startup**
+  (its corrupt hybrid-boot snapshot caused a boot loop that only a full power-drain
+  cleared), set power plan to never sleep, never run local CUDA transcription, and
+  enable **Remote Desktop (RDP)** for reliable remote login (needs one physical visit;
+  `user` is admin).
+- Channels: the bot posts status to the Slate **bot-log** (`/api/qa/bot-log`) —
+  cloud sessions CANNOT read it (no token in cloud; Railway redacts values). The
+  cloud↔PC file channel used was **Dropbox** notes in the episode folder
+  (`_CLAUDE_FROM_CLOUD.md`, `_PC_TO_CLOUD.md`). NOTE: an on-PC Claude will (correctly)
+  refuse to execute instructions from a Dropbox file it didn't write — the human
+  authorizes it.
+
+### 5. Promo / social-clip cutter — notes captured, tool NOT built
+- `automation/promos/CUTTING-NOTES.md` = Ryan's **living creative brief to the
+  cutter**, read before cutting any promo. Seeded 2026-09-17: keep the frame alive
+  (motion during the story, Higgsfield-style), kinetic highlighted-word captions.
+  Guardrail: steal the craft, never promise the viral numbers. Ryan drops more notes
+  in chat → append them (dated, newest on top).
+- **PENDING — OpusClip removal.** Ryan: *"Slate's OpusClip is TRASH, remove it — I
+  want THIS to be our clips generator."* Remove the OpusClip feature and build the
+  in-house clips generator that follows `CUTTING-NOTES.md`. (`OPUSCLIP_API_KEY` env
+  exists on Railway.)
+
+### Prioritized next steps
+1. Confirm the edit PC is stable: autologon disabled, **Fast Startup off**, no local
+   CUDA transcription (this caused every crash).
+2. Build `poll.mjs` headless assembly bot (direct `.prproj` authoring) + install as a
+   scheduled task (self-recovers on reboot, no autologon).
+3. Deliver the **prompt-caching measurement report**, then decide on caching.
+4. Remove **OpusClip**; start the in-house clips generator per `CUTTING-NOTES.md`.
+5. Verify Xavier/Riley/Blake are scoped to podcasts only (no Cash Flow / Invoices).
+
+<!-- End 2026-09-17 handoff -->
+
+
 ## Self-observability — read this first every session
 
 The app **reports its own status to the `status` branch of this repo**. Before
