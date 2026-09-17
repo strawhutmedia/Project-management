@@ -486,3 +486,139 @@ The page was an overwhelming wall of cards. Reworked (`ProjectPage.tsx`):
   `src/pages/ProjectPage.tsx`
 - Migrations added: `094_teleprompter_sessions.sql`, `154_project_archive.sql`
 - Client dep added: `qrcode` (QR for the phone-remote pairing)
+
+---
+
+# Session handoff — Cash Flow tracker, MRR Growth Pipeline, financial cleanup (Sept 2026)
+
+This block is the durable record of a long financial-tracking session with
+Ryan. Read it before touching any number in `/cashflow` or the Growth
+Pipeline. Everything described as "live" below is on `main`.
+
+## How this tracker works (learned the hard way — read before touching numbers)
+
+- **Every dollar figure must come from a primary source** — real QuickBooks
+  data, a bank statement screenshot, a real receipt/renewal email — never a
+  guess, a memory, or an extrapolation. When Ryan disputes a number, go
+  re-verify from source; don't defend the old figure.
+- **Ryan will demand exact numbers, not approximations**, when the stakes are
+  real (e.g. "There should be no approximation. There should be only an exact
+  number."). If a spreadsheet or report has its own internal gaps/bugs, don't
+  trust its printed totals — recompute by hand from the underlying line items.
+- **Recurring lines are corrected IN PLACE via UPDATE**, not re-logged every
+  month — see the `is_recurring` flag + the "latest row per counterparty"
+  `DISTINCT ON (kind, counterparty) ORDER BY ... occurred_on DESC, created_at
+  DESC` pattern already used throughout `server/routes/cashflow.ts`. Each
+  correction gets its own numbered migration citing the real evidence in a
+  SQL comment (see migrations `127`–`138`, `153` for the pattern to follow).
+- `/cashflow` is locked to `requireOwner` (Ryan only, see "Invoicing / payroll"
+  section above) — do not widen it, and do not let Caroline's narrower
+  invoicing seat touch it.
+
+## What's live now
+
+### Cash Flow tracker (`/cashflow`, `src/pages/CashFlowPage.tsx` + `server/routes/cashflow.ts`)
+
+Running balance, monthly history, a recurring-vs-one-time baseline split
+(the "sustainable number" separate from lumpy project wins like Disney/Hulu),
+and a fully itemized recurring checklist so every total is independently
+checkable line by line. Migrations `127`–`138` corrected specific real line
+items this session: Ali duplicate removed, Kirill/Carla verified, car payment
+$550→$554 (new car), "Tesla Insurance"→renamed "Car Insurance" $180→$340,
+Anthropic $45→$150, Ana (graphic designer) corrected to $520/mo via a real
+bank ACH statement screenshot (was a $541.67/mo guess), Jump Desktop added
+($23.56/mo — the monthly-equivalent of an annual Paddle renewal found in an
+email; was missing from the tracker entirely).
+
+### MRR Growth Pipeline (new this session — migration `139`, growth-pipeline
+routes in `server/routes/cashflow.ts`, the "MRR Growth Pipeline" card in
+`CashFlowPage.tsx`)
+
+Built because Ryan said: *"I want to be making a million or more a year!!! I
+need to get my MRR over $80k!!!"*
+
+- Tracks an editable **target MRR** (default $80,000/mo) against **current
+  MRR** (reuses the existing recurring-revenue baseline calc) and the **gap
+  to close**.
+- A working **deals pipeline** (`cashflow_pipeline_deals` table): name,
+  estimated MRR, stage (`prospecting` → `quoted` → `negotiating` →
+  `won`/`lost`), notes. Add/edit/delete from the card in the UI.
+- **Current real deal:** Bruce Poon Tip (G Adventures) — introduced May 2026
+  via Brett Marchand (Plus Company). Ryan quoted **$4,000/mo**; stage is now
+  **negotiating**, not yet won (migration `153` corrected this from the
+  original $0/`prospecting` placeholder seeded in `139`, before a rate had
+  been discussed).
+- **This is a live tracking tool, not a one-time snapshot.** As new prospects
+  surface or a quote/stage changes, add or update a deal (via the UI, or a
+  numbered migration for historical corrections, same pattern as the
+  cashflow-entry fixes above) — don't let it go stale.
+
+## Real numbers established this session (verified from primary sources)
+
+- **Amex balance: $101,940.20** (real QuickBooks Balance Sheet). Ryan believed
+  it was ~$88,000 — that was wrong. ($88,611.78, a combined-loan total, is
+  likely what he was actually remembering.)
+- **Hulu payment: $41,354.96** (real invoiced amount). Ryan estimated
+  "$30,000" — the real number is higher, which is good news for the Amex
+  payoff plan below.
+- **Naked Lunch owed: exactly $41,180.00**, last paid 19 months ago —
+  hand-verified from Ryan's own "Naked Lunch payout spreadsheet" (a Google
+  Drive xlsx), correcting 3 real gaps in the sheet's own formulas (missing
+  Megaphone line items in the printed Feb/Mar/Apr 2026 monthly totals, and no
+  total row at all for May 2026). This is an EXACT figure per Ryan's explicit
+  demand for no approximation — not an estimate.
+- **Ana (graphic designer): $520.00/mo** ($120/wk), confirmed via a real bank
+  ACH statement screenshot (now reflected in the tracker, migration `138`).
+
+## Open / unresolved — pick these up next session
+
+1. **QuickBooks recurring line — still wrong, real amount unknown.** Ryan said
+   "it's no longer $189" but never gave the actual current number despite
+   being asked directly. Ask him again before touching this line.
+2. **Freelancer.com breakdown — reported to Ryan but NOT yet shipped as a
+   migration.** Real itemized figures were found (Muhammad ~$520/mo steady,
+   Daniel ~$1,195/mo, Talha and Alaa volatile/tapering toward near-zero),
+   which should replace the flat $2,000/mo guess still sitting in the
+   tracker. Needs a migration in the `127`–`138` style, or a decision from
+   Ryan on whether the volatile contractors even belong in the recurring
+   baseline.
+3. **Sajid's real pay — unverified.** Same situation Ana was in before her
+   bank screenshot: no payroll record, no email trail found. Needs a
+   bank-statement-style verification directly from Ryan.
+4. **Lisane Basquiat course invoicing — not finalized.** Landed on
+   Production $2,400 (Ryan $800/day + Xavier $400/day; possibly $2,100 if
+   Day 1 is billed three-quarter-day instead of full) + Editing $5,900, split
+   Invoice 1 $5,350 (kickoff) / Invoice 2 $2,950 (delivery) — but this was
+   never confirmed as final. There's also an unresolved complaint from Jenay
+   Reed (about whether Lisane attended both recording days — Ryan confirmed
+   she did) to close out before sending. **Do not draft or send these
+   invoices from a session without QuickBooks access** — and per the "Client
+   invoices" rule above, Ryan reviews and clicks Send personally, always.
+5. **Amex payoff plan** ($101,940.20, real balance) using upcoming
+   Disney/Hulu money — discussed, not executed. Revisit once those payments
+   land (Ryan expected ~October 2026).
+6. **Naked Lunch repayment plan** for the exact $41,180.00 owed — discussed,
+   no plan agreed yet.
+7. **MRR growth plan beyond the pipeline tool itself.** Ryan ran through a
+   7-phase "get rich" Instagram AI-prompt template using real business data.
+   The Growth Pipeline feature above is the tracking mechanism; the actual
+   plan to fill it with new prospects (beyond Bruce Poon Tip) hasn't been
+   built out — add deals as real prospects surface, don't invent placeholder
+   ones.
+8. **Veed/Opus AI video tools** — kept both after Ryan verified real usage
+   via a Slack screenshot (Caroline confirmed Veed for captions on
+   promotional videos, Opus for cutting + captions); Higgsfield was
+   considered but not adopted. No action needed unless usage changes.
+9. **Melio ACH transfer limits** — confirmed 5 free transfers/month, $0.50
+   each after. FYI only, no action needed.
+
+## Where the code lives
+
+- Cash Flow page: `src/pages/CashFlowPage.tsx`
+- Cash Flow + Growth Pipeline API: `server/routes/cashflow.ts`
+- Migrations: `127`–`138` (individual real line-item corrections), `139`
+  (growth pipeline tables + Bruce Poon Tip seed), `153` (Bruce Poon Tip
+  quote/stage update)
+- Client API types/functions: `src/api.ts` — `ApiCashflowOverview.growthPipeline`,
+  `ApiPipelineDeal`, `updateGrowthTarget` / `createPipelineDeal` /
+  `updatePipelineDeal` / `deletePipelineDeal`
