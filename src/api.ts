@@ -2220,6 +2220,13 @@ export type ApiQaTemplateItem = { id: string; label: string; spec: string; posit
 
 export const qaApi = {
   context: () => request<ApiQaContext>('/api/qa/context'),
+  // Adds a podcast project from the QA show picker; returns the existing
+  // project (existed: true) when the name already matches one.
+  createShow: (name: string) =>
+    request<{ project: ApiQaContext['projects'][number]; existed: boolean }>('/api/qa/shows', {
+      method: 'POST',
+      body: JSON.stringify({ name }),
+    }),
   recordings: (opts?: { projectId?: string; status?: string }) => {
     const qs = new URLSearchParams()
     if (opts?.projectId) qs.set('projectId', opts.projectId)

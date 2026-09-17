@@ -233,8 +233,12 @@ function ShooterPicker({
   )
 }
 
+// Sentinel option value for the "add a show" entry in the show picker —
+// can't collide with a project id (those are UUIDs).
+const ADD_SHOW = '__add_show__'
+
 function RecordingForm({
-  ctx, initial, submitLabel, busy, onSubmit, onCancel,
+  ctx, initial, submitLabel, busy, onSubmit, onCancel, onShowCreated,
 }: {
   ctx: ApiQaContext
   initial: FormState
@@ -242,11 +246,30 @@ function RecordingForm({
   busy: boolean
   onSubmit: (f: FormState) => void
   onCancel: () => void
+  onShowCreated: (p: ApiQaContext['projects'][number]) => void
 }) {
   const [f, setF] = useState<FormState>(initial)
   const [pickerOpen, setPickerOpen] = useState(false)
+  const [addingShow, setAddingShow] = useState(false)
+  const [newShowName, setNewShowName] = useState('')
+  const [showBusy, setShowBusy] = useState(false)
   const set = <K extends keyof FormState>(k: K, v: FormState[K]) => setF((prev) => ({ ...prev, [k]: v }))
   const selectedShow = ctx.projects.find((p) => p.id === f.projectId)
+
+  const addShow = async () => {
+    const name = newShowName.trim()
+    if (!name || showBusy) return
+    setShowBusy(true)
+    try {
+      const { project } = await qaApi.createShow(name)
+      onShowCreated(project)
+      set('projectId', project.id)
+      setAddingShow(false)
+      setNewShowName('')
+    } finally {
+      setShowBusy(false)
+    }
+  }
   return (
     <div className="space-y-3">
       {pickerOpen && (
@@ -271,12 +294,45 @@ function RecordingForm({
         </div>
         <div>
           <div className={labelCls}>Show</div>
-          <select className={inputCls} value={f.projectId} onChange={(e) => set('projectId', e.target.value)}>
-            <option value="">— No show / one-off —</option>
-            {ctx.projects.map((p) => (
-              <option key={p.id} value={p.id}>{p.name}</option>
-            ))}
-          </select>
+          {addingShow ? (
+            <div className="flex items-center gap-2">
+              <input
+                autoFocus
+                className={inputCls}
+                placeholder="New show name"
+                value={newShowName}
+                onChange={(e) => setNewShowName(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') { e.preventDefault(); void addShow() }
+                  if (e.key === 'Escape') { setAddingShow(false); setNewShowName('') }
+                }}
+              />
+              <button
+                type="button"
+                disabled={showBusy || !newShowName.trim()}
+                onClick={() => void addShow()}
+                className="rounded-full bg-stage-mixing/90 hover:bg-stage-mixing text-ink text-xs font-bold px-3.5 py-2 disabled:opacity-40 transition shrink-0"
+              >
+                {showBusy ? 'Adding…' : 'Add'}
+              </button>
+              <button type="button" onClick={() => { setAddingShow(false); setNewShowName('') }} className={btnGhost}>✕</button>
+            </div>
+          ) : (
+            <select
+              className={inputCls}
+              value={f.projectId}
+              onChange={(e) => {
+                if (e.target.value === ADD_SHOW) setAddingShow(true)
+                else set('projectId', e.target.value)
+              }}
+            >
+              <option value="">— No show / one-off —</option>
+              {ctx.projects.map((p) => (
+                <option key={p.id} value={p.id}>{p.name}</option>
+              ))}
+              <option value={ADD_SHOW}>＋ Add a show…</option>
+            </select>
+          )}
         </div>
         <div>
           <div className={labelCls}>Record date</div>
@@ -454,13 +510,14 @@ function ChecklistBlock({
 }
 
 function RecordingCard({
-  rec, ctx, canWrite, onPatched, onDeleted,
+  rec, ctx, canWrite, onPatched, onDeleted, onShowCreated,
 }: {
   rec: ApiQaRecording
   ctx: ApiQaContext
   canWrite: boolean
   onPatched: (r: ApiQaRecording) => void
   onDeleted: (id: string) => void
+  onShowCreated: (p: ApiQaContext['projects'][number]) => void
 }) {
   const [open, setOpen] = useState(false)
   const [editing, setEditing] = useState(false)
@@ -554,6 +611,7 @@ function RecordingCard({
               busy={busy}
               onSubmit={(f) => void saveEdit(f)}
               onCancel={() => setEditing(false)}
+              onShowCreated={onShowCreated}
             />
           ) : (
             <>
@@ -741,6 +799,14 @@ export default function QAPage() {
 
   const patched = (r: ApiQaRecording) =>
     setRecordings((prev) => (prev ? prev.map((x) => (x.id === r.id ? r : x)) : prev))
+  // A show added from the form joins the picker immediately (alphabetical,
+  // same order the server returns) without a full reload.
+  const showCreated = (p: ApiQaContext['projects'][number]) =>
+    setCtx((prev) => {
+      if (!prev || prev.projects.some((x) => x.id === p.id)) return prev
+      const projects = [...prev.projects, p].sort((a, b) => a.name.localeCompare(b.name))
+      return { ...prev, projects }
+    })
   const deleted = (id: string) =>
     setRecordings((prev) => (prev ? prev.filter((x) => x.id !== id) : prev))
 
@@ -834,6 +900,7 @@ export default function QAPage() {
             busy={createBusy}
             onSubmit={(f) => void create(f)}
             onCancel={() => setCreating(false)}
+            onShowCreated={showCreated}
           />
         </div>
       )}
@@ -880,6 +947,7 @@ export default function QAPage() {
                 canWrite={ctx.canWrite}
                 onPatched={patched}
                 onDeleted={deleted}
+                onShowCreated={showCreated}
               />
             ))}
           </div>

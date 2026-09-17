@@ -1,6 +1,7 @@
 import { Router } from 'express'
 import { pool } from '../db'
 import { requireUser, getSessionUser, isViewer, type SessionUser } from '../auth'
+import { createProjectRecord } from './projects'
 import { logError } from '../diag'
 
 // QA Production Checklist — Slate's replacement for the "QA PRODUCTION
@@ -135,7 +136,8 @@ async function hasPodcastAccess(user: SessionUser): Promise<boolean> {
   const { rows } = await pool.query(
     `SELECT 1 FROM projects p
      LEFT JOIN project_members m ON m.project_id = p.id AND m.user_id = $1
-     WHERE p.kind = 'podcast' AND (p.created_by = $1 OR m.user_id IS NOT NULL)
+     WHERE p.kind = 'podcast' AND p.archived_at IS NULL
+       AND (p.created_by = $1 OR m.user_id IS NOT NULL)
      LIMIT 1`,
     [user.id],
   )
@@ -166,10 +168,12 @@ qaRouter.get('/context', async (req, res) => {
   try {
     const projects = await pool.query(
       user.role === 'admin'
-        ? `SELECT id, name, cover_art_url, dropbox_folder FROM projects WHERE kind = 'podcast' ORDER BY name ASC`
+        ? `SELECT id, name, cover_art_url, dropbox_folder FROM projects
+           WHERE kind = 'podcast' AND archived_at IS NULL ORDER BY name ASC`
         : `SELECT DISTINCT p.id, p.name, p.cover_art_url, p.dropbox_folder FROM projects p
            LEFT JOIN project_members m ON m.project_id = p.id AND m.user_id = $1
-           WHERE p.kind = 'podcast' AND (p.created_by = $1 OR m.user_id IS NOT NULL)
+           WHERE p.kind = 'podcast' AND p.archived_at IS NULL
+             AND (p.created_by = $1 OR m.user_id IS NOT NULL)
            ORDER BY p.name ASC`,
       user.role === 'admin' ? [] : [user.id],
     )
@@ -185,6 +189,46 @@ qaRouter.get('/context', async (req, res) => {
     })
   } catch (err) {
     logError('qa context failed', { error: err instanceof Error ? err.message : String(err) })
+    res.status(500).json({ error: 'internal_error' })
+  }
+})
+
+// ── Add a show from the QA board ────────────────────────────────────────
+// The show picker is the podcast project list, so a recording for a show
+// that isn't a Slate project yet had nowhere to go (that's how the seeded
+// "Invest in Her" sheet rows ended up show-less). Anyone who can log a
+// recording can add the missing show right here. Reuses the same creation
+// core as POST /api/projects (slug, podcast stage labels, Ryan as EP), and
+// returns the existing project instead when the name already matches one,
+// case-insensitively — a second "Private Talk" in the picker is exactly
+// what this must not create.
+qaRouter.post('/shows', async (req, res) => {
+  const user = await assertQaAccess(req, res, true)
+  if (!user) return
+  const name = str((req.body ?? {}).name).slice(0, 200)
+  if (!name) { res.status(400).json({ error: 'name_required' }); return }
+  try {
+    const existing = await pool.query(
+      `SELECT id, name, cover_art_url, dropbox_folder FROM projects
+        WHERE kind = 'podcast' AND archived_at IS NULL AND lower(name) = lower($1)
+        ORDER BY created_at ASC LIMIT 1`,
+      [name],
+    )
+    if (existing.rows[0]) {
+      const p = existing.rows[0]
+      res.json({
+        project: { id: p.id, name: p.name, coverArtUrl: p.cover_art_url ?? null, dropboxFolder: p.dropbox_folder ?? null },
+        existed: true,
+      })
+      return
+    }
+    const project = await createProjectRecord(user, { name, kind: 'podcast' })
+    res.json({
+      project: { id: project.id, name: project.name, coverArtUrl: null, dropboxFolder: project.dropbox_folder ?? null },
+      existed: false,
+    })
+  } catch (err) {
+    logError('qa show create failed', { error: err instanceof Error ? err.message : String(err) })
     res.status(500).json({ error: 'internal_error' })
   }
 })

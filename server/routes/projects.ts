@@ -146,19 +146,16 @@ const PODCAST_LABELS = {
   done: { label: 'Released', icon: '🚀' },
 }
 
-projectsRouter.post('/', async (req, res) => {
-  const user = (req as typeof req & { user: SessionUser }).user
-  const name = String(req.body?.name || '').trim()
-  const subtitle = String(req.body?.subtitle || '').trim() || null
-  const kindRaw = req.body?.kind
-  const kind = kindRaw === 'podcast' || kindRaw === 'film' ? kindRaw : 'album'
-  const dropboxFolder = String(req.body?.dropboxFolder || '').trim() || null
-
-  if (!name) {
-    res.status(400).json({ error: 'name_required' })
-    return
-  }
-
+// Shared creation core — used by POST / below and by the QA board's
+// "add a show" flow (server/routes/qa.ts), which needs the same slug,
+// stage-label and default-owner behavior without going through this router.
+export async function createProjectRecord(
+  user: SessionUser,
+  opts: { name: string; subtitle?: string | null; kind: 'album' | 'podcast' | 'film'; dropboxFolder?: string | null },
+): Promise<{ id: string; name: string; subtitle: string | null; kind: string; dropbox_folder: string | null }> {
+  const { name, kind } = opts
+  const subtitle = opts.subtitle ?? null
+  const dropboxFolder = opts.dropboxFolder ?? null
   const stageLabels = kind === 'podcast' ? PODCAST_LABELS : {}
   const channelsSubfolder = kind === 'podcast' ? 'episodes' : null
 
@@ -202,6 +199,23 @@ projectsRouter.post('/', async (req, res) => {
     [project.id, user.id],
   )
   logInfo('project created', { id: project.id, name: project.name, kind, by: user.id })
+  return project
+}
+
+projectsRouter.post('/', async (req, res) => {
+  const user = (req as typeof req & { user: SessionUser }).user
+  const name = String(req.body?.name || '').trim()
+  const subtitle = String(req.body?.subtitle || '').trim() || null
+  const kindRaw = req.body?.kind
+  const kind = kindRaw === 'podcast' || kindRaw === 'film' ? kindRaw : 'album'
+  const dropboxFolder = String(req.body?.dropboxFolder || '').trim() || null
+
+  if (!name) {
+    res.status(400).json({ error: 'name_required' })
+    return
+  }
+
+  const project = await createProjectRecord(user, { name, subtitle, kind, dropboxFolder })
   res.json({
     project: {
       id: project.id,
