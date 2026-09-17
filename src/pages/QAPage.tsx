@@ -277,7 +277,7 @@ function RecordingForm({
           // Non-admins can only browse inside the selected show's folder
           // (server-side scope guard); admins can browse anywhere.
           scopeProjectId={f.projectId || undefined}
-          initialPath={selectedShow?.dropboxFolder ?? undefined}
+          initialPath={selectedShow?.dropboxFolder ?? ctx.podcastsFolder ?? undefined}
           onSelect={(p) => { set('dropboxPath', p); setPickerOpen(false) }}
           onCancel={() => setPickerOpen(false)}
         />

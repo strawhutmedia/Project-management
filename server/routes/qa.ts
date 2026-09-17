@@ -175,10 +175,28 @@ qaRouter.get('/context', async (req, res) => {
     const users = await pool.query(
       `SELECT id, name, display_name, role FROM users ORDER BY COALESCE(display_name, name) ASC`,
     )
+    // Where the podcast folders live in Dropbox — the most common parent
+    // directory of the configured show folders. The picker opens here for a
+    // show that has no folder configured yet (e.g. one just added inline);
+    // the crew creates/uploads the episode folder in Dropbox before logging
+    // it in QA, so it's already there to select.
+    const parentCounts = new Map<string, number>()
+    for (const p of projects.rows) {
+      const f = typeof p.dropbox_folder === 'string' ? p.dropbox_folder.replace(/\/+$/, '') : ''
+      const idx = f.lastIndexOf('/')
+      const parent = idx > 0 ? f.slice(0, idx) : ''
+      if (parent) parentCounts.set(parent, (parentCounts.get(parent) ?? 0) + 1)
+    }
+    let podcastsFolder: string | null = null
+    let bestCount = 0
+    for (const [folder, count] of parentCounts) {
+      if (count > bestCount) { bestCount = count; podcastsFolder = folder }
+    }
     res.json({
       projects: projects.rows.map((p) => ({ id: p.id, name: p.name, coverArtUrl: p.cover_art_url ?? null, dropboxFolder: p.dropbox_folder ?? null })),
       users: users.rows.map((u) => ({ id: u.id, name: u.display_name || u.name, role: u.role })),
       canWrite: !isViewer(user),
+      podcastsFolder,
     })
   } catch (err) {
     logError('qa context failed', { error: err instanceof Error ? err.message : String(err) })

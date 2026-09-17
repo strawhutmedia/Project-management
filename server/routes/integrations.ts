@@ -176,6 +176,14 @@ function isPathWithin(child: string, parent: string): boolean {
   return c === p || c.startsWith(p + '/')
 }
 
+// "/A/B/Show" → "/A/B"; a top-level folder ("/Show") yields '' so callers
+// can refuse to widen scope to the Dropbox root.
+function parentDropboxDir(folder: string): string {
+  const clean = folder.replace(/\/+$/, '')
+  const idx = clean.lastIndexOf('/')
+  return idx > 0 ? clean.slice(0, idx) : ''
+}
+
 async function assertDropboxPathAllowed(
   user: SessionUser,
   path: string,
@@ -222,10 +230,30 @@ async function assertDropboxPathAllowed(
     [scopeProjectId],
   )
   if (rows.length === 0) return { ok: false, status: 404, error: 'project_not_found' }
-  const projectRoot = rows[0].dropbox_folder
-  if (!projectRoot) return { ok: false, status: 400, error: 'project_has_no_folder' }
   if (!(await podcastOrMember(scopeProjectId as string, rows[0].kind))) {
     return { ok: false, status: 403, error: 'forbidden' }
+  }
+  const projectRoot = rows[0].dropbox_folder
+  if (!projectRoot) {
+    // A podcast show without a configured root folder (e.g. one just added
+    // from the QA form) still needs a working picker — the crew creates the
+    // episode folder in Dropbox BEFORE logging it in QA (Ryan's workflow),
+    // so let them browse where the other podcast folders live: any parent
+    // directory of a configured podcast folder. Never falls open to the
+    // Dropbox root — top-level ('' / '/') parents are excluded.
+    if (rows[0].kind === 'podcast') {
+      const sib = await pool.query<{ f: string }>(
+        `SELECT DISTINCT dropbox_folder AS f FROM projects
+          WHERE kind = 'podcast' AND dropbox_folder IS NOT NULL AND archived_at IS NULL`,
+      )
+      const parents = new Set(
+        sib.rows.map((r) => parentDropboxDir(r.f)).filter((p) => p && p !== '/'),
+      )
+      for (const p of parents) {
+        if (isPathWithin(path, p)) return { ok: true }
+      }
+    }
+    return { ok: false, status: 400, error: 'project_has_no_folder' }
   }
   if (!isPathWithin(path, projectRoot)) {
     return { ok: false, status: 403, error: `out_of_scope:path_must_be_within:${projectRoot}` }

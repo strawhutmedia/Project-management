@@ -2214,6 +2214,9 @@ export type ApiQaContext = {
   projects: Array<{ id: string; name: string; coverArtUrl: string | null; dropboxFolder: string | null }>
   users: Array<{ id: string; name: string; role: 'admin' | 'user' | 'viewer' }>
   canWrite: boolean
+  // Parent directory the podcast show folders live in — picker fallback for
+  // shows without a configured folder.
+  podcastsFolder: string | null
 }
 
 export type ApiQaTemplateItem = { id: string; label: string; spec: string; position: number }
