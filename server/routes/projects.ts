@@ -51,20 +51,15 @@ export const projectsRouter = Router()
 
 projectsRouter.use(requireUser)
 
-projectsRouter.get('/', async (req, res) => {
-  const user = (req as typeof req & { user: SessionUser }).user
+projectsRouter.get('/', async (_req, res) => {
+  // Everyone signed in sees every project (Ryan, 2026-09-17: "everyone can
+  // see everything") — no membership scoping here. Only archived projects
+  // are hidden; write access is still governed per-project by roles.
   const projects = await pool.query(
-    `SELECT DISTINCT p.id, p.name, p.subtitle, p.kind, p.created_at, p.stage_labels
+    `SELECT p.id, p.name, p.subtitle, p.kind, p.created_at, p.stage_labels
      FROM projects p
-     LEFT JOIN songs s ON s.project_id = p.id
-     LEFT JOIN song_members sm ON sm.song_id = s.id AND sm.user_id = $1
-     WHERE (p.created_by = $1
-        OR EXISTS (SELECT 1 FROM project_members m WHERE m.project_id = p.id AND m.user_id = $1)
-        OR sm.user_id IS NOT NULL
-        OR $2 = 'admin')
-        AND p.archived_at IS NULL
+     WHERE p.archived_at IS NULL
      ORDER BY p.created_at DESC`,
-    [user.id, user.role],
   )
   const ids = projects.rows.map((p: { id: string }) => p.id)
   const songsByProject: Record<string, unknown[]> = Object.fromEntries(
@@ -382,16 +377,12 @@ projectsRouter.get('/:id/members', async (req, res) => {
   const projectId = req.params.id
 
   try {
-    // Verify access (full or partial via song_members)
+    // Readable by every signed-in user (Ryan, 2026-09-17: "everyone can see
+    // everything") — only existence is checked.
     if (user.role !== 'admin') {
       const access = await pool.query(
-        `SELECT 1 FROM projects p
-         LEFT JOIN project_members pm ON pm.project_id = p.id AND pm.user_id = $1
-         LEFT JOIN songs s ON s.project_id = p.id
-         LEFT JOIN song_members sm ON sm.song_id = s.id AND sm.user_id = $1
-         WHERE p.id = $2 AND (p.created_by = $1 OR pm.user_id IS NOT NULL OR sm.user_id IS NOT NULL)
-         LIMIT 1`,
-        [user.id, projectId],
+        `SELECT 1 FROM projects p WHERE p.id = $1 LIMIT 1`,
+        [projectId],
       )
       if (access.rows.length === 0) {
         res.status(403).json({ error: 'forbidden' })

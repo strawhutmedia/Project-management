@@ -25,7 +25,14 @@ export async function getProjectRole(
       `SELECT 1 FROM projects WHERE id = $1 AND created_by = $2 LIMIT 1`,
       [projectId, userId],
     )
-    return creator.length > 0 ? 'admin' : null
+    if (creator.length > 0) return 'admin'
+    // Everyone signed in to Slate can SEE every project (Ryan, 2026-09-17:
+    // "everyone can see everything") — non-members get read-only project
+    // access instead of a 403. Writes still require a real membership role,
+    // and the money sections (/cashflow, /invoicing, /api/qb) have their own
+    // owner/invoicing gates that this does not touch.
+    const exists = await pool.query(`SELECT 1 FROM projects WHERE id = $1 LIMIT 1`, [projectId])
+    return exists.rows.length > 0 ? 'viewer' : null
   }
   return rows[0].role
 }
@@ -47,7 +54,9 @@ export async function getSongRole(
   if (rows.length === 0) return null
   if (rows[0].role) return rows[0].role
   if (rows[0].created_by === userId) return 'admin'
-  return null
+  // Same everyone-can-see rule as getProjectRole: the song exists, so any
+  // signed-in user may read it; writes still need a membership role.
+  return 'viewer'
 }
 
 export function canWrite(role: ProjectRole | null): boolean {

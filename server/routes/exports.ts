@@ -12,22 +12,10 @@ import { logError } from '../diag'
 export const exportsRouter = Router()
 exportsRouter.use(requireUser)
 
-async function userCanAccessProject(userId: string, role: string, projectId: string): Promise<boolean> {
-  if (role === 'admin') return true
-  // Grant access if the user is: creator, project_member, OR song_member
-  // of any song in the project. Permissive by design — anyone on the
-  // project in any capacity should be able to download the printable
-  // production docs.
-  const { rows } = await pool.query(
-    `SELECT 1 FROM projects p
-       LEFT JOIN project_members m ON m.project_id = p.id AND m.user_id = $1
-       LEFT JOIN songs s ON s.project_id = p.id
-       LEFT JOIN song_members sm ON sm.song_id = s.id AND sm.user_id = $1
-      WHERE p.id = $2
-        AND (p.created_by = $1 OR m.user_id IS NOT NULL OR sm.user_id IS NOT NULL)
-      LIMIT 1`,
-    [userId, projectId],
-  )
+// Everyone signed in can see and work in every project (Ryan, 2026-09-17:
+// "everyone can see everything") — only existence is checked now.
+async function userCanAccessProject(_userId: string, _role: string, projectId: string): Promise<boolean> {
+  const { rows } = await pool.query(`SELECT 1 FROM projects WHERE id = $1 LIMIT 1`, [projectId])
   return rows.length > 0
 }
 

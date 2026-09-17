@@ -26,14 +26,10 @@ transcriptsRouter.use(requireUser)
 
 const MAX_FILE_BYTES = 10 * 1024 * 1024 * 1024 // 10 GB — Deepgram bills by
 
-async function userCanAccessProject(userId: string, role: string, projectId: string): Promise<boolean> {
-  if (role === 'admin') return true
-  const { rows } = await pool.query(
-    `SELECT 1 FROM projects p
-       LEFT JOIN project_members m ON m.project_id = p.id AND m.user_id = $1
-      WHERE p.id = $2 AND (p.created_by = $1 OR m.user_id IS NOT NULL) LIMIT 1`,
-    [userId, projectId],
-  )
+// Everyone signed in can see and work in every project (Ryan, 2026-09-17:
+// "everyone can see everything") — only existence is checked now.
+async function userCanAccessProject(_userId: string, _role: string, projectId: string): Promise<boolean> {
+  const { rows } = await pool.query(`SELECT 1 FROM projects WHERE id = $1 LIMIT 1`, [projectId])
   return rows.length > 0
 }
 

@@ -799,13 +799,13 @@ export default function QAPage() {
 
   const patched = (r: ApiQaRecording) =>
     setRecordings((prev) => (prev ? prev.map((x) => (x.id === r.id ? r : x)) : prev))
-  // A show added from the form joins the picker immediately (alphabetical,
-  // same order the server returns) without a full reload.
+  // A show added from the form joins the picker immediately, at the top —
+  // the picker is ordered most-recently-logged first and the new show is
+  // the one about to be logged against.
   const showCreated = (p: ApiQaContext['projects'][number]) =>
     setCtx((prev) => {
       if (!prev || prev.projects.some((x) => x.id === p.id)) return prev
-      const projects = [...prev.projects, p].sort((a, b) => a.name.localeCompare(b.name))
-      return { ...prev, projects }
+      return { ...prev, projects: [p, ...prev.projects] }
     })
   const deleted = (id: string) =>
     setRecordings((prev) => (prev ? prev.filter((x) => x.id !== id) : prev))

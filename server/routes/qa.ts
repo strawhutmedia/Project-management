@@ -128,20 +128,12 @@ qaRouter.get('/bot-log', async (req, res) => {
 
 qaRouter.use(requireUser)
 
-// The QA board is open to anyone who can see at least one podcast project
-// (admins see everything). It's a studio-wide log — same trust model as the
-// shared sheet it replaces — so access to any podcast unlocks the whole board.
-async function hasPodcastAccess(user: SessionUser): Promise<boolean> {
-  if (user.role === 'admin') return true
-  const { rows } = await pool.query(
-    `SELECT 1 FROM projects p
-     LEFT JOIN project_members m ON m.project_id = p.id AND m.user_id = $1
-     WHERE p.kind = 'podcast' AND p.archived_at IS NULL
-       AND (p.created_by = $1 OR m.user_id IS NOT NULL)
-     LIMIT 1`,
-    [user.id],
-  )
-  return rows.length > 0
+// The QA board is open to every signed-in Slate user (Ryan, 2026-09-17:
+// "everyone can see everything") — same trust model as the shared sheet it
+// replaces. Kept as a function so a future gate has one place to live;
+// account-level viewers still can't write (assertQaAccess below).
+async function hasPodcastAccess(_user: SessionUser): Promise<boolean> {
+  return true
 }
 
 function userOf(req: unknown): SessionUser {
@@ -166,16 +158,17 @@ qaRouter.get('/context', async (req, res) => {
   const user = await assertQaAccess(req, res, false)
   if (!user) return
   try {
+    // Everyone gets the full show list (no membership scoping), ordered by
+    // most recently logged first — shows you're actively recording float to
+    // the top of the picker, dormant ones sink; never-logged shows trail
+    // alphabetically (Ryan, 2026-09-17).
     const projects = await pool.query(
-      user.role === 'admin'
-        ? `SELECT id, name, cover_art_url, dropbox_folder FROM projects
-           WHERE kind = 'podcast' AND archived_at IS NULL ORDER BY name ASC`
-        : `SELECT DISTINCT p.id, p.name, p.cover_art_url, p.dropbox_folder FROM projects p
-           LEFT JOIN project_members m ON m.project_id = p.id AND m.user_id = $1
-           WHERE p.kind = 'podcast' AND p.archived_at IS NULL
-             AND (p.created_by = $1 OR m.user_id IS NOT NULL)
-           ORDER BY p.name ASC`,
-      user.role === 'admin' ? [] : [user.id],
+      `SELECT p.id, p.name, p.cover_art_url, p.dropbox_folder
+         FROM projects p
+        WHERE p.kind = 'podcast' AND p.archived_at IS NULL
+        ORDER BY (SELECT MAX(COALESCE(r.record_date::timestamptz, r.created_at))
+                    FROM qa_recordings r WHERE r.project_id = p.id) DESC NULLS LAST,
+                 p.name ASC`,
     )
     // Every Slate account is a valid "shot by" / "QA by" pick — the crew
     // list IS the accounts list, per Ryan.

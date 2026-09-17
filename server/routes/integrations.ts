@@ -193,11 +193,9 @@ async function assertDropboxPathAllowed(
     if (rows.length === 0) return { ok: false, status: 404, error: 'song_not_found' }
     const songRoot = rows[0].dropbox_folder
     if (!songRoot) return { ok: false, status: 400, error: 'song_has_no_folder' }
-    const access = await pool.query(
-      `SELECT 1 FROM project_members WHERE project_id = $1 AND user_id = $2 LIMIT 1`,
-      [rows[0].project_id, user.id],
-    )
-    if (access.rows.length === 0) return { ok: false, status: 403, error: 'forbidden' }
+    // No membership check: everyone can browse every project's footage
+    // (Ryan, 2026-09-17: "everyone can see everything"). The real guard is
+    // the path containment below — non-admins still can't leave the folder.
     if (!isPathWithin(path, songRoot)) {
       return { ok: false, status: 403, error: `out_of_scope:path_must_be_within:${songRoot}` }
     }
@@ -211,11 +209,7 @@ async function assertDropboxPathAllowed(
   if (rows.length === 0) return { ok: false, status: 404, error: 'project_not_found' }
   const projectRoot = rows[0].dropbox_folder
   if (!projectRoot) return { ok: false, status: 400, error: 'project_has_no_folder' }
-  const access = await pool.query(
-    `SELECT 1 FROM project_members WHERE project_id = $1 AND user_id = $2 LIMIT 1`,
-    [scopeProjectId, user.id],
-  )
-  if (access.rows.length === 0) return { ok: false, status: 403, error: 'forbidden' }
+  // Same as song scope: no membership check, path containment is the guard.
   if (!isPathWithin(path, projectRoot)) {
     return { ok: false, status: 403, error: `out_of_scope:path_must_be_within:${projectRoot}` }
   }
@@ -349,15 +343,13 @@ integrationsRouter.get('/dropbox/file', requireUser, async (req, res) => {
         }
       }
     } else {
-      // Regular users: only folders on projects they're a member of.
+      // Regular users: any project's brand-assets folder (Ryan, 2026-09-17:
+      // "everyone can see everything") — the path-prefix check below still
+      // keeps them inside brand folders.
       const { rows } = await pool.query<{ folder: string }>(
         `SELECT p.brand_assets_folder AS folder
            FROM projects p
-           LEFT JOIN project_members m
-             ON m.project_id = p.id AND m.user_id = $1
-          WHERE p.brand_assets_folder IS NOT NULL
-            AND (p.created_by = $1 OR m.user_id IS NOT NULL)`,
-        [user.id],
+          WHERE p.brand_assets_folder IS NOT NULL`,
       )
       for (const r of rows) {
         if (filePath === r.folder || filePath.startsWith(r.folder + '/')) {
