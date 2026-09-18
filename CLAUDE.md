@@ -178,6 +178,67 @@ synced Dropbox footage, hands-off, for EVERY episode (not one test).
    post-deploy verification (end of file) still owed. Storage/archive work
    continues per the PR #80 handoff block (end of file): RHINO/RECOVERY
    top-up uploads, wave-1 completion, Auto-queue decision from Ryan.
+7. Anthropic-spend follow-through (2026-09-18 session, PRs #79/#81 merged +
+   deploy-verified): once Ryan actually switches plans (recommended Team →
+   Max 20x), update the recurring "Anthropic (Claude)" Cash Flow line via a
+   new migration ($150 → whatever he lands on) — do NOT change it before
+   the switch happens.
+8. **After Ryan's Team→Max switch (planned ~2026-09-19): recreate ALL of
+   Ryan's claude.ai Routines under his PERSONAL account — there are 14, not
+   just one.** Every Routine (Podbooster daily, Straw Hut site daily pass,
+   Notes→CRM sweep, Calendar prep, House alert, homepage stats refresh,
+   follow-up rhythms, the Nov 3 Jaeson Wilkins follow-up, the monthly
+   Anthropic reconciliation, etc.) lives on the TEAM account and stops
+   firing when the org lapses **2026-10-07**. Full inventory with schedules
+   and verbatim (token-redacted) prompts:
+   **`docs/ROUTINES_MIGRATION_2026-09-18.md`** — follow its instructions,
+   then disable the old team-account copies so nothing double-fires before
+   Oct 7. Prerequisites on the personal account first: GitHub
+   (claude.ai/connect-github, repo access to the three strawhutmedia repos)
+   + Gmail/QuickBooks/Railway/Dropbox/Slack connectors. The monthly
+   Anthropic Routine's first run also does item 7 (recurring line $150 →
+   $200 if he landed on Max 20x, verified from the first Max receipt).
+
+## 🧾 SESSION HANDOFF — 2026-09-18 (Anthropic spending → Cash Flow → Team→Max switch)
+
+Ryan asked why his Anthropic bill exploded and whether Slate's Cash Flow
+reflects it. Findings (all from primary sources — the Anthropic receipt
+emails in his Gmail, read individually):
+
+- **September 2026 Anthropic net through Sep 17: $1,324.46** — $150 Team
+  plan subscription (1 Premium + 1 Standard seat, bills the 7th) plus
+  ~$1,174 of one-time overage: 26 "Auto recharge extra usage, Team plan"
+  top-ups ($44–58 each, Sep 9–17, Claude Code sessions + auto-reload),
+  $90 prepaid extra usage, $63.61 API console credits, −$25.16 refund.
+  Prior months: Aug $170, Jul $65, Jun $28.
+- **Decision (Ryan, 2026-09-18): switching to Max 20x ($200/mo), planned
+  for ~2026-09-19.** Steps given to him: kill extra-usage auto-reload
+  (claude.ai/admin-settings/usage) → cancel Team (admin-settings/Billing;
+  access runs to Oct 7, no refund) → subscribe Max 20x on his PERSONAL
+  account (same email, accounts coexist; switch via initials bottom-left)
+  → `/login` again on his Mac + the edit PC → reconnect connectors on the
+  personal account. Remote Control + cloud sessions are confirmed included
+  on Max (code.claude.com/docs/en/feature-availability). Chat history does
+  NOT move between org and personal accounts.
+- **Servers are unaffected by the plan switch**: Slate/Podbooster/site call
+  the API with Console `ANTHROPIC_API_KEY`s (separate billing, the ~$20-28
+  "Auto-recharge credits" line) — nothing to change on Railway.
+- **Shipped & verified: migration `156_cashflow_anthropic_september_overage.sql`**
+  (PR #79, merged, confirmed applied via status-branch latest.json): logs
+  the $1,174.46 September overage as a one-time entry and corrects the
+  recurring line's stale "pay-as-you-go API" description (amount stays
+  $150 until the switch actually happens). PR #81 (merged) recorded the
+  Routine gotcha; the Routines inventory doc ships in the next PR.
+- **Cash Flow had no monthly expense update** — the only monthly automation
+  is `server/cashflow_payment_check.ts` (day 1–3, INCOME side only, emails
+  a digest, writes nothing; the bookkeeper's QuickBooks work never flows
+  into Slate). The monthly mechanism is now a claude.ai Routine ("Monthly
+  Anthropic → Slate Cash Flow reconciliation", 5th of each month, after the
+  bookkeeper's close): reads the prior month's Anthropic receipts from
+  Gmail, compares to the tracker, ships a sourced migration PR, emails Ryan
+  the delta, and flags loudly if extra-usage top-ups reappear (>2/month =
+  the pattern that cost ~$1,100). Currently on the TEAM account — see
+  next-steps item 8 for the migration of it and the other 13 Routines.
 
 <!-- End 2026-09-17 handoff -->
 
