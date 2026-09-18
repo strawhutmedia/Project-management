@@ -9,6 +9,8 @@ import {
   type QaRecordingInput,
 } from '../api'
 
+type PromoMomentDraft = { description: string; approxTime: string }
+
 // Production QA — the in-app home of the old "QA PRODUCTION SHEET":
 // every recording session gets logged (who shot it, which cards, where it
 // landed in Dropbox), then someone runs QA against the show's expected
@@ -153,6 +155,9 @@ type FormState = {
   dropboxPath: string
   notes: string
   shooterIds: string[]
+  // Create-only: promo moments called out at the shoot. On an existing
+  // recording they're managed live on the card (attribution survives).
+  promoMoments: PromoMomentDraft[]
 }
 
 const emptyForm = (): FormState => ({
@@ -169,6 +174,7 @@ const emptyForm = (): FormState => ({
   dropboxPath: '',
   notes: '',
   shooterIds: [],
+  promoMoments: [],
 })
 
 const formOf = (r: ApiQaRecording): FormState => ({
@@ -185,6 +191,7 @@ const formOf = (r: ApiQaRecording): FormState => ({
   dropboxPath: r.dropboxPath,
   notes: r.notes,
   shooterIds: r.shooters.map((s) => s.id),
+  promoMoments: [],
 })
 
 const toInput = (f: FormState): QaRecordingInput => ({
@@ -201,6 +208,7 @@ const toInput = (f: FormState): QaRecordingInput => ({
   dropboxPath: f.dropboxPath,
   notes: f.notes,
   shooterIds: f.shooterIds,
+  promoMoments: f.promoMoments,
 })
 
 function ShooterPicker({
@@ -233,12 +241,104 @@ function ShooterPicker({
   )
 }
 
+// Shared inputs for calling out one promo moment (description + rough
+// "where in the recording") — used by the log form and the card block.
+function MomentInputs({
+  description, approxTime, onDescription, onApproxTime, onAdd, busy,
+}: {
+  description: string
+  approxTime: string
+  onDescription: (v: string) => void
+  onApproxTime: (v: string) => void
+  onAdd: () => void
+  busy?: boolean
+}) {
+  const submit = (e: { key: string; preventDefault: () => void }) => {
+    if (e.key === 'Enter') { e.preventDefault(); onAdd() }
+  }
+  return (
+    <div className="flex flex-wrap gap-2">
+      <input
+        className={`${inputCls} !w-auto flex-1 min-w-[200px]`}
+        placeholder="Moment to promo (e.g. guest cracks up telling the tour-bus story)"
+        value={description}
+        onChange={(e) => onDescription(e.target.value)}
+        onKeyDown={submit}
+      />
+      <input
+        className={`${inputCls} !w-auto w-44`}
+        placeholder="When (e.g. ~20 min in)"
+        value={approxTime}
+        onChange={(e) => onApproxTime(e.target.value)}
+        onKeyDown={submit}
+      />
+      <button type="button" disabled={busy || !description.trim()} onClick={onAdd} className={`${btnGhost} disabled:opacity-40`}>
+        ＋ Add moment
+      </button>
+    </div>
+  )
+}
+
+// Create-form editor: moments queue up as separate entries and are saved
+// with the recording in one go.
+function MomentDraftEditor({
+  moments, onChange,
+}: {
+  moments: PromoMomentDraft[]
+  onChange: (m: PromoMomentDraft[]) => void
+}) {
+  const [description, setDescription] = useState('')
+  const [approxTime, setApproxTime] = useState('')
+  const add = () => {
+    const d = description.trim()
+    if (!d) return
+    onChange([...moments, { description: d, approxTime: approxTime.trim() }])
+    setDescription(''); setApproxTime('')
+  }
+  return (
+    <div>
+      <div className={labelCls}>Promo moments</div>
+      <div className="text-xs text-muted mt-0.5 mb-1.5">
+        Saw something while shooting that should be a promo? Call it out here — one entry per moment. The promo cutter hunts these down in the episode.
+      </div>
+      {moments.length > 0 && (
+        <div className="mb-2 space-y-1">
+          {moments.map((m, i) => (
+            <div key={i} className="flex items-start gap-2 group">
+              <span className="mt-0.5 shrink-0 text-[13px]">🎬</span>
+              <div className="min-w-0 flex-1 text-sm text-text/90">
+                {m.description}
+                {m.approxTime && <span className="ml-2 text-[11px] text-stage-tracking/90">{m.approxTime}</span>}
+              </div>
+              <button
+                type="button"
+                onClick={() => onChange(moments.filter((_, j) => j !== i))}
+                className="text-muted hover:text-urgent text-xs transition"
+                title="Remove moment"
+              >
+                ✕
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+      <MomentInputs
+        description={description}
+        approxTime={approxTime}
+        onDescription={setDescription}
+        onApproxTime={setApproxTime}
+        onAdd={add}
+      />
+    </div>
+  )
+}
+
 // Sentinel option value for the "add a show" entry in the show picker —
 // can't collide with a project id (those are UUIDs).
 const ADD_SHOW = '__add_show__'
 
 function RecordingForm({
-  ctx, initial, submitLabel, busy, onSubmit, onCancel, onShowCreated,
+  ctx, initial, submitLabel, busy, onSubmit, onCancel, onShowCreated, withPromoMoments,
 }: {
   ctx: ApiQaContext
   initial: FormState
@@ -247,6 +347,9 @@ function RecordingForm({
   onSubmit: (f: FormState) => void
   onCancel: () => void
   onShowCreated: (p: ApiQaContext['projects'][number]) => void
+  // Only the CREATE form collects moments — on an existing recording they're
+  // managed live on the card so attribution survives edits.
+  withPromoMoments?: boolean
 }) {
   const [f, setF] = useState<FormState>(initial)
   const [pickerOpen, setPickerOpen] = useState(false)
@@ -388,6 +491,11 @@ function RecordingForm({
           <div className={labelCls}>Who shot it</div>
           <div className="mt-1"><ShooterPicker users={ctx.users} selected={f.shooterIds} onChange={(ids) => set('shooterIds', ids)} /></div>
         </div>
+        {withPromoMoments && (
+          <div className="sm:col-span-2">
+            <MomentDraftEditor moments={f.promoMoments} onChange={(m) => set('promoMoments', m)} />
+          </div>
+        )}
         <div className="sm:col-span-2">
           <div className={labelCls}>Notes</div>
           <textarea
@@ -509,6 +617,84 @@ function ChecklistBlock({
   )
 }
 
+// Live promo-moments block on an existing recording — the uploader logs
+// them at the shoot, a producer can add more any time before the promos
+// are cut. Each entry keeps who called it out.
+function PromoMomentsBlock({
+  rec, canWrite, onPatched,
+}: {
+  rec: ApiQaRecording
+  canWrite: boolean
+  onPatched: (r: ApiQaRecording) => void
+}) {
+  const [description, setDescription] = useState('')
+  const [approxTime, setApproxTime] = useState('')
+  const [busy, setBusy] = useState(false)
+
+  const add = async () => {
+    const d = description.trim()
+    if (!d || busy) return
+    setBusy(true)
+    try {
+      const { recording } = await qaApi.addMoment(rec.id, { description: d, approxTime: approxTime.trim() })
+      setDescription(''); setApproxTime('')
+      onPatched(recording)
+    } finally {
+      setBusy(false)
+    }
+  }
+  const remove = async (momentId: string) => {
+    const out = await qaApi.deleteMoment(momentId)
+    if (out.recording) onPatched(out.recording)
+  }
+
+  return (
+    <div>
+      <div className={labelCls}>Promo moments</div>
+      {rec.promoMoments.length === 0 && (
+        <div className="text-xs text-muted mt-1">
+          None called out yet. Saw something worth a promo while shooting (or reviewing)? Add it below — one entry per moment.
+        </div>
+      )}
+      <div className="mt-1.5 space-y-1">
+        {rec.promoMoments.map((m) => (
+          <div key={m.id} className="flex items-start gap-2 group">
+            <span className="mt-0.5 shrink-0 text-[13px]">🎬</span>
+            <div className="min-w-0 flex-1">
+              <span className="text-sm text-text/90">{m.description}</span>
+              {m.approxTime && <span className="ml-2 text-[11px] text-stage-tracking/90">{m.approxTime}</span>}
+              {m.calledOutByName && (
+                <span className="ml-2 text-[11px] text-muted">— {m.calledOutByName}{m.createdAt ? ` · ${fmtWhen(m.createdAt)}` : ''}</span>
+              )}
+            </div>
+            {canWrite && (
+              <button
+                onClick={() => void remove(m.id)}
+                className="opacity-0 group-hover:opacity-100 text-muted hover:text-urgent text-xs transition"
+                title="Remove moment"
+              >
+                ✕
+              </button>
+            )}
+          </div>
+        ))}
+      </div>
+      {canWrite && (
+        <div className="mt-2">
+          <MomentInputs
+            description={description}
+            approxTime={approxTime}
+            onDescription={setDescription}
+            onApproxTime={setApproxTime}
+            onAdd={() => void add()}
+            busy={busy}
+          />
+        </div>
+      )}
+    </div>
+  )
+}
+
 function RecordingCard({
   rec, ctx, canWrite, onPatched, onDeleted, onShowCreated,
 }: {
@@ -582,6 +768,9 @@ function RecordingCard({
               {total > 0 && (
                 <span className={done === total ? 'text-stage-done' : ''}>· ☑ {done}/{total}</span>
               )}
+              {rec.promoMoments.length > 0 && (
+                <span>· 🎬 {rec.promoMoments.length} promo moment{rec.promoMoments.length === 1 ? '' : 's'}</span>
+              )}
               {rec.status === 'approved' && rec.qaByName && (
                 <span className="text-stage-done">· QA by {rec.qaByName} {fmtWhen(rec.qaAt)}</span>
               )}
@@ -647,6 +836,8 @@ function RecordingCard({
               )}
 
               <ChecklistBlock rec={rec} canWrite={canWrite} onPatched={onPatched} />
+
+              <PromoMomentsBlock rec={rec} canWrite={canWrite} onPatched={onPatched} />
 
               {canWrite && (
                 <div className="flex items-center gap-2 flex-wrap pt-1 border-t border-line/60">
@@ -901,6 +1092,7 @@ export default function QAPage() {
             onSubmit={(f) => void create(f)}
             onCancel={() => setCreating(false)}
             onShowCreated={showCreated}
+            withPromoMoments
           />
         </div>
       )}

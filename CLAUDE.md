@@ -170,7 +170,10 @@ synced Dropbox footage, hands-off, for EVERY episode (not one test).
 2. Build `poll.mjs` headless assembly bot (direct `.prproj` authoring) + install as a
    scheduled task (self-recovers on reboot, no autologon).
 3. Deliver the **prompt-caching measurement report**, then decide on caching.
-4. Remove **OpusClip**; start the in-house clips generator per `CUTTING-NOTES.md`.
+4. Remove **OpusClip**; start the in-house clips generator per `CUTTING-NOTES.md`
+   (the cutter's per-episode input now exists: QA **promo moments**, on
+   `/api/qa/approved` as `promoMoments` — see the 2026-09-18 promo-moments
+   handoff at the end of this file).
 5. ~~Verify Xavier/Riley/Blake are scoped to podcasts only~~ SUPERSEDED
    2026-09-17: everyone sees everything now (PR #78 handoff at end of file);
    Cash Flow / Invoices gates unchanged and verified in code.
@@ -1198,3 +1201,51 @@ live at 05:05 via `storage-verify.json` on the status branch).
   persists, the containers' scope excludes those subtrees → ONE paste on
   RED launches full-drive top-up containers (see
   `docs/ARCHIVE_MIGRATION_STATUS.md`).
+
+---
+
+# Session handoff — QA promo moments (2026-09-18, branch `claude/slate-qa-promo-moments-x4651f`)
+
+Ryan (verbatim intent): a field on each uploaded episode/recording where the
+uploader — or a producer later — enters the moments they watched happen while
+shooting that they want promos of, **a separate entry per moment**, which the
+promo cutter then hunts for when cutting promos. Built this session; in the
+PR on the branch above (draft until Ryan merges — NOT on main / not deployed
+until then).
+
+## What shipped
+
+- **Migration `158_qa_promo_moments.sql`** — `qa_promo_moments`: one row per
+  moment (`description` required, `approx_time` free text like "~20 min in",
+  `position`, `created_by`, FK → `qa_recordings` ON DELETE CASCADE).
+- **Server (`server/routes/qa.ts`)**:
+  - `loadRecordings` returns `promoMoments` (description, approxTime,
+    calledOutByName, createdAt) on every recording.
+  - `POST /api/qa/recordings` accepts `promoMoments: [{description,
+    approxTime}]` on CREATE only (stamped with the logger as created_by).
+    PATCH deliberately ignores it — post-create edits go through the moment
+    endpoints so attribution survives.
+  - New: `POST /api/qa/recordings/:id/moments`, `PATCH /api/qa/moments/:momentId`,
+    `DELETE /api/qa/moments/:momentId` (same assertQaAccess gates as checks).
+  - **`GET /api/qa/approved` (the premiere-bot/cutter feed) now carries
+    `promoMoments` per recording** — additive, token auth unchanged; this is
+    how the promo cutter is meant to receive them.
+- **UI (`src/pages/QAPage.tsx`)**: "Promo moments" editor in the Log-a-recording
+  form (queue entries, saved with the recording); a live "Promo moments" block
+  on every open recording card (add/remove any time, shows who called it out
+  and when); a `🎬 N promo moments` chip in the collapsed row. Client API in
+  `src/api.ts` (`ApiQaPromoMoment`, `qaApi.addMoment/setMoment/deleteMoment`).
+- **`automation/promos/CUTTING-NOTES.md`**: dated note telling the cutter to
+  cut the episode's Slate promo moments FIRST, then add its own finds.
+- Build verified clean locally (`npm run build`, client tsc + vite + server tsc).
+
+## Still open after merge
+
+- Post-deploy verification per the standing rule: bundle hash live, then log a
+  test-free check — open a recording on `/qa`, add a moment, confirm the chip,
+  and confirm `promoMoments` appears on `/api/qa/approved`.
+- The in-house clips generator (prioritized step 4) should consume
+  `promoMoments` from `/api/qa/approved`; the premiere-bot on the edit PC can
+  read the same field with its existing `QA_SERVICE_TOKEN`.
+- Nice-to-haves not built (ask Ryan before adding): promo moments in the daily
+  QA digest email; a "moment done/cut" checkbox for the cutter to tick off.
