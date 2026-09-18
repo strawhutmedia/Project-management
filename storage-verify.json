@@ -1,14 +1,14 @@
 {
-  "updatedAt": "2026-09-18T11:35:45.924Z",
+  "updatedAt": "2026-09-18T14:39:02.356Z",
   "runs": [
     {
       "name": "DROPBOX-WAVE1",
-      "run_at": "2026-09-18T11:35:45.908Z",
+      "run_at": "2026-09-18T14:39:02.333Z",
       "verdict": "INCOMPLETE",
       "files_expected": 37207,
-      "files_matched": 24420,
+      "files_matched": 29374,
       "tier2_matches": 0,
-      "missing_count": 12787,
+      "missing_count": 7833,
       "detail": {
         "targets": [
           {
@@ -219,11 +219,11 @@
           {
             "files": 18430,
             "target": "Ryan Tillotson/Old Dbox",
-            "matched": 5644,
+            "matched": 10598,
             "missing": [
               "Ryan Tillotson/Old Dbox/Ryan Old Dbox/Camera Uploads/2017-02-27 00.16.07.jpg",
-              "Ryan Tillotson/Old Dbox/Ryan Old Dbox/AWARE IMAGES/AWARE Invoices Etc/IND CONTRACTORS 1099s/ArturoO109915 001.tif",
-              "Ryan Tillotson/Old Dbox/Ryan Old Dbox/AWARE IMAGES/AWARE Invoices Etc/IND CONTRACTORS 1099s/CaleM109915 001.tif"
+              "Ryan Tillotson/Old Dbox/Ryan Old Dbox/AWARE IMAGES/Projects/Jennifer Partridge/PT36_ConnectingToYourTrueNature/GFX/PASTEL/Pastel-textures-backgrounds-forms/._Icon␍",
+              "Ryan Tillotson/Old Dbox/Ryan Old Dbox/AWARE IMAGES/AWARE Invoices Etc/WILLIAM STERLING/William Sterling Invoice copy.docx"
             ],
             "verdict": "in progress"
           }
@@ -232,12 +232,12 @@
     },
     {
       "name": "RECOVERY",
-      "run_at": "2026-09-18T05:05:44.701Z",
+      "run_at": "2026-09-18T14:39:02.333Z",
       "verdict": "INCOMPLETE",
       "files_expected": 22269,
-      "files_matched": 16148,
-      "tier2_matches": 3640,
-      "missing_count": 6121,
+      "files_matched": 16149,
+      "tier2_matches": 3641,
+      "missing_count": 6120,
       "detail": {
         "missing": [
           "1_PODCASTS/Can We Kick It/EPISODES/S3_EP01_060920/CWKI_S3_E1_060920_fullshow.mp3 (145079254 B)",
