@@ -830,24 +830,39 @@ async function runAndRecordVerify(name: string): Promise<VerifyResult & { name: 
   return { name, runAt: rows[0].run_at as string, ...r }
 }
 
-storageRouter.post('/transfers/:name/verify', async (req, res) => {
+// The button only KICKS OFF a verify and returns immediately — holding the
+// HTTP request open for a ~70k-object vault scan meant a redeploy or a phone
+// losing signal showed "Load failed" even though the check finished fine
+// server-side (2026-09-18, Ryan's screenshot). The verdict lands on the row
+// via the normal 30s poll.
+const verifyInFlight = new Set<string>()
+
+async function runVerifyGuarded(name: string): Promise<void> {
+  if (verifyInFlight.has(name)) return
+  verifyInFlight.add(name)
+  try {
+    await runAndRecordVerify(name)
+    await publishVerifySnapshot()
+  } catch (err) {
+    const detail = err instanceof Error ? err.message : String(err)
+    logError('storage verify failed', {
+      name,
+      error: /NoSuchKey/i.test(detail) ? 'census file not found in _INVENTORY — regenerate it on the NAS first' : detail,
+    })
+  } finally {
+    verifyInFlight.delete(name)
+  }
+}
+
+storageRouter.post('/transfers/:name/verify', (req, res) => {
   const name = String(req.params.name || '').replace(/[^A-Za-z0-9._-]/g, '').slice(0, 80)
   if (!VERIFIABLE.has(name)) {
     res.status(400).json({ error: 'verify_not_supported' })
     return
   }
-  try {
-    const run = await runAndRecordVerify(name)
-    void publishVerifySnapshot()
-    res.json({ ok: true, run })
-  } catch (err) {
-    const detail = err instanceof Error ? err.message : String(err)
-    logError('storage verify failed', { name, error: detail })
-    res.status(502).json({
-      error: 'verify_failed',
-      detail: /NoSuchKey/i.test(detail) ? 'census file not found in _INVENTORY — regenerate it on the NAS first' : detail,
-    })
-  }
+  const already = verifyInFlight.has(name)
+  if (!already) void runVerifyGuarded(name)
+  res.json({ ok: true, started: true, already })
 })
 
 // ── Auto-verify ────────────────────────────────────────────────────────
@@ -893,7 +908,6 @@ export async function autoVerifySweep(): Promise<void> {
        WHERE r.name = ANY($1)`,
       [[...VERIFIABLE]],
     )
-    let ran = false
     for (const r of rows) {
       const name = r.name as string
       const done = ((r.percent as number | null) ?? 0) >= 100
@@ -907,14 +921,8 @@ export async function autoVerifySweep(): Promise<void> {
       if (!isWave && !done) continue
       if (runAt > progressAt) continue
       if (isWave && runAt && Date.now() - runAt < WAVE1_REVERIFY_MS) continue
-      try {
-        await runAndRecordVerify(name)
-        ran = true
-      } catch (err) {
-        logError('storage auto-verify failed', { name, error: err instanceof Error ? err.message : String(err) })
-      }
+      await runVerifyGuarded(name)
     }
-    if (ran) await publishVerifySnapshot()
   } catch (err) {
     logError('storage auto-verify sweep failed', { error: err instanceof Error ? err.message : String(err) })
   } finally {
@@ -977,6 +985,7 @@ storageRouter.get('/transfers', async (_req, res) => {
           .slice(-5)
           .map((l) => (l.length > 220 ? l.slice(0, 220) + '…' : l)),
         verifiable: VERIFIABLE.has(r.name as string),
+        verifying: verifyInFlight.has(r.name as string),
         verify: r.verify_run_at
           ? {
               runAt: r.verify_run_at as string,
