@@ -60,8 +60,8 @@ export async function writeStatusFile(filePath: string, content: string, message
       if (res.ok) return { ok: true }
       const text = await res.text()
       lastErr = `github_${res.status}: ${text.slice(0, 200)}`
-      // Conflict (stale sha) → re-fetch sha and retry; other errors are terminal.
-      if (res.status !== 409 && res.status !== 422) return { ok: false, error: lastErr }
+      // Conflict (stale sha) → re-fetch sha and retry; transient server errors (5xx) → retry; other errors are terminal.
+      if (res.status !== 409 && res.status !== 422 && res.status < 500) return { ok: false, error: lastErr }
     } catch (err) {
       lastErr = err instanceof Error ? err.message : String(err)
     }
@@ -113,7 +113,7 @@ export async function appendStatusJsonl(filePath: string, entry: unknown): Promi
       if (res.ok) return { ok: true }
       const text = await res.text()
       lastErr = `github_${res.status}: ${text.slice(0, 200)}`
-      if (res.status !== 409 && res.status !== 422) return { ok: false, error: lastErr }
+      if (res.status !== 409 && res.status !== 422 && res.status < 500) return { ok: false, error: lastErr }
     } catch (err) {
       lastErr = err instanceof Error ? err.message : String(err)
     }

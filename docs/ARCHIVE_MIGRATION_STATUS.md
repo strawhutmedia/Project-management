@@ -63,6 +63,56 @@ each run logs a `storage verify` line that lands in the status branch's
 - Verify runs are audits, kept forever in `storage_verify_runs`
   (migration `156`).
 
+## Auto-verify results — 2026-09-18 (sweeps 05:05 / 14:39 / 15:00 UTC)
+
+Read from `storage-verify.json` on the status branch; acted on immediately.
+
+- **Wave 1 is nearly DONE**: by the 14:39 sweep, 29 of 30 targets were fully
+  in the vault. All previously deleted folders re-verified clean, and **11
+  more were verified then deleted Sept 18** (see log above; the last 7 at
+  ~15:30 UTC). Remaining ONLY: `Ryan Tillotson/Old Dbox` (10,598/18,430
+  files landed, still uploading/queued) and one HeartBreakers file
+  (`4_SOCIAL/HeartBreakers/Ep029_Solo/HB CAM 3 02.braw`). Wave 1 shows
+  paused with **Auto-queue OFF** (Ryan hasn't said whether that was
+  deliberate) — yet vault coverage for its targets grew massively between
+  sweeps, so uploads ARE landing; confirm which job is carrying them before
+  assuming the wave is stalled.
+- **CLIENTS (RED): VERIFIED** — all 1,490 census files in the vault
+  (15:00 sweep, zero missing).
+- **HENRI (Henri Recordings coverage): 25 of 27** — missing only
+  `Henri.prin` + `Henri.prproj` (~110 KB total, Premiere project files in
+  `Ryan Tillotson/Henri Recordings/`). Not deletable until they land AND
+  the folder passes the 1-year gate (2026-10-24).
+- **RHINO: NOT wipe-safe.** Census 13,331 files → 11,917 in vault (88 by
+  name+size), **1,414 missing** — mostly
+  `1_PODCASTS/Brandi Glanville Unfiltered/1_Episodes/_Archive_/…` WAVs.
+  The rclone job legitimately "Finished" — its source scope was narrower
+  than the drive census. The files are still ON the physical drive; a
+  follow-up upload covering the missing subtrees is needed before the
+  drive can be swapped/wiped.
+- **RECOVERY: NOT wipe-safe.** Census 22,269 → 16,148 matched (3,640 by
+  name+size), **6,121 missing** — e.g. the whole
+  `1_PODCASTS/Can We Kick It/EPISODES/S3_*` season. Same shape as RHINO:
+  job scope < census; files still on the drive; needs a top-up upload.
+- **CRITICAL (confirmed 2026-09-18 via Dropbox connector): the missing
+  RHINO/RECOVERY files are SOLE COPIES.** They are NOT in Dropbox anymore —
+  `1_PODCASTS/Can We Kick It` does not exist in the team space at all, and
+  `Brandi Glanville Unfiltered/1_Episodes/_Archive_` is gone (the show
+  folder itself still exists, 394 GB). Ryan confirmed the old workflow:
+  files started on Dropbox and were MOVED to these drives. So until the
+  top-ups land in the vault, those ~7,500 files exist only on two bare
+  HDDs. Ryan also confirmed the partial upload was NOT intentional —
+  "get it all uploaded." **Do not wipe, swap, or unplug RHINO/RECOVERY.**
+- Fix path (no terminal first): Ryan taps **Resume** on the RHINO and
+  RECOVERY rows — docker restarts the same rclone containers; with
+  `--ignore-existing` they only send what's missing IF the missing subtrees
+  are inside the containers' source scope. Auto-verify re-checks by itself
+  when they finish. If the gap persists after that, the containers' source
+  scope excludes those subtrees and closing it needs ONE paste on RED
+  (a full-drive `rclone copy` top-up container per drive — prep the exact
+  docker command for Ryan, wave1.sh shape, `--ignore-existing` so nothing
+  re-sends).
+
 ## ⚡ IF YOU ARE THE NEXT SESSION — DO THIS FIRST, UNPROMPTED
 
 Wave 1 was still uploading when the last session archived. This work is
@@ -146,7 +196,16 @@ Sept 17: Hollywood Horror Stories 58, The Inside Track 63, Brandi Glanville
 PurchasedMaterials 33, Decks & Marketing 7.5, Newsletter 6.5, History. Rated
 R. 4.2, Virgo Sisters 7.8, Salt and Flickers 85, HeartBreakers (podcast) 137,
 Straw Hut Ads 133, Podcast Primer Pro 163, Rainbow Media 310.
-**Running total ≈ 1.7 TB freed.**
+Sept 18 (personal space `ns:1531957776`, vault-verified by Slate auto-verify
+run 05:05 UTC, deleted via Dropbox connector): You Are U 123 GB (1,891
+files), Indy Automous challenge podcast 81 GB (4 files — recounted live in
+Dropbox before delete, exactly 4), Ryan Personal Photos 74 GB (4,910 files),
+Straw Hut General's files 100 GB (2,973 files).
+Sept 18 later (vault-verified by the 14:39 UTC auto-verify sweep, deleted via
+Dropbox connector): Don't Be Alone with Jay Kogen (1) 45 GB, (2) 37 GB,
+(3) 18.5 GB, Camera Uploads (1) 12.4 GB, Videos 10.6 GB, Shaping Freedom
+Podcast 13.1 GB, Apps 465.6 GB (2,592 files).
+**Running total ≈ 2.7 TB freed.**
 
 ## Wave 1 (in flight at archive time)
 

@@ -853,7 +853,9 @@ export type ApiArchiveTransfer = {
   errors: number
   errorLines?: string[]
   verifiable?: boolean
+  verifying?: boolean
   verify?: ApiArchiveVerify | null
+  heal?: { attempts: number; maxAttempts: number; acceptedMissing: number | null; acceptedAt: string | null } | null
   lastProgressAt?: string
   currentFiles?: Array<{ name: string; pct: number | null; speed: string; eta: string }>
   reportedAt: string
@@ -1096,8 +1098,13 @@ export const api = {
   storageTransferDismiss: (name: string) =>
     request<{ ok: boolean }>(`/api/storage/transfers/${encodeURIComponent(name)}/dismiss`, { method: 'POST', body: '{}' }),
   storageVerify: (name: string) =>
-    request<{ ok: boolean; run: ApiArchiveVerify & { name: string } }>(
+    request<{ ok: boolean; started: boolean; already?: boolean }>(
       `/api/storage/transfers/${encodeURIComponent(name)}/verify`,
+      { method: 'POST', body: '{}' },
+    ),
+  storageAcceptMissing: (name: string) =>
+    request<{ ok: boolean; accepted: number }>(
+      `/api/storage/transfers/${encodeURIComponent(name)}/accept-missing`,
       { method: 'POST', body: '{}' },
     ),
   storageTransferCommand: (name: string, action: 'pause' | 'resume') =>

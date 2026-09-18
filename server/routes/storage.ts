@@ -575,7 +575,17 @@ const WAVE1_TARGETS = [
   'Ryan Tillotson/Apps', 'Ryan Tillotson/Old Dbox',
 ]
 
-const VERIFIABLE = new Set([...Object.keys(DRIVE_CENSUS), 'DROPBOX-WAVE1'])
+// NAS-box upload rows (RED = bare name, BLUE- prefix): verified against that
+// box's census listing, filtered to the roots this row uploads (same root
+// mapping as ledger2.mjs).
+const BOX_ROWS: Record<string, { census: string; roots: string[]; vaultRoot: string }> = {
+  PODCASTS: { census: '_INVENTORY/inventory-RED.txt', roots: ['PODCASTS', 'Podcast'], vaultRoot: '1_PODCASTS' },
+  CLIENTS: { census: '_INVENTORY/inventory-RED.txt', roots: ['CLIENTS'], vaultRoot: '2_CLIENTS' },
+  'BLUE-PODCASTS': { census: '_INVENTORY/inventory-BLUE.txt', roots: ['PODCASTS', 'Podcast'], vaultRoot: '1_PODCASTS' },
+  'BLUE-CLIENTS': { census: '_INVENTORY/inventory-BLUE.txt', roots: ['CLIENTS'], vaultRoot: '2_CLIENTS' },
+}
+
+const VERIFIABLE = new Set([...Object.keys(DRIVE_CENSUS), ...Object.keys(BOX_ROWS), 'HENRI', 'DROPBOX-WAVE1'])
 
 // Full vault listing as a lookup index (~70k objects ≈ 70 LIST calls, a few
 // seconds). Cached briefly so back-to-back verifies don't re-scan.
@@ -669,6 +679,87 @@ async function verifyDrive(name: string): Promise<VerifyResult> {
   }
 }
 
+// A NAS-box upload row (PODCASTS / CLIENTS / BLUE-*): every file the box's
+// census lists under this row's roots must be in the vault at the mapped
+// path+size (tier 1) or anywhere by basename+size (tier 2).
+async function verifyBox(name: string): Promise<VerifyResult> {
+  const src = BOX_ROWS[name]
+  const [census, vault] = await Promise.all([fetchInventory(src.census), vaultIndex()])
+  let expected = 0
+  let matched = 0
+  let tier2 = 0
+  const missing: string[] = []
+  for (const line of census.split('\n')) {
+    const m = line.match(/^(\d+) (.+)$/)
+    if (!m) continue
+    const parts = m[2].split('/')
+    if (!src.roots.includes(parts[0]) || parts.length < 2) continue
+    const rel = parts.slice(1).join('/')
+    if (VERIFY_SKIP_RE.test(rel)) continue
+    const size = +m[1]
+    const key = src.vaultRoot + '/' + rel
+    expected += 1
+    if (vault.byPath.get(key) === size) matched += 1
+    else if (vault.byNameSize.has((rel.split('/').pop() || '') + '|' + size)) {
+      matched += 1
+      tier2 += 1
+    } else if (missing.length < 20) missing.push(`${key} (${size} B)`)
+  }
+  const missingCount = expected - matched
+  return {
+    verdict: missingCount === 0 ? 'VERIFIED' : 'INCOMPLETE',
+    filesExpected: expected,
+    filesMatched: matched,
+    tier2Matches: tier2,
+    missingCount,
+    detail: missingCount ? { missing } : null,
+  }
+}
+
+// HENRI (the Henri Recordings top-up): coverage of the whole Henri
+// Recordings Dropbox folder from the team census, matched tier 1 by
+// normalized path or tier 2 by basename+size anywhere in the vault (the
+// wave-2 rule — RHINO landed the same content under 1_PODCASTS/Henri G/).
+async function verifyHenri(): Promise<VerifyResult> {
+  const [censusCsv, vault] = await Promise.all([
+    fetchInventory('_INVENTORY/inventory-DROPBOX-TEAM.csv'),
+    vaultIndex(),
+  ])
+  let expected = 0
+  let matched = 0
+  let tier2 = 0
+  const missing: string[] = []
+  for (const line of censusCsv.split('\n')) {
+    if (!line.trim()) continue
+    const i = line.indexOf(';')
+    if (i < 1) continue
+    const j = line.indexOf(';', i + 1)
+    if (j < 0) continue
+    const size = +line.slice(0, i)
+    let p = line.slice(j + 1)
+    if (!Number.isFinite(size)) continue
+    if (p.startsWith('Straw Hut Team Folder/')) p = p.slice('Straw Hut Team Folder/'.length)
+    if (VERIFY_SKIP_RE.test(p)) continue
+    if (!p.split('/').some((seg) => /^henri recordings$/i.test(seg))) continue
+    expected += 1
+    if (vault.byPath.get(p) === size) matched += 1
+    else if (vault.byNameSize.has((p.split('/').pop() || '') + '|' + size)) {
+      matched += 1
+      tier2 += 1
+    } else if (missing.length < 20) missing.push(`${p} (${size} B)`)
+  }
+  if (expected === 0) throw new Error('no census entries for Henri Recordings — regenerate the team census')
+  const missingCount = expected - matched
+  return {
+    verdict: missingCount === 0 ? 'VERIFIED' : 'INCOMPLETE',
+    filesExpected: expected,
+    filesMatched: matched,
+    tier2Matches: tier2,
+    missingCount,
+    detail: missingCount ? { missing } : null,
+  }
+}
+
 // Wave 1: per target folder, every Dropbox file (from the team census) must
 // be in the vault at the exact normalized path with the same size — the
 // strict tier-1-only rule the deletion loop uses.
@@ -718,7 +809,11 @@ async function verifyWave1(): Promise<VerifyResult> {
 
 async function runAndRecordVerify(name: string): Promise<VerifyResult & { name: string; runAt: string }> {
   const started = Date.now()
-  const r = name === 'DROPBOX-WAVE1' ? await verifyWave1() : await verifyDrive(name)
+  const r =
+    name === 'DROPBOX-WAVE1' ? await verifyWave1()
+    : name === 'HENRI' ? await verifyHenri()
+    : BOX_ROWS[name] ? await verifyBox(name)
+    : await verifyDrive(name)
   const { rows } = await pool.query(
     `INSERT INTO storage_verify_runs (name, verdict, files_expected, files_matched, tier2_matches, missing_count, detail)
      VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING run_at`,
@@ -735,24 +830,139 @@ async function runAndRecordVerify(name: string): Promise<VerifyResult & { name: 
   return { name, runAt: rows[0].run_at as string, ...r }
 }
 
-storageRouter.post('/transfers/:name/verify', async (req, res) => {
+// The button only KICKS OFF a verify and returns immediately — holding the
+// HTTP request open for a ~70k-object vault scan meant a redeploy or a phone
+// losing signal showed "Load failed" even though the check finished fine
+// server-side (2026-09-18, Ryan's screenshot). The verdict lands on the row
+// via the normal 30s poll.
+const verifyInFlight = new Set<string>()
+
+async function runVerifyGuarded(name: string): Promise<void> {
+  if (verifyInFlight.has(name)) return
+  verifyInFlight.add(name)
+  try {
+    await runAndRecordVerify(name)
+    await publishVerifySnapshot()
+    await maybeHeal(name)
+  } catch (err) {
+    const detail = err instanceof Error ? err.message : String(err)
+    logError('storage verify failed', {
+      name,
+      error: /NoSuchKey/i.test(detail) ? 'census file not found in _INVENTORY — regenerate it on the NAS first' : detail,
+    })
+  } finally {
+    verifyInFlight.delete(name)
+  }
+}
+
+// ── Auto-heal (Ryan, 2026-09-18: "it should be corrected immediately by
+// you and keep trying to upload until everything is there") ──────────────
+// A verify that finds missing files on a FINISHED, healable job re-issues
+// that job's start command itself — the exact mechanism behind the Resume
+// button, so the NAS re-runs the same rclone container, which skips
+// everything already uploaded (--ignore-existing) and sends only strays.
+// `attempts` counts consecutive re-runs that did NOT shrink the missing
+// count; after 3 the server stops retrying and the row asks Ryan to widen
+// the job's folder scope on the NAS or approve skipping the listed files.
+const HEAL_MAX_NO_PROGRESS = 3
+const HEALABLE = new Set([...Object.keys(DRIVE_CENSUS), ...Object.keys(BOX_ROWS), 'HENRI'])
+
+async function maybeHeal(name: string): Promise<void> {
+  if (!HEALABLE.has(name)) return
+  try {
+    const { rows } = await pool.query(
+      `SELECT v.missing_count, r.percent,
+              c.action AS cmd_action, c.executed_at AS cmd_executed_at,
+              h.attempts, h.last_missing, h.accepted_missing
+       FROM storage_transfer_reports r
+       LEFT JOIN LATERAL (
+         SELECT missing_count FROM storage_verify_runs WHERE name = r.name ORDER BY run_at DESC LIMIT 1
+       ) v ON true
+       LEFT JOIN storage_transfer_commands c ON c.name = r.name
+       LEFT JOIN storage_heal_state h ON h.name = r.name
+       WHERE r.name = $1`,
+      [name],
+    )
+    const r = rows[0]
+    if (!r || r.missing_count == null) return
+    const missing = r.missing_count as number
+    if (missing === 0) {
+      // fully landed — clear retry bookkeeping (keep an acceptance if one exists)
+      await pool.query(`DELETE FROM storage_heal_state WHERE name = $1 AND accepted_missing IS NULL`, [name])
+      return
+    }
+    if (r.accepted_missing != null && missing <= (r.accepted_missing as number)) return // Ryan approved skipping these
+    if (((r.percent as number | null) ?? 0) < 100) return // job is already running again
+    if (r.cmd_action && !r.cmd_executed_at) return // a command is already pending on the NAS
+    const attempts = (r.attempts as number | null) ?? 0
+    const lastMissing = r.last_missing as number | null
+    const progressed = lastMissing == null || missing < lastMissing
+    if (!progressed && attempts >= HEAL_MAX_NO_PROGRESS) return // gave up — the row asks Ryan
+    await pool.query(
+      `INSERT INTO storage_transfer_commands (name, action, requested_at, executed_at)
+       VALUES ($1, 'start', now(), NULL)
+       ON CONFLICT (name) DO UPDATE SET action = 'start', requested_at = now(), executed_at = NULL`,
+      [name],
+    )
+    const nextAttempts = progressed ? 1 : attempts + 1
+    await pool.query(
+      `INSERT INTO storage_heal_state (name, attempts, last_missing, updated_at)
+       VALUES ($1, $2, $3, now())
+       ON CONFLICT (name) DO UPDATE SET attempts = $2, last_missing = $3, updated_at = now()`,
+      [name, nextAttempts, missing],
+    )
+    logInfo('storage auto-heal: re-running upload to pick up missing files', {
+      name,
+      missing,
+      attempt: nextAttempts,
+      maxWithoutProgress: HEAL_MAX_NO_PROGRESS,
+    })
+  } catch (err) {
+    logError('storage auto-heal failed', { name, error: err instanceof Error ? err.message : String(err) })
+  }
+}
+
+// Ryan's explicit approval that the currently missing files don't need to
+// be uploaded. Affects reporting only — deletes nothing, uploads nothing.
+storageRouter.post('/transfers/:name/accept-missing', async (req, res) => {
   const name = String(req.params.name || '').replace(/[^A-Za-z0-9._-]/g, '').slice(0, 80)
   if (!VERIFIABLE.has(name)) {
     res.status(400).json({ error: 'verify_not_supported' })
     return
   }
   try {
-    const run = await runAndRecordVerify(name)
-    void publishVerifySnapshot()
-    res.json({ ok: true, run })
+    const { rows } = await pool.query(
+      `SELECT missing_count FROM storage_verify_runs WHERE name = $1 ORDER BY run_at DESC LIMIT 1`,
+      [name],
+    )
+    const missing = rows[0]?.missing_count as number | undefined
+    if (missing == null || missing === 0) {
+      res.status(400).json({ error: 'nothing_to_accept' })
+      return
+    }
+    await pool.query(
+      `INSERT INTO storage_heal_state (name, attempts, last_missing, accepted_missing, accepted_at, updated_at)
+       VALUES ($1, 0, $2, $2, now(), now())
+       ON CONFLICT (name) DO UPDATE SET accepted_missing = $2, accepted_at = now(), updated_at = now()`,
+      [name, missing],
+    )
+    logInfo('storage verify: admin approved skipping missing files', { name, missing })
+    res.json({ ok: true, accepted: missing })
   } catch (err) {
-    const detail = err instanceof Error ? err.message : String(err)
-    logError('storage verify failed', { name, error: detail })
-    res.status(502).json({
-      error: 'verify_failed',
-      detail: /NoSuchKey/i.test(detail) ? 'census file not found in _INVENTORY — regenerate it on the NAS first' : detail,
-    })
+    logError('storage accept-missing failed', { name, error: err instanceof Error ? err.message : String(err) })
+    res.status(500).json({ error: 'accept_failed' })
   }
+})
+
+storageRouter.post('/transfers/:name/verify', (req, res) => {
+  const name = String(req.params.name || '').replace(/[^A-Za-z0-9._-]/g, '').slice(0, 80)
+  if (!VERIFIABLE.has(name)) {
+    res.status(400).json({ error: 'verify_not_supported' })
+    return
+  }
+  const already = verifyInFlight.has(name)
+  if (!already) void runVerifyGuarded(name)
+  res.json({ ok: true, started: true, already })
 })
 
 // ── Auto-verify ────────────────────────────────────────────────────────
@@ -798,7 +1008,6 @@ export async function autoVerifySweep(): Promise<void> {
        WHERE r.name = ANY($1)`,
       [[...VERIFIABLE]],
     )
-    let ran = false
     for (const r of rows) {
       const name = r.name as string
       const done = ((r.percent as number | null) ?? 0) >= 100
@@ -810,16 +1019,15 @@ export async function autoVerifySweep(): Promise<void> {
       // as it progresses, at most every 6h (a full check reads the big team
       // census from S3 — no need to do that every sweep).
       if (!isWave && !done) continue
-      if (runAt > progressAt) continue
-      if (isWave && runAt && Date.now() - runAt < WAVE1_REVERIFY_MS) continue
-      try {
-        await runAndRecordVerify(name)
-        ran = true
-      } catch (err) {
-        logError('storage auto-verify failed', { name, error: err instanceof Error ? err.message : String(err) })
+      if (runAt > progressAt) {
+        // Verdict is current — no re-verify needed, but a current verdict
+        // with missing files is exactly what auto-heal exists for.
+        await maybeHeal(name)
+        continue
       }
+      if (isWave && runAt && Date.now() - runAt < WAVE1_REVERIFY_MS) continue
+      await runVerifyGuarded(name)
     }
-    if (ran) await publishVerifySnapshot()
   } catch (err) {
     logError('storage auto-verify sweep failed', { error: err instanceof Error ? err.message : String(err) })
   } finally {
@@ -843,10 +1051,12 @@ storageRouter.get('/transfers', async (_req, res) => {
               c.action AS cmd_action, c.requested_at AS cmd_requested_at, c.executed_at AS cmd_executed_at,
               v.run_at AS verify_run_at, v.verdict AS verify_verdict, v.files_expected AS verify_expected,
               v.files_matched AS verify_matched, v.tier2_matches AS verify_tier2,
-              v.missing_count AS verify_missing, v.detail AS verify_detail
+              v.missing_count AS verify_missing, v.detail AS verify_detail,
+              h.attempts AS heal_attempts, h.accepted_missing AS heal_accepted, h.accepted_at AS heal_accepted_at
        FROM storage_transfer_reports r
        LEFT JOIN storage_transfer_commands c ON c.name = r.name
        LEFT JOIN storage_transfer_dismissals d ON d.name = r.name
+       LEFT JOIN storage_heal_state h ON h.name = r.name
        LEFT JOIN LATERAL (
          SELECT run_at, verdict, files_expected, files_matched, tier2_matches, missing_count, detail
          FROM storage_verify_runs WHERE name = r.name ORDER BY run_at DESC LIMIT 1
@@ -882,6 +1092,16 @@ storageRouter.get('/transfers', async (_req, res) => {
           .slice(-5)
           .map((l) => (l.length > 220 ? l.slice(0, 220) + '…' : l)),
         verifiable: VERIFIABLE.has(r.name as string),
+        verifying: verifyInFlight.has(r.name as string),
+        heal:
+          r.heal_attempts != null || r.heal_accepted != null
+            ? {
+                attempts: (r.heal_attempts as number | null) ?? 0,
+                maxAttempts: HEAL_MAX_NO_PROGRESS,
+                acceptedMissing: (r.heal_accepted as number | null) ?? null,
+                acceptedAt: (r.heal_accepted_at as string | null) ?? null,
+              }
+            : null,
         verify: r.verify_run_at
           ? {
               runAt: r.verify_run_at as string,
