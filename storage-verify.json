@@ -1,5 +1,5 @@
 {
-  "updatedAt": "2026-09-18T17:03:33.923Z",
+  "updatedAt": "2026-09-18T21:00:36.320Z",
   "runs": [
     {
       "name": "CLIENTS",
@@ -13,12 +13,12 @@
     },
     {
       "name": "DROPBOX-WAVE1",
-      "run_at": "2026-09-18T14:39:02.333Z",
+      "run_at": "2026-09-18T21:00:36.309Z",
       "verdict": "INCOMPLETE",
       "files_expected": 37207,
-      "files_matched": 29374,
+      "files_matched": 37205,
       "tier2_matches": 0,
-      "missing_count": 7833,
+      "missing_count": 2,
       "detail": {
         "targets": [
           {
@@ -229,11 +229,9 @@
           {
             "files": 18430,
             "target": "Ryan Tillotson/Old Dbox",
-            "matched": 10598,
+            "matched": 18429,
             "missing": [
-              "Ryan Tillotson/Old Dbox/Ryan Old Dbox/Camera Uploads/2017-02-27 00.16.07.jpg",
-              "Ryan Tillotson/Old Dbox/Ryan Old Dbox/AWARE IMAGES/Projects/Jennifer Partridge/PT36_ConnectingToYourTrueNature/GFX/PASTEL/Pastel-textures-backgrounds-forms/._Icon␍",
-              "Ryan Tillotson/Old Dbox/Ryan Old Dbox/AWARE IMAGES/AWARE Invoices Etc/WILLIAM STERLING/William Sterling Invoice copy.docx"
+              "Ryan Tillotson/Old Dbox/Ryan Old Dbox/AWARE IMAGES/Projects/Jennifer Partridge/PT36_ConnectingToYourTrueNature/GFX/PASTEL/Pastel-textures-backgrounds-forms/._Icon␍"
             ],
             "verdict": "in progress"
           }
