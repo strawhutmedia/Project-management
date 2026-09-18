@@ -1,14 +1,14 @@
 {
-  "updatedAt": "2026-09-18T05:05:45.677Z",
+  "updatedAt": "2026-09-18T11:35:45.924Z",
   "runs": [
     {
       "name": "DROPBOX-WAVE1",
-      "run_at": "2026-09-18T05:05:45.664Z",
+      "run_at": "2026-09-18T11:35:45.908Z",
       "verdict": "INCOMPLETE",
       "files_expected": 37207,
-      "files_matched": 15418,
+      "files_matched": 24420,
       "tier2_matches": 0,
-      "missing_count": 21789,
+      "missing_count": 12787,
       "detail": {
         "targets": [
           {
@@ -170,90 +170,62 @@
           {
             "files": 6,
             "target": "Ryan Tillotson/Don't Be Alone with Jay Kogen (1)",
-            "matched": 1,
-            "missing": [
-              "Ryan Tillotson/Don't Be Alone with Jay Kogen (1)/DBA Dana Gould.mp4",
-              "Ryan Tillotson/Don't Be Alone with Jay Kogen (1)/DBA Dave Foley.mp4",
-              "Ryan Tillotson/Don't Be Alone with Jay Kogen (1)/DBA Grunny.mp4"
-            ],
-            "verdict": "in progress"
+            "matched": 6,
+            "missing": [],
+            "verdict": "VERIFIED — DELETABLE"
           },
           {
             "files": 5,
             "target": "Ryan Tillotson/Don't Be Alone with Jay Kogen (2)",
-            "matched": 0,
-            "missing": [
-              "Ryan Tillotson/Don't Be Alone with Jay Kogen (2)/DBA Dana Gould.mp4",
-              "Ryan Tillotson/Don't Be Alone with Jay Kogen (2)/DBA Dave Foley.mp4",
-              "Ryan Tillotson/Don't Be Alone with Jay Kogen (2)/DBA Grunny.mp4"
-            ],
-            "verdict": "not started"
+            "matched": 5,
+            "missing": [],
+            "verdict": "VERIFIED — DELETABLE"
           },
           {
             "files": 93,
             "target": "Ryan Tillotson/Don't Be Alone with Jay Kogen (3)",
-            "matched": 0,
-            "missing": [
-              "Ryan Tillotson/Don't Be Alone with Jay Kogen (3)/LarryWilmore DBAWJK opening.MOV",
-              "Ryan Tillotson/Don't Be Alone with Jay Kogen (3)/Arnie Kogen DBAWJK OPENINGS/VIDEO__20250226_152653_729.mp4",
-              "Ryan Tillotson/Don't Be Alone with Jay Kogen (3)/Arnie Kogen DBAWJK OPENINGS/VIDEO__20250226_154219_354.mp4"
-            ],
-            "verdict": "not started"
+            "matched": 93,
+            "missing": [],
+            "verdict": "VERIFIED — DELETABLE"
           },
           {
             "files": 20,
             "target": "Ryan Tillotson/Camera Uploads (1)",
-            "matched": 0,
-            "missing": [
-              "Ryan Tillotson/Camera Uploads (1)/2021-08-23 11.35.54.mp4",
-              "Ryan Tillotson/Camera Uploads (1)/2021-08-23 11.38.18.mp4",
-              "Ryan Tillotson/Camera Uploads (1)/2021-08-23 11.39.29.mp4"
-            ],
-            "verdict": "not started"
+            "matched": 20,
+            "missing": [],
+            "verdict": "VERIFIED — DELETABLE"
           },
           {
             "files": 23,
             "target": "Ryan Tillotson/Videos",
-            "matched": 0,
-            "missing": [
-              "Ryan Tillotson/Videos/IMG_9515.MOV",
-              "Ryan Tillotson/Videos/Stacey Ep 52 Ian.mp4",
-              "Ryan Tillotson/Videos/The Shit Podcast - 3-25-2021.mp4"
-            ],
-            "verdict": "not started"
+            "matched": 23,
+            "missing": [],
+            "verdict": "VERIFIED — DELETABLE"
           },
           {
             "files": 620,
             "target": "Ryan Tillotson/Shaping Freedom Podcast",
-            "matched": 0,
-            "missing": [
-              "Ryan Tillotson/Shaping Freedom Podcast/Plsrateandreview.wav",
-              "Ryan Tillotson/Shaping Freedom Podcast/Aaron Robinson/Aaron Family legacy Thumbnail .png",
-              "Ryan Tillotson/Shaping Freedom Podcast/Ainsley/AinsleyBreak1.wav"
-            ],
-            "verdict": "not started"
+            "matched": 620,
+            "missing": [],
+            "verdict": "VERIFIED — DELETABLE"
           },
           {
             "files": 2592,
             "target": "Ryan Tillotson/Apps",
-            "matched": 0,
-            "missing": [
-              "Ryan Tillotson/Apps/zencastr/ab-madsen-promo/recording-1/2021-06-23--t11-09-50pm--5eab4f9366d84600bc67b692--strawhutmedia (1).mov",
-              "Ryan Tillotson/Apps/zencastr/ab-madsen-promo/recording-1/2021-06-23--t11-09-50pm--5eab4f9366d84600bc67b692--strawhutmedia.mov",
-              "Ryan Tillotson/Apps/zencastr/ab-madsen-promo/recording-1/2021-06-23--t11-09-50pm--5eab4f9366d84600bc67b692--strawhutmedia.mp3"
-            ],
-            "verdict": "not started"
+            "matched": 2592,
+            "missing": [],
+            "verdict": "VERIFIED — DELETABLE"
           },
           {
             "files": 18430,
             "target": "Ryan Tillotson/Old Dbox",
-            "matched": 0,
+            "matched": 5644,
             "missing": [
-              "Ryan Tillotson/Old Dbox/Ryan Old Dbox/Hystera.mp4",
-              "Ryan Tillotson/Old Dbox/Ryan Old Dbox/RyanApplicationInfo.docx",
-              "Ryan Tillotson/Old Dbox/Ryan Old Dbox/A Lesson In Slove/LessonInSlove.mp3"
+              "Ryan Tillotson/Old Dbox/Ryan Old Dbox/Camera Uploads/2017-02-27 00.16.07.jpg",
+              "Ryan Tillotson/Old Dbox/Ryan Old Dbox/AWARE IMAGES/AWARE Invoices Etc/IND CONTRACTORS 1099s/ArturoO109915 001.tif",
+              "Ryan Tillotson/Old Dbox/Ryan Old Dbox/AWARE IMAGES/AWARE Invoices Etc/IND CONTRACTORS 1099s/CaleM109915 001.tif"
             ],
-            "verdict": "not started"
+            "verdict": "in progress"
           }
         ]
       }
