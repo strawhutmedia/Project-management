@@ -1,9 +1,27 @@
 # Dropbox → AWS Archive migration — status & handoff
 
-_Last updated: 2026-09-17 (session archived mid–wave 1). This is the living
+_Last updated: 2026-09-18. This is the living
 handoff for the storage-migration project. A future session touching storage,
 Dropbox deletions, the UGREENs, or the archive should read this whole file
 first._
+
+## Dashboard snapshot — 2026-09-18 08:36 PT (from Ryan's screenshot; nothing broken)
+
+- **RHINO**: 13.277 TiB, 100% uploaded, "Finished — 11,782 files. Ready to
+  verify." 1 rclone error auto-retried during the run — run the verify pass
+  (`rclone check --one-way`) before calling the drive safe.
+- **RECOVERY**: 11.977 TiB, 100% uploaded, 12,508 files, ready to verify.
+  Same single auto-retried error note.
+- **PODCASTS**: 28.089 of 32.032 TiB (~88%), live at ~45 MiB/s, ETA ~1 day.
+  (The "PODCASTS ~done" note further down predates this; the real total is
+  32 TiB.)
+- **HENRI**: 60.434 GiB, finished, 2 files. Consistent with the Henri
+  Recordings wave-2 top-up (only the missing ~7% of 926 GiB, not a re-send)
+  — verify by basename+size before counting Henri as covered.
+- **DROPBOX-WAVE1**: auto-paused "waiting its turn" (progress kept,
+  mid-HeartBreakers). **Auto-queue is OFF**, so nothing will restart it when
+  PODCASTS finishes — Ryan must either re-enable Auto-queue or hit Resume.
+  Asked Ryan 2026-09-18 whether the off switch was deliberate.
 
 ## ⚡ IF YOU ARE THE NEXT SESSION — DO THIS FIRST, UNPROMPTED
 
