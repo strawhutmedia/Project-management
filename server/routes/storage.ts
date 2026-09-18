@@ -575,7 +575,17 @@ const WAVE1_TARGETS = [
   'Ryan Tillotson/Apps', 'Ryan Tillotson/Old Dbox',
 ]
 
-const VERIFIABLE = new Set([...Object.keys(DRIVE_CENSUS), 'DROPBOX-WAVE1'])
+// NAS-box upload rows (RED = bare name, BLUE- prefix): verified against that
+// box's census listing, filtered to the roots this row uploads (same root
+// mapping as ledger2.mjs).
+const BOX_ROWS: Record<string, { census: string; roots: string[]; vaultRoot: string }> = {
+  PODCASTS: { census: '_INVENTORY/inventory-RED.txt', roots: ['PODCASTS', 'Podcast'], vaultRoot: '1_PODCASTS' },
+  CLIENTS: { census: '_INVENTORY/inventory-RED.txt', roots: ['CLIENTS'], vaultRoot: '2_CLIENTS' },
+  'BLUE-PODCASTS': { census: '_INVENTORY/inventory-BLUE.txt', roots: ['PODCASTS', 'Podcast'], vaultRoot: '1_PODCASTS' },
+  'BLUE-CLIENTS': { census: '_INVENTORY/inventory-BLUE.txt', roots: ['CLIENTS'], vaultRoot: '2_CLIENTS' },
+}
+
+const VERIFIABLE = new Set([...Object.keys(DRIVE_CENSUS), ...Object.keys(BOX_ROWS), 'HENRI', 'DROPBOX-WAVE1'])
 
 // Full vault listing as a lookup index (~70k objects ≈ 70 LIST calls, a few
 // seconds). Cached briefly so back-to-back verifies don't re-scan.
@@ -669,6 +679,87 @@ async function verifyDrive(name: string): Promise<VerifyResult> {
   }
 }
 
+// A NAS-box upload row (PODCASTS / CLIENTS / BLUE-*): every file the box's
+// census lists under this row's roots must be in the vault at the mapped
+// path+size (tier 1) or anywhere by basename+size (tier 2).
+async function verifyBox(name: string): Promise<VerifyResult> {
+  const src = BOX_ROWS[name]
+  const [census, vault] = await Promise.all([fetchInventory(src.census), vaultIndex()])
+  let expected = 0
+  let matched = 0
+  let tier2 = 0
+  const missing: string[] = []
+  for (const line of census.split('\n')) {
+    const m = line.match(/^(\d+) (.+)$/)
+    if (!m) continue
+    const parts = m[2].split('/')
+    if (!src.roots.includes(parts[0]) || parts.length < 2) continue
+    const rel = parts.slice(1).join('/')
+    if (VERIFY_SKIP_RE.test(rel)) continue
+    const size = +m[1]
+    const key = src.vaultRoot + '/' + rel
+    expected += 1
+    if (vault.byPath.get(key) === size) matched += 1
+    else if (vault.byNameSize.has((rel.split('/').pop() || '') + '|' + size)) {
+      matched += 1
+      tier2 += 1
+    } else if (missing.length < 20) missing.push(`${key} (${size} B)`)
+  }
+  const missingCount = expected - matched
+  return {
+    verdict: missingCount === 0 ? 'VERIFIED' : 'INCOMPLETE',
+    filesExpected: expected,
+    filesMatched: matched,
+    tier2Matches: tier2,
+    missingCount,
+    detail: missingCount ? { missing } : null,
+  }
+}
+
+// HENRI (the Henri Recordings top-up): coverage of the whole Henri
+// Recordings Dropbox folder from the team census, matched tier 1 by
+// normalized path or tier 2 by basename+size anywhere in the vault (the
+// wave-2 rule — RHINO landed the same content under 1_PODCASTS/Henri G/).
+async function verifyHenri(): Promise<VerifyResult> {
+  const [censusCsv, vault] = await Promise.all([
+    fetchInventory('_INVENTORY/inventory-DROPBOX-TEAM.csv'),
+    vaultIndex(),
+  ])
+  let expected = 0
+  let matched = 0
+  let tier2 = 0
+  const missing: string[] = []
+  for (const line of censusCsv.split('\n')) {
+    if (!line.trim()) continue
+    const i = line.indexOf(';')
+    if (i < 1) continue
+    const j = line.indexOf(';', i + 1)
+    if (j < 0) continue
+    const size = +line.slice(0, i)
+    let p = line.slice(j + 1)
+    if (!Number.isFinite(size)) continue
+    if (p.startsWith('Straw Hut Team Folder/')) p = p.slice('Straw Hut Team Folder/'.length)
+    if (VERIFY_SKIP_RE.test(p)) continue
+    if (!p.split('/').some((seg) => /^henri recordings$/i.test(seg))) continue
+    expected += 1
+    if (vault.byPath.get(p) === size) matched += 1
+    else if (vault.byNameSize.has((p.split('/').pop() || '') + '|' + size)) {
+      matched += 1
+      tier2 += 1
+    } else if (missing.length < 20) missing.push(`${p} (${size} B)`)
+  }
+  if (expected === 0) throw new Error('no census entries for Henri Recordings — regenerate the team census')
+  const missingCount = expected - matched
+  return {
+    verdict: missingCount === 0 ? 'VERIFIED' : 'INCOMPLETE',
+    filesExpected: expected,
+    filesMatched: matched,
+    tier2Matches: tier2,
+    missingCount,
+    detail: missingCount ? { missing } : null,
+  }
+}
+
 // Wave 1: per target folder, every Dropbox file (from the team census) must
 // be in the vault at the exact normalized path with the same size — the
 // strict tier-1-only rule the deletion loop uses.
@@ -718,7 +809,11 @@ async function verifyWave1(): Promise<VerifyResult> {
 
 async function runAndRecordVerify(name: string): Promise<VerifyResult & { name: string; runAt: string }> {
   const started = Date.now()
-  const r = name === 'DROPBOX-WAVE1' ? await verifyWave1() : await verifyDrive(name)
+  const r =
+    name === 'DROPBOX-WAVE1' ? await verifyWave1()
+    : name === 'HENRI' ? await verifyHenri()
+    : BOX_ROWS[name] ? await verifyBox(name)
+    : await verifyDrive(name)
   const { rows } = await pool.query(
     `INSERT INTO storage_verify_runs (name, verdict, files_expected, files_matched, tier2_matches, missing_count, detail)
      VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING run_at`,
