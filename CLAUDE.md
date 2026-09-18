@@ -1104,6 +1104,18 @@ live at 05:05 via `storage-verify.json` on the status branch).
   covered less than the drive censuses (files are still on the physical
   drives, nothing lost). Full breakdown + next steps in
   `docs/ARCHIVE_MIGRATION_STATUS.md` "First auto-verify results".
-- **Still open**: Auto-queue is OFF and Ryan hasn't answered whether that
-  was deliberate — wave 1 will NOT self-resume when PODCASTS finishes
-  (~Sept 19); top-up uploads needed for RHINO/RECOVERY missing subtrees.
+- **Ryan's answers (2026-09-18):** Auto-queue is back ON (wave 1 self-resumes;
+  Old Dbox is the last wave-1 folder). The partial RHINO/RECOVERY uploads
+  were NOT intentional — "get it all uploaded so we can delete." He is out
+  of Dropbox space; freeing it is the whole point, and he is (rightly)
+  terrified of anything being deleted without a verified copy.
+- **CRITICAL — SOLE COPIES on RHINO/RECOVERY**: the ~7,500 missing files are
+  NOT in Dropbox anymore (confirmed via connector: `Can We Kick It` and
+  Brandi's `_Archive_` are gone from the team space — old workflow moved
+  them to drives). Until the top-ups land, those files exist only on two
+  bare HDDs. **Never wipe/swap/unplug RHINO or RECOVERY.** Fix path:
+  Ryan taps Resume on both rows (re-runs the same containers,
+  `--ignore-existing`); auto-verify re-checks on its own. If the gap
+  persists, the containers' scope excludes those subtrees → ONE paste on
+  RED launches full-drive top-up containers (see
+  `docs/ARCHIVE_MIGRATION_STATUS.md`).

@@ -94,13 +94,24 @@ Read from `storage-verify.json` on the status branch; acted on immediately.
   name+size), **6,121 missing** — e.g. the whole
   `1_PODCASTS/Can We Kick It/EPISODES/S3_*` season. Same shape as RHINO:
   job scope < census; files still on the drive; needs a top-up upload.
-- Caveat on both drive verdicts: "missing" = not in the VAULT. Under
-  Ryan's rule 1 a copy on RED/BLUE also counts for *Dropbox deletion*
-  purposes — but for wiping the physical drives, vault coverage is the
-  bar, and it isn't met yet. Next session: define/extend the RHINO and
-  RECOVERY upload jobs to cover the missing subtrees (needs the NAS-side
-  docker job shapes — see wave1.sh pattern), or confirm with Ryan that
-  the uncovered subtrees were intentionally excluded.
+- **CRITICAL (confirmed 2026-09-18 via Dropbox connector): the missing
+  RHINO/RECOVERY files are SOLE COPIES.** They are NOT in Dropbox anymore —
+  `1_PODCASTS/Can We Kick It` does not exist in the team space at all, and
+  `Brandi Glanville Unfiltered/1_Episodes/_Archive_` is gone (the show
+  folder itself still exists, 394 GB). Ryan confirmed the old workflow:
+  files started on Dropbox and were MOVED to these drives. So until the
+  top-ups land in the vault, those ~7,500 files exist only on two bare
+  HDDs. Ryan also confirmed the partial upload was NOT intentional —
+  "get it all uploaded." **Do not wipe, swap, or unplug RHINO/RECOVERY.**
+- Fix path (no terminal first): Ryan taps **Resume** on the RHINO and
+  RECOVERY rows — docker restarts the same rclone containers; with
+  `--ignore-existing` they only send what's missing IF the missing subtrees
+  are inside the containers' source scope. Auto-verify re-checks by itself
+  when they finish. If the gap persists after that, the containers' source
+  scope excludes those subtrees and closing it needs ONE paste on RED
+  (a full-drive `rclone copy` top-up container per drive — prep the exact
+  docker command for Ryan, wave1.sh shape, `--ignore-existing` so nothing
+  re-sends).
 
 ## ⚡ IF YOU ARE THE NEXT SESSION — DO THIS FIRST, UNPROMPTED
 
