@@ -57,8 +57,13 @@ function TransferRow({ t, onCommand, onDismiss }: {
   const heal = t.heal ?? null
   const missing = verify?.missingCount ?? 0
   const accepted = missing > 0 && (acceptedLocal || (heal?.acceptedMissing != null && missing <= heal.acceptedMissing))
-  const healGaveUp = missing > 0 && !accepted && (heal?.attempts ?? 0) >= (heal?.maxAttempts ?? 3)
-  const healRetrying = missing > 0 && !accepted && !healGaveUp && (heal?.attempts ?? 0) > 0
+  // rclone printing "directory not found" for its source root means the
+  // job's drive is unplugged (or its dock is off) — a physical problem no
+  // retry or approval can fix. Show that, plainly, instead of scope advice.
+  const driveMissing =
+    missing > 0 && (t.errorLines ?? []).some((l) => /error reading source root|directory not found/i.test(l))
+  const healGaveUp = missing > 0 && !accepted && !driveMissing && (heal?.attempts ?? 0) >= (heal?.maxAttempts ?? 3)
+  const healRetrying = missing > 0 && !accepted && !driveMissing && !healGaveUp && (heal?.attempts ?? 0) > 0
   const acceptMissing = async () => {
     try {
       await api.storageAcceptMissing(t.name)
@@ -115,6 +120,7 @@ function TransferRow({ t, onCommand, onDismiss }: {
       return { icon: '📤', label: 'uploading', cls: 'border-stage-producing/50 bg-stage-producing/10 text-stage-producing' }
     }
     if (verify && (verify.missingCount === 0 || accepted)) return { icon: '✅', label: 'safe in the vault', cls: 'border-stage-done/50 bg-stage-done/10 text-stage-done' }
+    if (driveMissing) return { icon: '🔌', label: 'drive disconnected', cls: 'border-stage-tracking/50 bg-stage-tracking/10 text-stage-tracking' }
     if (healGaveUp) return { icon: '🟡', label: 'needs your OK', cls: 'border-stage-tracking/50 bg-stage-tracking/10 text-stage-tracking' }
     return { icon: '🔄', label: 'double-checking', cls: 'border-line bg-ink/40 text-muted' }
   })()
@@ -147,6 +153,13 @@ function TransferRow({ t, onCommand, onDismiss }: {
                   <>✅ All {fmtCount(verify.filesExpected)} files confirmed in the vault (checked {fmtWhen(verify.runAt)}).</>
                 ) : accepted ? (
                   <>✅ {fmtCount(verify.filesMatched)} files confirmed in the vault; you approved skipping {fmtCount(verify.missingCount)} (checked {fmtWhen(verify.runAt)}).</>
+                ) : driveMissing ? (
+                  <>
+                    🔌 The NAS can't see this job's source drive (its log says "directory not found") — the drive is
+                    unplugged or its dock is powered off. {fmtCount(verify.missingCount)} files are waiting on it; they are
+                    safe on the drive itself. Plug it back in and Slate retries automatically every hour — nothing to
+                    approve, nothing is lost.
+                  </>
                 ) : healGaveUp ? (
                   <>
                     This upload re-ran {heal!.maxAttempts}× by itself and still can't reach {fmtCount(verify.missingCount)} files —

@@ -871,9 +871,9 @@ async function maybeHeal(name: string): Promise<void> {
   if (!HEALABLE.has(name)) return
   try {
     const { rows } = await pool.query(
-      `SELECT v.missing_count, r.percent,
+      `SELECT v.missing_count, r.percent, r.raw,
               c.action AS cmd_action, c.executed_at AS cmd_executed_at,
-              h.attempts, h.last_missing, h.accepted_missing
+              h.attempts, h.last_missing, h.accepted_missing, h.updated_at AS heal_updated_at
        FROM storage_transfer_reports r
        LEFT JOIN LATERAL (
          SELECT missing_count FROM storage_verify_runs WHERE name = r.name ORDER BY run_at DESC LIMIT 1
@@ -897,14 +897,25 @@ async function maybeHeal(name: string): Promise<void> {
     const attempts = (r.attempts as number | null) ?? 0
     const lastMissing = r.last_missing as number | null
     const progressed = lastMissing == null || missing < lastMissing
-    if (!progressed && attempts >= HEAL_MAX_NO_PROGRESS) return // gave up — the row asks Ryan
+    // rclone saying "directory not found" for its source root = the job's
+    // drive is unplugged (2026-09-18: RHINO/RECOVERY's dock was off; the jobs
+    // no-op'd instantly and burned their retries). That's physical, so the
+    // attempts cap doesn't apply — instead poke the job at most hourly so it
+    // resumes by itself the moment the drive is plugged back in.
+    const driveMissing = /error reading source root|directory not found/i.test((r.raw as string) ?? '')
+    if (driveMissing) {
+      const lastHealAt = r.heal_updated_at ? new Date(r.heal_updated_at as string).getTime() : 0
+      if (Date.now() - lastHealAt < 60 * 60_000) return
+    } else if (!progressed && attempts >= HEAL_MAX_NO_PROGRESS) {
+      return // gave up — the row asks Ryan
+    }
     await pool.query(
       `INSERT INTO storage_transfer_commands (name, action, requested_at, executed_at)
        VALUES ($1, 'start', now(), NULL)
        ON CONFLICT (name) DO UPDATE SET action = 'start', requested_at = now(), executed_at = NULL`,
       [name],
     )
-    const nextAttempts = progressed ? 1 : attempts + 1
+    const nextAttempts = driveMissing ? attempts : progressed ? 1 : attempts + 1
     await pool.query(
       `INSERT INTO storage_heal_state (name, attempts, last_missing, updated_at)
        VALUES ($1, $2, $3, now())
