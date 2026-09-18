@@ -1,14 +1,14 @@
 {
-  "updatedAt": "2026-09-18T14:39:02.378Z",
+  "updatedAt": "2026-09-18T14:39:02.346Z",
   "runs": [
     {
       "name": "DROPBOX-WAVE1",
-      "run_at": "2026-09-18T14:39:02.333Z",
+      "run_at": "2026-09-18T11:35:45.908Z",
       "verdict": "INCOMPLETE",
       "files_expected": 37207,
-      "files_matched": 29374,
+      "files_matched": 24420,
       "tier2_matches": 0,
-      "missing_count": 7833,
+      "missing_count": 12787,
       "detail": {
         "targets": [
           {
@@ -219,11 +219,11 @@
           {
             "files": 18430,
             "target": "Ryan Tillotson/Old Dbox",
-            "matched": 10598,
+            "matched": 5644,
             "missing": [
               "Ryan Tillotson/Old Dbox/Ryan Old Dbox/Camera Uploads/2017-02-27 00.16.07.jpg",
-              "Ryan Tillotson/Old Dbox/Ryan Old Dbox/AWARE IMAGES/Projects/Jennifer Partridge/PT36_ConnectingToYourTrueNature/GFX/PASTEL/Pastel-textures-backgrounds-forms/._Icon␍",
-              "Ryan Tillotson/Old Dbox/Ryan Old Dbox/AWARE IMAGES/AWARE Invoices Etc/WILLIAM STERLING/William Sterling Invoice copy.docx"
+              "Ryan Tillotson/Old Dbox/Ryan Old Dbox/AWARE IMAGES/AWARE Invoices Etc/IND CONTRACTORS 1099s/ArturoO109915 001.tif",
+              "Ryan Tillotson/Old Dbox/Ryan Old Dbox/AWARE IMAGES/AWARE Invoices Etc/IND CONTRACTORS 1099s/CaleM109915 001.tif"
             ],
             "verdict": "in progress"
           }
@@ -265,7 +265,7 @@
     },
     {
       "name": "RHINO",
-      "run_at": "2026-09-18T14:39:02.357Z",
+      "run_at": "2026-09-18T05:05:44.240Z",
       "verdict": "INCOMPLETE",
       "files_expected": 13331,
       "files_matched": 11917,
