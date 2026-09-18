@@ -23,6 +23,35 @@ first._
   PODCASTS finishes — Ryan must either re-enable Auto-queue or hit Resume.
   Asked Ryan 2026-09-18 whether the off switch was deliberate.
 
+## In-app verification — the "Verify against vault" button (2026-09-18, PR #80)
+
+Ryan (verbatim intent): *"There should be a button — I don't want to have to
+paste shit in terminal or PowerShell."* So verification now runs INSIDE Slate:
+the Railway service already holds archive S3 read keys (`ARCHIVE_ACCESS_KEY_ID`
+/ `ARCHIVE_SECRET_ACCESS_KEY` — different names from the tools'
+`ARCHIVE_AWS_*`, confirmed present in Railway env), so the server compares
+census vs vault itself. **A cloud session no longer needs Ryan's key paste for
+wave-1/drive verification — read the button's results instead** (persisted in
+`storage_verify_runs`, latest per row in `GET /api/storage/transfers`, and
+each run logs a `storage verify` line that lands in the status branch's
+`recentLog`). Ryan pasting keys is still the fallback for ad-hoc ledger work.
+
+- Storage-page rows RHINO / RECOVERY / DROPBOX-WAVE1 get a
+  **🔍 Verify against vault** button (`POST /api/storage/transfers/:name/verify`,
+  admin): drive rows check every census file (tier 1 exact mapped path+size,
+  tier 2 basename+size — Ryan's approved rule); DROPBOX-WAVE1 re-runs the
+  wave-1 per-target check (tier 1 only, same as `wave1-verify.mjs`) and shows
+  per-folder verdicts incl. `VERIFIED — DELETABLE`. Mapping/matching logic is
+  a port of `ledger2.mjs`/`wave1-verify.mjs` — keep them in sync.
+- The scary "N errors — auto-retrying" badge is now honest: it expands to show
+  the actual rclone ERROR lines when they're still inside the stored log tail
+  (`errorLines` on the transfers API), and says to run Verify when they've
+  scrolled out. Context: rclone's `Errors:` stats counter is cumulative and
+  does NOT un-count an operation that succeeded on retry — "1 error" on a
+  finished run can mean zero missing files. Verify is the only truth.
+- Verify runs are audits, kept forever in `storage_verify_runs`
+  (migration `156`).
+
 ## ⚡ IF YOU ARE THE NEXT SESSION — DO THIS FIRST, UNPROMPTED
 
 Wave 1 was still uploading when the last session archived. This work is

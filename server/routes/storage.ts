@@ -3,6 +3,7 @@ import crypto from 'crypto'
 import {
   S3Client,
   ListObjectsV2Command,
+  GetObjectCommand,
   type _Object as S3Object,
 } from '@aws-sdk/client-s3'
 import { requireAdmin } from '../auth'
@@ -530,15 +531,240 @@ storageRouter.post('/transfers/:name/dismiss', async (req, res) => {
   }
 })
 
+// ── Vault verification (the "Verify against vault" button) ─────────────
+// Compares what SHOULD be in the vault — a drive's census file in
+// _INVENTORY/, or the wave-1 Dropbox target list against the team census —
+// file-by-file with what IS in the vault, entirely server-side using the
+// archive read keys this service already holds. Exists so nobody ever has
+// to run rclone check or paste anything in a terminal: the button answers
+// "did every file land?" and names any that didn't. Matching/mapping logic
+// mirrors tools/archive/ledger2.mjs + wave1-verify.mjs — keep them in sync.
+
+// Junk that the uploads deliberately exclude (and OS noise on raw drives):
+// never count these as "expected in the vault".
+const VERIFY_SKIP_RE = /(^|\/)(\.DS_Store|Thumbs\.db)$|(^|\/)(\$RECYCLE\.BIN|System Volume Information|#recycle)\//
+
+// Drive rows with a census listing in _INVENTORY/. mapPath turns a path as
+// it appears in the census into the vault key the upload wrote it to.
+const DRIVE_CENSUS: Record<string, { census: string; mapPath: (rel: string) => string }> = {
+  RHINO: {
+    census: '_INVENTORY/inventory-RHINO.txt',
+    mapPath: (p) => (p.startsWith('1_PODCASTS/') ? p : '1_PODCASTS/Henri G/' + p),
+  },
+  RECOVERY: {
+    census: '_INVENTORY/inventory-RECOVERY.txt',
+    mapPath: (p) => '1_PODCASTS/' + p,
+  },
+}
+
+// The wave-1 Dropbox folders (same list as tools/archive/wave1-verify.mjs).
+const WAVE1_TARGETS = [
+  '1_PODCASTS/Hollywood Horror Stories', '1_PODCASTS/The Inside Track',
+  '2_CLIENTS/Brandi Glanville', '1_PODCASTS/Poopies', '1_PODCASTS/Murder Room',
+  "1_PODCASTS/It's a Racquet", '5_MARKETING/Website', '5_MARKETING/PurchasedMaterials',
+  '5_MARKETING/Decks & Marketing', '5_MARKETING/Straw Hut Podcast Newsletter',
+  '1_PODCASTS/History. Rated R.', '1_PODCASTS/Virgo Sisters',
+  '1_PODCASTS/Salt and Flickers', '1_PODCASTS/HeartBreakers',
+  '5_MARKETING/Straw Hut Ads', '3_COURSES/Podcast Primer Pro',
+  '2_CLIENTS/Rainbow Media', '4_SOCIAL/HeartBreakers',
+  'Ryan Tillotson/You Are U', 'Ryan Tillotson/Indy Automous challenge podcast',
+  'Ryan Tillotson/Ryan Personal Photos', 'Ryan Tillotson/Straw Hut General’s files',
+  "Ryan Tillotson/Don't Be Alone with Jay Kogen (1)", "Ryan Tillotson/Don't Be Alone with Jay Kogen (2)",
+  "Ryan Tillotson/Don't Be Alone with Jay Kogen (3)", 'Ryan Tillotson/Camera Uploads (1)',
+  'Ryan Tillotson/Videos', 'Ryan Tillotson/Shaping Freedom Podcast',
+  'Ryan Tillotson/Apps', 'Ryan Tillotson/Old Dbox',
+]
+
+const VERIFIABLE = new Set([...Object.keys(DRIVE_CENSUS), 'DROPBOX-WAVE1'])
+
+// Full vault listing as a lookup index (~70k objects ≈ 70 LIST calls, a few
+// seconds). Cached briefly so back-to-back verifies don't re-scan.
+type VaultIndex = { byPath: Map<string, number>; byNameSize: Set<string> }
+const VAULT_INDEX_TTL_MS = 5 * 60 * 1000
+let vaultIndexCache: { at: number; data: VaultIndex } | null = null
+let vaultIndexInFlight: Promise<VaultIndex> | null = null
+
+async function vaultIndex(): Promise<VaultIndex> {
+  if (vaultIndexCache && Date.now() - vaultIndexCache.at < VAULT_INDEX_TTL_MS) return vaultIndexCache.data
+  if (!vaultIndexInFlight) {
+    vaultIndexInFlight = (async () => {
+      const c = s3()
+      if (!c) throw new Error('archive_not_configured')
+      const Bucket = bucketName()
+      const byPath = new Map<string, number>()
+      const byNameSize = new Set<string>()
+      let ContinuationToken: string | undefined
+      let pages = 0
+      do {
+        const out = await c.send(new ListObjectsV2Command({ Bucket, ContinuationToken, MaxKeys: 1000 }))
+        for (const obj of out.Contents ?? []) {
+          const key = obj.Key ?? ''
+          if (!key || key.startsWith('_INVENTORY/')) continue
+          const size = obj.Size ?? 0
+          byPath.set(key, size)
+          byNameSize.add((key.split('/').pop() || '') + '|' + size)
+        }
+        ContinuationToken = out.IsTruncated ? out.NextContinuationToken : undefined
+        pages += 1
+      } while (ContinuationToken && pages < MAX_PAGES)
+      const data = { byPath, byNameSize }
+      vaultIndexCache = { at: Date.now(), data }
+      return data
+    })().finally(() => {
+      vaultIndexInFlight = null
+    })
+  }
+  return vaultIndexInFlight
+}
+
+async function fetchInventory(key: string): Promise<string> {
+  const c = s3()
+  if (!c) throw new Error('archive_not_configured')
+  const out = await c.send(new GetObjectCommand({ Bucket: bucketName(), Key: key }))
+  const body = out.Body as { transformToString(enc: string): Promise<string> } | undefined
+  if (!body) throw new Error('census_empty')
+  return body.transformToString('utf8')
+}
+
+type VerifyResult = {
+  verdict: 'VERIFIED' | 'INCOMPLETE'
+  filesExpected: number
+  filesMatched: number
+  tier2Matches: number
+  missingCount: number
+  detail: Record<string, unknown> | null
+}
+
+// A drive (RHINO/RECOVERY): every census file must be in the vault at the
+// mapped path with the same size (tier 1), or anywhere by basename+size
+// (tier 2 — same rule Ryan approved for deletions).
+async function verifyDrive(name: string): Promise<VerifyResult> {
+  const src = DRIVE_CENSUS[name]
+  const [census, vault] = await Promise.all([fetchInventory(src.census), vaultIndex()])
+  let expected = 0
+  let matched = 0
+  let tier2 = 0
+  const missing: string[] = []
+  for (const line of census.split('\n')) {
+    const m = line.match(/^(\d+) (.+)$/)
+    if (!m) continue
+    const rel = m[2].replace(/^\.\//, '')
+    if (VERIFY_SKIP_RE.test(rel)) continue
+    const size = +m[1]
+    expected += 1
+    if (vault.byPath.get(src.mapPath(rel)) === size) matched += 1
+    else if (vault.byNameSize.has((rel.split('/').pop() || '') + '|' + size)) {
+      matched += 1
+      tier2 += 1
+    } else if (missing.length < 20) missing.push(`${src.mapPath(rel)} (${size} B)`)
+  }
+  const missingCount = expected - matched
+  return {
+    verdict: missingCount === 0 ? 'VERIFIED' : 'INCOMPLETE',
+    filesExpected: expected,
+    filesMatched: matched,
+    tier2Matches: tier2,
+    missingCount,
+    detail: missingCount ? { missing } : null,
+  }
+}
+
+// Wave 1: per target folder, every Dropbox file (from the team census) must
+// be in the vault at the exact normalized path with the same size — the
+// strict tier-1-only rule the deletion loop uses.
+async function verifyWave1(): Promise<VerifyResult> {
+  const [censusCsv, vault] = await Promise.all([
+    fetchInventory('_INVENTORY/inventory-DROPBOX-TEAM.csv'),
+    vaultIndex(),
+  ])
+  const want = new Map<string, Array<{ p: string; size: number }>>(WAVE1_TARGETS.map((t) => [t, []]))
+  for (const line of censusCsv.split('\n')) {
+    if (!line.trim()) continue
+    const i = line.indexOf(';')
+    if (i < 1) continue
+    const j = line.indexOf(';', i + 1)
+    if (j < 0) continue
+    const size = +line.slice(0, i)
+    let p = line.slice(j + 1)
+    if (!Number.isFinite(size)) continue
+    if (p.startsWith('Straw Hut Team Folder/')) p = p.slice('Straw Hut Team Folder/'.length)
+    if (VERIFY_SKIP_RE.test(p)) continue
+    const tgt = WAVE1_TARGETS.find((x) => p.startsWith(x + '/'))
+    if (tgt) want.get(tgt)!.push({ p, size })
+  }
+  const targets = WAVE1_TARGETS.map((tgt) => {
+    const files = want.get(tgt)!
+    if (files.length === 0) return { target: tgt, files: 0, matched: 0, verdict: 'no census entries — already deleted?', missing: [] as string[] }
+    let matched = 0
+    const missing: string[] = []
+    for (const { p, size } of files) {
+      if (vault.byPath.get(p) === size) matched += 1
+      else if (missing.length < 3) missing.push(p)
+    }
+    const verdict = matched === files.length ? 'VERIFIED — DELETABLE' : matched === 0 ? 'not started' : 'in progress'
+    return { target: tgt, files: files.length, matched, verdict, missing }
+  })
+  const expected = targets.reduce((a, t) => a + t.files, 0)
+  const matched = targets.reduce((a, t) => a + t.matched, 0)
+  return {
+    verdict: targets.every((t) => t.files === 0 || t.verdict === 'VERIFIED — DELETABLE') ? 'VERIFIED' : 'INCOMPLETE',
+    filesExpected: expected,
+    filesMatched: matched,
+    tier2Matches: 0,
+    missingCount: expected - matched,
+    detail: { targets },
+  }
+}
+
+storageRouter.post('/transfers/:name/verify', async (req, res) => {
+  const name = String(req.params.name || '').replace(/[^A-Za-z0-9._-]/g, '').slice(0, 80)
+  if (!VERIFIABLE.has(name)) {
+    res.status(400).json({ error: 'verify_not_supported' })
+    return
+  }
+  try {
+    const started = Date.now()
+    const r = name === 'DROPBOX-WAVE1' ? await verifyWave1() : await verifyDrive(name)
+    const { rows } = await pool.query(
+      `INSERT INTO storage_verify_runs (name, verdict, files_expected, files_matched, tier2_matches, missing_count, detail)
+       VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING run_at`,
+      [name, r.verdict, r.filesExpected, r.filesMatched, r.tier2Matches, r.missingCount, r.detail ? JSON.stringify(r.detail) : null],
+    )
+    logInfo('storage verify', {
+      name,
+      verdict: r.verdict,
+      expected: r.filesExpected,
+      matched: r.filesMatched,
+      missing: r.missingCount,
+      tookMs: Date.now() - started,
+    })
+    res.json({ ok: true, run: { name, runAt: rows[0].run_at as string, ...r } })
+  } catch (err) {
+    const detail = err instanceof Error ? err.message : String(err)
+    logError('storage verify failed', { name, error: detail })
+    res.status(502).json({
+      error: 'verify_failed',
+      detail: /NoSuchKey/i.test(detail) ? 'census file not found in _INVENTORY — regenerate it on the NAS first' : detail,
+    })
+  }
+})
+
 storageRouter.get('/transfers', async (_req, res) => {
   try {
     const { rows } = await pool.query(
       `SELECT r.name, r.raw, r.bytes_done, r.bytes_total, r.percent, r.speed, r.eta, r.files_done, r.files_total,
               r.errors, r.reported_at, r.last_progress_at,
-              c.action AS cmd_action, c.requested_at AS cmd_requested_at, c.executed_at AS cmd_executed_at
+              c.action AS cmd_action, c.requested_at AS cmd_requested_at, c.executed_at AS cmd_executed_at,
+              v.run_at AS verify_run_at, v.verdict AS verify_verdict, v.files_expected AS verify_expected,
+              v.files_matched AS verify_matched, v.tier2_matches AS verify_tier2,
+              v.missing_count AS verify_missing, v.detail AS verify_detail
        FROM storage_transfer_reports r
        LEFT JOIN storage_transfer_commands c ON c.name = r.name
        LEFT JOIN storage_transfer_dismissals d ON d.name = r.name
+       LEFT JOIN LATERAL (
+         SELECT run_at, verdict, files_expected, files_matched, tier2_matches, missing_count, detail
+         FROM storage_verify_runs WHERE name = r.name ORDER BY run_at DESC LIMIT 1
+       ) v ON true
        WHERE r.name <> 'connection-test'
          -- verification diaries (rclone check logs) are audits, not transfers:
          -- they'd render as bogus paused rows with Resume buttons that map to
@@ -561,6 +787,26 @@ storageRouter.get('/transfers', async (_req, res) => {
         filesDone: r.files_done as number | null,
         filesTotal: r.files_total as number | null,
         errors: (r.errors as number | null) ?? 0,
+        // Actual rclone ERROR lines still inside the stored log tail, so the
+        // error badge can show WHAT failed, not just a count. Older errors
+        // scroll out of the tail — the verify run is the authoritative check.
+        errorLines: [...(r.raw as string).matchAll(/^.*\bERROR\b.*$/gm)]
+          .map((m) => m[0].trim())
+          .filter((l) => !/Errors:/.test(l))
+          .slice(-5)
+          .map((l) => (l.length > 220 ? l.slice(0, 220) + '…' : l)),
+        verifiable: VERIFIABLE.has(r.name as string),
+        verify: r.verify_run_at
+          ? {
+              runAt: r.verify_run_at as string,
+              verdict: r.verify_verdict as string,
+              filesExpected: r.verify_expected as number,
+              filesMatched: r.verify_matched as number,
+              tier2Matches: (r.verify_tier2 as number | null) ?? 0,
+              missingCount: r.verify_missing as number,
+              detail: (r.verify_detail as Record<string, unknown> | null) ?? null,
+            }
+          : null,
         lastProgressAt: (r.last_progress_at as string | null) ?? (r.reported_at as string),
         // Files rclone reports as in-flight in the latest stats block, e.g.
         //  * Episodes/Ep041_…/Cut 2.mp4: 43% /1.19Gi, 8.145Mi/s, 3m9s

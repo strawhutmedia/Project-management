@@ -1031,3 +1031,42 @@ check its state first; nothing below is live until it merges to `main`
   Dropbox picker confined to podcast folders, `/cashflow` + `/invoicing`
   still locked.
 - Remind Ryan to hard-refresh (Cmd+Shift+R) before judging the dropdown.
+
+---
+
+# Session handoff — Storage: "Verify against vault" button + error visibility (2026-09-18, PR #80)
+
+Ryan panicked at the Master Archive dashboard ("1 error" badges on finished
+RHINO/RECOVERY uploads) and issued a standing demand: **no terminal, no
+PowerShell, no pasting — there should be a button.** This session's work is in
+**PR #80** (branch `claude/storage-issue-lxjlf4`; PR #78 merged earlier).
+Nothing is live until Ryan merges it to `main`.
+
+- **In-app vault verification**: `POST /api/storage/transfers/:name/verify`
+  + a "🔍 Verify against vault" button on RHINO / RECOVERY / DROPBOX-WAVE1
+  rows on the Storage page. Server-side census-vs-S3 comparison using the
+  `ARCHIVE_ACCESS_KEY_ID`/`ARCHIVE_SECRET_ACCESS_KEY` already on Railway —
+  a cloud session no longer needs Ryan to paste archive keys for wave-1/drive
+  verification. Runs persist in `storage_verify_runs` (migration `156`);
+  each run also emits a `storage verify` logInfo line readable in the status
+  branch. Full detail: `docs/ARCHIVE_MIGRATION_STATUS.md` ("In-app
+  verification" section) — the matching logic mirrors
+  `tools/archive/ledger2.mjs`/`wave1-verify.mjs`, keep them in sync.
+- **Error badges are inspectable**: the transfers API now returns `errorLines`
+  (real rclone ERROR lines from the stored log tail) and the badge expands to
+  show them. Key fact for talking Ryan down: rclone's `Errors:` counter is
+  cumulative and doesn't un-count retries that later succeeded — "1 error" on
+  a finished run can mean zero missing files; Verify is the truth.
+- **Dashboard state 2026-09-18**: RHINO (13.3 TiB) + RECOVERY (12 TiB) +
+  HENRI (60 GiB top-up) finished, awaiting verify; PODCASTS ~88% (~1 day
+  left); DROPBOX-WAVE1 auto-paused. **Auto-queue is OFF** — wave 1 will NOT
+  restart itself when PODCASTS finishes. Asked Ryan whether that was
+  deliberate; unanswered so far. If wave 1 looks stalled after PODCASTS is
+  done, that toggle (or the row's Resume button) is why.
+
+## Post-merge verification owed
+- Bundle-hash check per the standing deploy rule, then on the Storage page:
+  hit Verify on RHINO and RECOVERY, confirm verdicts render and rows show the
+  persisted result after a reload; expand the error badge on either row.
+- Run Verify on DROPBOX-WAVE1 and act on any `VERIFIED — DELETABLE` targets
+  per the deletion rules in `docs/ARCHIVE_MIGRATION_STATUS.md`.
