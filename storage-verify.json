@@ -1,14 +1,24 @@
 {
-  "updatedAt": "2026-09-18T14:39:02.346Z",
+  "updatedAt": "2026-09-18T15:00:36.000Z",
   "runs": [
     {
+      "name": "CLIENTS",
+      "run_at": "2026-09-18T15:00:34.887Z",
+      "verdict": "VERIFIED",
+      "files_expected": 1490,
+      "files_matched": 1490,
+      "tier2_matches": 0,
+      "missing_count": 0,
+      "detail": null
+    },
+    {
       "name": "DROPBOX-WAVE1",
-      "run_at": "2026-09-18T11:35:45.908Z",
+      "run_at": "2026-09-18T14:39:02.333Z",
       "verdict": "INCOMPLETE",
       "files_expected": 37207,
-      "files_matched": 24420,
+      "files_matched": 29374,
       "tier2_matches": 0,
-      "missing_count": 12787,
+      "missing_count": 7833,
       "detail": {
         "targets": [
           {
@@ -219,14 +229,29 @@
           {
             "files": 18430,
             "target": "Ryan Tillotson/Old Dbox",
-            "matched": 5644,
+            "matched": 10598,
             "missing": [
               "Ryan Tillotson/Old Dbox/Ryan Old Dbox/Camera Uploads/2017-02-27 00.16.07.jpg",
-              "Ryan Tillotson/Old Dbox/Ryan Old Dbox/AWARE IMAGES/AWARE Invoices Etc/IND CONTRACTORS 1099s/ArturoO109915 001.tif",
-              "Ryan Tillotson/Old Dbox/Ryan Old Dbox/AWARE IMAGES/AWARE Invoices Etc/IND CONTRACTORS 1099s/CaleM109915 001.tif"
+              "Ryan Tillotson/Old Dbox/Ryan Old Dbox/AWARE IMAGES/Projects/Jennifer Partridge/PT36_ConnectingToYourTrueNature/GFX/PASTEL/Pastel-textures-backgrounds-forms/._Icon␍",
+              "Ryan Tillotson/Old Dbox/Ryan Old Dbox/AWARE IMAGES/AWARE Invoices Etc/WILLIAM STERLING/William Sterling Invoice copy.docx"
             ],
             "verdict": "in progress"
           }
+        ]
+      }
+    },
+    {
+      "name": "HENRI",
+      "run_at": "2026-09-18T15:00:35.976Z",
+      "verdict": "INCOMPLETE",
+      "files_expected": 27,
+      "files_matched": 25,
+      "tier2_matches": 25,
+      "missing_count": 2,
+      "detail": {
+        "missing": [
+          "Ryan Tillotson/Henri Recordings/Henri.prin (55724 B)",
+          "Ryan Tillotson/Henri Recordings/Henri.prproj (52998 B)"
         ]
       }
     },
@@ -265,7 +290,7 @@
     },
     {
       "name": "RHINO",
-      "run_at": "2026-09-18T05:05:44.240Z",
+      "run_at": "2026-09-18T14:39:02.357Z",
       "verdict": "INCOMPLETE",
       "files_expected": 13331,
       "files_matched": 11917,
