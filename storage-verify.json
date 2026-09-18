@@ -1,0 +1,328 @@
+{
+  "updatedAt": "2026-09-18T05:05:45.677Z",
+  "runs": [
+    {
+      "name": "DROPBOX-WAVE1",
+      "run_at": "2026-09-18T05:05:45.664Z",
+      "verdict": "INCOMPLETE",
+      "files_expected": 37207,
+      "files_matched": 15418,
+      "tier2_matches": 0,
+      "missing_count": 21789,
+      "detail": {
+        "targets": [
+          {
+            "files": 1031,
+            "target": "1_PODCASTS/Hollywood Horror Stories",
+            "matched": 1031,
+            "missing": [],
+            "verdict": "VERIFIED — DELETABLE"
+          },
+          {
+            "files": 192,
+            "target": "1_PODCASTS/The Inside Track",
+            "matched": 192,
+            "missing": [],
+            "verdict": "VERIFIED — DELETABLE"
+          },
+          {
+            "files": 842,
+            "target": "2_CLIENTS/Brandi Glanville",
+            "matched": 842,
+            "missing": [],
+            "verdict": "VERIFIED — DELETABLE"
+          },
+          {
+            "files": 435,
+            "target": "1_PODCASTS/Poopies",
+            "matched": 435,
+            "missing": [],
+            "verdict": "VERIFIED — DELETABLE"
+          },
+          {
+            "files": 49,
+            "target": "1_PODCASTS/Murder Room",
+            "matched": 49,
+            "missing": [],
+            "verdict": "VERIFIED — DELETABLE"
+          },
+          {
+            "files": 205,
+            "target": "1_PODCASTS/It's a Racquet",
+            "matched": 205,
+            "missing": [],
+            "verdict": "VERIFIED — DELETABLE"
+          },
+          {
+            "files": 366,
+            "target": "5_MARKETING/Website",
+            "matched": 366,
+            "missing": [],
+            "verdict": "VERIFIED — DELETABLE"
+          },
+          {
+            "files": 593,
+            "target": "5_MARKETING/PurchasedMaterials",
+            "matched": 593,
+            "missing": [],
+            "verdict": "VERIFIED — DELETABLE"
+          },
+          {
+            "files": 263,
+            "target": "5_MARKETING/Decks & Marketing",
+            "matched": 263,
+            "missing": [],
+            "verdict": "VERIFIED — DELETABLE"
+          },
+          {
+            "files": 7,
+            "target": "5_MARKETING/Straw Hut Podcast Newsletter",
+            "matched": 7,
+            "missing": [],
+            "verdict": "VERIFIED — DELETABLE"
+          },
+          {
+            "files": 40,
+            "target": "1_PODCASTS/History. Rated R.",
+            "matched": 40,
+            "missing": [],
+            "verdict": "VERIFIED — DELETABLE"
+          },
+          {
+            "files": 16,
+            "target": "1_PODCASTS/Virgo Sisters",
+            "matched": 16,
+            "missing": [],
+            "verdict": "VERIFIED — DELETABLE"
+          },
+          {
+            "files": 210,
+            "target": "1_PODCASTS/Salt and Flickers",
+            "matched": 210,
+            "missing": [],
+            "verdict": "VERIFIED — DELETABLE"
+          },
+          {
+            "files": 399,
+            "target": "1_PODCASTS/HeartBreakers",
+            "matched": 399,
+            "missing": [],
+            "verdict": "VERIFIED — DELETABLE"
+          },
+          {
+            "files": 513,
+            "target": "5_MARKETING/Straw Hut Ads",
+            "matched": 513,
+            "missing": [],
+            "verdict": "VERIFIED — DELETABLE"
+          },
+          {
+            "files": 141,
+            "target": "3_COURSES/Podcast Primer Pro",
+            "matched": 141,
+            "missing": [],
+            "verdict": "VERIFIED — DELETABLE"
+          },
+          {
+            "files": 257,
+            "target": "2_CLIENTS/Rainbow Media",
+            "matched": 257,
+            "missing": [],
+            "verdict": "VERIFIED — DELETABLE"
+          },
+          {
+            "files": 81,
+            "target": "4_SOCIAL/HeartBreakers",
+            "matched": 80,
+            "missing": [
+              "4_SOCIAL/HeartBreakers/Ep029_Solo/HB CAM 3 02.braw"
+            ],
+            "verdict": "in progress"
+          },
+          {
+            "files": 1891,
+            "target": "Ryan Tillotson/You Are U",
+            "matched": 1891,
+            "missing": [],
+            "verdict": "VERIFIED — DELETABLE"
+          },
+          {
+            "files": 4,
+            "target": "Ryan Tillotson/Indy Automous challenge podcast",
+            "matched": 4,
+            "missing": [],
+            "verdict": "VERIFIED — DELETABLE"
+          },
+          {
+            "files": 4910,
+            "target": "Ryan Tillotson/Ryan Personal Photos",
+            "matched": 4910,
+            "missing": [],
+            "verdict": "VERIFIED — DELETABLE"
+          },
+          {
+            "files": 2973,
+            "target": "Ryan Tillotson/Straw Hut General’s files",
+            "matched": 2973,
+            "missing": [],
+            "verdict": "VERIFIED — DELETABLE"
+          },
+          {
+            "files": 6,
+            "target": "Ryan Tillotson/Don't Be Alone with Jay Kogen (1)",
+            "matched": 1,
+            "missing": [
+              "Ryan Tillotson/Don't Be Alone with Jay Kogen (1)/DBA Dana Gould.mp4",
+              "Ryan Tillotson/Don't Be Alone with Jay Kogen (1)/DBA Dave Foley.mp4",
+              "Ryan Tillotson/Don't Be Alone with Jay Kogen (1)/DBA Grunny.mp4"
+            ],
+            "verdict": "in progress"
+          },
+          {
+            "files": 5,
+            "target": "Ryan Tillotson/Don't Be Alone with Jay Kogen (2)",
+            "matched": 0,
+            "missing": [
+              "Ryan Tillotson/Don't Be Alone with Jay Kogen (2)/DBA Dana Gould.mp4",
+              "Ryan Tillotson/Don't Be Alone with Jay Kogen (2)/DBA Dave Foley.mp4",
+              "Ryan Tillotson/Don't Be Alone with Jay Kogen (2)/DBA Grunny.mp4"
+            ],
+            "verdict": "not started"
+          },
+          {
+            "files": 93,
+            "target": "Ryan Tillotson/Don't Be Alone with Jay Kogen (3)",
+            "matched": 0,
+            "missing": [
+              "Ryan Tillotson/Don't Be Alone with Jay Kogen (3)/LarryWilmore DBAWJK opening.MOV",
+              "Ryan Tillotson/Don't Be Alone with Jay Kogen (3)/Arnie Kogen DBAWJK OPENINGS/VIDEO__20250226_152653_729.mp4",
+              "Ryan Tillotson/Don't Be Alone with Jay Kogen (3)/Arnie Kogen DBAWJK OPENINGS/VIDEO__20250226_154219_354.mp4"
+            ],
+            "verdict": "not started"
+          },
+          {
+            "files": 20,
+            "target": "Ryan Tillotson/Camera Uploads (1)",
+            "matched": 0,
+            "missing": [
+              "Ryan Tillotson/Camera Uploads (1)/2021-08-23 11.35.54.mp4",
+              "Ryan Tillotson/Camera Uploads (1)/2021-08-23 11.38.18.mp4",
+              "Ryan Tillotson/Camera Uploads (1)/2021-08-23 11.39.29.mp4"
+            ],
+            "verdict": "not started"
+          },
+          {
+            "files": 23,
+            "target": "Ryan Tillotson/Videos",
+            "matched": 0,
+            "missing": [
+              "Ryan Tillotson/Videos/IMG_9515.MOV",
+              "Ryan Tillotson/Videos/Stacey Ep 52 Ian.mp4",
+              "Ryan Tillotson/Videos/The Shit Podcast - 3-25-2021.mp4"
+            ],
+            "verdict": "not started"
+          },
+          {
+            "files": 620,
+            "target": "Ryan Tillotson/Shaping Freedom Podcast",
+            "matched": 0,
+            "missing": [
+              "Ryan Tillotson/Shaping Freedom Podcast/Plsrateandreview.wav",
+              "Ryan Tillotson/Shaping Freedom Podcast/Aaron Robinson/Aaron Family legacy Thumbnail .png",
+              "Ryan Tillotson/Shaping Freedom Podcast/Ainsley/AinsleyBreak1.wav"
+            ],
+            "verdict": "not started"
+          },
+          {
+            "files": 2592,
+            "target": "Ryan Tillotson/Apps",
+            "matched": 0,
+            "missing": [
+              "Ryan Tillotson/Apps/zencastr/ab-madsen-promo/recording-1/2021-06-23--t11-09-50pm--5eab4f9366d84600bc67b692--strawhutmedia (1).mov",
+              "Ryan Tillotson/Apps/zencastr/ab-madsen-promo/recording-1/2021-06-23--t11-09-50pm--5eab4f9366d84600bc67b692--strawhutmedia.mov",
+              "Ryan Tillotson/Apps/zencastr/ab-madsen-promo/recording-1/2021-06-23--t11-09-50pm--5eab4f9366d84600bc67b692--strawhutmedia.mp3"
+            ],
+            "verdict": "not started"
+          },
+          {
+            "files": 18430,
+            "target": "Ryan Tillotson/Old Dbox",
+            "matched": 0,
+            "missing": [
+              "Ryan Tillotson/Old Dbox/Ryan Old Dbox/Hystera.mp4",
+              "Ryan Tillotson/Old Dbox/Ryan Old Dbox/RyanApplicationInfo.docx",
+              "Ryan Tillotson/Old Dbox/Ryan Old Dbox/A Lesson In Slove/LessonInSlove.mp3"
+            ],
+            "verdict": "not started"
+          }
+        ]
+      }
+    },
+    {
+      "name": "RECOVERY",
+      "run_at": "2026-09-18T05:05:44.701Z",
+      "verdict": "INCOMPLETE",
+      "files_expected": 22269,
+      "files_matched": 16148,
+      "tier2_matches": 3640,
+      "missing_count": 6121,
+      "detail": {
+        "missing": [
+          "1_PODCASTS/Can We Kick It/EPISODES/S3_EP01_060920/CWKI_S3_E1_060920_fullshow.mp3 (145079254 B)",
+          "1_PODCASTS/Can We Kick It/EPISODES/S3_EP02_061620/CWKI_S3E3_fullshow.mp3 (198108588 B)",
+          "1_PODCASTS/Can We Kick It/EPISODES/S3_EP03_062320/CWKI_S3E3_fullshow.mp3 (124551716 B)",
+          "1_PODCASTS/Can We Kick It/EPISODES/S3_EP04_063020/CWKI_S3_E4_063020_fullshow.mp3 (190405956 B)",
+          "1_PODCASTS/Can We Kick It/EPISODES/S3_EP05_070720/CWKI_S3_E5_070720.mp3 (246703656 B)",
+          "1_PODCASTS/Can We Kick It/EPISODES/S3_EP06_071720/CWKI_S3_EP6_071620.mp3 (155228458 B)",
+          "1_PODCASTS/Can We Kick It/EPISODES/S3_EP07_072820/CWKI_S3_EP07_fullshow.mp3 (144177931 B)",
+          "1_PODCASTS/Can We Kick It/EPISODES/S3_EP08_080420/CWKI_S3_EP8_fullshow.mp3 (170480326 B)",
+          "1_PODCASTS/Can We Kick It/EPISODES/S3_EP09_081120/CWKI_S3_EP09_fullshow.mp3 (197181649 B)",
+          "1_PODCASTS/Can We Kick It/EPISODES/S3_EP10_081820/CWKI_S3_EP10_081820.mp3 (199006428 B)",
+          "1_PODCASTS/Can We Kick It/EPISODES/S3_EP11_082620/CWKI_S3_EP11_082620_fullshow.mp3 (170085982 B)",
+          "1_PODCASTS/Can We Kick It/EPISODES/S3_EP12_090820/CWKI_S3_EP12_fullshow.mp3 (154728489 B)",
+          "1_PODCASTS/Can We Kick It/EPISODES/S3_EP14_092220/CWKI_EP14_092220_Willam_fullshow.mp3 (161755141 B)",
+          "1_PODCASTS/Can We Kick It/EPISODES/S3_EP15_092920/CWKI_S3_EP15_092920_fullshow.mp3 (169853387 B)",
+          "1_PODCASTS/Can We Kick It/EPISODES/S3_EP16_101420/CWKI_S3_EP16_101320.mp3 (159876911 B)",
+          "1_PODCASTS/Can We Kick It/EPISODES/S3_EP17_102820/CWKI_S3_EP17_102820.mp3 (139892297 B)",
+          "1_PODCASTS/Poopies/Episodes/Ep023_GabbyLamby/Project Files/Images/361617390_18380289862026137_8089435388444277536_n.jpg (181386 B)",
+          "1_PODCASTS/Poopies/Episodes/Ep023_GabbyLamby/Project Files/Images/362279202_18380289895026137_6810589939410140185_n.jpg (162040 B)",
+          "1_PODCASTS/Poopies/Episodes/Ep023_GabbyLamby/Project Files/Images/362621361_18380289853026137_5623109675554982944_n.jpg (184060 B)",
+          "1_PODCASTS/Poopies/Episodes/Ep023_GabbyLamby/Project Files/Images/SaveInsta.App - 3114550180536623637_8730136.mp4 (4121948 B)"
+        ]
+      }
+    },
+    {
+      "name": "RHINO",
+      "run_at": "2026-09-18T05:05:44.240Z",
+      "verdict": "INCOMPLETE",
+      "files_expected": 13331,
+      "files_matched": 11917,
+      "tier2_matches": 88,
+      "missing_count": 1414,
+      "detail": {
+        "missing": [
+          "1_PODCASTS/Henri G/.dropbox.device (56 B)",
+          "1_PODCASTS/Brandi Glanville Unfiltered/1_Episodes/_Archive_/Ep392_PerezHilton/Project Files/Intro-Outro/brandi-glanville-unf_untitled-recording_brandilynn_me_com-pjbr9fzll_2022-jun-03-1942pm-utc-riverside.wav (66398542 B)",
+          "1_PODCASTS/Brandi Glanville Unfiltered/1_Episodes/_Archive_/Ep392_PerezHilton/Project Files/Intro-Outro/brandi-glanville-unf_untitled-recording_ryan-cgjcf7lxv_2022-jun-03-1942pm-utc-riverside.mp4 (361588231 B)",
+          "1_PODCASTS/Brandi Glanville Unfiltered/1_Episodes/_Archive_/Ep392_PerezHilton/Project Files/Intro-Outro/brandi-glanville-unf_untitled-recording_ryan-cgjcf7lxv_2022-jun-03-1942pm-utc-riverside.wav (66376752 B)",
+          "1_PODCASTS/Brandi Glanville Unfiltered/1_Episodes/_Archive_/Ep393_Shayne Lamas/Project Files/2022_0608_0001/MIC1.WAV (341108736 B)",
+          "1_PODCASTS/Brandi Glanville Unfiltered/1_Episodes/_Archive_/Ep393_Shayne Lamas/Project Files/2022_0608_0001/MIC2.WAV (341108736 B)",
+          "1_PODCASTS/Brandi Glanville Unfiltered/1_Episodes/_Archive_/Ep393_Shayne Lamas/Project Files/2022_0608_0001/MIC3.WAV (341108736 B)",
+          "1_PODCASTS/Brandi Glanville Unfiltered/1_Episodes/_Archive_/Ep393_Shayne Lamas/Project Files/2022_0608_0001/SOUND_PAD.WAV (682184704 B)",
+          "1_PODCASTS/Brandi Glanville Unfiltered/1_Episodes/_Archive_/Ep393_Shayne Lamas/Project Files/2022_0608_0001/USB.WAV (682184704 B)",
+          "1_PODCASTS/Brandi Glanville Unfiltered/1_Episodes/_Archive_/Ep393_Shayne Lamas/Project Files/2022_0608_0125/MIC1.WAV (28744448 B)",
+          "1_PODCASTS/Brandi Glanville Unfiltered/1_Episodes/_Archive_/Ep393_Shayne Lamas/Project Files/2022_0608_0125/MIC2.WAV (28744448 B)",
+          "1_PODCASTS/Brandi Glanville Unfiltered/1_Episodes/_Archive_/Ep393_Shayne Lamas/Project Files/2022_0608_0125/MIC3.WAV (28744448 B)",
+          "1_PODCASTS/Brandi Glanville Unfiltered/1_Episodes/_Archive_/Ep393_Shayne Lamas/Project Files/2022_0608_0125/SOUND_PAD.WAV (57456128 B)",
+          "1_PODCASTS/Brandi Glanville Unfiltered/1_Episodes/_Archive_/Ep393_Shayne Lamas/Project Files/2022_0608_0125/USB.WAV (57456128 B)",
+          "1_PODCASTS/Brandi Glanville Unfiltered/1_Episodes/_Archive_/Ep394_Hazel-E/Project Files/2022_0608_0205/MIC1.WAV (225377536 B)",
+          "1_PODCASTS/Brandi Glanville Unfiltered/1_Episodes/_Archive_/Ep394_Hazel-E/Project Files/2022_0608_0205/MIC2.WAV (225377536 B)",
+          "1_PODCASTS/Brandi Glanville Unfiltered/1_Episodes/_Archive_/Ep394_Hazel-E/Project Files/2022_0608_0205/MIC3.WAV (225377536 B)",
+          "1_PODCASTS/Brandi Glanville Unfiltered/1_Episodes/_Archive_/Ep394_Hazel-E/Project Files/2022_0608_0205/SOUND_PAD.WAV (450722304 B)",
+          "1_PODCASTS/Brandi Glanville Unfiltered/1_Episodes/_Archive_/Ep394_Hazel-E/Project Files/2022_0608_0205/USB.WAV (450722304 B)",
+          "1_PODCASTS/Brandi Glanville Unfiltered/1_Episodes/_Archive_/Ep395_PattiNegri/Project Files/2022_0615_0030/MIC1.WAV (257577344 B)"
+        ]
+      }
+    }
+  ]
+}
