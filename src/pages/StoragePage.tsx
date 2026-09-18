@@ -42,10 +42,8 @@ function TransferRow({ t, onCommand, onDismiss }: {
   onCommand: (name: string, action: 'pause' | 'resume') => Promise<void>
   onDismiss: (name: string) => Promise<void>
 }) {
-  const [filesOpen, setFilesOpen] = useState(false)
+  const [open, setOpen] = useState(false)
   const [sending, setSending] = useState(false)
-  const [errsOpen, setErrsOpen] = useState(false)
-  const [verifyOpen, setVerifyOpen] = useState(false)
   const [verifyError, setVerifyError] = useState<string | null>(null)
   // A click only KICKS OFF the server-side check (instant response); the
   // verdict arrives with the normal 30s poll. `kickedAt` keeps the button in
@@ -104,152 +102,99 @@ function TransferRow({ t, onCommand, onDismiss }: {
       setSending(false)
     }
   }
+  // ONE plain status per row (Ryan, 2026-09-18: "so much text… my team will
+  // be completely confused"). Everything else — buttons, file lists, verdict
+  // detail — lives behind the details chevron.
+  const chipBase = 'inline-flex items-center rounded-full border px-2.5 py-0.5 text-[11px] font-bold'
+  const status = (() => {
+    if (stale && !done) return { icon: '⚠️', label: 'no signal', cls: 'border-stage-tracking/50 bg-stage-tracking/10 text-stage-tracking' }
+    if (!done) {
+      if (cmdPending) return { icon: '📤', label: cmd?.action === 'stop' ? 'pausing…' : 'starting…', cls: 'border-line bg-ink/40 text-muted' }
+      if (resuming) return { icon: '📤', label: 'starting back up', cls: 'border-line bg-ink/40 text-muted' }
+      if (paused) return { icon: '⏸', label: 'waiting its turn', cls: 'border-line bg-ink/40 text-muted' }
+      return { icon: '📤', label: 'uploading', cls: 'border-stage-producing/50 bg-stage-producing/10 text-stage-producing' }
+    }
+    if (verify && (verify.missingCount === 0 || accepted)) return { icon: '✅', label: 'safe in the vault', cls: 'border-stage-done/50 bg-stage-done/10 text-stage-done' }
+    if (healGaveUp) return { icon: '🟡', label: 'needs your OK', cls: 'border-stage-tracking/50 bg-stage-tracking/10 text-stage-tracking' }
+    return { icon: '🔄', label: 'double-checking', cls: 'border-line bg-ink/40 text-muted' }
+  })()
+
   return (
     <div className="py-2">
-      <div className="flex items-center gap-2 flex-wrap">
-        <span className="text-sm font-semibold">{done ? '✅' : stale ? '⚠️' : paused ? '⏸' : '📤'} {t.name}</span>
-        {paused && (
-          <span className="inline-flex items-center rounded-full border border-line bg-ink/40 text-muted px-2 py-0.5 text-[11px] font-bold">
-            {pausedByButton ? 'paused' : 'paused — waiting its turn'}
-          </span>
-        )}
-        {cmdPending && (
-          <span className="inline-flex items-center rounded-full border border-line bg-ink/40 text-muted px-2 py-0.5 text-[11px] font-bold">
-            {cmd?.action === 'stop' ? 'pausing…' : 'resuming…'} the NAS picks this up within ~30s
-          </span>
-        )}
-        {resuming && !cmdPending && (
-          <span className="inline-flex items-center rounded-full border border-line bg-ink/40 text-muted px-2 py-0.5 text-[11px] font-bold">
-            resuming — first progress lines coming up
-          </span>
-        )}
-        {(done || stale) && (
-          <button
-            onClick={() => { void onDismiss(t.name) }}
-            className="inline-flex items-center gap-1 rounded-full border border-line bg-panel hover:bg-line/40 px-2.5 py-0.5 text-[11px] font-bold text-muted"
-            title="Hides this finished row from the dashboard. Deletes NOTHING — not from the drive, not from Dropbox, not from the vault. The row comes back on its own if the job ever runs again."
-          >
-            Hide row
-          </button>
-        )}
-        {!done && !stale && !cmdPending && (
-          <button
-            onClick={() => { void sendCommand(paused ? 'resume' : 'pause') }}
-            disabled={sending}
-            className={`inline-flex items-center gap-1 rounded-full border px-3 py-1 text-xs font-bold disabled:opacity-50 ${
-              paused
-                ? 'border-stage-done/60 bg-stage-done/15 text-stage-done hover:bg-stage-done/30'
-                : 'border-stage-tracking/60 bg-stage-tracking/15 text-stage-tracking hover:bg-stage-tracking/30'
-            }`}
-            title={paused ? 'Start this job again — it resumes exactly where it stopped' : 'Stop this job cleanly — progress is kept, resume any time'}
-          >
-            {paused ? '▶ Resume' : '⏸ Pause'}
-          </button>
-        )}
-        {t.verifiable && (
-          <button
-            onClick={() => { void runVerify() }}
-            disabled={verifying}
-            className="inline-flex items-center gap-1 rounded-full border border-stage-mixing/60 bg-stage-mixing/10 text-stage-mixing hover:bg-stage-mixing/25 px-2.5 py-0.5 text-[11px] font-bold disabled:opacity-50"
-            title="Compare every file that should be in the vault against what's actually there — runs on the server, takes under a minute, changes nothing"
-          >
-            {verifying ? '⏳ verifying — checking every file…' : '🔍 Verify against vault'}
-          </button>
-        )}
-        {t.errors > 0 &&
-          ((t.errorLines?.length ?? 0) > 0 ? (
-            <button
-              onClick={() => setErrsOpen((v) => !v)}
-              className="inline-flex items-center rounded-full border border-urgent/40 bg-urgent/10 text-urgent hover:bg-urgent/20 px-2 py-0.5 text-[11px] font-bold"
-              title="Show the actual error lines from the job log"
-            >
-              {t.errors} error{t.errors === 1 ? '' : 's'} — {errsOpen ? 'hide what failed ▾' : 'see what failed ▸'}
-            </button>
-          ) : (
-            <span
-              className="inline-flex items-center rounded-full border border-urgent/40 bg-urgent/10 text-urgent px-2 py-0.5 text-[11px] font-bold"
-              title="The error line has scrolled out of the log tail the NAS sends — the Verify button is the authoritative check that nothing is missing"
-            >
-              {t.errors} error{t.errors === 1 ? '' : 's'} auto-retried{t.verifiable ? ' — hit Verify to confirm nothing was missed' : ''}
-            </span>
-          ))}
-        <span className="ml-auto text-xs text-muted tabular-nums">
+      <button onClick={() => setOpen((v) => !v)} className="w-full flex items-center gap-2 text-left">
+        <span className="text-sm font-semibold shrink-0">{status.icon} {t.name}</span>
+        <span className={`${chipBase} ${status.cls} shrink-0`}>{status.label}</span>
+        <span className="ml-auto min-w-0 truncate text-right text-xs text-muted tabular-nums">
           {t.bytesDone && t.bytesTotal ? `${t.bytesDone} of ${t.bytesTotal}` : ''}
-          {!done && t.speed ? ` · ${t.speed}` : ''}
-          {!done && t.eta ? ` · ETA ${t.eta}` : ''}
+          {!done && !paused && t.speed ? ` · ${t.speed}` : ''}
+          {!done && !paused && t.eta ? ` · ETA ${t.eta}` : ''}
         </span>
-      </div>
+        <span className="text-[10px] text-muted shrink-0">{open ? '▾' : '▸'}</span>
+      </button>
       <div className="mt-1.5 h-2 rounded-full bg-ink/60 overflow-hidden">
         <div
           className={`h-full rounded-full ${done ? 'bg-stage-done' : 'bg-gradient-to-r from-stage-producing to-stage-mastering'}`}
           style={{ width: `${pct}%` }}
         />
       </div>
-      {errsOpen && (t.errorLines?.length ?? 0) > 0 && (
-        <div className="mt-1.5 rounded-lg border border-urgent/30 bg-urgent/5 p-2 space-y-1">
-          {t.errorLines!.map((l, i) => (
-            <div key={i} className="text-[11px] text-urgent/90 font-mono break-all">{l}</div>
-          ))}
-          <div className="text-[11px] text-muted">
-            These are auto-retried by the job; the Verify button is the final word on whether anything is actually missing.
-          </div>
-        </div>
-      )}
-      {verifyError && <div className="mt-1.5 text-[11px] text-urgent">Couldn't start the check ({verifyError}) — it also runs by itself every 30 min.</div>}
-      {verify && (
-        <div className="mt-1.5">
-          <button
-            onClick={() => setVerifyOpen((v) => !v)}
-            className={`text-[11px] font-bold inline-flex items-center gap-1 text-left ${verify.missingCount === 0 ? 'text-stage-done' : 'text-stage-tracking'}`}
-          >
-            {verify.missingCount === 0
-              ? `✅ Verified ${fmtWhen(verify.runAt)} — all ${fmtCount(verify.filesExpected)} files are safe in the vault`
-              : accepted
-                ? `✅ Verified ${fmtWhen(verify.runAt)} — ${fmtCount(verify.filesMatched)} files in the vault; you approved skipping ${fmtCount(verify.missingCount)}`
-                : `🕗 Checked ${fmtWhen(verify.runAt)} — ${fmtCount(verify.filesMatched)} of ${fmtCount(verify.filesExpected)} files in the vault, ${fmtCount(verify.missingCount)} still to land`}
-            {verify.tier2Matches > 0 && !accepted ? ` (${fmtCount(verify.tier2Matches)} matched by name+size)` : ''}
-            {(verify.detail?.missing?.length ?? 0) + (verify.detail?.targets?.length ?? 0) > 0 && (
-              <span className="text-[9px]">{verifyOpen ? '▾' : '▸'}</span>
+      {open && (
+        <div className="mt-2 rounded-lg border border-line bg-ink/30 p-2.5 space-y-2 text-[11px]">
+          {/* Plain-language state */}
+          <div className="text-text/90">
+            {done ? (
+              verify ? (
+                verify.missingCount === 0 ? (
+                  <>✅ All {fmtCount(verify.filesExpected)} files confirmed in the vault (checked {fmtWhen(verify.runAt)}).</>
+                ) : accepted ? (
+                  <>✅ {fmtCount(verify.filesMatched)} files confirmed in the vault; you approved skipping {fmtCount(verify.missingCount)} (checked {fmtWhen(verify.runAt)}).</>
+                ) : healGaveUp ? (
+                  <>
+                    This upload re-ran {heal!.maxAttempts}× by itself and still can't reach {fmtCount(verify.missingCount)} files —
+                    they're outside the folders it was set up to copy. They are safe on their source. To upload them, the job's
+                    folder scope on the NAS must be widened (ask Claude — it has the exact fix ready). Or, if they truly don't
+                    need to be in the vault:
+                  </>
+                ) : (
+                  <>
+                    {fmtCount(verify.filesMatched)} of {fmtCount(verify.filesExpected)} files confirmed in the vault
+                    {verify.tier2Matches > 0 ? ` (${fmtCount(verify.tier2Matches)} matched by name+size)` : ''}, {fmtCount(verify.missingCount)} still
+                    to land — Slate re-runs this upload by itself{healRetrying ? ` (retry ${heal!.attempts} of ${heal!.maxAttempts})` : ''}.
+                    Nothing is lost; the files are safe on their source.
+                  </>
+                )
+              ) : (
+                <>Finished — {t.filesTotal ? `${fmtCount(t.filesTotal)} files` : 'complete'}. Slate is double-checking every file against the vault; the result will appear here.</>
+              )
+            ) : stale ? (
+              <>No update in {Math.round(ageMs / 60000)} min — the job may have just finished, or the reporter on the NAS stopped. Check Docker on RED if this persists.</>
+            ) : paused ? (
+              <>Held where it stopped ({t.filesDone != null && t.filesTotal != null ? `${fmtCount(t.filesDone)} of ${fmtCount(t.filesTotal)} files` : 'progress kept'}) — starts again by itself when its box frees up.</>
+            ) : (
+              <>{t.filesDone != null && t.filesTotal != null ? `${fmtCount(t.filesDone)} of ${fmtCount(t.filesTotal)} files · ` : ''}updated {Math.max(1, Math.round(ageMs / 1000))}s ago.</>
             )}
-          </button>
-          {healRetrying && (
-            <div className="text-[11px] text-muted">
-              🔁 Re-running this upload automatically to pick those up (try {heal!.attempts} of {heal!.maxAttempts}) — no action needed.
-            </div>
-          )}
+          </div>
           {healGaveUp && (
-            <div className="mt-1 rounded-lg border border-stage-tracking/40 bg-stage-tracking/5 p-2 space-y-1.5">
-              <div className="text-[11px] text-text/90">
-                This upload job re-ran {heal!.maxAttempts}× and still can't reach these {fmtCount(verify.missingCount)} files —
-                they're outside the folders the job was set up to copy. The files are safe on their source; to upload them,
-                the job's folder scope on the NAS has to be widened (ask Claude — it has the exact fix ready).
-              </div>
-              <button
-                onClick={() => { void acceptMissing() }}
-                className="inline-flex items-center gap-1 rounded-full border border-line bg-panel hover:bg-line/40 px-2.5 py-0.5 text-[11px] font-bold text-muted"
-                title="Only choose this if these files genuinely don't need to be in the vault. It changes nothing on any drive or in Dropbox — it just stops this row from warning about them."
-              >
-                These files don't need uploading — approve skipping them
-              </button>
-            </div>
+            <button
+              onClick={() => { void acceptMissing() }}
+              className="inline-flex items-center gap-1 rounded-full border border-line bg-panel hover:bg-line/40 px-2.5 py-0.5 font-bold text-muted"
+              title="Only choose this if these files genuinely don't need to be in the vault. It changes nothing on any drive or in Dropbox — it just stops this row from warning about them."
+            >
+              These files don't need uploading — approve skipping them
+            </button>
           )}
-          {verify.missingCount > 0 && !accepted && !healGaveUp && !healRetrying && (
-            <div className="text-[11px] text-muted">
-              Nothing is lost — these files are still on their source; their vault copy just hasn't landed yet. Re-checked automatically as uploads continue.
-            </div>
-          )}
-          {verifyOpen && (verify.detail?.missing?.length ?? 0) > 0 && (
-            <div className="mt-1 rounded-lg border border-line bg-ink/30 p-2 space-y-0.5">
-              <div className="text-[11px] text-muted font-bold">Missing from the vault{verify.missingCount > verify.detail!.missing!.length ? ` (first ${verify.detail!.missing!.length})` : ''}:</div>
-              {verify.detail!.missing!.map((p, i) => (
-                <div key={i} className="text-[11px] font-mono break-all text-text/80">{p}</div>
+          {/* Missing files / per-folder verdicts */}
+          {(verify?.detail?.missing?.length ?? 0) > 0 && (
+            <div className="space-y-0.5">
+              <div className="text-muted font-bold">Still to land{(verify!.missingCount > verify!.detail!.missing!.length) ? ` (first ${verify!.detail!.missing!.length} of ${fmtCount(verify!.missingCount)})` : ''}:</div>
+              {verify!.detail!.missing!.map((p, i) => (
+                <div key={i} className="font-mono break-all text-text/80">{p}</div>
               ))}
             </div>
           )}
-          {verifyOpen && (verify.detail?.targets?.length ?? 0) > 0 && (
-            <div className="mt-1 rounded-lg border border-line bg-ink/30 p-2 space-y-0.5">
-              {verify.detail!.targets!.map((tg) => (
-                <div key={tg.target} className="flex items-center gap-2 text-[11px]">
+          {(verify?.detail?.targets?.length ?? 0) > 0 && (
+            <div className="space-y-0.5">
+              {verify!.detail!.targets!.map((tg) => (
+                <div key={tg.target} className="flex items-center gap-2">
                   <span className={`shrink-0 font-bold ${tg.verdict.startsWith('VERIFIED') ? 'text-stage-done' : tg.verdict === 'in progress' ? 'text-stage-tracking' : 'text-muted'}`}>
                     {tg.verdict.startsWith('VERIFIED') ? '✅' : tg.verdict === 'in progress' ? '⏳' : '·'}
                   </span>
@@ -261,53 +206,73 @@ function TransferRow({ t, onCommand, onDismiss }: {
               ))}
             </div>
           )}
-        </div>
-      )}
-      {!done && !stale && !paused && (t.currentFiles?.length ?? 0) > 0 && (
-        <div className="mt-1.5">
-          <button
-            onClick={() => setFilesOpen((v) => !v)}
-            className="text-[11px] text-muted hover:text-text inline-flex items-center gap-1"
-          >
-            <span className="text-[9px]">{filesOpen ? '▾' : '▸'}</span>
-            now uploading {t.currentFiles!.length} file{t.currentFiles!.length === 1 ? '' : 's'}
-          </button>
-          {filesOpen && (
-            <div className="mt-1 space-y-0.5">
+          {/* Live file list while uploading */}
+          {!done && !stale && !paused && (t.currentFiles?.length ?? 0) > 0 && (
+            <div className="space-y-0.5">
+              <div className="text-muted font-bold">Now uploading:</div>
               {t.currentFiles!.map((f, i) => {
                 const file = typeof f === 'string' ? { name: f, pct: null, speed: '', eta: '' } : f
                 return (
-                  <div key={i} className="pl-4 py-0.5">
-                    <div className="flex items-center gap-2 text-[11px] text-muted">
-                      <span className="truncate min-w-0">🎬 {file.name}</span>
-                      <span className="ml-auto shrink-0 tabular-nums">
-                        {file.pct != null ? `${file.pct}%` : 'starting…'}
-                        {file.speed ? ` · ${file.speed}` : ''}
-                        {file.eta ? ` · ${file.eta} left` : ''}
-                      </span>
-                    </div>
-                    <div className="mt-0.5 h-1 rounded-full bg-ink/60 overflow-hidden">
-                      <div
-                        className="h-full rounded-full bg-stage-stems/80"
-                        style={{ width: `${Math.max(2, Math.min(100, file.pct ?? 2))}%` }}
-                      />
-                    </div>
+                  <div key={i} className="flex items-center gap-2 text-muted">
+                    <span className="truncate min-w-0">🎬 {file.name}</span>
+                    <span className="ml-auto shrink-0 tabular-nums">
+                      {file.pct != null ? `${file.pct}%` : 'starting…'}
+                      {file.speed ? ` · ${file.speed}` : ''}
+                      {file.eta ? ` · ${file.eta} left` : ''}
+                    </span>
                   </div>
                 )
               })}
             </div>
           )}
+          {/* Raw upload errors, if the log still holds them */}
+          {t.errors > 0 && (t.errorLines?.length ?? 0) > 0 && (
+            <div className="space-y-0.5">
+              <div className="text-muted font-bold">Upload errors seen (auto-retried; the vault check above is the final word):</div>
+              {t.errorLines!.map((l, i) => (
+                <div key={i} className="font-mono break-all text-urgent/80">{l}</div>
+              ))}
+            </div>
+          )}
+          {verifyError && <div className="text-urgent">Couldn't start a manual check ({verifyError}) — it runs by itself every 30 min anyway.</div>}
+          {/* Controls */}
+          <div className="flex items-center gap-2 flex-wrap pt-0.5">
+            {!done && !stale && !cmdPending && (
+              <button
+                onClick={() => { void sendCommand(paused ? 'resume' : 'pause') }}
+                disabled={sending}
+                className={`inline-flex items-center gap-1 rounded-full border px-3 py-1 text-xs font-bold disabled:opacity-50 ${
+                  paused
+                    ? 'border-stage-done/60 bg-stage-done/15 text-stage-done hover:bg-stage-done/30'
+                    : 'border-stage-tracking/60 bg-stage-tracking/15 text-stage-tracking hover:bg-stage-tracking/30'
+                }`}
+                title={paused ? 'Start this job again — it resumes exactly where it stopped' : 'Stop this job cleanly — progress is kept, resume any time'}
+              >
+                {paused ? '▶ Resume' : '⏸ Pause'}
+              </button>
+            )}
+            {t.verifiable && (
+              <button
+                onClick={() => { void runVerify() }}
+                disabled={verifying}
+                className="inline-flex items-center gap-1 rounded-full border border-line bg-panel hover:bg-line/40 px-2.5 py-0.5 font-bold text-muted disabled:opacity-50"
+                title="Checks run by themselves every 30 minutes — this just runs one now. Changes nothing."
+              >
+                {verifying ? '⏳ checking every file…' : 'Check now'}
+              </button>
+            )}
+            {(done || stale) && (
+              <button
+                onClick={() => { void onDismiss(t.name) }}
+                className="inline-flex items-center gap-1 rounded-full border border-line bg-panel hover:bg-line/40 px-2.5 py-0.5 font-bold text-muted"
+                title="Hides this finished row from the dashboard. Deletes NOTHING — not from the drive, not from Dropbox, not from the vault. The row comes back on its own if the job ever runs again."
+              >
+                Hide row
+              </button>
+            )}
+          </div>
         </div>
       )}
-      <div className="mt-1 text-[11px] text-muted">
-        {done
-          ? `Finished — ${t.filesTotal ? fmtCount(t.filesTotal) + ' files' : 'complete'}.${t.verifiable && !verify ? ' Verifying against the vault automatically — the verdict will appear here.' : ''}`
-          : stale
-            ? `No update in ${Math.round(ageMs / 60000)} min — the job may have just finished, or the reporter on the NAS stopped. Check Docker on RED if this persists.`
-            : paused
-              ? `Held where it stopped (${t.filesDone != null && t.filesTotal != null ? `${fmtCount(t.filesDone)} of ${fmtCount(t.filesTotal)} files` : 'progress kept'}) — resumes exactly here when its box frees up.`
-              : `${t.filesDone != null && t.filesTotal != null ? `${fmtCount(t.filesDone)} of ${fmtCount(t.filesTotal)} files · ` : ''}updated ${Math.max(1, Math.round(ageMs / 1000))}s ago`}
-      </div>
     </div>
   )
 }
@@ -527,21 +492,15 @@ export default function StoragePage() {
           const uploading = transfers.filter((t) => (t.percent ?? 0) < 100).length
           return (
             <div className="mb-2 rounded-lg border border-line bg-ink/30 p-2 text-[11px] text-muted">
-              🛡 Every finished job below is checked file-by-file against the vault, and uploads re-run themselves until
-              everything lands. Nothing is ever deleted anywhere without a verified vault copy.
+              🛡 Checked file-by-file, re-uploaded automatically, never deleted without a verified vault copy.
               <span className="text-text/90 font-bold">
-                {' '}Right now: {clean.length} of {checked.length} checked jobs fully in the vault
+                {' '}{clean.length} of {checked.length} jobs safe in the vault
                 {toLand > 0 ? ` · ${fmtCount(toLand)} files still to land` : ''}
-                {uploading > 0 ? ` · ${uploading} upload${uploading === 1 ? '' : 's'} running` : ''}.
+                {uploading > 0 ? ` · ${uploading} uploading` : ''}.
               </span>
             </div>
           )
         })()}
-        {autoQueue && transfers.length > 0 && (
-          <div className="text-[11px] text-muted mb-2">
-            When a box goes idle, its next paused job starts automatically. A job you paused yourself is left alone for an hour.
-          </div>
-        )}
         {transfers.length > 0 ? (
           <div className="divide-y divide-line/60">
             {transfers.map((t) => (
