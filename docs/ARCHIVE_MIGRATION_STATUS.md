@@ -256,6 +256,24 @@ Re-generate after major changes by re-running the scan container on RED
 prefer "short paste that downloads a script from `_INVENTORY`" over long
 heredocs, which mangle).
 
+## Ryan's target architecture (stated 2026-09-18 — the plan to build toward)
+
+1. **UGREEN (RED/BLUE) = the active editing store** — editors work off it.
+2. **Dropbox = sharing only**, kept small. He is out of space; freeing it is
+   the driver of everything here.
+3. **Vault = everything, forever** — anything can be deleted anywhere else
+   only after file-by-file vault verification (already enforced).
+4. **Automatic archiving**: folders untouched for a long time auto-move to
+   the vault and come off Dropbox — the wave-1 loop, made a standing
+   automated pipeline instead of manually planned waves. **Exception:
+   branding folders — never auto-archived** (light, and worth keeping warm
+   even when untouched). Exemption list still needs defining with Ryan
+   (name-match on "brand"? explicit list?).
+5. Drive rotation continues (queue: Rabbit, SHM #1, Octopus, Lion, Stork,
+   Hippo) — a drive may be swapped ONLY after its row reads "safe in the
+   vault"; build the auto-slot watcher BEFORE the first swap so a newly
+   docked drive is detected and uploaded without terminal work.
+
 ## Big picture / what's next (priority order)
 
 1. **Finish wave 1** → verify → delete → report (per the loop above).
