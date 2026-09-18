@@ -55,6 +55,20 @@ function TransferRow({ t, onCommand, onDismiss }: {
   const verifying =
     Boolean(t.verifying) ||
     (kickedAt != null && Date.now() - kickedAt < 45_000 && (!verify || new Date(verify.runAt).getTime() < kickedAt))
+  const [acceptedLocal, setAcceptedLocal] = useState(false)
+  const heal = t.heal ?? null
+  const missing = verify?.missingCount ?? 0
+  const accepted = missing > 0 && (acceptedLocal || (heal?.acceptedMissing != null && missing <= heal.acceptedMissing))
+  const healGaveUp = missing > 0 && !accepted && (heal?.attempts ?? 0) >= (heal?.maxAttempts ?? 3)
+  const healRetrying = missing > 0 && !accepted && !healGaveUp && (heal?.attempts ?? 0) > 0
+  const acceptMissing = async () => {
+    try {
+      await api.storageAcceptMissing(t.name)
+      setAcceptedLocal(true)
+    } catch {
+      /* row keeps asking; next poll shows real state */
+    }
+  }
   const ageMs = Date.now() - new Date(t.reportedAt).getTime()
   const stale = ageMs > 5 * 60 * 1000
   const done = (t.percent ?? 0) >= 100
@@ -113,9 +127,9 @@ function TransferRow({ t, onCommand, onDismiss }: {
           <button
             onClick={() => { void onDismiss(t.name) }}
             className="inline-flex items-center gap-1 rounded-full border border-line bg-panel hover:bg-line/40 px-2.5 py-0.5 text-[11px] font-bold text-muted"
-            title="Clear this row from the card. If this job ever runs again, it reappears on its own."
+            title="Hides this finished row from the dashboard. Deletes NOTHING — not from the drive, not from Dropbox, not from the vault. The row comes back on its own if the job ever runs again."
           >
-            ✕ Clear
+            Hide row
           </button>
         )}
         {!done && !stale && !cmdPending && (
@@ -190,13 +204,36 @@ function TransferRow({ t, onCommand, onDismiss }: {
           >
             {verify.missingCount === 0
               ? `✅ Verified ${fmtWhen(verify.runAt)} — all ${fmtCount(verify.filesExpected)} files are safe in the vault`
-              : `🕗 Checked ${fmtWhen(verify.runAt)} — ${fmtCount(verify.filesMatched)} of ${fmtCount(verify.filesExpected)} files in the vault, ${fmtCount(verify.missingCount)} still to land`}
-            {verify.tier2Matches > 0 ? ` (${fmtCount(verify.tier2Matches)} matched by name+size)` : ''}
+              : accepted
+                ? `✅ Verified ${fmtWhen(verify.runAt)} — ${fmtCount(verify.filesMatched)} files in the vault; you approved skipping ${fmtCount(verify.missingCount)}`
+                : `🕗 Checked ${fmtWhen(verify.runAt)} — ${fmtCount(verify.filesMatched)} of ${fmtCount(verify.filesExpected)} files in the vault, ${fmtCount(verify.missingCount)} still to land`}
+            {verify.tier2Matches > 0 && !accepted ? ` (${fmtCount(verify.tier2Matches)} matched by name+size)` : ''}
             {(verify.detail?.missing?.length ?? 0) + (verify.detail?.targets?.length ?? 0) > 0 && (
               <span className="text-[9px]">{verifyOpen ? '▾' : '▸'}</span>
             )}
           </button>
-          {verify.missingCount > 0 && (
+          {healRetrying && (
+            <div className="text-[11px] text-muted">
+              🔁 Re-running this upload automatically to pick those up (try {heal!.attempts} of {heal!.maxAttempts}) — no action needed.
+            </div>
+          )}
+          {healGaveUp && (
+            <div className="mt-1 rounded-lg border border-stage-tracking/40 bg-stage-tracking/5 p-2 space-y-1.5">
+              <div className="text-[11px] text-text/90">
+                This upload job re-ran {heal!.maxAttempts}× and still can't reach these {fmtCount(verify.missingCount)} files —
+                they're outside the folders the job was set up to copy. The files are safe on their source; to upload them,
+                the job's folder scope on the NAS has to be widened (ask Claude — it has the exact fix ready).
+              </div>
+              <button
+                onClick={() => { void acceptMissing() }}
+                className="inline-flex items-center gap-1 rounded-full border border-line bg-panel hover:bg-line/40 px-2.5 py-0.5 text-[11px] font-bold text-muted"
+                title="Only choose this if these files genuinely don't need to be in the vault. It changes nothing on any drive or in Dropbox — it just stops this row from warning about them."
+              >
+                These files don't need uploading — approve skipping them
+              </button>
+            </div>
+          )}
+          {verify.missingCount > 0 && !accepted && !healGaveUp && !healRetrying && (
             <div className="text-[11px] text-muted">
               Nothing is lost — these files are still on their source; their vault copy just hasn't landed yet. Re-checked automatically as uploads continue.
             </div>
@@ -477,6 +514,29 @@ export default function StoragePage() {
             </button>
           )}
         </div>
+        {transfers.length > 0 && (() => {
+          const checked = transfers.filter((t) => t.verify)
+          const clean = checked.filter((t) => {
+            const m = t.verify!.missingCount
+            return m === 0 || (t.heal?.acceptedMissing != null && m <= t.heal.acceptedMissing)
+          })
+          const toLand = checked.reduce((a, t) => {
+            const m = t.verify!.missingCount
+            return a + (t.heal?.acceptedMissing != null && m <= t.heal.acceptedMissing ? 0 : m)
+          }, 0)
+          const uploading = transfers.filter((t) => (t.percent ?? 0) < 100).length
+          return (
+            <div className="mb-2 rounded-lg border border-line bg-ink/30 p-2 text-[11px] text-muted">
+              🛡 Every finished job below is checked file-by-file against the vault, and uploads re-run themselves until
+              everything lands. Nothing is ever deleted anywhere without a verified vault copy.
+              <span className="text-text/90 font-bold">
+                {' '}Right now: {clean.length} of {checked.length} checked jobs fully in the vault
+                {toLand > 0 ? ` · ${fmtCount(toLand)} files still to land` : ''}
+                {uploading > 0 ? ` · ${uploading} upload${uploading === 1 ? '' : 's'} running` : ''}.
+              </span>
+            </div>
+          )
+        })()}
         {autoQueue && transfers.length > 0 && (
           <div className="text-[11px] text-muted mb-2">
             When a box goes idle, its next paused job starts automatically. A job you paused yourself is left alone for an hour.
