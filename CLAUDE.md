@@ -54,9 +54,12 @@ non-negotiable deletion rules, the full deletion log, wave-1 folder list, and
 the runnable tools in `tools/archive/`. Never delete anything from Dropbox
 without that doc's verification rules.
 
-**Your first move needs one thing only Ryan holds: the archive AWS key pair**
-(this repo must never contain it — GitHub/AWS auto-revoke leaked keys). Open
-by asking him exactly this, so he only has to copy-paste:
+**UPDATE 2026-09-18: you no longer need Ryan's AWS keys to verify.** Slate
+verifies against the vault automatically (PR #80, live on main) and publishes
+verdicts to the status branch as `storage-verify.json` — read that first:
+`mcp__github__get_file_contents owner=strawhutmedia repo=Project-management
+path=storage-verify.json ref=status`. The key-paste ask below remains only as
+a fallback for ad-hoc ledger work (`ledger2.mjs`, wave-2 planning):
 > "I'm resuming the archive migration. Paste this in the RED terminal and
 > send me the two values it prints:
 > `sudo grep -A4 '\[archive\]' /volume1/rclone-config/rclone.conf`"
@@ -171,60 +174,10 @@ synced Dropbox footage, hands-off, for EVERY episode (not one test).
 5. ~~Verify Xavier/Riley/Blake are scoped to podcasts only~~ SUPERSEDED
    2026-09-17: everyone sees everything now (PR #78 handoff at end of file);
    Cash Flow / Invoices gates unchanged and verified in code.
-6. ~~If PR #78 isn't merged yet, get it merged~~ MERGED 2026-09-18 — the
-   post-deploy verification in its handoff block (end of file) is still owed.
-7. Anthropic-spend follow-through (2026-09-18 session): once Ryan actually
-   switches plans (recommended Team → Max 20x), update the recurring
-   "Anthropic (Claude)" Cash Flow line via a new migration ($150 → whatever
-   he lands on) — do NOT change it before the switch happens.
-8. **After Ryan's Team→Max switch (he planned it for ~2026-09-19): recreate
-   the monthly Anthropic reconciliation Routine under his PERSONAL claude.ai
-   account.** The existing Routine ("Monthly Anthropic → Slate Cash Flow
-   reconciliation", 5th of each month) was created from his TEAM account and
-   gets suspended when the Team org lapses (2026-10-07). Its full prompt is
-   preserved in the 2026-09-18 handoff block below — recreate it verbatim,
-   and make sure the new account's sessions have Gmail + GitHub connected
-   first. Its first run should also do item 7 (recurring line $150 → $200 if
-   he landed on Max 20x, verified from the first Max receipt).
-
-## 🧾 SESSION HANDOFF — 2026-09-18 (Anthropic spending → Cash Flow)
-
-Ryan asked why his Anthropic bill exploded and whether Slate's Cash Flow
-reflects it. Findings (all from primary sources — the Anthropic receipt
-emails in his Gmail, read individually):
-
-- **September 2026 Anthropic net through Sep 17: $1,324.46** — $150 Team
-  plan subscription (1 Premium + 1 Standard seat, bills the 7th) plus
-  ~$1,174 of one-time overage: 26 "Auto recharge extra usage, Team plan"
-  top-ups ($44–58 each, Sep 9–17, Claude Code sessions + auto-reload),
-  $90 prepaid extra usage, $63.61 API console credits, −$25.16 refund.
-  Prior months: Aug $170, Jul $65, Jun $28.
-- **Recommendation given to Ryan (not yet acted on):** kill extra-usage
-  auto-reload in claude.ai admin billing settings today; drop the 2-seat
-  Team plan ($150/mo, the Standard seat is unused) and move to Max 20x
-  ($200/mo, ~3x the included usage of a Team Premium seat, no weekly cap).
-  Before cancelling Team, verify Claude Code Remote Control (currently
-  enabled org-wide via Team admin settings) is available on an individual
-  Max account.
-- **Cash Flow was understating this**: the recurring Anthropic line says
-  $150/mo (migration 137) and nothing updates expense lines monthly.
-  The only monthly automation is `server/cashflow_payment_check.ts`
-  (day 1–3: checks recurring INCOME clients are paid in QuickBooks and
-  emails a digest — it never writes entries, never touches expenses, and
-  the bookkeeper's QuickBooks work never flows into Slate).
-- **Shipped this session — migration `156_cashflow_anthropic_september_overage.sql`**:
-  logs the $1,174.46 September overage as a one-time (non-recurring)
-  entry so the sustainable baseline isn't distorted, and corrects the
-  recurring line's stale "pay-as-you-go API" description (amount stays
-  $150 — that's the real subscription). PR opened from
-  `claude/anthropic-spending-optimization-m178nb`; check its merge state.
-- **Monthly mechanism**: a Claude Routine ("Monthly Anthropic → Slate
-  Cash Flow reconciliation") runs on the 5th of each month — after the
-  bookkeeper's close and the day-1–3 income check — reads the prior
-  month's Anthropic receipts from Gmail, compares against the tracker,
-  and ships a sourced migration PR + emails Ryan the delta. If receipts
-  show the spend has stabilized at a new normal, it should propose
-  correcting the recurring line instead of stacking one-time entries.
+6. ~~If PR #78 isn't merged yet, get it merged~~ MERGED 2026-09-17; its
+   post-deploy verification (end of file) still owed. Storage/archive work
+   continues per the PR #80 handoff block (end of file): RHINO/RECOVERY
+   top-up uploads, wave-1 completion, Auto-queue decision from Ryan.
 
 <!-- End 2026-09-17 handoff -->
 
@@ -244,6 +197,9 @@ DB state, applied migrations, user/project counts, and the last 50 log lines.
 
 `errors.jsonl` is an append-only log of every error the app caught (capped at
 the last 200 lines). Each line is a JSON object with `ts`, `msg`, `data`.
+
+`storage-verify.json` (since 2026-09-18) holds the latest vault-verification
+verdict per Storage-page row — see the archive-migration section above.
 
 If you see errors that aren't yet fixed in `main`, **investigate, fix, push to
 main**. Railway will auto-deploy. After the new boot reports healthy, the app
@@ -522,6 +478,9 @@ automatically (same review queue as every other import).
 | `INVOICING_ENC_KEY` | AES-256 key (64 hex chars, `openssl rand -hex 32`) that encrypts contractor W9 TINs. **Required** for vendors to submit W9s; without it the intake form refuses submissions (never stores plaintext). Keep stable — rotating makes stored TINs undecryptable. |
 | `INVOICING_OWNER_EMAIL` | Sole account allowed into the Invoices/payroll section. Defaults to `ryan@strawhutmedia.com`. |
 | `INVOICING_SERVICE_TOKEN` | Bearer token for the monthly invoice automation. Sent as `X-Invoicing-Token` (or `Authorization: Bearer`); when it matches, `/api/invoicing/*` acts as the owner without a browser session. Optional — unset means only Ryan's login works. Rotate/clear to revoke automation. |
+| `ARCHIVE_ACCESS_KEY_ID` / `ARCHIVE_SECRET_ACCESS_KEY` | Archive-scoped IAM keys (S3 read, no delete) for the Master Archive browser + the automatic vault verification (`autoVerifySweep`, PR #80). Fall back to `AWS_ACCESS_KEY_ID`/`AWS_SECRET_ACCESS_KEY`. |
+| `ARCHIVE_BUCKET` / `ARCHIVE_REGION` | Vault bucket (default `strawhut-master-archive`) and region (default `us-west-2`). |
+| `STORAGE_REPORT_TOKEN` | Token the NAS reporter/commander containers use for `/api/storage/transfer-report` + agent command endpoints. |
 | `QB_CLIENT_ID` / `QB_CLIENT_SECRET` | QuickBooks Online OAuth app credentials (from an Intuit Developer app). Powers the AR side — connect + draft/send client estimates & invoices. See `server/quickbooks.ts`. |
 | `QB_ENV` | `sandbox` (default) or `production`. Redirect URI is `${APP_BASE_URL}/api/qb/callback` — must be registered in the Intuit app. |
 
@@ -1012,10 +971,9 @@ and what's still open so the next session doesn't have to re-derive it.
 # Session handoff — QA show picker, everyone-sees-everything, Dropbox scoping (2026-09-17, PR #78)
 
 All of this session's work is in **[PR #78](https://github.com/strawhutmedia/Project-management/pull/78)**
-(branch `claude/trusting-ramanujan-3r4d7w`, 4 commits, build clean). At the
-time this was written the PR was **OPEN and waiting on Ryan's merge** —
-check its state first; nothing below is live until it merges to `main`
-(Railway deploys, migration 155 runs at boot).
+(branch `claude/trusting-ramanujan-3r4d7w`, 4 commits, build clean).
+**MERGED to `main` 2026-09-17** (Railway deployed, migration 155 ran at
+boot); the post-merge verification below is still owed.
 
 ## What's in PR #78
 
@@ -1092,7 +1050,9 @@ Ryan panicked at the Master Archive dashboard ("1 error" badges on finished
 RHINO/RECOVERY uploads) and issued a standing demand: **no terminal, no
 PowerShell, no pasting — there should be a button.** This session's work is in
 **PR #80** (branch `claude/storage-issue-lxjlf4`; PR #78 merged earlier).
-Nothing is live until Ryan merges it to `main`.
+**PR #80 is MERGED & DEPLOYED** (Ryan told the session to merge, 2026-09-18
+~05:03 UTC; Railway deploy SUCCESS 05:04; auto-verify's first run confirmed
+live at 05:05 via `storage-verify.json` on the status branch).
 
 - **Vault verification is now AUTOMATIC + in-app**: `autoVerifySweep()`
   (60s after every boot, then every 30 min) verifies each finished drive
@@ -1121,9 +1081,21 @@ Nothing is live until Ryan merges it to `main`.
   deliberate; unanswered so far. If wave 1 looks stalled after PODCASTS is
   done, that toggle (or the row's Resume button) is why.
 
-## Post-merge verification owed
-- Bundle-hash check per the standing deploy rule, then on the Storage page:
-  hit Verify on RHINO and RECOVERY, confirm verdicts render and rows show the
-  persisted result after a reload; expand the error badge on either row.
-- Run Verify on DROPBOX-WAVE1 and act on any `VERIFIED — DELETABLE` targets
-  per the deletion rules in `docs/ARCHIVE_MIGRATION_STATUS.md`.
+## Post-merge results (2026-09-18, same session — done, not owed)
+- Deploy verified live (deploy SUCCESS on merge commit `3220483`;
+  `storage-verify.json` written by the new code at 05:05 UTC — stronger
+  proof than the bundle hash, which was also confirmed fresh).
+- **Wave 1 verdicts**: 17 previously deleted folders re-verified clean;
+  **4 newly VERIFIED — DELETABLE folders were deleted from Dropbox**
+  (You Are U, Indy Automous challenge podcast, Ryan Personal Photos,
+  Straw Hut General's files — ~378 GB; **running total ≈ 2.1 TB freed**).
+  4_SOCIAL/HeartBreakers is 80/81 — one file
+  (`Ep029_Solo/HB CAM 3 02.braw`) still missing.
+- **RHINO / RECOVERY: NOT wipe-safe.** Census-vs-vault found 1,414 (RHINO)
+  and 6,121 (RECOVERY) files not in the vault — the "finished" rclone jobs
+  covered less than the drive censuses (files are still on the physical
+  drives, nothing lost). Full breakdown + next steps in
+  `docs/ARCHIVE_MIGRATION_STATUS.md` "First auto-verify results".
+- **Still open**: Auto-queue is OFF and Ryan hasn't answered whether that
+  was deliberate — wave 1 will NOT self-resume when PODCASTS finishes
+  (~Sept 19); top-up uploads needed for RHINO/RECOVERY missing subtrees.

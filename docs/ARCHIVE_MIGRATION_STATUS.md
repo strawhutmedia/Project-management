@@ -63,6 +63,37 @@ each run logs a `storage verify` line that lands in the status branch's
 - Verify runs are audits, kept forever in `storage_verify_runs`
   (migration `156`).
 
+## First auto-verify results — 2026-09-18 05:05 UTC (PR #80 deployed 05:04)
+
+Read from `storage-verify.json` on the status branch; acted on immediately.
+
+- **Wave 1**: all 17 previously deleted folders re-verified clean (the
+  deletions were sound). Four MORE hit `VERIFIED — DELETABLE` and were
+  **deleted Sept 18** (see log above). Remaining: 4_SOCIAL/HeartBreakers
+  **80/81 — one file short**: `Ep029_Solo/HB CAM 3 02.braw` (likely the
+  RHINO job's "1 error"; should clear when the wave re-runs/continues),
+  then Jay Kogen (1)(2)(3), Camera Uploads (1), Videos, Shaping Freedom
+  Podcast, Apps, Old Dbox — all queued behind PODCASTS; wave 1 is PAUSED
+  and **Auto-queue is OFF** (Ryan hasn't said whether that was deliberate).
+- **RHINO: NOT wipe-safe.** Census 13,331 files → 11,917 in vault (88 by
+  name+size), **1,414 missing** — mostly
+  `1_PODCASTS/Brandi Glanville Unfiltered/1_Episodes/_Archive_/…` WAVs.
+  The rclone job legitimately "Finished" — its source scope was narrower
+  than the drive census. The files are still ON the physical drive; a
+  follow-up upload covering the missing subtrees is needed before the
+  drive can be swapped/wiped.
+- **RECOVERY: NOT wipe-safe.** Census 22,269 → 16,148 matched (3,640 by
+  name+size), **6,121 missing** — e.g. the whole
+  `1_PODCASTS/Can We Kick It/EPISODES/S3_*` season. Same shape as RHINO:
+  job scope < census; files still on the drive; needs a top-up upload.
+- Caveat on both drive verdicts: "missing" = not in the VAULT. Under
+  Ryan's rule 1 a copy on RED/BLUE also counts for *Dropbox deletion*
+  purposes — but for wiping the physical drives, vault coverage is the
+  bar, and it isn't met yet. Next session: define/extend the RHINO and
+  RECOVERY upload jobs to cover the missing subtrees (needs the NAS-side
+  docker job shapes — see wave1.sh pattern), or confirm with Ryan that
+  the uncovered subtrees were intentionally excluded.
+
 ## ⚡ IF YOU ARE THE NEXT SESSION — DO THIS FIRST, UNPROMPTED
 
 Wave 1 was still uploading when the last session archived. This work is
@@ -146,7 +177,12 @@ Sept 17: Hollywood Horror Stories 58, The Inside Track 63, Brandi Glanville
 PurchasedMaterials 33, Decks & Marketing 7.5, Newsletter 6.5, History. Rated
 R. 4.2, Virgo Sisters 7.8, Salt and Flickers 85, HeartBreakers (podcast) 137,
 Straw Hut Ads 133, Podcast Primer Pro 163, Rainbow Media 310.
-**Running total ≈ 1.7 TB freed.**
+Sept 18 (personal space `ns:1531957776`, vault-verified by Slate auto-verify
+run 05:05 UTC, deleted via Dropbox connector): You Are U 123 GB (1,891
+files), Indy Automous challenge podcast 81 GB (4 files — recounted live in
+Dropbox before delete, exactly 4), Ryan Personal Photos 74 GB (4,910 files),
+Straw Hut General's files 100 GB (2,973 files).
+**Running total ≈ 2.1 TB freed.**
 
 ## Wave 1 (in flight at archive time)
 
