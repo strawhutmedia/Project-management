@@ -63,18 +63,26 @@ each run logs a `storage verify` line that lands in the status branch's
 - Verify runs are audits, kept forever in `storage_verify_runs`
   (migration `156`).
 
-## First auto-verify results — 2026-09-18 05:05 UTC (PR #80 deployed 05:04)
+## Auto-verify results — 2026-09-18 (sweeps 05:05 / 14:39 / 15:00 UTC)
 
 Read from `storage-verify.json` on the status branch; acted on immediately.
 
-- **Wave 1**: all 17 previously deleted folders re-verified clean (the
-  deletions were sound). Four MORE hit `VERIFIED — DELETABLE` and were
-  **deleted Sept 18** (see log above). Remaining: 4_SOCIAL/HeartBreakers
-  **80/81 — one file short**: `Ep029_Solo/HB CAM 3 02.braw` (likely the
-  RHINO job's "1 error"; should clear when the wave re-runs/continues),
-  then Jay Kogen (1)(2)(3), Camera Uploads (1), Videos, Shaping Freedom
-  Podcast, Apps, Old Dbox — all queued behind PODCASTS; wave 1 is PAUSED
-  and **Auto-queue is OFF** (Ryan hasn't said whether that was deliberate).
+- **Wave 1 is nearly DONE**: by the 14:39 sweep, 29 of 30 targets were fully
+  in the vault. All previously deleted folders re-verified clean, and **11
+  more were verified then deleted Sept 18** (see log above; the last 7 at
+  ~15:30 UTC). Remaining ONLY: `Ryan Tillotson/Old Dbox` (10,598/18,430
+  files landed, still uploading/queued) and one HeartBreakers file
+  (`4_SOCIAL/HeartBreakers/Ep029_Solo/HB CAM 3 02.braw`). Wave 1 shows
+  paused with **Auto-queue OFF** (Ryan hasn't said whether that was
+  deliberate) — yet vault coverage for its targets grew massively between
+  sweeps, so uploads ARE landing; confirm which job is carrying them before
+  assuming the wave is stalled.
+- **CLIENTS (RED): VERIFIED** — all 1,490 census files in the vault
+  (15:00 sweep, zero missing).
+- **HENRI (Henri Recordings coverage): 25 of 27** — missing only
+  `Henri.prin` + `Henri.prproj` (~110 KB total, Premiere project files in
+  `Ryan Tillotson/Henri Recordings/`). Not deletable until they land AND
+  the folder passes the 1-year gate (2026-10-24).
 - **RHINO: NOT wipe-safe.** Census 13,331 files → 11,917 in vault (88 by
   name+size), **1,414 missing** — mostly
   `1_PODCASTS/Brandi Glanville Unfiltered/1_Episodes/_Archive_/…` WAVs.
@@ -182,7 +190,11 @@ run 05:05 UTC, deleted via Dropbox connector): You Are U 123 GB (1,891
 files), Indy Automous challenge podcast 81 GB (4 files — recounted live in
 Dropbox before delete, exactly 4), Ryan Personal Photos 74 GB (4,910 files),
 Straw Hut General's files 100 GB (2,973 files).
-**Running total ≈ 2.1 TB freed.**
+Sept 18 later (vault-verified by the 14:39 UTC auto-verify sweep, deleted via
+Dropbox connector): Don't Be Alone with Jay Kogen (1) 45 GB, (2) 37 GB,
+(3) 18.5 GB, Camera Uploads (1) 12.4 GB, Videos 10.6 GB, Shaping Freedom
+Podcast 13.1 GB, Apps 465.6 GB (2,592 files).
+**Running total ≈ 2.7 TB freed.**
 
 ## Wave 1 (in flight at archive time)
 

@@ -1086,11 +1086,19 @@ live at 05:05 via `storage-verify.json` on the status branch).
   `storage-verify.json` written by the new code at 05:05 UTC — stronger
   proof than the bundle hash, which was also confirmed fresh).
 - **Wave 1 verdicts**: 17 previously deleted folders re-verified clean;
-  **4 newly VERIFIED — DELETABLE folders were deleted from Dropbox**
+  **11 newly VERIFIED — DELETABLE folders were deleted from Dropbox Sept 18**
   (You Are U, Indy Automous challenge podcast, Ryan Personal Photos,
-  Straw Hut General's files — ~378 GB; **running total ≈ 2.1 TB freed**).
-  4_SOCIAL/HeartBreakers is 80/81 — one file
-  (`Ep029_Solo/HB CAM 3 02.braw`) still missing.
+  Straw Hut General's files, Jay Kogen (1)(2)(3), Camera Uploads (1),
+  Videos, Shaping Freedom Podcast, Apps — ~980 GB;
+  **running total ≈ 2.7 TB freed**). Wave 1 remaining: ONLY Old Dbox
+  (uploading) + one HeartBreakers file. Later sweeps: **CLIENTS VERIFIED**
+  (all 1,490 files), **HENRI 25/27** (missing just Henri.prin/.prproj,
+  ~110 KB). Also shipped same day (direct to main per the standing
+  fix-to-main rule): auto-verify covers CLIENTS/PODCASTS/BLUE-*/HENRI
+  (`331c786`), and the Verify button kicks off the check server-side
+  instead of holding the HTTP request — the "Verify failed: Load failed"
+  Ryan saw was the held request dying on a redeploy (`c4059fd`), plus
+  calmer verdict copy ("N still to land — nothing is lost").
 - **RHINO / RECOVERY: NOT wipe-safe.** Census-vs-vault found 1,414 (RHINO)
   and 6,121 (RECOVERY) files not in the vault — the "finished" rclone jobs
   covered less than the drive censuses (files are still on the physical
