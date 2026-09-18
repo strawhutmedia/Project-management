@@ -43,6 +43,17 @@ each run logs a `storage verify` line that lands in the status branch's
   wave-1 per-target check (tier 1 only, same as `wave1-verify.mjs`) and shows
   per-folder verdicts incl. `VERIFIED — DELETABLE`. Mapping/matching logic is
   a port of `ledger2.mjs`/`wave1-verify.mjs` — keep them in sync.
+- **Verification is also AUTOMATIC** (Ryan, same day: "you're the one
+  verifying — so do it"): `autoVerifySweep()` runs 60s after every boot and
+  every 30 min — each finished drive is verified once (re-verified only if
+  its job reports new progress, i.e. a re-run), wave 1 re-checked at most
+  every 6h while it uploads. After each sweep the latest verdict per row is
+  published to the **status branch as `storage-verify.json`** — THAT is how
+  a cloud session reads verdicts and picks `VERIFIED — DELETABLE` folders
+  for the deletion loop, zero credentials needed.
+- **If verify finds missing files**: the fix is the row's **Resume** button —
+  the rclone job re-runs, skips everything already uploaded, copies only the
+  strays; auto-verify then re-checks because the row reported new progress.
 - The scary "N errors — auto-retrying" badge is now honest: it expands to show
   the actual rclone ERROR lines when they're still inside the stored log tail
   (`errorLines` on the transfers API), and says to run Verify when they've

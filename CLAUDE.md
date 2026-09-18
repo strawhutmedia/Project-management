@@ -1042,16 +1042,21 @@ PowerShell, no pasting — there should be a button.** This session's work is in
 **PR #80** (branch `claude/storage-issue-lxjlf4`; PR #78 merged earlier).
 Nothing is live until Ryan merges it to `main`.
 
-- **In-app vault verification**: `POST /api/storage/transfers/:name/verify`
-  + a "🔍 Verify against vault" button on RHINO / RECOVERY / DROPBOX-WAVE1
-  rows on the Storage page. Server-side census-vs-S3 comparison using the
-  `ARCHIVE_ACCESS_KEY_ID`/`ARCHIVE_SECRET_ACCESS_KEY` already on Railway —
-  a cloud session no longer needs Ryan to paste archive keys for wave-1/drive
-  verification. Runs persist in `storage_verify_runs` (migration `156`);
-  each run also emits a `storage verify` logInfo line readable in the status
-  branch. Full detail: `docs/ARCHIVE_MIGRATION_STATUS.md` ("In-app
-  verification" section) — the matching logic mirrors
-  `tools/archive/ledger2.mjs`/`wave1-verify.mjs`, keep them in sync.
+- **Vault verification is now AUTOMATIC + in-app**: `autoVerifySweep()`
+  (60s after every boot, then every 30 min) verifies each finished drive
+  census-vs-S3 server-side and re-checks the wave-1 folders every ≤6h,
+  using the `ARCHIVE_ACCESS_KEY_ID`/`ARCHIVE_SECRET_ACCESS_KEY` already on
+  Railway; a "🔍 Verify against vault" button on RHINO / RECOVERY /
+  DROPBOX-WAVE1 rows runs the same check on demand
+  (`POST /api/storage/transfers/:name/verify`). Runs persist in
+  `storage_verify_runs` (migration `156`) and the latest verdict per row is
+  published to the **status branch as `storage-verify.json`** — read THAT
+  for wave-1 `VERIFIED — DELETABLE` folders; a cloud session needs no keys
+  from Ryan. If files are missing, the row's Resume button re-runs the copy
+  (skips existing, picks up strays) and auto-verify re-checks. Full detail:
+  `docs/ARCHIVE_MIGRATION_STATUS.md` ("In-app verification" section) — the
+  matching logic mirrors `tools/archive/ledger2.mjs`/`wave1-verify.mjs`,
+  keep them in sync.
 - **Error badges are inspectable**: the transfers API now returns `errorLines`
   (real rclone ERROR lines from the stored log tail) and the badge expands to
   show them. Key fact for talking Ryan down: rclone's `Errors:` counter is

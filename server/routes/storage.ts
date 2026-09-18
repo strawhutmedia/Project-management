@@ -716,6 +716,25 @@ async function verifyWave1(): Promise<VerifyResult> {
   }
 }
 
+async function runAndRecordVerify(name: string): Promise<VerifyResult & { name: string; runAt: string }> {
+  const started = Date.now()
+  const r = name === 'DROPBOX-WAVE1' ? await verifyWave1() : await verifyDrive(name)
+  const { rows } = await pool.query(
+    `INSERT INTO storage_verify_runs (name, verdict, files_expected, files_matched, tier2_matches, missing_count, detail)
+     VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING run_at`,
+    [name, r.verdict, r.filesExpected, r.filesMatched, r.tier2Matches, r.missingCount, r.detail ? JSON.stringify(r.detail) : null],
+  )
+  logInfo('storage verify', {
+    name,
+    verdict: r.verdict,
+    expected: r.filesExpected,
+    matched: r.filesMatched,
+    missing: r.missingCount,
+    tookMs: Date.now() - started,
+  })
+  return { name, runAt: rows[0].run_at as string, ...r }
+}
+
 storageRouter.post('/transfers/:name/verify', async (req, res) => {
   const name = String(req.params.name || '').replace(/[^A-Za-z0-9._-]/g, '').slice(0, 80)
   if (!VERIFIABLE.has(name)) {
@@ -723,22 +742,9 @@ storageRouter.post('/transfers/:name/verify', async (req, res) => {
     return
   }
   try {
-    const started = Date.now()
-    const r = name === 'DROPBOX-WAVE1' ? await verifyWave1() : await verifyDrive(name)
-    const { rows } = await pool.query(
-      `INSERT INTO storage_verify_runs (name, verdict, files_expected, files_matched, tier2_matches, missing_count, detail)
-       VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING run_at`,
-      [name, r.verdict, r.filesExpected, r.filesMatched, r.tier2Matches, r.missingCount, r.detail ? JSON.stringify(r.detail) : null],
-    )
-    logInfo('storage verify', {
-      name,
-      verdict: r.verdict,
-      expected: r.filesExpected,
-      matched: r.filesMatched,
-      missing: r.missingCount,
-      tookMs: Date.now() - started,
-    })
-    res.json({ ok: true, run: { name, runAt: rows[0].run_at as string, ...r } })
+    const run = await runAndRecordVerify(name)
+    void publishVerifySnapshot()
+    res.json({ ok: true, run })
   } catch (err) {
     const detail = err instanceof Error ? err.message : String(err)
     logError('storage verify failed', { name, error: detail })
@@ -748,6 +754,86 @@ storageRouter.post('/transfers/:name/verify', async (req, res) => {
     })
   }
 })
+
+// ── Auto-verify ────────────────────────────────────────────────────────
+// Nobody should have to click Verify either (Ryan, 2026-09-18: "you're the
+// one verifying — so do it"). A background sweep verifies each finished
+// drive once (and again only if it reports new progress), and re-checks the
+// wave-1 folders every few hours while the wave uploads. Results land in
+// storage_verify_runs (same as the button) and are mirrored to the status
+// branch as storage-verify.json so cloud Claude sessions can read verdicts
+// without any credentials from Ryan.
+const WAVE1_REVERIFY_MS = 6 * 60 * 60 * 1000
+
+async function publishVerifySnapshot(): Promise<void> {
+  try {
+    const { statusReportingEnabled, writeStatusFile } = await import('../github')
+    if (!statusReportingEnabled()) return
+    const { rows } = await pool.query(
+      `SELECT DISTINCT ON (name) name, run_at, verdict, files_expected, files_matched, tier2_matches, missing_count, detail
+       FROM storage_verify_runs ORDER BY name, run_at DESC`,
+    )
+    await writeStatusFile(
+      'storage-verify.json',
+      JSON.stringify({ updatedAt: new Date().toISOString(), runs: rows }, null, 2),
+      'status: storage verify snapshot',
+    )
+  } catch (err) {
+    logError('storage verify snapshot publish failed', { error: err instanceof Error ? err.message : String(err) })
+  }
+}
+
+let autoVerifyRunning = false
+export async function autoVerifySweep(): Promise<void> {
+  if (autoVerifyRunning) return
+  autoVerifyRunning = true
+  try {
+    if (!s3()) return
+    const { rows } = await pool.query(
+      `SELECT r.name, r.percent, r.last_progress_at, v.run_at
+       FROM storage_transfer_reports r
+       LEFT JOIN LATERAL (
+         SELECT run_at FROM storage_verify_runs WHERE name = r.name ORDER BY run_at DESC LIMIT 1
+       ) v ON true
+       WHERE r.name = ANY($1)`,
+      [[...VERIFIABLE]],
+    )
+    let ran = false
+    for (const r of rows) {
+      const name = r.name as string
+      const done = ((r.percent as number | null) ?? 0) >= 100
+      const runAt = r.run_at ? new Date(r.run_at as string).getTime() : 0
+      const progressAt = new Date(r.last_progress_at as string).getTime()
+      const isWave = name === 'DROPBOX-WAVE1'
+      // Drives: verify once finished; again only if the job reports new
+      // progress after a run (a re-run picked up strays). Wave 1: re-check
+      // as it progresses, at most every 6h (a full check reads the big team
+      // census from S3 — no need to do that every sweep).
+      if (!isWave && !done) continue
+      if (runAt > progressAt) continue
+      if (isWave && runAt && Date.now() - runAt < WAVE1_REVERIFY_MS) continue
+      try {
+        await runAndRecordVerify(name)
+        ran = true
+      } catch (err) {
+        logError('storage auto-verify failed', { name, error: err instanceof Error ? err.message : String(err) })
+      }
+    }
+    if (ran) await publishVerifySnapshot()
+  } catch (err) {
+    logError('storage auto-verify sweep failed', { error: err instanceof Error ? err.message : String(err) })
+  } finally {
+    autoVerifyRunning = false
+  }
+}
+
+export function startStorageAutoVerify(): void {
+  // First sweep shortly after boot (covers "just deployed, verify RHINO +
+  // RECOVERY now"), then every 30 min; the sweep itself decides whether
+  // anything actually needs (re-)verifying.
+  setTimeout(() => { void autoVerifySweep() }, 60_000)
+  setInterval(() => { void autoVerifySweep() }, 30 * 60_000)
+}
 
 storageRouter.get('/transfers', async (_req, res) => {
   try {

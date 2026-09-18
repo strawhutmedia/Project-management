@@ -260,7 +260,7 @@ function TransferRow({ t, onCommand, onDismiss }: {
       )}
       <div className="mt-1 text-[11px] text-muted">
         {done
-          ? `Finished — ${t.filesTotal ? fmtCount(t.filesTotal) + ' files' : 'complete'}. Ready to verify.`
+          ? `Finished — ${t.filesTotal ? fmtCount(t.filesTotal) + ' files' : 'complete'}.${t.verifiable && !verify ? ' Verifying against the vault automatically — the verdict will appear here.' : t.verifiable ? '' : ' Ready to verify.'}`
           : stale
             ? `No update in ${Math.round(ageMs / 60000)} min — the job may have just finished, or the reporter on the NAS stopped. Check Docker on RED if this persists.`
             : paused
