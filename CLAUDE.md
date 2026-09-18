@@ -171,8 +171,51 @@ synced Dropbox footage, hands-off, for EVERY episode (not one test).
 5. ~~Verify Xavier/Riley/Blake are scoped to podcasts only~~ SUPERSEDED
    2026-09-17: everyone sees everything now (PR #78 handoff at end of file);
    Cash Flow / Invoices gates unchanged and verified in code.
-6. If PR #78 isn't merged yet, get it merged and do the post-deploy
-   verification listed in its handoff block (end of file).
+6. ~~If PR #78 isn't merged yet, get it merged~~ MERGED 2026-09-18 — the
+   post-deploy verification in its handoff block (end of file) is still owed.
+7. Anthropic-spend follow-through (2026-09-18 session): once Ryan actually
+   switches plans (recommended Team → Max 20x), update the recurring
+   "Anthropic (Claude)" Cash Flow line via a new migration ($150 → whatever
+   he lands on) — do NOT change it before the switch happens.
+
+## 🧾 SESSION HANDOFF — 2026-09-18 (Anthropic spending → Cash Flow)
+
+Ryan asked why his Anthropic bill exploded and whether Slate's Cash Flow
+reflects it. Findings (all from primary sources — the Anthropic receipt
+emails in his Gmail, read individually):
+
+- **September 2026 Anthropic net through Sep 17: $1,324.46** — $150 Team
+  plan subscription (1 Premium + 1 Standard seat, bills the 7th) plus
+  ~$1,174 of one-time overage: 26 "Auto recharge extra usage, Team plan"
+  top-ups ($44–58 each, Sep 9–17, Claude Code sessions + auto-reload),
+  $90 prepaid extra usage, $63.61 API console credits, −$25.16 refund.
+  Prior months: Aug $170, Jul $65, Jun $28.
+- **Recommendation given to Ryan (not yet acted on):** kill extra-usage
+  auto-reload in claude.ai admin billing settings today; drop the 2-seat
+  Team plan ($150/mo, the Standard seat is unused) and move to Max 20x
+  ($200/mo, ~3x the included usage of a Team Premium seat, no weekly cap).
+  Before cancelling Team, verify Claude Code Remote Control (currently
+  enabled org-wide via Team admin settings) is available on an individual
+  Max account.
+- **Cash Flow was understating this**: the recurring Anthropic line says
+  $150/mo (migration 137) and nothing updates expense lines monthly.
+  The only monthly automation is `server/cashflow_payment_check.ts`
+  (day 1–3: checks recurring INCOME clients are paid in QuickBooks and
+  emails a digest — it never writes entries, never touches expenses, and
+  the bookkeeper's QuickBooks work never flows into Slate).
+- **Shipped this session — migration `156_cashflow_anthropic_september_overage.sql`**:
+  logs the $1,174.46 September overage as a one-time (non-recurring)
+  entry so the sustainable baseline isn't distorted, and corrects the
+  recurring line's stale "pay-as-you-go API" description (amount stays
+  $150 — that's the real subscription). PR opened from
+  `claude/anthropic-spending-optimization-m178nb`; check its merge state.
+- **Monthly mechanism**: a Claude Routine ("Monthly Anthropic → Slate
+  Cash Flow reconciliation") runs on the 5th of each month — after the
+  bookkeeper's close and the day-1–3 income check — reads the prior
+  month's Anthropic receipts from Gmail, compares against the tracker,
+  and ships a sourced migration PR + emails Ryan the delta. If receipts
+  show the spend has stabilized at a new normal, it should propose
+  correcting the recurring line instead of stacking one-time entries.
 
 <!-- End 2026-09-17 handoff -->
 
