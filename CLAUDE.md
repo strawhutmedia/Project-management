@@ -220,6 +220,24 @@ emails in his Gmail, read individually):
   personal account. Remote Control + cloud sessions are confirmed included
   on Max (code.claude.com/docs/en/feature-availability). Chat history does
   NOT move between org and personal accounts.
+- **Switch attempt 2026-09-18 — BLOCKED until Sep 22, then resume.** Ryan
+  turned auto-reload OFF and started the switch live, but Max web checkout
+  on his personal org failed with "You have an existing subscription
+  through the App Store": a previously unknown **Apple-billed Claude Pro
+  (~$20/mo)** sits on the personal account — already cancelled, **expires
+  2026-09-22** (Apple bills it, so it never appeared in the Anthropic
+  receipt audit; treat App Store as a possible hidden-spend source in
+  future audits). Ryan refuses Apple pricing (correct — Apple's cut is
+  priced in). Plan: wait for Sep 22, buy Max 20x on the web on his
+  personal org (his two "personal" org entries turned out to be the same
+  thing). A one-shot Routine ("Sep 22: buy Max 20x (Apple block expired)",
+  fires 2026-09-22 18:00 UTC, push+email) sends him the exact steps,
+  verifies the Team cancellation actually saved (if it didn't, he gets
+  charged $150 on Oct 7 — CHECK THIS), and looks for any post-Sep-18
+  auto-recharge receipts. **Not independently verified this session:**
+  that auto-reload-off and Cancel-plan were completed on the Straw Hut
+  Media org (Ryan initially did steps while in the wrong org) — the Sep 22
+  session and/or the Oct 5 reconciliation must confirm both from receipts.
 - **Servers are unaffected by the plan switch**: Slate/Podbooster/site call
   the API with Console `ANTHROPIC_API_KEY`s (separate billing, the ~$20-28
   "Auto-recharge credits" line) — nothing to change on Railway.
