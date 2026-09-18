@@ -1,9 +1,9 @@
 {
   "version": "0.2.2",
-  "now": "2026-09-18T17:02:07.368Z",
+  "now": "2026-09-18T17:46:29.785Z",
   "boot": {
-    "startedAt": "2026-09-18T17:02:06.236Z",
-    "completedAt": "2026-09-18T17:02:07.335Z",
+    "startedAt": "2026-09-18T17:46:29.214Z",
+    "completedAt": "2026-09-18T17:46:29.769Z",
     "error": null
   },
   "env": {
@@ -297,7 +297,7 @@
   "recentLog": [
     {
       "level": "info",
-      "ts": "2026-09-18T17:02:06.235Z",
+      "ts": "2026-09-18T17:46:29.211Z",
       "msg": "serving client from",
       "data": {
         "clientDir": "/app/dist"
@@ -305,7 +305,7 @@
     },
     {
       "level": "info",
-      "ts": "2026-09-18T17:02:06.236Z",
+      "ts": "2026-09-18T17:46:29.214Z",
       "msg": "boot starting",
       "data": {
         "cwd": "/app",
@@ -316,12 +316,12 @@
     },
     {
       "level": "info",
-      "ts": "2026-09-18T17:02:07.036Z",
+      "ts": "2026-09-18T17:46:29.613Z",
       "msg": "migrations complete"
     },
     {
       "level": "info",
-      "ts": "2026-09-18T17:02:07.225Z",
+      "ts": "2026-09-18T17:46:29.713Z",
       "msg": "wardrobe outfits: applied",
       "data": {
         "projectId": "12f53ed1-c6c7-4c11-8d7b-06d91744c9af",
@@ -332,7 +332,7 @@
     },
     {
       "level": "info",
-      "ts": "2026-09-18T17:02:07.225Z",
+      "ts": "2026-09-18T17:46:29.713Z",
       "msg": "BIYA seed: project already exists, ensured shoot days",
       "data": {
         "projectId": "12f53ed1-c6c7-4c11-8d7b-06d91744c9af"
@@ -340,17 +340,17 @@
     },
     {
       "level": "info",
-      "ts": "2026-09-18T17:02:07.335Z",
+      "ts": "2026-09-18T17:46:29.769Z",
       "msg": "listening on :8080"
     },
     {
       "level": "info",
-      "ts": "2026-09-18T17:02:07.336Z",
+      "ts": "2026-09-18T17:46:29.770Z",
       "msg": "scheduler started (every 5 min)"
     },
     {
       "level": "info",
-      "ts": "2026-09-18T17:02:07.339Z",
+      "ts": "2026-09-18T17:46:29.773Z",
       "msg": "autopilot: loop started",
       "data": {
         "tickMinutes": 10
@@ -358,7 +358,7 @@
     },
     {
       "level": "info",
-      "ts": "2026-09-18T17:02:07.339Z",
+      "ts": "2026-09-18T17:46:29.773Z",
       "msg": "cashflow payment check: loop started",
       "data": {
         "tickHours": 6
@@ -366,7 +366,7 @@
     },
     {
       "level": "info",
-      "ts": "2026-09-18T17:02:07.339Z",
+      "ts": "2026-09-18T17:46:29.773Z",
       "msg": "qa digest: loop started",
       "data": {
         "sendHourPT": 8
