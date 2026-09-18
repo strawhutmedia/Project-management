@@ -476,5 +476,11 @@
     "outcome": "fixed",
     "summary": "Added message pattern check to catch JSON parse errors from body-parser that weren't being caught by the existing type/status checks, preventing \"Unterminated string in JSON\" errors from being logged as unhandled errors.",
     "iterations": 12
+  },
+  "locations dump: github write failed::{\"error\":\"github_503: {\\\"message\\\":\\\"Could not create file. Please try again lat": {
+    "attemptedAt": "2026-09-18T08:03:29.936Z",
+    "outcome": "fixed",
+    "summary": "Added retry logic for GitHub API 5xx server errors (503, etc.) in writeStatusFile and appendStatusJsonl functions to handle transient service unavailability.",
+    "iterations": 12
   }
 }
