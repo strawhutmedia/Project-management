@@ -273,6 +273,16 @@ heredocs, which mangle).
    Hippo) — a drive may be swapped ONLY after its row reads "safe in the
    vault"; build the auto-slot watcher BEFORE the first swap so a newly
    docked drive is detected and uploaded without terminal work.
+6. **SWAP GATE (Ryan's challenge, 2026-09-18: "how do I know ALL the
+   content is actually in the archive?"): a stale census is not proof.**
+   Evidence: RHINO's restarted upload found 2.5 TiB to send — more than its
+   old census gap accounts for, so the old inventory undercounts the drive.
+   RULE: before any drive is declared swappable, run a FRESH full-drive
+   scan (regenerate its census on the NAS that same day) and verify THAT
+   against the vault — file count and bytes must both match 100%. The
+   auto-slot watcher must do this scan-after-upload step automatically for
+   every docked drive. Until a drive passes the fresh-scan gate, "safe in
+   the vault" refers only to its last census, and the drive stays docked.
 
 ## Big picture / what's next (priority order)
 
