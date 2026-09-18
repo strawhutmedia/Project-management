@@ -823,6 +823,24 @@ export type ApiArchiveFile = {
 
 export type ApiArchivePrefixAgg = { prefix: string; objects: number; bytes: number }
 
+export type ApiArchiveVerifyTarget = {
+  target: string
+  files: number
+  matched: number
+  verdict: string
+  missing: string[]
+}
+
+export type ApiArchiveVerify = {
+  runAt: string
+  verdict: string
+  filesExpected: number
+  filesMatched: number
+  tier2Matches: number
+  missingCount: number
+  detail: { missing?: string[]; targets?: ApiArchiveVerifyTarget[] } | null
+}
+
 export type ApiArchiveTransfer = {
   name: string
   bytesDone: string
@@ -833,6 +851,9 @@ export type ApiArchiveTransfer = {
   filesDone: number | null
   filesTotal: number | null
   errors: number
+  errorLines?: string[]
+  verifiable?: boolean
+  verify?: ApiArchiveVerify | null
   lastProgressAt?: string
   currentFiles?: Array<{ name: string; pct: number | null; speed: string; eta: string }>
   reportedAt: string
@@ -1074,6 +1095,11 @@ export const api = {
     request<{ ok: boolean; on: boolean }>('/api/storage/auto-queue', { method: 'POST', body: JSON.stringify({ on }) }),
   storageTransferDismiss: (name: string) =>
     request<{ ok: boolean }>(`/api/storage/transfers/${encodeURIComponent(name)}/dismiss`, { method: 'POST', body: '{}' }),
+  storageVerify: (name: string) =>
+    request<{ ok: boolean; run: ApiArchiveVerify & { name: string } }>(
+      `/api/storage/transfers/${encodeURIComponent(name)}/verify`,
+      { method: 'POST', body: '{}' },
+    ),
   storageTransferCommand: (name: string, action: 'pause' | 'resume') =>
     request<{ ok: boolean; action: 'stop' | 'start' }>(`/api/storage/transfers/${encodeURIComponent(name)}/command`, {
       method: 'POST',

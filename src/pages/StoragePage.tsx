@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useAuth } from '../auth'
-import { api, type ApiArchiveFile, type ApiArchiveSummary, type ApiArchiveTransfer } from '../api'
+import { api, type ApiArchiveFile, type ApiArchiveSummary, type ApiArchiveTransfer, type ApiArchiveVerify } from '../api'
 
 // Master Archive — the read-only window into the S3 Deep Archive vault the
 // UGREEN NASes upload to (mirroring the Dropbox structure: 1_PODCASTS /
@@ -44,6 +44,14 @@ function TransferRow({ t, onCommand, onDismiss }: {
 }) {
   const [filesOpen, setFilesOpen] = useState(false)
   const [sending, setSending] = useState(false)
+  const [errsOpen, setErrsOpen] = useState(false)
+  const [verifying, setVerifying] = useState(false)
+  const [verifyOpen, setVerifyOpen] = useState(false)
+  const [verifyError, setVerifyError] = useState<string | null>(null)
+  const [freshVerify, setFreshVerify] = useState<ApiArchiveVerify | null>(null)
+  // Latest verify result: a run just fired from this row wins over the
+  // (possibly older) one the 30s poll delivered with the transfer.
+  const verify = freshVerify ?? t.verify ?? null
   const ageMs = Date.now() - new Date(t.reportedAt).getTime()
   const stale = ageMs > 5 * 60 * 1000
   const done = (t.percent ?? 0) >= 100
@@ -62,6 +70,19 @@ function TransferRow({ t, onCommand, onDismiss }: {
     Date.now() - new Date(cmd.executedAt as string).getTime() < 10 * 60 * 1000
   const paused = !done && !stale && !resuming && (pausedByButton || progressAgeMs > 10 * 60 * 1000)
   const pct = Math.max(0, Math.min(100, t.percent ?? 0))
+  const runVerify = async () => {
+    setVerifying(true)
+    setVerifyError(null)
+    try {
+      const res = await api.storageVerify(t.name)
+      setFreshVerify(res.run)
+      setVerifyOpen(true)
+    } catch (err) {
+      setVerifyError(err instanceof Error ? err.message : String(err))
+    } finally {
+      setVerifying(false)
+    }
+  }
   const sendCommand = async (action: 'pause' | 'resume') => {
     setSending(true)
     try {
@@ -112,11 +133,33 @@ function TransferRow({ t, onCommand, onDismiss }: {
             {paused ? '▶ Resume' : '⏸ Pause'}
           </button>
         )}
-        {t.errors > 0 && (
-          <span className="inline-flex items-center rounded-full border border-urgent/40 bg-urgent/10 text-urgent px-2 py-0.5 text-[11px] font-bold">
-            {t.errors} error{t.errors === 1 ? '' : 's'} — auto-retrying; verify will catch anything missed
-          </span>
+        {t.verifiable && (
+          <button
+            onClick={() => { void runVerify() }}
+            disabled={verifying}
+            className="inline-flex items-center gap-1 rounded-full border border-stage-mixing/60 bg-stage-mixing/10 text-stage-mixing hover:bg-stage-mixing/25 px-2.5 py-0.5 text-[11px] font-bold disabled:opacity-50"
+            title="Compare every file that should be in the vault against what's actually there — runs on the server, takes under a minute, changes nothing"
+          >
+            {verifying ? '⏳ verifying — checking every file…' : '🔍 Verify against vault'}
+          </button>
         )}
+        {t.errors > 0 &&
+          ((t.errorLines?.length ?? 0) > 0 ? (
+            <button
+              onClick={() => setErrsOpen((v) => !v)}
+              className="inline-flex items-center rounded-full border border-urgent/40 bg-urgent/10 text-urgent hover:bg-urgent/20 px-2 py-0.5 text-[11px] font-bold"
+              title="Show the actual error lines from the job log"
+            >
+              {t.errors} error{t.errors === 1 ? '' : 's'} — {errsOpen ? 'hide what failed ▾' : 'see what failed ▸'}
+            </button>
+          ) : (
+            <span
+              className="inline-flex items-center rounded-full border border-urgent/40 bg-urgent/10 text-urgent px-2 py-0.5 text-[11px] font-bold"
+              title="The error line has scrolled out of the log tail the NAS sends — the Verify button is the authoritative check that nothing is missing"
+            >
+              {t.errors} error{t.errors === 1 ? '' : 's'} auto-retried{t.verifiable ? ' — hit Verify to confirm nothing was missed' : ''}
+            </span>
+          ))}
         <span className="ml-auto text-xs text-muted tabular-nums">
           {t.bytesDone && t.bytesTotal ? `${t.bytesDone} of ${t.bytesTotal}` : ''}
           {!done && t.speed ? ` · ${t.speed}` : ''}
@@ -129,6 +172,56 @@ function TransferRow({ t, onCommand, onDismiss }: {
           style={{ width: `${pct}%` }}
         />
       </div>
+      {errsOpen && (t.errorLines?.length ?? 0) > 0 && (
+        <div className="mt-1.5 rounded-lg border border-urgent/30 bg-urgent/5 p-2 space-y-1">
+          {t.errorLines!.map((l, i) => (
+            <div key={i} className="text-[11px] text-urgent/90 font-mono break-all">{l}</div>
+          ))}
+          <div className="text-[11px] text-muted">
+            These are auto-retried by the job; the Verify button is the final word on whether anything is actually missing.
+          </div>
+        </div>
+      )}
+      {verifyError && <div className="mt-1.5 text-[11px] text-urgent">Verify failed: {verifyError}</div>}
+      {verify && (
+        <div className="mt-1.5">
+          <button
+            onClick={() => setVerifyOpen((v) => !v)}
+            className={`text-[11px] font-bold inline-flex items-center gap-1 ${verify.missingCount === 0 ? 'text-stage-done' : 'text-stage-tracking'}`}
+          >
+            {verify.missingCount === 0
+              ? `✅ Verified ${fmtWhen(verify.runAt)} — all ${fmtCount(verify.filesExpected)} files are in the vault`
+              : `⚠️ Verified ${fmtWhen(verify.runAt)} — ${fmtCount(verify.missingCount)} of ${fmtCount(verify.filesExpected)} files not in the vault yet`}
+            {verify.tier2Matches > 0 ? ` (${fmtCount(verify.tier2Matches)} matched by name+size)` : ''}
+            {(verify.detail?.missing?.length ?? 0) + (verify.detail?.targets?.length ?? 0) > 0 && (
+              <span className="text-[9px]">{verifyOpen ? '▾' : '▸'}</span>
+            )}
+          </button>
+          {verifyOpen && (verify.detail?.missing?.length ?? 0) > 0 && (
+            <div className="mt-1 rounded-lg border border-line bg-ink/30 p-2 space-y-0.5">
+              <div className="text-[11px] text-muted font-bold">Missing from the vault{verify.missingCount > verify.detail!.missing!.length ? ` (first ${verify.detail!.missing!.length})` : ''}:</div>
+              {verify.detail!.missing!.map((p, i) => (
+                <div key={i} className="text-[11px] font-mono break-all text-text/80">{p}</div>
+              ))}
+            </div>
+          )}
+          {verifyOpen && (verify.detail?.targets?.length ?? 0) > 0 && (
+            <div className="mt-1 rounded-lg border border-line bg-ink/30 p-2 space-y-0.5">
+              {verify.detail!.targets!.map((tg) => (
+                <div key={tg.target} className="flex items-center gap-2 text-[11px]">
+                  <span className={`shrink-0 font-bold ${tg.verdict.startsWith('VERIFIED') ? 'text-stage-done' : tg.verdict === 'in progress' ? 'text-stage-tracking' : 'text-muted'}`}>
+                    {tg.verdict.startsWith('VERIFIED') ? '✅' : tg.verdict === 'in progress' ? '⏳' : '·'}
+                  </span>
+                  <span className="truncate min-w-0">{tg.target}</span>
+                  <span className="ml-auto shrink-0 tabular-nums text-muted">
+                    {tg.files > 0 ? `${fmtCount(tg.matched)}/${fmtCount(tg.files)} files` : ''} · {tg.verdict}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
       {!done && !stale && !paused && (t.currentFiles?.length ?? 0) > 0 && (
         <div className="mt-1.5">
           <button
@@ -167,7 +260,7 @@ function TransferRow({ t, onCommand, onDismiss }: {
       )}
       <div className="mt-1 text-[11px] text-muted">
         {done
-          ? `Finished — ${t.filesTotal ? fmtCount(t.filesTotal) + ' files' : 'complete'}. Ready to verify.`
+          ? `Finished — ${t.filesTotal ? fmtCount(t.filesTotal) + ' files' : 'complete'}.${t.verifiable && !verify ? ' Verifying against the vault automatically — the verdict will appear here.' : t.verifiable ? '' : ' Ready to verify.'}`
           : stale
             ? `No update in ${Math.round(ageMs / 60000)} min — the job may have just finished, or the reporter on the NAS stopped. Check Docker on RED if this persists.`
             : paused

@@ -1,9 +1,67 @@
 # Dropbox → AWS Archive migration — status & handoff
 
-_Last updated: 2026-09-17 (session archived mid–wave 1). This is the living
+_Last updated: 2026-09-18. This is the living
 handoff for the storage-migration project. A future session touching storage,
 Dropbox deletions, the UGREENs, or the archive should read this whole file
 first._
+
+## Dashboard snapshot — 2026-09-18 08:36 PT (from Ryan's screenshot; nothing broken)
+
+- **RHINO**: 13.277 TiB, 100% uploaded, "Finished — 11,782 files. Ready to
+  verify." 1 rclone error auto-retried during the run — run the verify pass
+  (`rclone check --one-way`) before calling the drive safe.
+- **RECOVERY**: 11.977 TiB, 100% uploaded, 12,508 files, ready to verify.
+  Same single auto-retried error note.
+- **PODCASTS**: 28.089 of 32.032 TiB (~88%), live at ~45 MiB/s, ETA ~1 day.
+  (The "PODCASTS ~done" note further down predates this; the real total is
+  32 TiB.)
+- **HENRI**: 60.434 GiB, finished, 2 files. Consistent with the Henri
+  Recordings wave-2 top-up (only the missing ~7% of 926 GiB, not a re-send)
+  — verify by basename+size before counting Henri as covered.
+- **DROPBOX-WAVE1**: auto-paused "waiting its turn" (progress kept,
+  mid-HeartBreakers). **Auto-queue is OFF**, so nothing will restart it when
+  PODCASTS finishes — Ryan must either re-enable Auto-queue or hit Resume.
+  Asked Ryan 2026-09-18 whether the off switch was deliberate.
+
+## In-app verification — the "Verify against vault" button (2026-09-18, PR #80)
+
+Ryan (verbatim intent): *"There should be a button — I don't want to have to
+paste shit in terminal or PowerShell."* So verification now runs INSIDE Slate:
+the Railway service already holds archive S3 read keys (`ARCHIVE_ACCESS_KEY_ID`
+/ `ARCHIVE_SECRET_ACCESS_KEY` — different names from the tools'
+`ARCHIVE_AWS_*`, confirmed present in Railway env), so the server compares
+census vs vault itself. **A cloud session no longer needs Ryan's key paste for
+wave-1/drive verification — read the button's results instead** (persisted in
+`storage_verify_runs`, latest per row in `GET /api/storage/transfers`, and
+each run logs a `storage verify` line that lands in the status branch's
+`recentLog`). Ryan pasting keys is still the fallback for ad-hoc ledger work.
+
+- Storage-page rows RHINO / RECOVERY / DROPBOX-WAVE1 get a
+  **🔍 Verify against vault** button (`POST /api/storage/transfers/:name/verify`,
+  admin): drive rows check every census file (tier 1 exact mapped path+size,
+  tier 2 basename+size — Ryan's approved rule); DROPBOX-WAVE1 re-runs the
+  wave-1 per-target check (tier 1 only, same as `wave1-verify.mjs`) and shows
+  per-folder verdicts incl. `VERIFIED — DELETABLE`. Mapping/matching logic is
+  a port of `ledger2.mjs`/`wave1-verify.mjs` — keep them in sync.
+- **Verification is also AUTOMATIC** (Ryan, same day: "you're the one
+  verifying — so do it"): `autoVerifySweep()` runs 60s after every boot and
+  every 30 min — each finished drive is verified once (re-verified only if
+  its job reports new progress, i.e. a re-run), wave 1 re-checked at most
+  every 6h while it uploads. After each sweep the latest verdict per row is
+  published to the **status branch as `storage-verify.json`** — THAT is how
+  a cloud session reads verdicts and picks `VERIFIED — DELETABLE` folders
+  for the deletion loop, zero credentials needed.
+- **If verify finds missing files**: the fix is the row's **Resume** button —
+  the rclone job re-runs, skips everything already uploaded, copies only the
+  strays; auto-verify then re-checks because the row reported new progress.
+- The scary "N errors — auto-retrying" badge is now honest: it expands to show
+  the actual rclone ERROR lines when they're still inside the stored log tail
+  (`errorLines` on the transfers API), and says to run Verify when they've
+  scrolled out. Context: rclone's `Errors:` stats counter is cumulative and
+  does NOT un-count an operation that succeeded on retry — "1 error" on a
+  finished run can mean zero missing files. Verify is the only truth.
+- Verify runs are audits, kept forever in `storage_verify_runs`
+  (migration `156`).
 
 ## ⚡ IF YOU ARE THE NEXT SESSION — DO THIS FIRST, UNPROMPTED
 

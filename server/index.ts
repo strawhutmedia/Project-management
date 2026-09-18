@@ -34,7 +34,7 @@ import { intakeRouter } from './routes/intake'
 import { audienceRouter } from './routes/audience'
 import { quickbooksRouter } from './routes/quickbooks'
 import { qbInvoicesRouter } from './routes/qb_invoices'
-import { storageRouter, handleTransferReport, handleAgentCommands, handleAgentAck } from './routes/storage'
+import { storageRouter, handleTransferReport, handleAgentCommands, handleAgentAck, startStorageAutoVerify } from './routes/storage'
 import { qaRouter } from './routes/qa'
 import { handleResendWebhook } from './routes/outreach_webhook'
 import { handleSesNotify } from './routes/ses_notify'
@@ -322,6 +322,7 @@ async function start() {
     void import('./qa_digest').then(({ startQaDigestLoop }) => {
       startQaDigestLoop()
     })
+    startStorageAutoVerify()
     void enableDomainOpenTracking()
     // Pick up any breakdown runs that were killed by the previous
     // shutdown (deploy / crash). Producers don't have to click
