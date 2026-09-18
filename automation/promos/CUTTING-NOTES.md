@@ -18,6 +18,15 @@ built to hold attention. It is SEPARATE from the podcast episode assembly
 
 ## Notes
 
+### 2026-09-18
+- **Check the episode's PROMO MOMENTS in Slate before hunting on your own.**
+  Every QA recording now carries a "Promo moments" list — separate entries the
+  crew/producer called out while shooting ("guest cracks up telling the
+  tour-bus story", "~20 min in"). They ride along on
+  `GET /api/qa/approved` as `promoMoments` (`description`, `approxTime`,
+  `calledOutBy`). Cut those first — they're the moments someone in the room
+  already knew were good — then add your own finds.
+
 ### 2026-09-17
 - **Keep the frame alive — motion during the story.** Don't leave a clip as
   a static talking head. Add movement: punch-in zooms on emphasis, subtle

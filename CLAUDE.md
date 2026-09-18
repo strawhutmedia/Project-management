@@ -170,7 +170,10 @@ synced Dropbox footage, hands-off, for EVERY episode (not one test).
 2. Build `poll.mjs` headless assembly bot (direct `.prproj` authoring) + install as a
    scheduled task (self-recovers on reboot, no autologon).
 3. Deliver the **prompt-caching measurement report**, then decide on caching.
-4. Remove **OpusClip**; start the in-house clips generator per `CUTTING-NOTES.md`.
+4. Remove **OpusClip**; start the in-house clips generator per `CUTTING-NOTES.md`
+   (the cutter's per-episode input now exists: QA **promo moments**, on
+   `/api/qa/approved` as `promoMoments` — see the 2026-09-18 promo-moments
+   handoff at the end of this file).
 5. ~~Verify Xavier/Riley/Blake are scoped to podcasts only~~ SUPERSEDED
    2026-09-17: everyone sees everything now (PR #78 handoff at end of file);
    Cash Flow / Invoices gates unchanged and verified in code.
@@ -257,6 +260,24 @@ emails in his Gmail, read individually):
   personal account. Remote Control + cloud sessions are confirmed included
   on Max (code.claude.com/docs/en/feature-availability). Chat history does
   NOT move between org and personal accounts.
+- **Switch attempt 2026-09-18 — BLOCKED until Sep 22, then resume.** Ryan
+  turned auto-reload OFF and started the switch live, but Max web checkout
+  on his personal org failed with "You have an existing subscription
+  through the App Store": a previously unknown **Apple-billed Claude Pro
+  (~$20/mo)** sits on the personal account — already cancelled, **expires
+  2026-09-22** (Apple bills it, so it never appeared in the Anthropic
+  receipt audit; treat App Store as a possible hidden-spend source in
+  future audits). Ryan refuses Apple pricing (correct — Apple's cut is
+  priced in). Plan: wait for Sep 22, buy Max 20x on the web on his
+  personal org (his two "personal" org entries turned out to be the same
+  thing). A one-shot Routine ("Sep 22: buy Max 20x (Apple block expired)",
+  fires 2026-09-22 18:00 UTC, push+email) sends him the exact steps,
+  verifies the Team cancellation actually saved (if it didn't, he gets
+  charged $150 on Oct 7 — CHECK THIS), and looks for any post-Sep-18
+  auto-recharge receipts. **Not independently verified this session:**
+  that auto-reload-off and Cancel-plan were completed on the Straw Hut
+  Media org (Ryan initially did steps while in the wrong org) — the Sep 22
+  session and/or the Oct 5 reconciliation must confirm both from receipts.
 - **Servers are unaffected by the plan switch**: Slate/Podbooster/site call
   the API with Console `ANTHROPIC_API_KEY`s (separate billing, the ~$20-28
   "Auto-recharge credits" line) — nothing to change on Railway.
@@ -1217,3 +1238,57 @@ live at 05:05 via `storage-verify.json` on the status branch).
   persists, the containers' scope excludes those subtrees → ONE paste on
   RED launches full-drive top-up containers (see
   `docs/ARCHIVE_MIGRATION_STATUS.md`).
+
+---
+
+# Session handoff — QA promo moments (2026-09-18, branch `claude/slate-qa-promo-moments-x4651f`)
+
+Ryan (verbatim intent): a field on each uploaded episode/recording where the
+uploader — or a producer later — enters the moments they watched happen while
+shooting that they want promos of, **a separate entry per moment**, which the
+promo cutter then hunts for when cutting promos. Built this session.
+**MERGED & DEPLOYED 2026-09-18** — Ryan said merge it; PR #85 merged to main
+(commit `cc14f10`), Railway deploy verified live 23:21 UTC: exact bundle hash
+`index-Dv9M2Wt2.js` served, migration `158` in the status branch's
+`migrationsApplied`, boot clean (no errors).
+
+## What shipped
+
+- **Migration `158_qa_promo_moments.sql`** — `qa_promo_moments`: one row per
+  moment (`description` required, `approx_time` free text like "~20 min in",
+  `position`, `created_by`, FK → `qa_recordings` ON DELETE CASCADE).
+- **Server (`server/routes/qa.ts`)**:
+  - `loadRecordings` returns `promoMoments` (description, approxTime,
+    calledOutByName, createdAt) on every recording.
+  - `POST /api/qa/recordings` accepts `promoMoments: [{description,
+    approxTime}]` on CREATE only (stamped with the logger as created_by).
+    PATCH deliberately ignores it — post-create edits go through the moment
+    endpoints so attribution survives.
+  - New: `POST /api/qa/recordings/:id/moments`, `PATCH /api/qa/moments/:momentId`,
+    `DELETE /api/qa/moments/:momentId` (same assertQaAccess gates as checks).
+  - **`GET /api/qa/approved` (the premiere-bot/cutter feed) now carries
+    `promoMoments` per recording** — additive, token auth unchanged; this is
+    how the promo cutter is meant to receive them.
+- **UI (`src/pages/QAPage.tsx`)**: "Promo moments" editor in the Log-a-recording
+  form (queue entries, saved with the recording); a live "Promo moments" block
+  on every open recording card (add/remove any time, shows who called it out
+  and when); a `🎬 N promo moments` chip in the collapsed row. Client API in
+  `src/api.ts` (`ApiQaPromoMoment`, `qaApi.addMoment/setMoment/deleteMoment`).
+- **`automation/promos/CUTTING-NOTES.md`**: dated note telling the cutter to
+  cut the episode's Slate promo moments FIRST, then add its own finds.
+- Build verified clean locally (`npm run build`, client tsc + vite + server tsc).
+
+## Still open after merge
+
+- ~~Bundle hash + migration verification~~ DONE 2026-09-18 (see above). One
+  check a cloud session CANNOT do (no QA_SERVICE_TOKEN in cloud): an
+  authenticated read of `/api/qa/approved` showing `promoMoments`. Ryan (or
+  the premiere-bot with its token) sees it on first use; deployed code is the
+  merged commit, so [Likely] fine — flag only if the bot chokes on the feed.
+- Ryan should hard-refresh (Cmd+Shift+R) `/qa` before judging — old tabs stay
+  on the old bundle.
+- The in-house clips generator (prioritized step 4) should consume
+  `promoMoments` from `/api/qa/approved`; the premiere-bot on the edit PC can
+  read the same field with its existing `QA_SERVICE_TOKEN`.
+- Nice-to-haves not built (ask Ryan before adding): promo moments in the daily
+  QA digest email; a "moment done/cut" checkbox for the cutter to tick off.

@@ -541,8 +541,11 @@ storageRouter.post('/transfers/:name/dismiss', async (req, res) => {
 // mirrors tools/archive/ledger2.mjs + wave1-verify.mjs — keep them in sync.
 
 // Junk that the uploads deliberately exclude (and OS noise on raw drives):
-// never count these as "expected in the vault".
-const VERIFY_SKIP_RE = /(^|\/)(\.DS_Store|Thumbs\.db)$|(^|\/)(\$RECYCLE\.BIN|System Volume Information|#recycle)\//
+// never count these as "expected in the vault". `._*` = macOS AppleDouble
+// resource-fork stubs (2026-09-18: a 4 KB `._Icon<CR>` was the only thing
+// holding the 636 GiB Old Dbox folder back from deletion); .dropbox.device
+// is Dropbox's own 56-byte device marker.
+const VERIFY_SKIP_RE = /(^|\/)(\.DS_Store|Thumbs\.db|\.dropbox\.device|\._[^/]*)$|(^|\/)(\$RECYCLE\.BIN|System Volume Information|#recycle)\//
 
 // Drive rows with a census listing in _INVENTORY/. mapPath turns a path as
 // it appears in the census into the vault key the upload wrote it to.
@@ -865,7 +868,10 @@ async function runVerifyGuarded(name: string): Promise<void> {
 // count; after 3 the server stops retrying and the row asks Ryan to widen
 // the job's folder scope on the NAS or approve skipping the listed files.
 const HEAL_MAX_NO_PROGRESS = 3
-const HEALABLE = new Set([...Object.keys(DRIVE_CENSUS), ...Object.keys(BOX_ROWS), 'HENRI'])
+// DROPBOX-WAVE1 included: once the wave's script has completed (percent 100)
+// with stragglers left (e.g. one HeartBreakers .braw), a re-run walks the
+// whole target list with --ignore-existing and picks up only what's missing.
+const HEALABLE = new Set([...Object.keys(DRIVE_CENSUS), ...Object.keys(BOX_ROWS), 'HENRI', 'DROPBOX-WAVE1'])
 
 async function maybeHeal(name: string): Promise<void> {
   if (!HEALABLE.has(name)) return
