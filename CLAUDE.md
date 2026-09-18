@@ -177,15 +177,21 @@ synced Dropbox footage, hands-off, for EVERY episode (not one test).
    switches plans (recommended Team → Max 20x), update the recurring
    "Anthropic (Claude)" Cash Flow line via a new migration ($150 → whatever
    he lands on) — do NOT change it before the switch happens.
-8. **After Ryan's Team→Max switch (he planned it for ~2026-09-19): recreate
-   the monthly Anthropic reconciliation Routine under his PERSONAL claude.ai
-   account.** The existing Routine ("Monthly Anthropic → Slate Cash Flow
-   reconciliation", 5th of each month) was created from his TEAM account and
-   gets suspended when the Team org lapses (2026-10-07). Its full prompt is
-   preserved in the 2026-09-18 handoff block below — recreate it verbatim,
-   and make sure the new account's sessions have Gmail + GitHub connected
-   first. Its first run should also do item 7 (recurring line $150 → $200 if
-   he landed on Max 20x, verified from the first Max receipt).
+8. **After Ryan's Team→Max switch (planned ~2026-09-19): recreate ALL of
+   Ryan's claude.ai Routines under his PERSONAL account — there are 14, not
+   just one.** Every Routine (Podbooster daily, Straw Hut site daily pass,
+   Notes→CRM sweep, Calendar prep, House alert, homepage stats refresh,
+   follow-up rhythms, the Nov 3 Jaeson Wilkins follow-up, the monthly
+   Anthropic reconciliation, etc.) lives on the TEAM account and stops
+   firing when the org lapses **2026-10-07**. Full inventory with schedules
+   and verbatim (token-redacted) prompts:
+   **`docs/ROUTINES_MIGRATION_2026-09-18.md`** — follow its instructions,
+   then disable the old team-account copies so nothing double-fires before
+   Oct 7. Prerequisites on the personal account first: GitHub
+   (claude.ai/connect-github, repo access to the three strawhutmedia repos)
+   + Gmail/QuickBooks/Railway/Dropbox/Slack connectors. The monthly
+   Anthropic Routine's first run also does item 7 (recurring line $150 →
+   $200 if he landed on Max 20x, verified from the first Max receipt).
 
 ## 🧾 SESSION HANDOFF — 2026-09-18 (Anthropic spending → Cash Flow)
 
