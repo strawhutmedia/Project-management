@@ -49,6 +49,24 @@ qaRouter.get('/approved', async (req, res) => {
         LIMIT 200`,
       params,
     )
+    // Promo moments ride along so the promo cutter knows what to hunt for
+    // in each episode — the whole point of collecting them at the shoot.
+    const momentsBy = new Map<string, Array<{ description: string; approxTime: string; calledOutBy: string | null }>>()
+    if (rows.length > 0) {
+      const m = await pool.query(
+        `SELECT m.recording_id, m.description, m.approx_time,
+                COALESCE(u.display_name, u.name) AS called_out_by
+           FROM qa_promo_moments m LEFT JOIN users u ON u.id = m.created_by
+          WHERE m.recording_id = ANY($1::uuid[])
+          ORDER BY m.position ASC, m.created_at ASC`,
+        [rows.map((r) => r.id)],
+      )
+      for (const row of m.rows) {
+        const list = momentsBy.get(row.recording_id) ?? []
+        list.push({ description: row.description, approxTime: row.approx_time, calledOutBy: row.called_out_by ?? null })
+        momentsBy.set(row.recording_id, list)
+      }
+    }
     res.json({
       approved: rows.map((r) => ({
         id: r.id,
@@ -63,6 +81,7 @@ qaRouter.get('/approved', async (req, res) => {
         approvedBy: r.qa_by_display || r.qa_by_name || null,
         projectId: r.project_id,
         projectName: r.project_name,
+        promoMoments: momentsBy.get(r.id) ?? [],
       })),
     })
   } catch (err) {
@@ -251,6 +270,11 @@ type CheckRow = {
   checked_at: string | null; checked_by_name: string | null
 }
 
+type MomentRow = {
+  id: string; recording_id: string; description: string; approx_time: string
+  position: number; created_at: string; created_by_name: string | null
+}
+
 async function loadRecordings(where: string, params: unknown[]) {
   const { rows } = await pool.query(
     `SELECT r.*, p.name AS project_name, p.cover_art_url AS project_cover,
@@ -280,6 +304,14 @@ async function loadRecordings(where: string, params: unknown[]) {
       ORDER BY c.position ASC, c.label ASC`,
     [ids],
   )
+  const moments = await pool.query<MomentRow>(
+    `SELECT m.id, m.recording_id, m.description, m.approx_time, m.position, m.created_at,
+            COALESCE(u.display_name, u.name) AS created_by_name
+       FROM qa_promo_moments m LEFT JOIN users u ON u.id = m.created_by
+      WHERE m.recording_id = ANY($1::uuid[])
+      ORDER BY m.position ASC, m.created_at ASC`,
+    [ids],
+  )
   const shootersBy = new Map<string, Array<{ id: string; name: string }>>()
   for (const s of shooters.rows) {
     const list = shootersBy.get(s.recording_id) ?? []
@@ -291,6 +323,12 @@ async function loadRecordings(where: string, params: unknown[]) {
     const list = checksBy.get(c.recording_id) ?? []
     list.push(c)
     checksBy.set(c.recording_id, list)
+  }
+  const momentsBy = new Map<string, MomentRow[]>()
+  for (const m of moments.rows) {
+    const list = momentsBy.get(m.recording_id) ?? []
+    list.push(m)
+    momentsBy.set(m.recording_id, list)
   }
   return rows.map((r) => ({
     id: r.id,
@@ -322,6 +360,13 @@ async function loadRecordings(where: string, params: unknown[]) {
       checked: c.checked,
       checkedByName: c.checked_by_name,
       checkedAt: c.checked_at,
+    })),
+    promoMoments: (momentsBy.get(r.id) ?? []).map((m) => ({
+      id: m.id,
+      description: m.description,
+      approxTime: m.approx_time,
+      calledOutByName: m.created_by_name,
+      createdAt: m.created_at,
     })),
   }))
 }
@@ -362,6 +407,10 @@ type RecordingBody = {
   dropboxPath?: string
   notes?: string
   shooterIds?: string[]
+  // Only honored on CREATE — one entry per promo-worthy moment called out at
+  // the shoot. After that, moments live on their own endpoints below (so
+  // edits never wipe who called one out).
+  promoMoments?: Array<{ description?: string; approxTime?: string }>
 }
 
 const str = (v: unknown): string => (typeof v === 'string' ? v.trim() : '')
@@ -404,6 +453,21 @@ qaRouter.post('/recordings', async (req, res) => {
     )
     const id = rows[0].id
     await setShooters(id, body.shooterIds)
+    // Promo moments called out while logging — one row each, stamped with
+    // who logged them.
+    if (Array.isArray(body.promoMoments)) {
+      let pos = 0
+      for (const m of body.promoMoments) {
+        const description = str(m?.description).slice(0, 2000)
+        if (!description) continue
+        pos += 10
+        await pool.query(
+          `INSERT INTO qa_promo_moments (recording_id, description, approx_time, position, created_by)
+           VALUES ($1, $2, $3, $4, $5)`,
+          [id, description, str(m?.approxTime).slice(0, 200), pos, user.id],
+        )
+      }
+    }
     // Stamp the show's expected-deliverables template onto this recording.
     if (projectId) {
       await pool.query(
@@ -576,6 +640,79 @@ qaRouter.delete('/checks/:checkId', async (req, res) => {
     }
   } catch (err) {
     logError('qa check delete failed', { error: err instanceof Error ? err.message : String(err), checkId: req.params.checkId })
+    res.status(500).json({ error: 'internal_error' })
+  }
+})
+
+// ── Promo moments ───────────────────────────────────────────────────────
+// Separate entries per moment (Ryan, 2026-09-18) — the uploader logs them
+// at the shoot, a producer can add more later, and the promo cutter reads
+// them off /api/qa/approved to know what to hunt for in the episode.
+qaRouter.post('/recordings/:id/moments', async (req, res) => {
+  const user = await assertQaAccess(req, res, true)
+  if (!user) return
+  const body = (req.body ?? {}) as { description?: string; approxTime?: string }
+  const description = str(body.description).slice(0, 2000)
+  if (!description) { res.status(400).json({ error: 'description_required' }); return }
+  try {
+    await pool.query(
+      `INSERT INTO qa_promo_moments (recording_id, description, approx_time, position, created_by)
+       VALUES ($1, $2, $3,
+               COALESCE((SELECT MAX(position) FROM qa_promo_moments WHERE recording_id = $1), 0) + 10,
+               $4)`,
+      [req.params.id, description, str(body.approxTime).slice(0, 200), user.id],
+    )
+    const [recording] = await loadRecordings('WHERE r.id = $1', [req.params.id])
+    if (!recording) { res.status(404).json({ error: 'not_found' }); return }
+    res.json({ recording })
+  } catch (err) {
+    logError('qa moment add failed', { error: err instanceof Error ? err.message : String(err), id: req.params.id })
+    res.status(500).json({ error: 'internal_error' })
+  }
+})
+
+qaRouter.patch('/moments/:momentId', async (req, res) => {
+  const user = await assertQaAccess(req, res, true)
+  if (!user) return
+  const body = (req.body ?? {}) as { description?: string; approxTime?: string }
+  try {
+    if (typeof body.description === 'string') {
+      const d = str(body.description).slice(0, 2000)
+      if (!d) { res.status(400).json({ error: 'description_required' }); return }
+      await pool.query(`UPDATE qa_promo_moments SET description = $2 WHERE id = $1`, [req.params.momentId, d])
+    }
+    if (typeof body.approxTime === 'string') {
+      await pool.query(`UPDATE qa_promo_moments SET approx_time = $2 WHERE id = $1`, [req.params.momentId, str(body.approxTime).slice(0, 200)])
+    }
+    const rec = await pool.query<{ recording_id: string }>(
+      `SELECT recording_id FROM qa_promo_moments WHERE id = $1`, [req.params.momentId],
+    )
+    if (!rec.rows[0]) { res.status(404).json({ error: 'not_found' }); return }
+    const [recording] = await loadRecordings('WHERE r.id = $1', [rec.rows[0].recording_id])
+    res.json({ recording })
+  } catch (err) {
+    logError('qa moment update failed', { error: err instanceof Error ? err.message : String(err), momentId: req.params.momentId })
+    res.status(500).json({ error: 'internal_error' })
+  }
+})
+
+qaRouter.delete('/moments/:momentId', async (req, res) => {
+  const user = await assertQaAccess(req, res, true)
+  if (!user) return
+  try {
+    const rec = await pool.query<{ recording_id: string }>(
+      `SELECT recording_id FROM qa_promo_moments WHERE id = $1`, [req.params.momentId],
+    )
+    await pool.query(`DELETE FROM qa_promo_moments WHERE id = $1`, [req.params.momentId])
+    const recordingId = rec.rows[0]?.recording_id
+    if (recordingId) {
+      const [recording] = await loadRecordings('WHERE r.id = $1', [recordingId])
+      res.json({ recording })
+    } else {
+      res.json({ ok: true })
+    }
+  } catch (err) {
+    logError('qa moment delete failed', { error: err instanceof Error ? err.message : String(err), momentId: req.params.momentId })
     res.status(500).json({ error: 'internal_error' })
   }
 })

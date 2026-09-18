@@ -2201,6 +2201,16 @@ export type ApiQaCheck = {
   checkedAt: string | null
 }
 
+// A promo-worthy moment someone saw happen while shooting — one entry per
+// moment, so the promo cutter can hunt each one down in the episode.
+export type ApiQaPromoMoment = {
+  id: string
+  description: string
+  approxTime: string
+  calledOutByName: string | null
+  createdAt: string
+}
+
 export type ApiQaRecording = {
   id: string
   projectId: string | null
@@ -2225,6 +2235,7 @@ export type ApiQaRecording = {
   createdAt: string
   shooters: Array<{ id: string; name: string }>
   checks: ApiQaCheck[]
+  promoMoments: ApiQaPromoMoment[]
 }
 
 export type QaRecordingInput = {
@@ -2241,6 +2252,9 @@ export type QaRecordingInput = {
   dropboxPath?: string
   notes?: string
   shooterIds?: string[]
+  // Create-only: moments called out at the shoot (edits go through the
+  // moment endpoints so attribution survives).
+  promoMoments?: Array<{ description: string; approxTime: string }>
 }
 
 export type ApiQaContext = {
@@ -2293,6 +2307,18 @@ export const qaApi = {
     }),
   deleteCheck: (checkId: string) =>
     request<{ recording?: ApiQaRecording; ok?: true }>(`/api/qa/checks/${checkId}`, { method: 'DELETE' }),
+  addMoment: (recordingId: string, body: { description: string; approxTime?: string }) =>
+    request<{ recording: ApiQaRecording }>(`/api/qa/recordings/${recordingId}/moments`, {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+  setMoment: (momentId: string, body: { description?: string; approxTime?: string }) =>
+    request<{ recording: ApiQaRecording }>(`/api/qa/moments/${momentId}`, {
+      method: 'PATCH',
+      body: JSON.stringify(body),
+    }),
+  deleteMoment: (momentId: string) =>
+    request<{ recording?: ApiQaRecording; ok?: true }>(`/api/qa/moments/${momentId}`, { method: 'DELETE' }),
   template: (projectId: string) =>
     request<{ items: ApiQaTemplateItem[] }>(`/api/qa/projects/${projectId}/template`),
   saveTemplate: (projectId: string, items: Array<{ label: string; spec: string }>) =>
