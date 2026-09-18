@@ -1209,9 +1209,11 @@ live at 05:05 via `storage-verify.json` on the status branch).
 Ryan (verbatim intent): a field on each uploaded episode/recording where the
 uploader — or a producer later — enters the moments they watched happen while
 shooting that they want promos of, **a separate entry per moment**, which the
-promo cutter then hunts for when cutting promos. Built this session; in the
-PR on the branch above (draft until Ryan merges — NOT on main / not deployed
-until then).
+promo cutter then hunts for when cutting promos. Built this session.
+**MERGED & DEPLOYED 2026-09-18** — Ryan said merge it; PR #85 merged to main
+(commit `cc14f10`), Railway deploy verified live 23:21 UTC: exact bundle hash
+`index-Dv9M2Wt2.js` served, migration `158` in the status branch's
+`migrationsApplied`, boot clean (no errors).
 
 ## What shipped
 
@@ -1241,9 +1243,13 @@ until then).
 
 ## Still open after merge
 
-- Post-deploy verification per the standing rule: bundle hash live, then log a
-  test-free check — open a recording on `/qa`, add a moment, confirm the chip,
-  and confirm `promoMoments` appears on `/api/qa/approved`.
+- ~~Bundle hash + migration verification~~ DONE 2026-09-18 (see above). One
+  check a cloud session CANNOT do (no QA_SERVICE_TOKEN in cloud): an
+  authenticated read of `/api/qa/approved` showing `promoMoments`. Ryan (or
+  the premiere-bot with its token) sees it on first use; deployed code is the
+  merged commit, so [Likely] fine — flag only if the bot chokes on the feed.
+- Ryan should hard-refresh (Cmd+Shift+R) `/qa` before judging — old tabs stay
+  on the old bundle.
 - The in-house clips generator (prioritized step 4) should consume
   `promoMoments` from `/api/qa/approved`; the premiere-bot on the edit PC can
   read the same field with its existing `QA_SERVICE_TOKEN`.
