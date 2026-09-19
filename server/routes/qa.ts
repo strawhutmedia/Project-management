@@ -238,6 +238,14 @@ if (-not $isAdmin) {
   return
 }
 
+if (Test-Path (Join-Path $Dir 'CLAUDE.md')) {
+  Write-Host ''
+  Write-Host 'STOP: this machine already has a working Premiere bot (its own Claude session'
+  Write-Host 'evolves the files in ' $Dir ' - overwriting them would erase its learned rules).'
+  Write-Host 'Nothing was changed. Nothing needs installing here.'
+  return
+}
+
 Write-Host '[1/5] Downloading the Premiere bot from Slate...'
 New-Item -ItemType Directory -Force -Path $Dir | Out-Null
 foreach ($f in @('poll.mjs','CLAUDE.md','PREMIERE.md','README.md','install-task.ps1','.env.example')) {
