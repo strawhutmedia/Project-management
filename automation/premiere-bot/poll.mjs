@@ -12,7 +12,7 @@
 //
 // State: seen.json (recording ids already handled) — delete it to reprocess.
 import { readFileSync, writeFileSync, existsSync, appendFileSync } from 'node:fs'
-import { execFileSync } from 'node:child_process'
+import { execFileSync, spawn } from 'node:child_process'
 
 // Tiny .env loader (no dependencies on the edit machine).
 const env = {}
@@ -49,6 +49,9 @@ async function botLog(level, message, data) {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'X-QA-Token': TOKEN },
       body: JSON.stringify({ level, source: 'premiere-bot', message, data }),
+      // A hung post (e.g. mid-redeploy on Slate's side) must never stall
+      // the pipeline — give up after 15s and move on.
+      signal: AbortSignal.timeout(15000),
     })
   } catch (err) {
     console.error(new Date().toISOString(), 'bot-log post failed:', err.message)
@@ -95,17 +98,38 @@ function pcBusyReason() {
 let busy = false
 let lastDeferReason = null
 
+// Runs one headless Claude assembly WITHOUT blocking the event loop, so
+// the 60s heartbeat polls keep flowing while a project builds (a blocked
+// loop reads as "edit PC off" in Slate — learned live on the first run).
+function runClaude(prompt) {
+  return new Promise((resolve, reject) => {
+    const child = spawn('claude', ['-p', prompt], { windowsHide: true })
+    let out = ''
+    child.stdout.on('data', (d) => { out += d })
+    child.stderr.on('data', (d) => { out += d })
+    const killer = setTimeout(() => { child.kill(); reject(new Error(`timed out after 60 min: ${out.slice(-300)}`)) }, 60 * 60 * 1000)
+    child.on('error', (err) => { clearTimeout(killer); reject(err) })
+    child.on('close', (code) => {
+      clearTimeout(killer)
+      if (code === 0) resolve(out)
+      else reject(new Error(`claude exited ${code}: ${out.slice(-300)}`))
+    })
+  })
+}
+
 async function tick() {
-  if (busy) return // one assembly at a time; the next tick picks up the rest
+  // Always poll the feed — even mid-assembly — so the heartbeat (stamped
+  // server-side on every token-authed poll) keeps saying "edit PC online".
   let approved
   try {
-    const res = await fetch(`${BASE}/api/qa/approved`, { headers: { 'X-QA-Token': TOKEN } })
+    const res = await fetch(`${BASE}/api/qa/approved`, { headers: { 'X-QA-Token': TOKEN }, signal: AbortSignal.timeout(20000) })
     if (!res.ok) throw new Error(`HTTP ${res.status}`)
     approved = (await res.json()).approved
   } catch (err) {
     console.error(new Date().toISOString(), 'poll failed:', err.message)
     return
   }
+  if (busy) return // one assembly at a time; the next tick picks up the rest
   const pending = approved.filter((rec) => !seen.has(rec.id))
   if (pending.length > 0) {
     const reason = pcBusyReason()
@@ -148,7 +172,7 @@ async function tick() {
       try {
         // Headless run; permissions come from .claude/settings.json. Output
         // goes to the console and runs.log.
-        const out = execFileSync('claude', ['-p', prompt], { encoding: 'utf8', timeout: 60 * 60 * 1000 })
+        const out = await runClaude(prompt)
         appendFileSync(new URL('runs.log', import.meta.url), `${new Date().toISOString()} ${rec.id} ok: ${out.slice(0, 500).replace(/\n/g, ' ')}\n`)
         await botLog('ok', `Assembled "${rec.title}" — Premiere project drafted`, { recordingId: rec.id, summary: out.slice(0, 500) })
         notify('Premiere Bot', `Drafted: ${rec.title}`)
