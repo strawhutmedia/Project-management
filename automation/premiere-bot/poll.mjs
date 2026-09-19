@@ -32,6 +32,12 @@ if (!TOKEN) {
   process.exit(1)
 }
 
+// Don't start an assembly while a human is using the machine (Ryan,
+// 2026-09-19): if Premiere is open or free RAM is tight, hold the episode
+// and recheck every poll — it starts the moment the machine is free.
+const BUSY_MIN_FREE_GB = Math.max(1, Number(env.BUSY_MIN_FREE_GB || 6))
+const BUSY_CHECK = (env.BUSY_CHECK || 'on') !== 'off'
+
 const seenPath = new URL('seen.json', import.meta.url)
 const seen = new Set(existsSync(seenPath) ? JSON.parse(readFileSync(seenPath, 'utf8')) : [])
 
@@ -61,7 +67,33 @@ function notify(title, body) {
   } catch { /* headless or notifications unavailable — fine */ }
 }
 
+// Why is the machine not available for an assembly right now? Returns a
+// human-readable reason, or null when it's free. "Can't tell" counts as
+// free — a broken check must never silently stall the pipeline.
+function pcBusyReason() {
+  if (!BUSY_CHECK) return null
+  try {
+    if (process.platform === 'win32') {
+      const out = execFileSync('powershell', ['-NoProfile', '-Command',
+        "$p = Get-Process -Name 'Adobe Premiere Pro' -ErrorAction SilentlyContinue; " +
+        '$os = Get-CimInstance Win32_OperatingSystem; ' +
+        "Write-Output ((($null -ne $p).ToString()) + '|' + [math]::Round($os.FreePhysicalMemory/1MB,1))",
+      ], { encoding: 'utf8', timeout: 20000 }).trim()
+      const [premiereOpen, freeGb] = out.split('|')
+      if (premiereOpen === 'True') return 'Premiere is open — someone may be editing'
+      if (Number(freeGb) < BUSY_MIN_FREE_GB) return `only ${freeGb} GB RAM free (waiting for ${BUSY_MIN_FREE_GB} GB)`
+    } else if (process.platform === 'darwin') {
+      try {
+        execFileSync('pgrep', ['-f', 'Adobe Premiere Pro'], { timeout: 10000 })
+        return 'Premiere is open — someone may be editing'
+      } catch { /* pgrep exits non-zero when nothing matches — machine is free */ }
+    }
+  } catch { /* can't tell → treat as free */ }
+  return null
+}
+
 let busy = false
+let lastDeferReason = null
 
 async function tick() {
   if (busy) return // one assembly at a time; the next tick picks up the rest
@@ -74,10 +106,36 @@ async function tick() {
     console.error(new Date().toISOString(), 'poll failed:', err.message)
     return
   }
+  const pending = approved.filter((rec) => !seen.has(rec.id))
+  if (pending.length > 0) {
+    const reason = pcBusyReason()
+    if (reason) {
+      // Hold everything and recheck next poll. Report only on a state
+      // change so the bot-log shows one "waiting" line, not one a minute.
+      if (reason !== lastDeferReason) {
+        lastDeferReason = reason
+        console.log(new Date().toISOString(), 'deferring:', reason)
+        await botLog('warn', `Holding ${pending.length} approved episode${pending.length === 1 ? '' : 's'} — ${reason}. Starts automatically when the machine is free.`)
+      }
+      return
+    }
+    if (lastDeferReason) {
+      lastDeferReason = null
+      await botLog('info', 'Machine is free — starting held assemblies')
+    }
+  }
   busy = true
   try {
     for (const rec of approved) {
       if (seen.has(rec.id)) continue
+      // Re-check between episodes: if an editor opened Premiere while the
+      // previous assembly ran, hold the rest until the machine frees up.
+      const midReason = pcBusyReason()
+      if (midReason) {
+        lastDeferReason = midReason
+        await botLog('warn', `Pausing queue — ${midReason}. Remaining episodes start when the machine is free.`)
+        break
+      }
       seen.add(rec.id)
       writeFileSync(seenPath, JSON.stringify([...seen], null, 2))
       console.log(new Date().toISOString(), 'QA approved →', rec.title)
