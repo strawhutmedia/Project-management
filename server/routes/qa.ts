@@ -1,8 +1,11 @@
 import { Router } from 'express'
+import { createHmac, timingSafeEqual } from 'node:crypto'
+import { readFileSync } from 'node:fs'
+import path from 'node:path'
 import { pool } from '../db'
 import { requireUser, getSessionUser, isViewer, type SessionUser } from '../auth'
 import { createProjectRecord } from './projects'
-import { logError } from '../diag'
+import { logError, logInfo } from '../diag'
 
 // QA Production Checklist — Slate's replacement for the "QA PRODUCTION
 // SHEET" Google Sheet. Anyone with access to at least one podcast project
@@ -163,7 +166,127 @@ qaRouter.get('/bot-log', async (req, res) => {
   }
 })
 
+// ── One-paste edit-PC install, served by Slate ──────────────────────────
+// Ryan (2026-09-19): "You do the damn work" — the on-PC install must be ONE
+// pasted command, not a list of steps. Slate's deploy already contains the
+// bot files (automation/premiere-bot) and knows QA_SERVICE_TOKEN, so it can
+// serve the whole install. Flow: an ADMIN clicks "Install on edit PC" on
+// /qa → Slate returns a command carrying a short-lived HMAC key → pasting
+// it in an admin PowerShell on the edit PC pulls the files from these keyed
+// endpoints, writes .env, and registers the always-on scheduled task.
+// The key is signed with QA_SERVICE_TOKEN itself and expires in 30 minutes;
+// anyone holding a valid key can read the token (it goes into .env), which
+// is why only an admin session can mint one.
+const SETUP_KEY_TTL_MS = 30 * 60 * 1000
+
+function setupSecret(): string {
+  return (process.env.QA_SERVICE_TOKEN ?? '').trim()
+}
+
+function signSetupKey(expiresAtMs: number): string {
+  const sig = createHmac('sha256', setupSecret()).update(String(expiresAtMs)).digest('hex')
+  return `${expiresAtMs}.${sig}`
+}
+
+function setupKeyOk(k: unknown): boolean {
+  if (setupSecret().length < 16 || typeof k !== 'string') return false
+  const [expRaw, sig] = k.split('.')
+  const exp = Number(expRaw)
+  if (!exp || !sig || exp < Date.now()) return false
+  const want = createHmac('sha256', setupSecret()).update(expRaw).digest('hex')
+  try {
+    return timingSafeEqual(Buffer.from(sig, 'hex'), Buffer.from(want, 'hex'))
+  } catch {
+    return false
+  }
+}
+
+// The bot files the installer pulls. Served straight out of this deploy so
+// the edit PC never needs git or GitHub access.
+const BOT_FILES = new Set(['poll.mjs', 'CLAUDE.md', 'PREMIERE.md', 'README.md', 'install-task.ps1', '.env.example'])
+
+qaRouter.get('/bot-files/:name', (req, res) => {
+  if (!setupKeyOk(req.query.k)) { res.status(401).json({ error: 'bad_or_expired_key' }); return }
+  const name = String(req.params.name)
+  if (!BOT_FILES.has(name)) { res.status(404).json({ error: 'not_found' }); return }
+  try {
+    const body = readFileSync(path.join(process.cwd(), 'automation', 'premiere-bot', name), 'utf8')
+    res.type('text/plain').send(body)
+  } catch (err) {
+    logError('qa bot-files read failed', { name, error: err instanceof Error ? err.message : String(err) })
+    res.status(500).json({ error: 'internal_error' })
+  }
+})
+
+qaRouter.get('/bot-setup.ps1', (req, res) => {
+  if (!setupKeyOk(req.query.k)) { res.status(401).json({ error: 'bad_or_expired_key' }); return }
+  const base = (process.env.APP_BASE_URL || 'https://slate.strawhutmedia.com').replace(/\/+$/, '')
+  const k = String(req.query.k)
+  // PowerShell, not a template to fill in: pasting this one command on the
+  // edit PC does the entire install. No backticks (PS escape char) below.
+  const script = `
+$ErrorActionPreference = 'Stop'
+$Base = '${base}'
+$K = '${k}'
+$Dir = 'C:\\Users\\editbot\\premiere-bot'
+
+$isAdmin = ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
+if (-not $isAdmin) { throw 'Run this in PowerShell opened AS ADMINISTRATOR (right-click PowerShell, Run as administrator), then paste the command again.' }
+
+Write-Host '[1/5] Downloading the Premiere bot from Slate...'
+New-Item -ItemType Directory -Force -Path $Dir | Out-Null
+foreach ($f in @('poll.mjs','CLAUDE.md','PREMIERE.md','README.md','install-task.ps1','.env.example')) {
+  Invoke-RestMethod -Uri ($Base + '/api/qa/bot-files/' + $f + '?k=' + $K) -OutFile (Join-Path $Dir $f)
+}
+
+Write-Host '[2/5] Writing .env (service token from Slate)...'
+Set-Content -Path (Join-Path $Dir '.env') -Value ('QA_SERVICE_TOKEN=' + '${setupSecret()}') -Encoding ascii
+
+Write-Host '[3/5] Checking Node.js...'
+$node = Get-Command node -ErrorAction SilentlyContinue
+if (-not $node) {
+  Write-Host '      Node not found - installing via winget (this can take a few minutes)...'
+  winget install --id OpenJS.NodeJS.LTS --silent --accept-package-agreements --accept-source-agreements
+  $env:Path = [Environment]::GetEnvironmentVariable('Path','Machine') + ';' + [Environment]::GetEnvironmentVariable('Path','User')
+  $node = Get-Command node -ErrorAction Stop
+}
+Write-Host ('      Node: ' + $node.Source)
+
+Write-Host '[4/5] Registering the always-on PremiereBot task (asks once for the editbot password)...'
+$action = New-ScheduledTaskAction -Execute $node.Source -Argument 'poll.mjs' -WorkingDirectory $Dir
+$boot = New-ScheduledTaskTrigger -AtStartup
+$repeat = New-ScheduledTaskTrigger -Once -At (Get-Date).AddMinutes(1) -RepetitionInterval (New-TimeSpan -Minutes 1) -RepetitionDuration ([TimeSpan]::MaxValue)
+$settings = New-ScheduledTaskSettingsSet -MultipleInstances IgnoreNew -RestartCount 999 -RestartInterval (New-TimeSpan -Minutes 1) -ExecutionTimeLimit ([TimeSpan]::Zero) -StartWhenAvailable -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries
+$cred = Get-Credential -UserName ($env:COMPUTERNAME + '\\editbot') -Message 'Password for the editbot account'
+Register-ScheduledTask -TaskName 'PremiereBot' -Action $action -Trigger $boot, $repeat -Settings $settings -User $cred.UserName -Password $cred.GetNetworkCredential().Password -RunLevel Limited -Force | Out-Null
+
+Write-Host '[5/5] Starting it...'
+Start-ScheduledTask -TaskName 'PremiereBot'
+Write-Host ''
+Write-Host ('DONE. Open ' + $Base + '/qa - the Edit bot strip should say "edit PC online" within a minute,')
+Write-Host 'then "Picked up ..." for anything already QA-approved. If Claude Code is not signed in for the'
+Write-Host 'editbot account yet, assemblies will fail with a visible error on that strip - sign in once as editbot.'
+`.trimStart()
+  logInfo('qa bot-setup script served')
+  res.type('text/plain').send(script)
+})
+
 qaRouter.use(requireUser)
+
+// Mints the one-paste install command. Admin only — the command lets the
+// holder read QA_SERVICE_TOKEN, so minting is as sensitive as the Railway
+// variables page.
+qaRouter.post('/bot-setup-link', async (req, res) => {
+  const user = userOf(req)
+  if (user.role !== 'admin') { res.status(403).json({ error: 'admin_only' }); return }
+  if (setupSecret().length < 16) { res.status(500).json({ error: 'qa_service_token_not_set' }); return }
+  const base = (process.env.APP_BASE_URL || 'https://slate.strawhutmedia.com').replace(/\/+$/, '')
+  const expiresAt = Date.now() + SETUP_KEY_TTL_MS
+  const command = `irm "${base}/api/qa/bot-setup.ps1?k=${signSetupKey(expiresAt)}" | iex`
+  logInfo('qa bot-setup link minted', { by: user.email, expiresAt: new Date(expiresAt).toISOString() })
+  res.json({ command, expiresAt: new Date(expiresAt).toISOString() })
+})
+
 
 // The QA board is open to every signed-in Slate user (Ryan, 2026-09-17:
 // "everyone can see everything") — same trust model as the shared sheet it

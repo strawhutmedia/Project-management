@@ -2282,6 +2282,9 @@ export const qaApi = {
   context: () => request<ApiQaContext>('/api/qa/context'),
   botLog: (limit = 30) =>
     request<{ log: ApiQaBotLogEntry[]; botLastSeen: string | null }>(`/api/qa/bot-log?limit=${limit}`),
+  // Admin only: mints the one-paste edit-PC install command (30-min expiry).
+  botSetupLink: () =>
+    request<{ command: string; expiresAt: string }>('/api/qa/bot-setup-link', { method: 'POST' }),
   // Adds a podcast project from the QA show picker; returns the existing
   // project (existed: true) when the name already matches one.
   createShow: (name: string) =>
