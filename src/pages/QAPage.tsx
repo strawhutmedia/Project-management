@@ -976,16 +976,26 @@ const BOT_LEVEL_CLS: Record<ApiQaBotLogEntry['level'], string> = {
   info: 'text-muted',
 }
 
+// How the "edit PC alive?" chip reads the heartbeat: the bot polls Slate
+// every 60s, so a last-seen older than 5 minutes means the PC/task is down.
+function botPresence(lastSeen: string | null): { label: string; cls: string } {
+  if (!lastSeen) return { label: 'never connected', cls: 'border-line text-muted' }
+  const ageMs = Date.now() - new Date(lastSeen).getTime()
+  if (ageMs < 5 * 60 * 1000) return { label: 'edit PC online', cls: 'border-stage-mixing/50 text-stage-mixing' }
+  return { label: `edit PC off — last seen ${fmtWhen(lastSeen)}`, cls: 'border-urgent/50 text-urgent' }
+}
+
 function BotLogPanel() {
   const [log, setLog] = useState<ApiQaBotLogEntry[] | null>(null)
+  const [lastSeen, setLastSeen] = useState<string | null>(null)
   const [open, setOpen] = useState(false)
 
   useEffect(() => {
     let alive = true
     const pull = async () => {
       try {
-        const { log } = await qaApi.botLog(30)
-        if (alive) setLog(log)
+        const { log, botLastSeen } = await qaApi.botLog(30)
+        if (alive) { setLog(log); setLastSeen(botLastSeen) }
       } catch { /* panel is best-effort — the board still works without it */ }
     }
     void pull()
@@ -994,12 +1004,16 @@ function BotLogPanel() {
   }, [])
 
   const latest = log?.[0]
+  const presence = botPresence(lastSeen)
   return (
     <div className={card}>
       <button className="w-full text-left px-4 py-2.5 hover:bg-line/20 transition" onClick={() => setOpen((v) => !v)}>
         <div className="flex items-center gap-2 min-w-0">
           <span className="shrink-0 text-sm">🤖</span>
           <span className="shrink-0 text-xs font-bold">Edit bot</span>
+          <span className={`shrink-0 rounded-full border px-2 py-0.5 text-[11px] font-bold ${presence.cls}`}>
+            {presence.label}
+          </span>
           {latest ? (
             <>
               <span className={`min-w-0 truncate text-xs ${BOT_LEVEL_CLS[latest.level] ?? 'text-muted'}`}>{latest.message}</span>

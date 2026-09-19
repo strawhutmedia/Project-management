@@ -2280,7 +2280,8 @@ export type ApiQaBotLogEntry = {
 
 export const qaApi = {
   context: () => request<ApiQaContext>('/api/qa/context'),
-  botLog: (limit = 30) => request<{ log: ApiQaBotLogEntry[] }>(`/api/qa/bot-log?limit=${limit}`),
+  botLog: (limit = 30) =>
+    request<{ log: ApiQaBotLogEntry[]; botLastSeen: string | null }>(`/api/qa/bot-log?limit=${limit}`),
   // Adds a podcast project from the QA show picker; returns the existing
   // project (existed: true) when the name already matches one.
   createShow: (name: string) =>

@@ -1320,3 +1320,28 @@ was added — none is needed.
   strip ("no activity yet" until the PC task runs).
 - After the on-PC install: the strip should show "Premiere Bot online…"
   within a minute — that's the end-to-end proof the Approve trigger works.
+
+## Added same session (Ryan's follow-up, 2026-09-19): bot heartbeat + twice-a-day offline watchdog
+
+Ryan asked what makes sure "the computer is not running" gets noticed.
+Nothing did. Now:
+
+- **Migration `159_qa_bot_state.sql`** — single-row heartbeat; stamped
+  (`stampBotSeen` in `server/routes/qa.ts`) on every token-authed
+  `/api/qa/approved` poll and bot-log post.
+- **`server/qa_bot_watchdog.ts`** (wired in `index.ts`): every 10 min, finds
+  approved recordings >15 min old (≤7 days) with NO bot-log entry carrying
+  their `recordingId`, and emails Ryan via `sendAdminAlert` — dedupe key is
+  date+am/pm with a 24h window, so **max twice a day**. The email says
+  whether the edit PC looks OFF (no poll in >10 min) or is online-but-stuck.
+  **Deliberately silent until the bot has connected once ever** — no nag
+  emails before the one-time on-PC install.
+- **QA panel presence chip**: `GET /api/qa/bot-log` now returns
+  `botLastSeen`; the 🤖 Edit bot strip shows "edit PC online" (green, seen
+  <5 min), "edit PC off — last seen …" (red), or "never connected".
+- Build clean (`npm run build`).
+
+Nicety NOT built (ask Ryan): emailing on assembly *failures* (bot posts
+level:error to bot-log; the panel shows it red, but no email today —
+failed pickups don't retrigger the watchdog since the bot-log row counts
+as claimed).
