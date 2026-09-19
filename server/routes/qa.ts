@@ -231,7 +231,12 @@ $K = '${k}'
 $Dir = 'C:\\Users\\editbot\\premiere-bot'
 
 $isAdmin = ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
-if (-not $isAdmin) { throw 'Run this in PowerShell opened AS ADMINISTRATOR (right-click PowerShell, Run as administrator), then paste the command again.' }
+if (-not $isAdmin) {
+  Write-Host 'Elevating - click YES on the Windows prompt. The install continues in a new window.'
+  $b = [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes('irm "' + $Base + '/api/qa/bot-setup.ps1?k=' + $K + '" | iex; Read-Host "Done - press Enter to close"'))
+  Start-Process powershell -Verb RunAs -ArgumentList ('-NoProfile -ExecutionPolicy Bypass -EncodedCommand ' + $b)
+  return
+}
 
 Write-Host '[1/5] Downloading the Premiere bot from Slate...'
 New-Item -ItemType Directory -Force -Path $Dir | Out-Null
