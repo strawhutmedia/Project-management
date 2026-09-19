@@ -202,6 +202,43 @@ synced Dropbox footage, hands-off, for EVERY episode (not one test).
    Anthropic Routine's first run also does item 7 (recurring line $150 →
    $200 if he landed on Max 20x, verified from the first Max receipt).
 
+## 🎬 SESSION HANDOFF — 2026-09-18 (BACK IN YOUR ARMS casting outreach — Gmail drafts, no code)
+
+Non-code session: rep-email research + Gmail draft prep for the BACK IN YOUR
+ARMS feature (lead role "Jason Kendrick", dark comedy thriller by Stephen
+Markley). Ryan sends everything personally — Claude drafts only, NEVER sends
+(same rule as client invoices).
+
+- **Ryan's rule (2026-09-18, explicit): one outreach email PER REP.** He does
+  not want a talent's reps sharing one To line, and never cross-talent. The
+  first pass grouped agent+manager per talent; he rejected that — split.
+- **State of his Drafts folder (final, confirmed by Ryan): 18 drafts, all
+  intentional.** 15 single-rep outreach drafts for 6 actors (Robert
+  Pattinson ×3, Lee Pace ×2, Elijah Wood ×2, Justin Timberlake ×2, Josh
+  Hartnett ×4, Ryan Philippe ×2 — recipients from his tracking sheet, Google
+  Sheet id `1OICIUYPXtGankd3zjEUc5dJYSQlcWUPH2HcHm6-j1sM`, plus researched
+  gap-fills) + 3 older follow-up drafts (Finn Cole/UTA, Tom Pelphrey/Gersh,
+  Tom Pelphrey/Brillstein) Ryan said to keep.
+- **Researched contacts added (not on the sheet), with confidence:**
+  Stephanie Ritz/WME for Pattinson `sritz@wmeentertainment.com` (likely);
+  Brian DePersia/Cognition for Pace `bdepersia@cognition-content.com`
+  (guessed local part — may bounce); Brandt Joel/WME for Timberlake
+  `bjoel@wmeagency.com` (pattern-guessed — may bounce); Megan Moss direct is
+  `megan@narrative-pr.com` (not drafted; publicists deliberately excluded —
+  agents/managers field casting).
+- **DECKS ARE NOT ATTACHED — the one step still owed, and it's Ryan's.**
+  Every draft body says "We've attached the deck" but none has it. The six
+  per-talent decks (~20 MB each, renamed 2026-09-16) are in Dropbox at
+  `Straw Hut Team Folder/2_CLIENTS/Back In Your Arms/Deck/Deck Versions/`
+  ("Back In Your Arms - Deck -Holliday Grainger & <Name>.pdf"). The Gmail
+  MCP can't carry 20 MB attachments (inline-base64 only) — do not promise
+  otherwise; Ryan drags them in himself. Match deck↔draft by GREETING name,
+  not subject (Hartnett has 4 identical subjects, Pattinson 3).
+- Gotcha learned: `update_draft` strips existing attachments unless
+  re-provided — check `get_draft` for attachments before ever updating a
+  draft. (These had none; the 2026-09-15 session renamed decks in Dropbox
+  the day AFTER creating the drafts and never attached them.)
+
 ## 🧾 SESSION HANDOFF — 2026-09-18 (Anthropic spending → Cash Flow → Team→Max switch)
 
 Ryan asked why his Anthropic bill exploded and whether Slate's Cash Flow
