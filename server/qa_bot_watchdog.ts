@@ -38,6 +38,11 @@ async function runOnce(): Promise<void> {
       WHERE r.status = 'approved'
         AND r.qa_at < now() - ($1 || ' milliseconds')::interval
         AND r.qa_at > now() - interval '7 days'
+        -- Only approvals the machine has NEVER SEEN count: a feed poll
+        -- after the approval means it knows (the on-PC session works
+        -- episodes without posting per-recording claims — Chastain was
+        -- delivered while this query still counted it as waiting).
+        AND r.qa_at > (SELECT last_seen_at FROM qa_bot_state WHERE id = 1)
         AND NOT EXISTS (
           SELECT 1 FROM qa_bot_log l WHERE l.data->>'recordingId' = r.id::text
         )
