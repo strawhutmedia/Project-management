@@ -5,6 +5,16 @@ Slate's QA board and, when a recording is **QA approved**, drafts the
 Adobe Premiere project for that episode from the footage in the synced
 Dropbox folder — and does nothing else.
 
+**The Approve button in Slate IS the start-editing button.** There is no
+second button and none is needed: approving puts the recording on
+`/api/qa/approved`, this watcher polls that feed every 60 seconds, and
+assembly starts on the next poll. Slate is in the cloud and can't reach
+into the studio LAN, so a fast poll from this side is the push — a
+one-minute pickup is invisible next to a 10–30 minute assembly. The bot
+reports every pickup/success/failure back to Slate's bot-log, shown in
+the **🤖 Edit bot** panel on the QA page, so you can watch it work
+without touching this machine.
+
 Security posture (non-negotiable, per Ryan):
 - Runs under a dedicated **Standard (non-admin) OS account**.
 - The OS app allowlist limits that account to Adobe Creative Cloud apps
@@ -54,11 +64,17 @@ Security posture (non-negotiable, per Ryan):
    with a finished episode's project + folder open as the reference.
    That session's job is to write `PREMIERE.md` (the conventions:
    bins, sequences, naming, multicam setup, what goes where).
-9. **Start the watcher**: `node poll.mjs`. It checks Slate every 5
-   minutes; each newly approved recording kicks off one headless Claude
-   run that builds the project draft per `PREMIERE.md` and posts a
-   desktop notification when it's ready. Keep it running in a Terminal
-   tab (a launchd/Task Scheduler entry can come later once it's proven).
+9. **Install the watcher as a headless scheduled task** (Windows): from
+   an elevated PowerShell in this folder run
+   `powershell -ExecutionPolicy Bypass -File .\install-task.ps1`
+   — it registers a "PremiereBot" task that runs `node poll.mjs` as
+   `editbot` whether anyone is logged on or not, starts at boot, and
+   restarts itself if it dies. No autologon needed. (For a quick manual
+   test first: `node poll.mjs` in a terminal.) It checks Slate every
+   **60 seconds**; each newly approved recording kicks off one headless
+   Claude run that builds the project draft per `PREMIERE.md`. Status
+   lands in Slate's QA-page "🤖 Edit bot" panel, `runs.log`, and (when a
+   desktop session exists) a notification.
 
 ## What one run does
 

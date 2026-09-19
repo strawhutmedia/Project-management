@@ -27,6 +27,8 @@ qaRouter.get('/approved', async (req, res) => {
   if (!tokenOk) {
     const u = await getSessionUser(req)
     if (!u) { res.status(401).json({ error: 'unauthorized' }); return }
+  } else {
+    stampBotSeen('approved-poll')
   }
   try {
     const since = typeof req.query.since === 'string' && req.query.since ? new Date(req.query.since) : null
@@ -103,10 +105,25 @@ function qaTokenOk(req: { header: (n: string) => string | undefined }): boolean 
   return configured.length >= 16 && presented === configured
 }
 
+// The bot's heartbeat: every token-authed touch (its 60s /approved poll,
+// every bot-log post) stamps last-seen, so the watchdog and the QA page can
+// tell whether the edit PC is alive. Fire-and-forget — never blocks a reply.
+function stampBotSeen(source: string): void {
+  void pool
+    .query(
+      `INSERT INTO qa_bot_state (id, last_seen_at, last_source) VALUES (1, now(), $1)
+       ON CONFLICT (id) DO UPDATE SET last_seen_at = now(), last_source = $1`,
+      [source],
+    )
+    .catch((err) => logError('qa bot heartbeat stamp failed', { error: err instanceof Error ? err.message : String(err) }))
+}
+
 qaRouter.post('/bot-log', async (req, res) => {
   if (!qaTokenOk(req)) {
     const u = await getSessionUser(req)
     if (!u) { res.status(401).json({ error: 'unauthorized' }); return }
+  } else {
+    stampBotSeen('bot-log')
   }
   try {
     const b = (req.body ?? {}) as { level?: string; message?: string; data?: unknown; source?: string }
@@ -134,11 +151,12 @@ qaRouter.get('/bot-log', async (req, res) => {
   }
   try {
     const limit = Math.min(200, Math.max(1, Number(req.query.limit) || 50))
-    const { rows } = await pool.query(
-      `SELECT ts, level, source, message, data FROM qa_bot_log ORDER BY ts DESC LIMIT $1`,
-      [limit],
-    )
-    res.json({ log: rows })
+    const [{ rows }, state] = await Promise.all([
+      pool.query(`SELECT ts, level, source, message, data FROM qa_bot_log ORDER BY ts DESC LIMIT $1`, [limit]),
+      pool.query(`SELECT last_seen_at FROM qa_bot_state WHERE id = 1`),
+    ])
+    // botLastSeen: null until the edit PC's watcher has connected once ever.
+    res.json({ log: rows, botLastSeen: (state.rows[0]?.last_seen_at as string | undefined) ?? null })
   } catch (err) {
     logError('qa bot-log get failed', { error: err instanceof Error ? err.message : String(err) })
     res.status(500).json({ error: 'internal_error' })

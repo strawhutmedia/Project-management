@@ -322,6 +322,9 @@ async function start() {
     void import('./qa_digest').then(({ startQaDigestLoop }) => {
       startQaDigestLoop()
     })
+    void import('./qa_bot_watchdog').then(({ startQaBotWatchdogLoop }) => {
+      startQaBotWatchdogLoop()
+    })
     startStorageAutoVerify()
     void enableDomainOpenTracking()
     // Pick up any breakdown runs that were killed by the previous
