@@ -1,9 +1,9 @@
 {
   "version": "0.2.2",
-  "now": "2026-09-18T23:22:48.248Z",
+  "now": "2026-09-19T04:16:11.627Z",
   "boot": {
-    "startedAt": "2026-09-18T23:22:47.851Z",
-    "completedAt": "2026-09-18T23:22:48.230Z",
+    "startedAt": "2026-09-19T04:16:11.190Z",
+    "completedAt": "2026-09-19T04:16:11.596Z",
     "error": null
   },
   "env": {
@@ -199,7 +199,7 @@
       "158_qa_promo_moments.sql"
     ],
     "userCount": 14,
-    "projectCount": 16,
+    "projectCount": 17,
     "projects": [
       {
         "id": "2e9e2425-f53d-42d5-a4b6-ba29e25bb01b",
@@ -262,6 +262,11 @@
         "kind": "podcast"
       },
       {
+        "id": "2e1b9e1e-f9d8-47f0-9163-3f260c59b58f",
+        "name": "Seen on the Screen",
+        "kind": "podcast"
+      },
+      {
         "id": "8c019950-0299-4b76-aa22-ac1ad09caf19",
         "name": "Shaping Freedom",
         "kind": "podcast"
@@ -298,7 +303,7 @@
   "recentLog": [
     {
       "level": "info",
-      "ts": "2026-09-18T23:22:47.849Z",
+      "ts": "2026-09-19T04:16:11.188Z",
       "msg": "serving client from",
       "data": {
         "clientDir": "/app/dist"
@@ -306,7 +311,7 @@
     },
     {
       "level": "info",
-      "ts": "2026-09-18T23:22:47.851Z",
+      "ts": "2026-09-19T04:16:11.190Z",
       "msg": "boot starting",
       "data": {
         "cwd": "/app",
@@ -317,12 +322,12 @@
     },
     {
       "level": "info",
-      "ts": "2026-09-18T23:22:48.099Z",
+      "ts": "2026-09-19T04:16:11.419Z",
       "msg": "migrations complete"
     },
     {
       "level": "info",
-      "ts": "2026-09-18T23:22:48.199Z",
+      "ts": "2026-09-19T04:16:11.503Z",
       "msg": "wardrobe outfits: applied",
       "data": {
         "projectId": "12f53ed1-c6c7-4c11-8d7b-06d91744c9af",
@@ -333,7 +338,7 @@
     },
     {
       "level": "info",
-      "ts": "2026-09-18T23:22:48.199Z",
+      "ts": "2026-09-19T04:16:11.504Z",
       "msg": "BIYA seed: project already exists, ensured shoot days",
       "data": {
         "projectId": "12f53ed1-c6c7-4c11-8d7b-06d91744c9af"
@@ -341,17 +346,52 @@
     },
     {
       "level": "info",
-      "ts": "2026-09-18T23:22:48.230Z",
+      "ts": "2026-09-19T04:16:11.513Z",
+      "msg": "seed: Madeline memberships topped up",
+      "data": {
+        "added": 1
+      }
+    },
+    {
+      "level": "info",
+      "ts": "2026-09-19T04:16:11.525Z",
+      "msg": "seed: QA team memberships topped up",
+      "data": {
+        "email": "xavier@strawhutmedia.com",
+        "added": 1
+      }
+    },
+    {
+      "level": "info",
+      "ts": "2026-09-19T04:16:11.559Z",
+      "msg": "seed: QA team memberships topped up",
+      "data": {
+        "email": "riley@strawhutmedia.com",
+        "added": 1
+      }
+    },
+    {
+      "level": "info",
+      "ts": "2026-09-19T04:16:11.577Z",
+      "msg": "seed: QA team memberships topped up",
+      "data": {
+        "email": "blake@strawhutmedia.com",
+        "added": 1
+      }
+    },
+    {
+      "level": "info",
+      "ts": "2026-09-19T04:16:11.596Z",
       "msg": "listening on :8080"
     },
     {
       "level": "info",
-      "ts": "2026-09-18T23:22:48.231Z",
+      "ts": "2026-09-19T04:16:11.597Z",
       "msg": "scheduler started (every 5 min)"
     },
     {
       "level": "info",
-      "ts": "2026-09-18T23:22:48.233Z",
+      "ts": "2026-09-19T04:16:11.600Z",
       "msg": "autopilot: loop started",
       "data": {
         "tickMinutes": 10
@@ -359,7 +399,7 @@
     },
     {
       "level": "info",
-      "ts": "2026-09-18T23:22:48.234Z",
+      "ts": "2026-09-19T04:16:11.600Z",
       "msg": "cashflow payment check: loop started",
       "data": {
         "tickHours": 6
@@ -367,7 +407,7 @@
     },
     {
       "level": "info",
-      "ts": "2026-09-18T23:22:48.234Z",
+      "ts": "2026-09-19T04:16:11.600Z",
       "msg": "qa digest: loop started",
       "data": {
         "sendHourPT": 8
