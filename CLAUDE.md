@@ -1238,6 +1238,21 @@ live at 05:05 via `storage-verify.json` on the status branch).
   persists, the containers' scope excludes those subtrees → ONE paste on
   RED launches full-drive top-up containers (see
   `docs/ARCHIVE_MIGRATION_STATUS.md`).
+- **2026-09-19 (same session, overnight check-ins):** RHINO/RECOVERY were
+  found unplugged (Ryan replugged; uploads resumed — RHINO ~2.5 TiB /
+  RECOVERY ~3.9 TiB remaining as of late Sep 18). **Drive watcher + fresh-scan
+  swap gate BUILT** (`tools/archive/drive-watcher.sh`, pushed `9bc0b61`;
+  install copy in Dropbox `Straw Hut Team Folder/_ARCHIVE_TOOLS/`; the
+  one-paste install + how it works: `docs/ARCHIVE_MIGRATION_STATUS.md`
+  "Drive watcher" section) — NOT yet installed on RED; needed before any
+  drive swap. Also fixed a real sweep deadlock (`938d44f`): wave-1
+  re-verify was gated on job progress, so once the wave stopped reporting,
+  the verdict froze (21:00 snapshot stuck 7+ h) and rule changes like the
+  junk filter never re-applied — wave now re-verifies on age (6h) alone.
+  Wave-1 remaining at last verdict: Old Dbox 18,429/18,430 (only the
+  `._Icon` AppleDouble, junk-filtered now → should flip DELETABLE) and
+  4_SOCIAL/HeartBreakers missing one real file (`Ep029_Solo/HB CAM 3
+  02.braw` — wave heal re-runs the job for it).
 
 ---
 

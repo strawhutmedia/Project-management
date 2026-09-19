@@ -1036,13 +1036,20 @@ export async function autoVerifySweep(): Promise<void> {
       // as it progresses, at most every 6h (a full check reads the big team
       // census from S3 — no need to do that every sweep).
       if (!isWave && !done) continue
-      if (runAt > progressAt) {
+      // Wave 1 re-verifies on AGE alone: gating it on new job progress
+      // deadlocked once the wave stopped reporting (verdict newer than the
+      // last progress → never re-ran → a rules change like the junk filter
+      // could never take effect). Found 2026-09-19 with the snapshot frozen
+      // at the 21:00 run for 7+ hours.
+      const current = isWave
+        ? runAt > 0 && Date.now() - runAt < WAVE1_REVERIFY_MS
+        : runAt > progressAt
+      if (current) {
         // Verdict is current — no re-verify needed, but a current verdict
         // with missing files is exactly what auto-heal exists for.
         await maybeHeal(name)
         continue
       }
-      if (isWave && runAt && Date.now() - runAt < WAVE1_REVERIFY_MS) continue
       await runVerifyGuarded(name)
     }
   } catch (err) {
