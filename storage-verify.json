@@ -1,5 +1,5 @@
 {
-  "updatedAt": "2026-09-18T21:00:36.320Z",
+  "updatedAt": "2026-09-19T04:19:55.818Z",
   "runs": [
     {
       "name": "CLIENTS",
@@ -13,12 +13,12 @@
     },
     {
       "name": "DROPBOX-WAVE1",
-      "run_at": "2026-09-18T21:00:36.309Z",
+      "run_at": "2026-09-19T04:19:55.801Z",
       "verdict": "INCOMPLETE",
-      "files_expected": 37207,
-      "files_matched": 37205,
+      "files_expected": 36995,
+      "files_matched": 36994,
       "tier2_matches": 0,
-      "missing_count": 2,
+      "missing_count": 1,
       "detail": {
         "targets": [
           {
@@ -171,9 +171,9 @@
             "verdict": "VERIFIED — DELETABLE"
           },
           {
-            "files": 2973,
+            "files": 2966,
             "target": "Ryan Tillotson/Straw Hut General’s files",
-            "matched": 2973,
+            "matched": 2966,
             "missing": [],
             "verdict": "VERIFIED — DELETABLE"
           },
@@ -227,13 +227,11 @@
             "verdict": "VERIFIED — DELETABLE"
           },
           {
-            "files": 18430,
+            "files": 18225,
             "target": "Ryan Tillotson/Old Dbox",
-            "matched": 18429,
-            "missing": [
-              "Ryan Tillotson/Old Dbox/Ryan Old Dbox/AWARE IMAGES/Projects/Jennifer Partridge/PT36_ConnectingToYourTrueNature/GFX/PASTEL/Pastel-textures-backgrounds-forms/._Icon␍"
-            ],
-            "verdict": "in progress"
+            "matched": 18225,
+            "missing": [],
+            "verdict": "VERIFIED — DELETABLE"
           }
         ]
       }
