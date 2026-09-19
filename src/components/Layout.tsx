@@ -149,6 +149,9 @@ export default function Layout() {
                         <NavMenuLink to="/storage" onClick={() => setNavOpen(false)}>
                           🗄️ Storage
                         </NavMenuLink>
+                        <NavMenuLink to="/editbot" onClick={() => setNavOpen(false)}>
+                          🤖 Edit bot
+                        </NavMenuLink>
                         <NavMenuLink to="/admin/outreach" onClick={() => setNavOpen(false)}>
                           ✉ Outreach
                         </NavMenuLink>

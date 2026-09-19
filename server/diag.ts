@@ -105,6 +105,7 @@ async function collectSnapshot() {
   let userCount: number | null = null
   let projectCount: number | null = null
   let projects: Array<{ id: string; name: string; kind: string }> = []
+  let qaBot: { lastSeenAt: string; lastSource: string | null } | null = null
   let aiUsage30d: Array<{
     source: string; model: string; calls: number
     input_tokens: number; output_tokens: number
@@ -147,6 +148,15 @@ async function collectSnapshot() {
     } catch {
       // tables may not exist yet
     }
+    try {
+      // Edit-machine bot heartbeat (stamped on every token-authed QA poll)
+      // — lets cloud sessions confirm the Premiere bot is alive without a
+      // token or browser session.
+      const b = await pool.query(`SELECT last_seen_at, last_source FROM qa_bot_state WHERE id = 1`)
+      qaBot = b.rows[0] ? { lastSeenAt: b.rows[0].last_seen_at, lastSource: b.rows[0].last_source ?? null } : null
+    } catch {
+      // table may not exist yet
+    }
   } catch (err) {
     dbState = 'error'
     dbError = err instanceof Error ? err.message : String(err)
@@ -162,6 +172,7 @@ async function collectSnapshot() {
     env,
     paths: { ...expectedPaths, exists },
     db: { state: dbState, error: dbError, migrationsApplied, userCount, projectCount, projects, aiUsage30d },
+    qaBot,
     recentLog: ring.slice(-50),
   }
 }
