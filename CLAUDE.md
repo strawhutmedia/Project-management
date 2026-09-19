@@ -1431,6 +1431,32 @@ because the one-paste installer serves these files. If the bot was
 installed from a pre-#88 paste, re-running a fresh paste overwrites the
 files with the busy-aware version (seen.json is preserved).
 
-**STATE AT SESSION END: the one-paste install on the edit PC has NOT been
-confirmed done.** Until the /qa Edit-bot strip shows "edit PC online",
-nothing assembles and the Chastain interview waits on the feed.
+## Added 2026-09-19 (evening): installer self-elevates (PR #89) + Edit-bot OFF the QA page (PR #90), both MERGED & DEPLOYED
+
+- **PR #89** — Ryan pasted the install command in a NON-elevated PowerShell
+  on the edit PC and hit the script's own "run as Administrator" guard
+  (a handed-back step = banned). The served `bot-setup.ps1` now relaunches
+  itself elevated (`Start-Process -Verb RunAs` + base64 `-EncodedCommand`):
+  paste in ANY PowerShell → one UAC Yes → install continues in a new
+  window that stays open. Server log confirmed the flow worked live at
+  15:36-15:37 UTC: link minted by Ryan, script served twice (second fetch
+  = the elevated relaunch).
+- **PR #90** — Ryan (verbatim): the team "needs to handle nothing about
+  the technical side… this whole chunk should not be on this page." The
+  Edit-bot panel/installer is REMOVED from `/qa` (team sees only the
+  sheet) and lives at **`/editbot`** (admin-only page, "🤖 Edit bot" in
+  the admin hamburger next to Storage). Do not put bot machinery back on
+  /qa. Also: the diag snapshot (`/api/_diag` + status-branch
+  `latest.json`) now carries **`qaBot: { lastSeenAt, lastSource }`** — a
+  cloud session can confirm the Premiere bot is alive with a plain curl,
+  no token needed. Presence rule: lastSeenAt fresher than ~5 min = bot
+  online (it polls every 60s).
+
+**STATE AT SESSION END: install attempt was IN FLIGHT on the edit PC**
+(elevated window reached; likely at/past the editbot password prompt).
+Check `curl /api/_diag` → `qaBot.lastSeenAt`: fresh = bot online and the
+Chastain interview assembles first; stale = install didn't finish — Ryan
+re-mints the paste on `/editbot` (NOT /qa anymore). Heartbeat had stamped
+once at 15:08 UTC Sep 19 (source of that poll unidentified — possibly an
+old on-PC poll.mjs from a prior session; watch for a stray duplicate
+watcher if double pickups ever appear in the bot-log).
