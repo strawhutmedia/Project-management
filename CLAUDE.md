@@ -167,8 +167,11 @@ synced Dropbox footage, hands-off, for EVERY episode (not one test).
 ### Prioritized next steps
 1. Confirm the edit PC is stable: autologon disabled, **Fast Startup off**, no local
    CUDA transcription (this caused every crash).
-2. Build `poll.mjs` headless assembly bot (direct `.prproj` authoring) + install as a
-   scheduled task (self-recovers on reboot, no autologon).
+2. ~~Build `poll.mjs` headless assembly bot + install as a scheduled task~~
+   CODE SHIPPED 2026-09-19 (see the "Approve = start assembly" handoff at the
+   end of this file): 60s poll, bot-log reporting, `install-task.ps1`. Still
+   needs the ONE on-PC install (copy folder + .env + run installer as admin)
+   — that's the remaining piece of this item.
 3. Deliver the **prompt-caching measurement report**, then decide on caching.
 4. Remove **OpusClip**; start the in-house clips generator per `CUTTING-NOTES.md`
    (the cutter's per-episode input now exists: QA **promo moments**, on
@@ -1255,3 +1258,65 @@ promo cutter then hunts for when cutting promos. Built this session.
   read the same field with its existing `QA_SERVICE_TOKEN`.
 - Nice-to-haves not built (ask Ryan before adding): promo moments in the daily
   QA digest email; a "moment done/cut" checkbox for the cutter to tick off.
+
+---
+
+# Session handoff — QA Approve = start editing/assembly (2026-09-19, branch `claude/qa-approval-automation-dpy0mx`)
+
+Ryan asked: "when I hit QA Approve, can that BE the trigger that starts the
+editing/assembly/promo process, instead of something checking periodically?"
+Answer given (and now built): **the Approve button already IS the trigger on
+Slate's side** — approving puts the recording on `/api/qa/approved` instantly.
+Slate (cloud) cannot push into the studio LAN, so the edit PC's watcher pulls
+that feed; this session tightened the pull to 60 seconds (invisible next to a
+10–30 min assembly) and made the whole loop visible in Slate. No new button
+was added — none is needed.
+
+## What shipped (this branch/PR — awaiting merge)
+
+- **`automation/premiere-bot/poll.mjs` overhauled**: default poll 5 min → **60s**
+  (`POLL_SECONDS`, old `POLL_MINUTES` still honored); posts pickup / success /
+  failure (+ a boot "online" line) to `POST /api/qa/bot-log` with
+  `recordingId` in `data`; one-assembly-at-a-time guard; notifications now
+  best-effort per-platform (headless-safe — bot-log is the real channel).
+- **`automation/premiere-bot/install-task.ps1`** (new): one-paste elevated-
+  PowerShell installer registering scheduled task **"PremiereBot"** running
+  `node poll.mjs` as `editbot`, "whether user is logged on or not", at boot,
+  self-restarting — the no-autologon headless design from the 2026-09-17
+  handoff, now implemented.
+- **`automation/premiere-bot/.env.example`** (new — README referenced it but it
+  never existed) + README rewritten: "The Approve button in Slate IS the
+  start-editing button", scheduled-task install replaces the terminal-tab step.
+- **QA page "🤖 Edit bot" panel** (`BotLogPanel` in `src/pages/QAPage.tsx`,
+  `qaApi.botLog` + `ApiQaBotLogEntry` in `src/api.ts`): the bot-log GET
+  existed since migration 151 but NOTHING in the UI read it. Now a collapsed
+  one-line strip under the QA header shows the latest bot entry (auto-refresh
+  45s, expandable to last 30) — so Ryan sees "Picked up … starting Premiere
+  assembly" right where he clicked Approve. No migrations; no server changes.
+- Build verified clean locally (`npm run build`: client tsc + vite + server tsc).
+
+## What this does NOT do yet (told to Ryan — don't overpromise)
+
+- **The bot must be installed on the edit PC once** (it currently isn't
+  running there as a task): copy `automation/premiere-bot/` to
+  `C:\Users\editbot\premiere-bot`, create `.env` from `.env.example` with the
+  real `QA_SERVICE_TOKEN` (on Railway), run `install-task.ps1` from elevated
+  PowerShell. Until then, Approve marks the feed but nothing consumes it.
+  Prereqs from the 2026-09-17 handoff still apply (Claude Code signed in for
+  `editbot`, Dropbox synced, Fast Startup off).
+- **Promos are NOT auto-cut** — the in-house clips generator is still
+  prioritized-next-steps item 4 (not built). Approval delivers `promoMoments`
+  to the bot via the feed; assembly of the Premiere project is what starts
+  automatically.
+- Anything already `approved` before the bot's first run will be picked up on
+  its first poll (all-time feed + `seen.json` dedupe) — expected, not a bug.
+  The footage Ryan approved 2026-09-19 will therefore assemble as soon as the
+  task is installed.
+
+## Verification owed after merge
+
+- No Railway-deploy risk beyond the SPA bundle (server untouched); still:
+  confirm exact bundle hash live, hard-refresh `/qa`, see the "🤖 Edit bot"
+  strip ("no activity yet" until the PC task runs).
+- After the on-PC install: the strip should show "Premiere Bot online…"
+  within a minute — that's the end-to-end proof the Approve trigger works.

@@ -2268,8 +2268,19 @@ export type ApiQaContext = {
 
 export type ApiQaTemplateItem = { id: string; label: string; spec: string; position: number }
 
+// One line of the edit-machine bot's status feed (POST /api/qa/bot-log) —
+// how the QA page shows that an approval was picked up and assembled.
+export type ApiQaBotLogEntry = {
+  ts: string
+  level: 'info' | 'ok' | 'warn' | 'error'
+  source: string
+  message: string
+  data: unknown
+}
+
 export const qaApi = {
   context: () => request<ApiQaContext>('/api/qa/context'),
+  botLog: (limit = 30) => request<{ log: ApiQaBotLogEntry[] }>(`/api/qa/bot-log?limit=${limit}`),
   // Adds a podcast project from the QA show picker; returns the existing
   // project (existed: true) when the name already matches one.
   createShow: (name: string) =>
