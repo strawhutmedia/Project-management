@@ -19,6 +19,20 @@ Push to `main` → Railway auto-builds (`npm install && npm run build`) → star
 (`npm start`) → app serves both the React SPA and `/api/*` from the same Express
 process on port 8080.
 
+## 🔴 STANDING RULES — how to talk to Ryan (2026-09-19, he had to repeat himself; applies in EVERY repo/session)
+
+1. **Only ask Ryan YES-or-NO questions. Nothing open-ended, no lists of
+   options, no "how would you like…".** If a decision genuinely needs him,
+   compress it to "Do you want X? (yes/no)". Verbatim: "I want ONLY yes or
+   no questions nothing else!!!!"
+2. **DO the work — never hand Ryan steps to perform.** If something can be
+   reduced to a button in Slate or a single paste, BUILD that reduction
+   first and hand him the button/paste. Handing him a 3-step checklist is a
+   failure. (Same spirit as the 2026-09-18 storage demand: "no terminal, no
+   PowerShell, no pasting — there should be a button." When a machine we
+   can't reach is involved, ONE paste is the accepted floor — precedent:
+   the RED NAS one-paste containers, and the /qa one-paste bot install.)
+
 ## 🔁 STANDING ORDER — end EVERY task with a handoff update (Ryan, 2026-09-17)
 
 Ryan ends the session after a task and expects the NEXT session to know
@@ -1376,3 +1390,26 @@ Nicety NOT built (ask Ryan): emailing on assembly *failures* (bot posts
 level:error to bot-log; the panel shows it red, but no email today —
 failed pickups don't retrigger the watchdog since the bot-log row counts
 as claimed).
+
+## Added 2026-09-19 (later): ONE-PASTE edit-PC install, served by Slate
+
+Ryan rejected the step list ("You do the damn work"; the yes/no standing
+rule at the top of this file landed in the same message). Built: Slate now
+serves the entire bot install itself.
+
+- **Admin-only mint** — `POST /api/qa/bot-setup-link` (admin session)
+  returns a one-paste PowerShell command carrying a 30-minute HMAC key
+  (signed with the QA service token; a valid key can read that token since
+  it goes into the bot's `.env`, hence admin-only minting). UI: the
+  "⚙️ Install on the edit PC (one paste)" button in the /qa Edit-bot strip
+  (admins only, shown while the bot isn't online), with a Copy button.
+- **Keyed public endpoints** (registered before `requireUser` in
+  `server/routes/qa.ts`): `GET /api/qa/bot-setup.ps1?k=` — the full
+  installer: downloads the bot files, writes `.env`, installs Node via
+  winget if missing, registers + starts the always-on "PremiereBot"
+  scheduled task as `editbot` (prompts once for the editbot password) —
+  and `GET /api/qa/bot-files/:name?k=` (whitelisted files served from the
+  deploy's own `automation/premiere-bot/`).
+- What the paste can NOT do: sign Claude Code in as `editbot` (interactive
+  auth). If it isn't signed in, assemblies fail LOUDLY on the Edit-bot
+  strip — one manual `claude` sign-in as editbot fixes it.

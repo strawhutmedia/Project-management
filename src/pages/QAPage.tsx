@@ -986,9 +986,35 @@ function botPresence(lastSeen: string | null): { label: string; cls: string } {
 }
 
 function BotLogPanel() {
+  const { user } = useAuth()
   const [log, setLog] = useState<ApiQaBotLogEntry[] | null>(null)
   const [lastSeen, setLastSeen] = useState<string | null>(null)
   const [open, setOpen] = useState(false)
+  const [installCmd, setInstallCmd] = useState<string | null>(null)
+  const [installBusy, setInstallBusy] = useState(false)
+  const [copied, setCopied] = useState(false)
+
+  const mintInstall = async () => {
+    setInstallBusy(true)
+    try {
+      const { command } = await qaApi.botSetupLink()
+      setInstallCmd(command)
+      setOpen(true)
+    } catch {
+      setInstallCmd(null)
+      window.alert("Couldn't create the install command — check that QA_SERVICE_TOKEN is set on Railway.")
+    } finally {
+      setInstallBusy(false)
+    }
+  }
+  const copyInstall = async () => {
+    if (!installCmd) return
+    try {
+      await navigator.clipboard.writeText(installCmd)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    } catch { /* clipboard blocked — the command is selectable below */ }
+  }
 
   useEffect(() => {
     let alive = true
@@ -1027,6 +1053,27 @@ function BotLogPanel() {
           <span className="ml-auto shrink-0 text-[11px] text-muted">{open ? '▲' : '▼'}</span>
         </div>
       </button>
+      {user?.role === 'admin' && !installCmd && presence.label !== 'edit PC online' && (
+        <div className="border-t border-line/60 px-4 py-2">
+          <button onClick={() => void mintInstall()} disabled={installBusy} className={btnGhost}>
+            {installBusy ? 'Preparing…' : '⚙️ Install on the edit PC (one paste)'}
+          </button>
+        </div>
+      )}
+      {installCmd && (
+        <div className="border-t border-line/60 px-4 py-3 space-y-2">
+          <div className="text-xs text-text/90 font-bold">
+            On the edit PC: open PowerShell <span className="text-stage-tracking">as Administrator</span>, paste this, hit Enter.
+            It installs everything and asks once for the editbot password. Works for 30 minutes.
+          </div>
+          <div className="flex items-center gap-2">
+            <code className="min-w-0 flex-1 truncate rounded-lg border border-line bg-ink/60 px-2 py-1.5 text-[11px] select-all">
+              {installCmd}
+            </code>
+            <button onClick={() => void copyInstall()} className={btnGhost}>{copied ? '✓ Copied' : 'Copy'}</button>
+          </div>
+        </div>
+      )}
       {open && (
         <div className="border-t border-line/60 px-4 py-2.5 space-y-1 max-h-72 overflow-y-auto">
           {(log ?? []).length === 0 && <div className="text-xs text-muted">Nothing logged by the bot yet.</div>}
