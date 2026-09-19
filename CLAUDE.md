@@ -1413,3 +1413,24 @@ serves the entire bot install itself.
 - What the paste can NOT do: sign Claude Code in as `editbot` (interactive
   auth). If it isn't signed in, assemblies fail LOUDLY on the Edit-bot
   strip — one manual `claude` sign-in as editbot fixes it.
+
+## Added 2026-09-19 (latest): bot holds while a HUMAN is using the machine (PR #88, MERGED)
+
+Ryan (verbatim intent): the only "switch" he ever flips is QA Approve; the
+bot must start on its own "unless someone else is using Premiere or
+something else that takes up a lot of RAM" — the bot checks that itself.
+Built in `poll.mjs` (`pcBusyReason()`): before starting, and again between
+queued episodes, it checks whether Premiere is open (Get-Process / pgrep)
+or free RAM is under `BUSY_MIN_FREE_GB` (default 6); busy → episodes hold
+unconsumed and recheck every 60s, with ONE state-change line on the
+Edit-bot strip ("Holding N approved episodes — Premiere is open…" →
+"Machine is free — starting held assemblies"). A failed probe counts as
+FREE (never silently stall). `BUSY_CHECK=off` disables. PR #88 merged
+2026-09-19 (`741aec7`) — bot-folder only; the Railway deploy matters
+because the one-paste installer serves these files. If the bot was
+installed from a pre-#88 paste, re-running a fresh paste overwrites the
+files with the busy-aware version (seen.json is preserved).
+
+**STATE AT SESSION END: the one-paste install on the edit PC has NOT been
+confirmed done.** Until the /qa Edit-bot strip shows "edit PC online",
+nothing assembles and the Chastain interview waits on the feed.
