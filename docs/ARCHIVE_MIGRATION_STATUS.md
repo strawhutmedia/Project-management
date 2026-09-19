@@ -284,6 +284,47 @@ heredocs, which mangle).
    every docked drive. Until a drive passes the fresh-scan gate, "safe in
    the vault" refers only to its last census, and the drive stays docked.
 
+## Drive watcher + swap gate — BUILT 2026-09-19, awaiting ONE install paste on RED
+
+The auto-slot watcher demanded by architecture items 5–6 exists:
+`tools/archive/drive-watcher.sh` (reference copy in this repo; the byte-same
+install copy lives in Dropbox at
+`Straw Hut Team Folder/_ARCHIVE_TOOLS/drive-watcher.sh` so RED can fetch it
+with its own rclone — no heredocs, no GitHub token). What it does, every
+5 min, as container `archive-watcher`: detects docked drives (RHINO/RECOVERY
+by root shape, anything else auto-named `NEW-<dev>` with its own upload
+container + dashboard row), restarts crashed upload containers, recreates a
+container whose bind points at a stale `/mnt/@usb` letter (yesterday's
+replug pain), and — THE SWAP GATE — after any upload exits clean it rescans
+the whole drive fresh and overwrites `_INVENTORY/inventory-<NAME>.txt`
+(+ a dated copy), which is exactly the file Slate's auto-verify reads, so
+the next sweep's verdict is against TODAY's census. It also runs RHINO's
+root top-up (files outside `1_PODCASTS/` → `1_PODCASTS/Henri G/`, matching
+the census mapPath) so "finished" covers the whole drive. It never deletes,
+never writes to a source drive (all mounts read-only, verbs only
+copy/copyto/lsf), and writes its status into each row's own log file, so
+everything shows on the Storage page via the existing reporter.
+
+**Install (Ryan, one paste in the RED SSH session — `ssh
+strawhutmedia@192.168.1.122` first):**
+
+```
+sudo -v
+sudo mkdir -p /volume1/rclone-config/watcher
+sudo docker run --rm -v /volume1/rclone-config:/config rclone/rclone --config /config/rclone.conf --dropbox-root-namespace 3230198179 copyto "dropbox:Straw Hut Team Folder/_ARCHIVE_TOOLS/drive-watcher.sh" /config/watcher/drive-watcher.sh
+sudo docker rm -f archive-watcher 2>/dev/null; sudo docker run -d --name archive-watcher --restart always -v /var/run/docker.sock:/var/run/docker.sock -v /volume1/rclone-config:/config docker:27-cli sh /config/watcher/drive-watcher.sh
+```
+
+(Upgrading to a new script version = re-run the same paste; the Dropbox
+copy is the distribution channel, keep it in sync with the repo file.)
+Within ~10 min of install, watcher NOTICE lines appear in the RHINO /
+RECOVERY drawers on the Storage page — that's the health check.
+**A new drive from the queue still needs one small Slate push** (a
+`DRIVE_CENSUS` entry in `server/routes/storage.ts` mapping
+`inventory-NEW-<dev>.txt` → vault paths, RECOVERY-style `'1_PODCASTS/'+p`)
+before its row can verify — the watcher's "new drive detected" NOTICE is
+the cue for whichever session sees it.
+
 ## Big picture / what's next (priority order)
 
 1. **Finish wave 1** → verify → delete → report (per the loop above).
@@ -296,10 +337,11 @@ heredocs, which mangle).
    13.9 TB, Naked Lunch 9.5 TB, String and Tell 7.8 TB…) are NOT deletable
    under the rules — they shrink only as episodes age past a year / wrap.
 3. **RED/BLUE/RHINO/RECOVERY uploads**: PODCASTS ~done, CLIENTS resumed
-   Sept 17, RHINO/RECOVERY finishing; verify each with `rclone check
-   --one-way` before telling Ryan a drive is safe to swap/wipe. HDD queue
-   after RHINO+RECOVERY: Rabbit, SHM #1, Octopus, Lion, Stork, Hippo —
-   build the auto-slot watcher BEFORE the first swap.
+   Sept 17, RHINO/RECOVERY finishing; a drive is safe to swap/wipe only
+   after the fresh-scan swap gate (see "Drive watcher" section above).
+   HDD queue after RHINO+RECOVERY: Rabbit, SHM #1, Octopus, Lion, Stork,
+   Hippo — the auto-slot watcher is BUILT (2026-09-19); install it before
+   the first swap.
 4. **BLUE reporter** still tails 4 KB (RED is 20 KB) — replace BLUE's
    archive-reporter with the 20 KB `tail -c 20000` variant when convenient.
 5. **Frozen until Ryan's explicit go**: the full client build (Explorer
