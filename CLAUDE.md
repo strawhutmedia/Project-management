@@ -1287,7 +1287,17 @@ that feed; this session tightened the pull to 60 seconds (invisible next to a
 10–30 min assembly) and made the whole loop visible in Slate. No new button
 was added — none is needed.
 
-## What shipped (this branch/PR — awaiting merge)
+**PR #86 MERGED & DEPLOY-VERIFIED 2026-09-19** on Ryan's explicit go-ahead
+("BUILD THAT ASSEMBLY AND EVERYTHING"; required behavior, verbatim intent:
+approve → starts immediately, waits ONLY if the PC is mid-assembly on
+another episode — which is exactly poll.mjs's busy-guard + queue). Merge
+commit `cb0b4bc`; exact bundle `index-B9_Vy3B3.js` confirmed served live;
+boot 08:12 UTC clean; migration `159` in the status branch's
+migrationsApplied. **The ONLY remaining step is the one-time on-PC install
+below — until it happens, approvals (incl. the Jessica Chastain interview
+Ryan approved 2026-09-19) queue on the feed and NOTHING assembles.**
+
+## What shipped (PR #86 — merged, live)
 
 - **`automation/premiere-bot/poll.mjs` overhauled**: default poll 5 min → **60s**
   (`POLL_SECONDS`, old `POLL_MINUTES` still honored); posts pickup / success /
@@ -1330,11 +1340,17 @@ was added — none is needed.
 
 ## Verification owed after merge
 
-- No Railway-deploy risk beyond the SPA bundle (server untouched); still:
-  confirm exact bundle hash live, hard-refresh `/qa`, see the "🤖 Edit bot"
-  strip ("no activity yet" until the PC task runs).
-- After the on-PC install: the strip should show "Premiere Bot online…"
-  within a minute — that's the end-to-end proof the Approve trigger works.
+- ~~Confirm exact bundle hash live~~ DONE 2026-09-19: `index-B9_Vy3B3.js`
+  served, boot clean, migration 159 applied (status-branch latest.json).
+  Ryan should still hard-refresh `/qa` (Cmd+Shift+R) to see the "🤖 Edit
+  bot" strip — it reads "never connected" until the PC install.
+- STILL OWED — the on-PC install (the whole remaining task): copy
+  `automation/premiere-bot/` to `C:\Users\editbot\premiere-bot` on the edit
+  PC, `.env` from `.env.example` with the real `QA_SERVICE_TOKEN` (Railway),
+  run `install-task.ps1` in elevated PowerShell. Then the strip shows
+  "Premiere Bot online…" within a minute and the Chastain recording (plus
+  anything else approved) assembles first — that's the end-to-end proof.
+  Also verify Claude Code is signed in under `editbot` (README step 5).
 
 ## Added same session (Ryan's follow-up, 2026-09-19): bot heartbeat + twice-a-day offline watchdog
 
