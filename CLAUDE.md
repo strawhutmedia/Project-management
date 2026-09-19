@@ -1452,11 +1452,41 @@ files with the busy-aware version (seen.json is preserved).
   no token needed. Presence rule: lastSeenAt fresher than ~5 min = bot
   online (it polls every 60s).
 
-**STATE AT SESSION END: install attempt was IN FLIGHT on the edit PC**
-(elevated window reached; likely at/past the editbot password prompt).
-Check `curl /api/_diag` → `qaBot.lastSeenAt`: fresh = bot online and the
-Chastain interview assembles first; stale = install didn't finish — Ryan
-re-mints the paste on `/editbot` (NOT /qa anymore). Heartbeat had stamped
-once at 15:08 UTC Sep 19 (source of that poll unidentified — possibly an
-old on-PC poll.mjs from a prior session; watch for a stray duplicate
-watcher if double pickups ever appear in the bot-log).
+## 🛑 FINAL STATE 2026-09-19 — READ THIS BEFORE TOUCHING ANYTHING EDIT-PC RELATED
+
+**The edit PC is NOT empty territory. It runs "editbot-studio" — a live
+on-PC Claude session (Remote Control, `claude.exe --remote-control
+"editbot-studio"`, running since 9/17) that IS the studio automation.** It
+holds the QA token, polls the feed (it's what stamped the heartbeat), and
+its `~/premiere-bot` files (CLAUDE.md ~8KB with studio guard / ATEM /
+disk-gate / delivery rules, an evolved PREMIERE.md, shows.json, AUDIO.md)
+are ITS memory, evolved on the machine — NOT copies of this repo's
+scaffold.
+
+**Incident (this session, 2026-09-19): the cloud-served one-paste installer
+OVERWROTE editbot-studio's files with this repo's generic scaffold at
+15:37 UTC (and a second paste ran ~15:50).** editbot-studio restored its
+CLAUDE.md verbatim and rebuilt PREMIERE.md (backup:
+`PREMIERE.md.reverted.bak`); token and shows.json survived. Ryan then said
+STOP — respected.
+
+- **NEVER serve/overwrite bot files onto the edit PC again.** The installer
+  (`/api/qa/bot-setup.ps1`) is disarmed: it now refuses to run when
+  `C:\Users\editbot\premiere-bot\CLAUDE.md` exists. Do not "fix" that.
+- **The Chastain interview was DELIVERED by editbot-studio** (its report:
+  20 sequences — assembly, rough cut, 9×16:9, 9×9:16, rack on all 20,
+  SFX/Music clean — both isos, 3 XMLs, transcript .txt+.json, sync, promo
+  notes with post copy, `_DELIVERY.json`). The pipeline WORKS; it just
+  isn't this repo's poll.mjs doing it.
+- **Open on the PC (editbot-studio's side, not ours): remove the
+  "PremiereBot" scheduled task** the installer registered (editbot-studio
+  itself suggested shutting it down; Ryan relays a "yes" in that session).
+  Two watchers on one feed risks double assembly — this repo's watchdog
+  and heartbeat now treat editbot-studio's polls as THE bot.
+- **Watchdog softened (same disarm PR): only the "edit PC looks OFF" email
+  remains.** The "online but hasn't started" alarm is removed —
+  editbot-studio doesn't post per-recording bot-log claims, so that alarm
+  would nag forever about episodes it already delivered.
+- The `/editbot` admin page remains (presence chip = editbot-studio's
+  polls; activity log shows whatever it chooses to post). `/qa` stays
+  team-only — no bot machinery, ever (Ryan).

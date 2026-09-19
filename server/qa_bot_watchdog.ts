@@ -47,6 +47,11 @@ async function runOnce(): Promise<void> {
   if (stuck.rows.length === 0) return
 
   const offline = Date.now() - lastSeen.getTime() > OFFLINE_AFTER_MS
+  // Only the "computer is not running" case alarms (Ryan's original ask).
+  // The edit PC's own Claude session works the feed without posting
+  // per-recording bot-log claims, so an "online but hasn't started" alarm
+  // would nag about episodes it already delivered (2026-09-19, Chastain).
+  if (!offline) return
   const list = stuck.rows
     .map((r) => `• ${r.title}${r.project_name ? ` (${r.project_name})` : ''} — approved ${new Date(r.qa_at).toLocaleString('en-US', { timeZone: 'America/Los_Angeles' })} PT`)
     .join('\n')
